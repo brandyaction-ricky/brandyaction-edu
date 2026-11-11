@@ -2,7 +2,7 @@
 import {createPortal} from 'react-dom';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CampusSnapshot } from '../contracts';
-import { avatarAppearance, publicAvatar, clockText, cohortGoalReached, participationStatus, defaultProfile, elapsed, isWorldMessage, pauseClock, profile, resumeClock, type FocusClock, type SpaceProfile, type SpaceState } from './domain';
+import { avatarAppearance, publicAvatar, clockText, focusDeadline, peerFocusClock, cohortGoalReached, participationStatus, defaultProfile, elapsed, isWorldMessage, pauseClock, profile, resumeClock, type FocusClock, type SpacePeer, type SpaceProfile, type SpaceState } from './domain';
 import { createDemoTransport, createLiveTransport, type SpaceTransport } from './transport';
 import type { SpaceCommand } from './server';
 import styles from './panel.module.css';
@@ -28,12 +28,14 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
  const [loadedRewards,setLoadedRewards]=useState<CommunityRewards|null>(null);const progress=demo?(rewards||loadedRewards):loadedRewards;
  const [token,setToken]=useState(''),[sessionId,setSessionId]=useState(''),[localPane,setPane]=useState<'focus'|'lounge'|'profile'|'settings'|'directory'>('focus');
  const pane=toolsPane||localPane;
- const [active,setActive]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[worldReady,setWorldReady]=useState(false);
+ const [active,setActive]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[worldReady,setWorldReady]=useState(false);
  const [slowWorld,setSlowWorld]=useState(false);
+ const [pending,setPending]=useState<'foreground'|'auto-entry'|null>(null);
+ const busy=pending!==null;
  const [draft,setDraft]=useState<SpaceProfile>(()=>defaultProfile(snapshot.viewer.displayName)),[saved,setSaved]=useState<SpaceProfile>(()=>defaultProfile(snapshot.viewer.displayName));
  const [state,setState]=useState<SpaceState|null>(null),[text,setText]=useState(''),[clock,setClock]=useState<FocusClock>(emptyClock),[now,setNow]=useState(Date.now),[duration,setDuration]=useState(25),[compact,setCompact]=useState(false),[photo,setPhoto]=useState('');
  useEffect(()=>{if(toolsPane||compact||worldReady)return;const timer=setTimeout(()=>setSlowWorld(true),12000);return()=>clearTimeout(timer);},[compact,worldReady,renderer,toolsPane]);
- useCampusDraftGuard(JSON.stringify({...draft,status:saved.status})!==JSON.stringify(saved),busy,'campus-space',toolsVisible);
+ useCampusDraftGuard(JSON.stringify({...draft,status:saved.status})!==JSON.stringify(saved),pending==='foreground','campus-space',toolsVisible);
  useEffect(()=>{const changed=(e:Event)=>{const d=(e as CustomEvent).detail;if(!demo&&d?.cohortId===cohortId){const a=publicAvatar(d.appearance);setSaved(p=>({...p,...a}));setDraft(p=>({...p,...a}));}};window.addEventListener('campus:avatar-saved',changed);return()=>window.removeEventListener('campus:avatar-saved',changed);},[demo,cohortId]);
  const [sound,setSound]=useState<AmbientKind|null>(null),[volume,setVolume]=useState(25);const audio=useRef<AmbientAudio|null>(null),soundGeneration=useRef(0);
  const frame=useRef<HTMLIFrameElement>(null),transport=useRef<SpaceTransport|null>(null),current=useRef({saved,clock,active,progress,space:state}),operation=useRef(false),mounted=useRef(true),actions=useRef<{seat:()=>void;navigate:(s:string)=>void;saveAppearance:(p:unknown)=>void}>({seat:()=>{},navigate:()=>{},saveAppearance:()=>{}});
@@ -70,7 +72,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
  const post=useCallback((type:string,payload:Record<string,unknown>={})=>{const target=frame.current?.contentWindow;if(token&&target&&shouldSendWorldState(worldState.current,type,payload))target.postMessage({source:'moonshot-host',token,type,payload},window.location.origin);},[token]);
  const command=useCallback(async(cmd:Partial<SpaceCommand>&{kind:string})=>{if(!transport.current)throw new Error('먼저 캠퍼스에 입장해 주세요.');return transport.current.command(cmd);},[]);
  function statusError(e:unknown){setError(e instanceof Error?e.message:'공간 연결을 확인하지 못했습니다.');}
- async function act(fn:()=>Promise<void>){if(operation.current)return;operation.current=true;setBusy(true);setError('');try{await fn();}catch(e){statusError(e);}finally{operation.current=false;if(mounted.current)setBusy(false);}}
+ async function act(fn:()=>Promise<void>,kind:'foreground'|'auto-entry'='foreground'){if(operation.current)return;operation.current=true;setPending(kind);setError('');try{await fn();}catch(e){statusError(e);}finally{operation.current=false;if(mounted.current)setPending(null);}}
  useEffect(()=>{mounted.current=true;queueMicrotask(()=>{if(mounted.current){setToken(crypto.randomUUID());setSessionId(crypto.randomUUID());}});return()=>{mounted.current=false;void audio.current?.stop();transport.current?.close();transport.current=null;};},[]);
  useEffect(()=>{if(!cohortId)return;let ignore=false;transport.current?.close();transport.current=null;queueMicrotask(()=>{if(!ignore){setActive(false);setState(null);setWorldReady(false);setError('');}});
   try{const raw=JSON.parse(sessionStorage.getItem(clockKey)||'null');if(raw&&['idle','focus','break'].includes(raw.phase)&&Number.isInteger(raw.duration)&&raw.duration>=0&&raw.duration<=3000&&Number.isFinite(raw.elapsed)&&raw.elapsed>=0&&(raw.runningSince===null||Number.isFinite(raw.runningSince)))queueMicrotask(()=>{if(!ignore)setClock(raw);});else queueMicrotask(()=>{if(!ignore)setClock(emptyClock);});}catch{queueMicrotask(()=>{if(!ignore)setClock(emptyClock);});}
@@ -106,7 +108,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
  },[token,post,state,demo,sessionId,snapshot.viewer.id,command]);
  useEffect(()=>{if(!active)return;
   let running=false;
-  const beat=async()=>{if(running||operation.current||(!demo&&!navigator.onLine))return;running=true;const connection=transport.current;try{const c=current.current.clock;await command({kind:'heartbeat',profile:current.current.saved,focusUntil:c.phase==='focus'&&c.runningSince!==null&&c.duration>elapsed(c)?new Date(Date.now()+(c.duration-elapsed(c))*1000).toISOString():null,focusMode:c.phase==='focus'?Math.round(c.duration/60):0});}catch(e){
+  const beat=async()=>{if(running||operation.current||(!demo&&!navigator.onLine))return;running=true;const connection=transport.current;try{const c=current.current.clock;const end=focusDeadline(c);await command({kind:'heartbeat',profile:current.current.saved,focusUntil:end!==null&&end>Date.now()?new Date(end).toISOString():null,focusMode:c.phase==='focus'?Math.round(c.duration/60):0});}catch(e){
    if(!connection||transport.current!==connection)return;
    // A suspended radio can fail a heartbeat before the browser reports offline.
    // Keep the session so the next heartbeat can retry. Server rejections still end it.
@@ -141,7 +143,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
  useEffect(()=>{if(previousSeat.current&&!ownSeat&&active){post('stand');sittingRef.current=false;setNotice('자리 이용이 끝났어요. 빈자리를 다시 선택할 수 있습니다.');}previousSeat.current=ownSeat?.id||null;},[ownSeat,active,post]);
  useEffect(()=>{actions.current.saveAppearance=(value)=>{if(operation.current||!current.current.active){post('appearance-result',{ok:false,error:'캠퍼스에 입장한 뒤 저장해 주세요.'});return;}void act(async()=>{try{const appearance=publicAvatar(value),next={...current.current.saved,...appearance};await command({kind:'profile',profile:next});setSaved(next);setDraft(p=>({...p,...appearance}));post('appearance-result',{ok:true});setNotice('캐릭터를 저장했어요. 다음 입장에도 같은 모습으로 만나요.');}catch(e){post('appearance-result',{ok:false,error:'저장하지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.'});throw e;}});};actions.current.navigate=(s)=>{if(['chat','crew','profile','desk','questfocus','terrace','settings'].includes(s))setToolsOpen(true);if(s.startsWith('exhibit:')){openExhibit(s.slice(8));return;}const zone=s==='presentation'?'board':s==='curriculum'?'mission':s;if(state?.controls?.closedZones?.includes(zone)){setNotice('이 공간은 잠시 쉬고 있어요. 다른 공간을 선택해 주세요.');return;}if(['chat','crew'].includes(s)){setPane('lounge');return;}if(s==='settings'){setPane('settings');return;}if(s==='profile'){setPane('profile');return;}if(['desk','questfocus','terrace','settings'].includes(s)){setPane('focus');return;}if(['ai','business','support','journal'].includes(s)){onNavigate?.(s);return;}if(s==='presentation'){openDemoDay();return;}if(s==='office'){onNavigate?.('office');return;}if(['board','detail','newpost'].includes(s))onNavigate?.('community');else if(['curriculum','resources','mission','missionmap','launch','achievements'].includes(s))onNavigate?.('learning');};
  actions.current.seat=()=>{setToolsOpen(true);setPane('focus');if(state?.controls?.closedZones?.includes('desk')){setNotice('집중석 신규 이용은 잠시 쉬고 있어요. 개인 타이머는 사용할 수 있습니다.');return;}if(!active){setNotice('입장한 뒤 빈자리를 선택해 주세요.');return;}const seat=['desk-1','desk-2','desk-3'].find(id=>!state?.seats.some(s=>s.id===id&&s.userId!==actor));if(seat)void takeSeat(seat);else setNotice('집중석이 모두 사용 중이에요. 자유 집중은 바로 시작할 수 있어요.');};});
- async function join(){await act(async()=>{
+ async function join(kind:'foreground'|'auto-entry'='foreground'){await act(async()=>{
   if(!cohortId)return;
   if(studyEntry)triedStudyEntry.current=true;
   const entering={...saved,status:participationStatus(participation)};
@@ -160,16 +162,36 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
    studyEntry?.onJoined();
    setActive(true);setNotice('입장했어요. 이동하거나 원하는 공간을 골라 보세요.');
   }catch(e){t.close();if(transport.current===t)transport.current=null;throw e;}
- });}
+ },kind);}
  useEffect(()=>{
   if(!studyEntry||!sessionId||!state||state.controls?.paused||triedStudyEntry.current||busy)return;
   triedStudyEntry.current=true;
-  void join();
+  void join('auto-entry');
  });
  async function leave(){await act(async()=>{await command({kind:'leave'});joinedSession.current=false;transport.current?.close();transport.current=null;setActive(false);post('stand');post('peers',{items:[]});setNotice('공간에서 나왔어요. 집중 타이머와 내 메모는 유지됩니다.');});}
  async function celebrateCohort(){await act(async()=>{let verified=progress;if(!demo){const r=await fetch('/api/campus/community/rewards?enrollmentId='+encodeURIComponent(snapshot.selectedEnrollmentId!),{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw Error('기수 목표 달성을 다시 확인하지 못했어요.');verified=await r.json() as CommunityRewards;setLoadedRewards(verified);}if(!cohortGoalReached(verified))throw Error('기수 공동 목표를 달성하면 기념 연출을 볼 수 있어요.');if(state?.controls?.paused||state?.controls?.closedZones?.includes('launch'))return;post('progress',{level:verified!.level,xp:verified!.xp,launched:!!verified!.claimedAt,cohortLaunches:verified!.cohortLaunches,cohortGoal:verified!.cohortGoal,demo});post('cohort-launch');setNotice((demo?'체험 · ':'')+'확인된 기수 공동 목표 달성을 축하합니다. 기념 연출이며 새 발사 기록이나 성장 점수를 만들지 않아요.');});}
  function startFocus(minutes:number){setClock({phase:'focus',duration:minutes*60,elapsed:0,runningSince:Date.now()});setNotice(minutes?`${minutes}분 동안 한 가지에 집중해요.`:'시간 제한 없이 내 속도로 집중해요.');}
 
+ function joinFocus(peer:SpacePeer,joinedAt:number){
+  const latest=current.current.space?.peers.find(p=>p.userId===peer.userId&&p.sessionId===peer.sessionId);
+  const next=latest&&peerFocusClock(latest,joinedAt);
+  if(!active||!next||latest.userId===actor)return;
+  setClock(next);
+  setNotice(latest.nickname+'님과 같은 시간에 집중을 마쳐요.');
+ }
+ const ownDeadline=focusDeadline(clock);
+ useEffect(()=>{if(active)transport.current?.setFocusDeadline?.(ownDeadline);},[active,ownDeadline]);
+ function focusAction(peer:SpacePeer, forRoster:boolean){
+  const shared=peerFocusClock(peer,now);
+  if(!shared)return null;
+  const aligned=ownDeadline===focusDeadline(shared);
+  return <div className={forRoster?styles.rosterFocus:styles.group}>
+   <span>{!forRoster&&peer.nickname+' · '}집중 중 · <time>{clockText(shared,now)}</time> 남음</span>
+   {aligned?<span>함께 집중 중</span>:<button type="button" disabled={!active||busy} onClick={()=>joinFocus(peer,Date.now())}>
+    {ownDeadline&&ownDeadline>now?'내 타이머 전환':forRoster?'함께하기':'남은 시간 함께하기'}
+   </button>}
+  </div>;
+ }
  const tools=<>
    <div hidden={!!toolsPane} className={styles.tabs} role="tablist" aria-label="공간 도구">{(['focus','lounge','profile'] as const).map((tab,i)=><button role="tab" aria-selected={pane===tab} key={tab} onClick={()=>setPane(tab)}>{['집중과 휴식','라운지','내 자리'][i]}</button>)}</div>
    {pane==='focus'&&<div className={styles.content} data-desk-theme={saved.deskTheme}>
@@ -181,7 +203,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
     <div className={styles.controls}>{clock.phase==='idle'||clock.duration>0&&elapsed(clock,now)>=clock.duration?<button className={styles.primary} onClick={()=>startFocus(duration)}>집중 시작</button>:<button className={styles.primary} onClick={()=>setClock(c=>c.runningSince===null?resumeClock(c):pauseClock(c))}>{clock.runningSince===null?'이어서 집중':'잠시 멈추기'}</button>}<button onClick={()=>{setClock(emptyClock);setNotice('오늘 한 일과 다음 시작점을 내 메모에 남겨 보세요.');}}>마무리</button></div>
     <div className={styles.controls}>{[3,5].map(m=><button key={m} onClick={()=>setClock({phase:'break',duration:m*60,elapsed:0,runningSince:Date.now()})}>{m}분 쉬기</button>)}</div>
     <details className={styles.ambient}><summary>나만의 30초 쉬기</summary><BreakOrbit/></details>
-    {(state?.peers||[]).filter(p=>p.userId!==actor&&p.focusUntil&&Date.parse(p.focusUntil)>now).slice(0,3).map(p=><div className={styles.group} key={p.userId}><span>{p.nickname} · 함께 집중 중</span><button onClick={()=>{setClock({phase:'focus',duration:Math.max(1,Math.round((Date.parse(p.focusUntil!)-Date.now())/1000)),elapsed:0,runningSince:Date.now()});setNotice('동료의 남은 집중 시간에 함께합니다. 내 메모는 공유되지 않아요.');}}>남은 시간 함께하기</button></div>)}
+    {(state?.peers||[]).filter(p=>p.userId!==actor&&peerFocusClock(p,now)).slice(0,3).map(p=><div key={p.userId}>{focusAction(p,false)}</div>)}
     <label className={styles.field}>나만 보는 메모<textarea aria-label="나만 보는 메모" maxLength={2000} value={draft.note} onChange={e=>setDraft({...draft,note:e.target.value})} placeholder="오늘 만든 것, 다음에 이어 할 한 가지" /></label><button disabled={busy||!active} onClick={()=>void act(async()=>{await command({kind:'profile',profile:{...saved,note:draft.note}});setSaved({...saved,note:draft.note});setNotice('나만 보는 메모를 저장했어요.');})}>내 메모 저장</button>
    </div>}
    {pane==='lounge'&&<div className={styles.content}><section className={styles.nearby} aria-label="가까운 동료 대화"><h3>가까운 동료에게 한마디</h3><p className={styles.caption}>주변 4칸 안 동료에게 잠깐 보여요. 같은 기수로 전달되는 위치 기반 대화이며 비공개 DM은 아닙니다. 12초 뒤 화면에서 사라지고 저장하지 않아요.</p>{participation==='quiet'?<p>조용히 집중 중에는 근처 대화를 받거나 보내지 않아요.</p>:<><div>{state?.nearby?.filter(m=>now-m.at<12000).map(m=><p key={m.id}><strong>{m.nickname}</strong> {m.text}</p>)}</div><div className={styles.controls}>{['👋 안녕하세요','👏 응원해요','🙏 고마워요'].map(text=><button disabled={!active||busy} key={text} onClick={()=>void act(async()=>{await command({kind:'emote',text});post('wave');})}>{text}</button>)}</div><form onSubmit={e=>{e.preventDefault();void act(async()=>{await command({kind:'nearby',text:nearDraft});setNearDraft('');});}}><label className={styles.field}>근처 한마디<input aria-label="근처 한마디" value={nearDraft} maxLength={120} onChange={e=>setNearDraft(e.target.value)}/></label><button disabled={!active||busy||!nearDraft.trim()}>근처에 보내기</button></form></>}</section><h3>함께 있는 동료</h3><div role="group" aria-label="함께 있는 동료" className={styles.peerList}>{(state?.peers||[]).map(p=><div key={p.userId}><span className={styles.dot} style={{background:p.coat}}/><strong>{p.nickname}{p.userId===actor?' · 나':''}</strong><small>{statuses[p.status]}</small></div>)}{!state?.peers.length&&<p>먼저 입장해 보세요. 연결된 동료만 여기에 나타납니다.</p>}</div><p className={styles.caption}>기수 안에서만 보이는 대화입니다. 최근 24시간, 최대 60개를 표시해요. 개인정보는 적지 마세요.</p><div ref={chatList} className={styles.chat} aria-label="라운지 대화" onScroll={event=>{
@@ -198,8 +220,8 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
  const peers=state?.peers||[];
  const entryCard=studyEntry?.host&&createPortal(
   <section className={styles.studyEntry} aria-label="지금 공부 중인 수강생">
-   <h2>지금 공부 중</h2>
-   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}>{peer.nickname}{peer.userId===actor&&' · 나'}</li>)}</ul>
+   <header><h2>지금 공부 중</h2>{active&&<span>{peers.length}명</span>}</header>
+   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}</ul>
     :<p role="status">{state?.controls?.paused?'공부방 참여가 잠시 중지됐어요.':busy||(!state&&!error)?'동료를 확인하고 있어요…':error||'동료 연결을 해제했어요.'}</p>}
    <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':'공부방에 참여하기'}</button>
   </section>,studyEntry.host);
