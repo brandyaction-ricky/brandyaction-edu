@@ -18,13 +18,18 @@ export async function loadOfficeState(db: Db, viewer: { id: string }, enrollment
   if(!access.data)campusError(403,'이용 가능한 수강권을 선택해 주세요.');
   const jobs=page.data.slice(0,20), tail=jobs.at(-1);
   let detail=null, history:OfficeState['history']=[];
-  if(selected && jobs.some(j=>j.id===selected)){
-    const [job,events]=await Promise.all([
-      db.from('edu_campus_office_jobs').select('id,employee_id,owner_id,enrollment_id,objective,material_urls,output_type,status,revision,draft_text,draft_url,review_note,error_note,created_at,updated_at').eq('id',selected).eq('owner_id',viewer.id).eq('enrollment_id',enrollmentId).maybeSingle(),
-      db.from('edu_campus_office_history').select('id,job_id,revision,actor_type,action,status,note,draft_text,created_at').eq('job_id',selected).order('revision',{ascending:false}).limit(20)
-    ]);
-    if(job.error||events.error)campusError(503,'업무 결과를 읽지 못했습니다.');
-    detail=job.data; history=events.data as OfficeState['history'];
+  if(selected){
+    let query=db.from('edu_campus_office_jobs').select('id,employee_id,owner_id,enrollment_id,objective,material_urls,output_type,status,revision,draft_text,draft_url,review_note,error_note,created_at,updated_at')
+      .eq('id',selected).eq('owner_id',viewer.id).eq('enrollment_id',enrollmentId);
+    if(employee)query=query.eq('employee_id',employee);
+    const job=await query.maybeSingle();
+    if(job.error)campusError(503,'업무 결과를 읽지 못했습니다.');
+    detail=job.data;
+    if(detail){
+      const events=await db.from('edu_campus_office_history').select('id,job_id,revision,actor_type,action,status,note,draft_text,created_at').eq('job_id',selected).order('revision',{ascending:false}).limit(20);
+      if(events.error)campusError(503,'업무 기록을 읽지 못했습니다.');
+      history=events.data as OfficeState['history'];
+    }
   }
   return {jobs,detail,history,next:page.data.length>20?{before:tail.created_at,id:tail.id}:null,connection:connection.data==='incoming_adapter_registered'?'incoming_adapter_registered':'not_connected',demo:false};
 }

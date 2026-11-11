@@ -12,12 +12,12 @@ import { OfficeConnectionGuide } from './connection-guide';
 import { officeReportText } from './report-text';
 import { AnswerText } from '@/app/ui/final/lesson-text';
 import { OfficeDispatchPanel } from './dispatch-panel';
-export function OfficePanel({ snapshot, demo,initialEmployee,active=true }: { snapshot: CampusSnapshot; demo: boolean;initialEmployee?:{id:string;name:string}|null;active?:boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}:${initialEmployee?.id||''}`} snapshot={snapshot} demo={demo} initialEmployee={initialEmployee} active={active} />; }
+export function OfficePanel({ snapshot, demo,initialEmployee,active=true }: { snapshot: CampusSnapshot; demo: boolean;initialEmployee?:{id:string;name:string;jobId?:string}|null;active?:boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}:${initialEmployee?.id||''}:${initialEmployee?.jobId||''}`} snapshot={snapshot} demo={demo} initialEmployee={initialEmployee} active={active} />; }
 export const Panel = OfficePanel;
-function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapshot: CampusSnapshot; demo: boolean;initialEmployee?:{id:string;name:string}|null;active?:boolean }) {
+function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapshot: CampusSnapshot; demo: boolean;initialEmployee?:{id:string;name:string;jobId?:string}|null;active?:boolean }) {
   const enrollmentId = snapshot.selectedEnrollmentId;
   const [state, setState] = useState<OfficeState | null>(() => demo ? emptyOfficeDemo() : null), [objective, setObjective] = useState(''), [materials, setMaterials] = useState(''), [output, setOutput] = useState<OfficeOutput>('plan');
-  const [selected, setSelected] = useState<string | null>(null), [note, setNote] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showArchived, setShowArchived] = useState(false);
+  const [selected, setSelected] = useState<string | null>(initialEmployee?.jobId||null), [note, setNote] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showArchived, setShowArchived] = useState(false);
   const [employee,setEmployee]=useState(initialEmployee?.id||''),[pages,setPages]=useState<{before:string;id:string}[]>([]);
   const cursor=pages.at(-1),directory=useDirectory(enrollmentId,!demo&&active,0);
   function resetList(){setPages([]);setSelected(null);setState(null);setNote('');}
@@ -52,6 +52,15 @@ function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapsho
     } catch (e) { setError(e instanceof Error ? e.message : '저장하지 못했습니다.'); return false; } finally { setBusy(false); }
   }
   const job = demo ? state?.jobs.find(j => j.id === selected) : state?.detail?.id===selected ? state?.detail : null;
+  const detailRef=useRef<HTMLElement>(null);
+  const scrollToJob=useRef(initialEmployee?.jobId);
+  useEffect(()=>{
+    if(job && scrollToJob.current===job.id){
+      scrollToJob.current=undefined;
+      detailRef.current?.focus({preventScroll:true});
+      detailRef.current?.scrollIntoView({block:'start'});
+    }
+  },[job]);
   const command = (action: OfficeCommand['action']) => ({ requestId: crypto.randomUUID(), enrollmentId: enrollmentId!, action, jobId: job?.id, expectedRevision: job?.revision, note });
   function receive(event: OfficeEvent['event']) {
     if (!job || !state || !demo) return;
@@ -75,7 +84,7 @@ function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapsho
         <div className={styles.jobs}>{state?.jobs.filter(j => showArchived ? j.status === 'archived' : j.status !== 'archived').map(j => <button type="button" className={`${styles.job} ${selected === j.id ? styles.selected : ''}`} key={j.id} onClick={() => { setSelected(j.id); setNote(''); }}><span className={styles.status} data-status={j.status}>{officeStatusLabels[j.status]}</span><h4>{j.objective}</h4><small>{outputLabels[j.output_type]} · v{j.revision}</small></button>)}</div>
       {!demo&&<nav aria-label="업무 페이지" className={styles.filters}><button type="button" disabled={busy||!pages.length} onClick={()=>movePage(pages.slice(0,-1))}>이전 업무</button><span>{pages.length+1}페이지</span><button type="button" disabled={busy||!state?.next} onClick={()=>state?.next&&movePage([...pages,state.next])}>다음 업무</button></nav>}
       </div></div>
-    {job && <article className={styles.detail} aria-label="선택한 AI 직원 작업"><div className={styles.listHeader}><h3>{outputLabels[job.output_type]}</h3><span className={styles.status} data-status={job.status}>{officeStatusLabels[job.status]}</span></div><p className={styles.body}>{job.objective}</p><div className={styles.links}>{job.material_urls.map((u, i) => <a href={u} key={u} target="_blank" rel="noopener noreferrer"><Link2 size={13} />참고 자료 {i + 1}</a>)}</div>
+    {job && <article ref={detailRef} tabIndex={-1} className={styles.detail} aria-label="선택한 AI 직원 작업"><div className={styles.listHeader}><h3>{outputLabels[job.output_type]}</h3><span className={styles.status} data-status={job.status}>{officeStatusLabels[job.status]}</span></div><p className={styles.body}>{job.objective}</p><div className={styles.links}>{job.material_urls.map((u, i) => <a href={u} key={u} target="_blank" rel="noopener noreferrer"><Link2 size={13} />참고 자료 {i + 1}</a>)}</div>
       {job.status === 'awaiting_connection' && <p className={styles.waiting}>아직 봇에 전달되지 않았어요. 실제 접수 이벤트가 와야 ‘요청 접수’로 바뀝니다.</p>}
       {job.draft_text && <section className={styles.draft}><h4>{job.status === 'approved' ? '내가 승인한 결과' : '검토할 초안'}</h4><p className={styles.body}><AnswerText text={officeReportText(job.draft_text)}/></p>{job.draft_url && <a href={job.draft_url} target="_blank" rel="noopener noreferrer">결과물 링크 열기</a>}</section>}
       <OfficeDispatchPanel job={job} demo={demo} onChanged={() => refresh()} onLockChange={setDispatchLocked}/>{job.error_note && <p role="alert" className={styles.error}>{job.error_note}</p>}
