@@ -149,7 +149,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  function enter(id:TourRoom){post('meetup-start');if(!mayLeave())return;if(visitorRef.current?.operatorReview&&!['live','library'].includes(id)){const q=new URLSearchParams({room:id});if(visitorRef.current.operatorEvent)q.set('event',visitorRef.current.operatorEvent);window.location.assign('/campus/operator?'+q);return;}if(!canEnter(role,id)){setMapOpen(false);setActivityMenu(false);setGate(id);return;}let first=false;if(id==='office'&&live&&role==='student'){try{const key='campus:office-guide:v1:'+snapshot.viewer.id;first=!localStorage.getItem(key);if(first)localStorage.setItem(key,'seen');}catch{}}
  setRoom(id);setMapOpen(false);setGate(null);setTool(first?'office-guide':'');setPrevious('');setActivityMenu(false);setNotice('');post('room',{id});}
  function selectTask(id:string){const t=managedTask(id);if(!t||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;if(room!==t.room){setRoom(t.room);post('room',{id:t.room});}setPrevious('');if(id==='learning')setRequestedLesson('');setTool(id);visitorRef.current?.onActivity(id);if(id==='legacy-space')setReady(false);setMapOpen(false);setActivityMenu(false);setNotice('');if(id==='office')setOfficeVisited(true);if(id==='ai')setAiVisited(true);const pane=spacePane(id);if(pane){setToolsPane(pane);setToolsVisited(true);}if(id==='focus')post('sit');}
- function open(id:string){if(visibleTasks(room,role).some(t=>t.id===id))selectTask(id);}
+ function open(id:string){if(visibleTasks(room,role).some(t=>t.id===id)){if(id==='office')setOfficeFilter(null);selectTask(id);}}
  function openLesson(id:string,missionId?:string){if(!mayLeave(true))return;track('lesson_open',id);if(live){
    if(!missionId && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED==='true' && canEnter(role,'study') && snapshot.lessons.some(lesson=>lesson.id===id)){
      setRequestedLesson(id);setPrevious(tool==='learning'?'':tool);setRoom('study');post('room',{id:'study'});setTool('learning');return;
@@ -178,28 +178,29 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const previousDeskView=useRef('');
  const deskTargets=useRef(new globalThis.Map<string,{id:string;name:string;jobId:string}>());
  const refreshDesks=useCallback(async(signal?:AbortSignal)=>{
-   const params=new URLSearchParams({enrollmentId:snapshot.selectedEnrollmentId||'',desks:'1'});
+   const params=new URLSearchParams({enrollmentId:snapshot.selectedEnrollmentId||''});
+   if(role==='student')params.set('desks','1');
    const response=await fetch('/api/campus/office/agents?'+params,{cache:'no-store',signal});
    if(!response.ok)throw Error('사무실 좌석을 읽지 못했습니다.');
-   const data=await response.json() as {document:BotDocument;desks:{jobId:string;employeeId:string;status:string}[]};
+   const data=await response.json() as {document:BotDocument;desks?:{jobId:string;employeeId:string;status:string}[]};
    if(signal?.aborted)return;
    const nextView=JSON.stringify(data);
    if(nextView===previousDeskView.current)return;
    previousDeskView.current=nextView;
    const targets=new globalThis.Map<string,{id:string;name:string;jobId:string}>();
-   for(const desk of data.desks){
+   for(const desk of data.desks||[]){
      const profile=data.document.profiles.find(p=>p.employeeId===desk.employeeId);
      if(profile)targets.set(desk.jobId,{id:profile.employeeId,name:profile.name,jobId:desk.jobId});
    }
    deskTargets.current=targets;
    post('personal-office',{document:data.document,desks:data.desks});
- },[snapshot.selectedEnrollmentId]);
+ },[snapshot.selectedEnrollmentId,role]);
  const clearDesks=useCallback(()=>{
    previousDeskView.current='';
    deskTargets.current.clear();
    post('office-desks-clear');
  },[]);
- const desksVisible=!!live&&role==='student'&&room==='office'&&ready&&!mapOpen&&!tool&&!gate&&!activityMenu;
+ const desksVisible=!!live&&canEnter(role,'office')&&room==='office'&&ready&&!mapOpen&&!tool&&!gate&&!activityMenu;
  useOfficeLive({enabled:desksVisible,enrollment:snapshot.selectedEnrollmentId,refresh:refreshDesks,onError:clearDesks,slow:false});
  useEffect(()=>clearDesks,[snapshot.selectedEnrollmentId,desksVisible,clearDesks]);
 
