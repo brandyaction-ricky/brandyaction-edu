@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CampusSnapshot } from '../contracts';
 import { avatarAppearance, publicAvatar, clockText, focusDeadline, peerFocusClock, cohortGoalReached, participationStatus, defaultProfile, elapsed, isWorldMessage, pauseClock, profile, resumeClock, type FocusClock, type SpacePeer, type SpaceProfile, type SpaceState } from './domain';
+import {FocusJournalForm} from './focus-journal';
 import { createDemoTransport, createLiveTransport, type SpaceTransport } from './transport';
 import type { SpaceCommand } from './server';
 import styles from './panel.module.css';
@@ -18,7 +19,7 @@ import {initialPreferences,parsePreferences,type Preferences} from '../support/d
 const statuses={joinable:'같이 해도 좋아요',quiet:'조용히 집중',help:'도움이 필요해요',working:'작업 중'};
 const zones=[['desk','문샷 집중실','한 가지에 몰입'],['mission','문샷 미션실','일차별 작은 실행'],['board','문샷 의견 나눔방','동료의 시선'],['chat','문샷 라운지','가벼운 대화'],['terrace','문샷 테라스','잠깐의 여백'],['launch','문샷 발사대','다음 도약']] as const;
 const emptyClock:FocusClock={phase:'idle',duration:0,elapsed:0,runningSince:null};
-export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onOpenEnvironment,rewards,immersive=false,spatial=false,blocked=false,toolsPane,initialRenderer='office',toolsVisible=true}:{snapshot:CampusSnapshot;demo:boolean;studyEntry?:{host:HTMLElement|null;openLounge:()=>void;onJoined:()=>void};toolsPane?:'focus'|'lounge'|'settings'|'profile';initialRenderer?:'classic'|'office';toolsVisible?:boolean;immersive?:boolean;spatial?:boolean;blocked?:boolean;onOpenLesson?:(id:string)=>void;onOpenEnvironment?:()=>void;onNavigate?:(section:string)=>void;rewards?:CommunityRewards|null}){
+export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,onNavigate,onOpenEnvironment,rewards,immersive=false,spatial=false,blocked=false,toolsPane,initialRenderer='office',toolsVisible=true}:{snapshot:CampusSnapshot;demo:boolean;journal?:boolean;studyEntry?:{host:HTMLElement|null;openLounge:()=>void;onJoined:()=>void};toolsPane?:'focus'|'lounge'|'settings'|'profile';initialRenderer?:'classic'|'office';toolsVisible?:boolean;immersive?:boolean;spatial?:boolean;blocked?:boolean;onOpenLesson?:(id:string)=>void;onOpenEnvironment?:()=>void;onNavigate?:(section:string)=>void;rewards?:CommunityRewards|null}){
  const scope=snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId),cohortId=scope?.cohortId;
  const [toolsOpen,setToolsOpen]=useState(false);
  const [renderer,setRenderer]=useState<'classic'|'office'>(initialRenderer);
@@ -28,7 +29,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  const [loadedRewards,setLoadedRewards]=useState<CommunityRewards|null>(null);const progress=demo?(rewards||loadedRewards):loadedRewards;
  const [token,setToken]=useState(''),[sessionId,setSessionId]=useState(''),[localPane,setPane]=useState<'focus'|'lounge'|'profile'|'settings'|'directory'>('focus');
  const pane=toolsPane||localPane;
- const [active,setActive]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[worldReady,setWorldReady]=useState(false);
+ const [active,setActive]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[journaling,setJournaling]=useState<number|null>(null),[worldReady,setWorldReady]=useState(false);
  const [slowWorld,setSlowWorld]=useState(false);
  const [pending,setPending]=useState<'foreground'|'auto-entry'|null>(null);
  const busy=pending!==null;
@@ -201,7 +202,8 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
     {ownSeat&&<button className={styles.link} disabled={busy} onClick={()=>void act(async()=>{await command({kind:'stand'});post('stand');})}>자리에서 일어나기</button>}
     <div className={styles.timer}><span>{clock.phase==='break'?'잠깐의 여백':clock.phase==='focus'?'나의 집중 시간':'준비되면 시작해요'}</span><strong aria-label="집중 타이머">{clock.phase==='idle'?`${duration?duration:'00'}:00`:clockText(clock,now)}</strong><small>페이지를 숨겨도 시간은 이어집니다.</small></div>
     <label className={styles.field}>집중 시간<select aria-label="집중 시간" value={duration} onChange={e=>setDuration(Number(e.target.value))}><option value={25}>25분</option><option value={50}>50분</option><option value={0}>자유 집중</option></select></label>
-    <div className={styles.controls}>{clock.phase==='idle'||clock.duration>0&&elapsed(clock,now)>=clock.duration?<button className={styles.primary} onClick={()=>startFocus(duration)}>집중 시작</button>:<button className={styles.primary} onClick={()=>setClock(c=>c.runningSince===null?resumeClock(c):pauseClock(c))}>{clock.runningSince===null?'이어서 집중':'잠시 멈추기'}</button>}<button onClick={()=>{setClock(emptyClock);setNotice('오늘 한 일과 다음 시작점을 내 메모에 남겨 보세요.');}}>마무리</button></div>
+    <div className={styles.controls}>{clock.phase==='idle'||clock.duration>0&&elapsed(clock,now)>=clock.duration?<button className={styles.primary} onClick={()=>startFocus(duration)}>집중 시작</button>:<button className={styles.primary} onClick={()=>setClock(c=>c.runningSince===null?resumeClock(c):pauseClock(c))}>{clock.runningSince===null?'이어서 집중':'잠시 멈추기'}</button>}<button onClick={()=>{const spent=clock.phase==='focus'?Math.round(elapsed(clock,Date.now())/60):null;setClock(emptyClock);if(journal&&spent!==null){setJournaling(spent);setNotice('');}else setNotice('오늘 한 일과 다음 시작점을 내 메모에 남겨 보세요.');}}>마무리</button></div>
+    {journaling!==null&&<FocusJournalForm snapshot={snapshot} demo={demo} minutes={journaling} onSkip={()=>setJournaling(null)} onSaved={()=>{setJournaling(null);setNotice('실행 수첩에 저장했어요.');}}/>}
     <div className={styles.controls}>{[3,5].map(m=><button key={m} onClick={()=>setClock({phase:'break',duration:m*60,elapsed:0,runningSince:Date.now()})}>{m}분 쉬기</button>)}</div>
     <details className={styles.ambient}><summary>나만의 30초 쉬기</summary><BreakOrbit/></details>
     {(state?.peers||[]).filter(p=>p.userId!==actor&&peerFocusClock(p,now)).slice(0,3).map(p=><div key={p.userId}>{focusAction(p,false)}</div>)}

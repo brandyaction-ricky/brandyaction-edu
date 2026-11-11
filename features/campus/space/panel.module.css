@@ -76,3 +76,8 @@
 .studyEntry .rosterFocus button {background:#f4f8fc;border-color:#b8cede;color:#214e79}
 .studyEntry button:focus-visible {outline:2px solid #2770aa;outline-offset:2px}
 @media(max-width:650px){.studyEntry{width:calc(100vw - 24px)}}
+.journalForm{display:grid;gap:4px;margin:14px 0 4px;padding:14px;border:1px solid #cad7e3;border-radius:12px;background:#fff;text-align:left}
+.journalForm h4{margin:0;font-size:15px;line-height:1.45}
+.journalForm>p{margin:2px 0 4px;font-size:12px;line-height:1.6;color:#526981}
+.journalForm .field{margin:8px 0 0}
+.journalForm .controls{justify-content:flex-end;margin-top:12px}
