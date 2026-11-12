@@ -59,12 +59,12 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  }
  // 잘못 등록한 직원 삭제. 자리에 앉아 있으면 자리부터 비운다(자리 문서가 직원을 다시 만들기 때문).
  async function remove(p:BotProfile){
-  if(!window.confirm(p.name+' 직원을 삭제할까요?\n보고 연결이 끊기고, 이미 받은 업무 기록은 작업함에 남아요.'))return;
+  if(!window.confirm('‘'+p.name+'’을(를) 직원 목록에서 삭제할까요?\n보고 연결이 끊기고, 이미 받은 업무 기록은 작업함에 남아요.'))return;
   if(desks.some(d=>d.employeeId===p.employeeId)&&!await save({...saved.document,profiles:saved.document.profiles.filter(d=>d.employeeId!==p.employeeId)}))return;
   if(locked.current)return;locked.current=true;setBusy(true);setMessage('');
   try{if(demo)setLocal(old=>old.filter(v=>v.employeeId!==p.employeeId));
    else{const r=await fetch('/api/campus/office/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',enrollmentId,employeeId:p.employeeId})});const d=await r.json();if(!r.ok)throw Error(d.error||'삭제하지 못했어요.');}
-   dir.first();changed();setGone(v=>v+1);setMessage(p.name+' 직원을 삭제했어요.');
+   dir.first();changed();setGone(v=>v+1);setMessage('‘'+p.name+'’을(를) 직원 목록에서 삭제했어요.');
   }catch(e){setMessage((e as Error).message);}finally{locked.current=false;setBusy(false);}
  }
  function place(p:BotProfile){

@@ -19,7 +19,7 @@ test('several employees register at once, take free desks, and lines that fail s
  await box.fill('GEO 담당자, @moonshot_geo_bot\n광고 담당자, @moonshot_ads_bot');await page.getByRole('button',{name:'한 번에 등록하고 자리에 앉히기',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('1명을 등록하고 1명을 자리에 앉혔어요.');await expect(box).toHaveValue('');await expect(page.getByText('자리 4/10',{exact:false})).toBeVisible();
  page.once('dialog',d=>void d.accept());await page.getByRole('article').filter({hasText:'GEO 담당자'}).getByRole('button',{name:'직원 삭제',exact:true}).click();
- await expect(page.getByRole('status')).toContainText('GEO 담당자 직원을 삭제했어요.');await expect(page.getByRole('article').filter({hasText:'GEO 담당자'})).toHaveCount(0);await expect(page.getByText('자리 3/10',{exact:false})).toBeVisible();
+ await expect(page.getByRole('status')).toContainText('‘GEO 담당자’을(를) 직원 목록에서 삭제했어요.');await expect(page.getByRole('article').filter({hasText:'GEO 담당자'})).toHaveCount(0);await expect(page.getByText('자리 3/10',{exact:false})).toBeVisible();
  await page.screenshot({path:test.info().outputPath('bulk-register.png'),fullPage:true});expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
 test('campus analytics displays real denominators, empty states and clear action definitions on mobile',async({page})=>{
