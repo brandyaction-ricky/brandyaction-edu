@@ -18,6 +18,10 @@ test('private production package cannot send a device credential to the DEV rece
     const {endpoint}=await import(pathToFileURL(join(scripts,'campus-student-device.mjs')));
     const {deliverReport}=await import(pathToFileURL(join(scripts,'campus-office-report.mjs')));
     assert.equal(endpoint,production+'/functions/v1/campus-student-report');
+    // The production gateway rejects devices without the public project key; the package must carry it.
+    const {gatewayHeaders}=await import(pathToFileURL(join(scripts,'student-target.mjs')));
+    const headers=await gatewayHeaders();
+    assert.match(headers.apikey,/^[\w-]+\.[\w-]+\.[\w-]+$/);assert.equal(headers.Authorization,'Bearer '+headers.apikey);
     let sent=false;
     await assert.rejects(deliverReport({environment:'production',transport:'student-device',endpoint:development+'/functions/v1/campus-student-report'}, {}, 'fixture',async()=>{sent=true;}),/Invalid student endpoint/);
     assert.equal(sent,false);
