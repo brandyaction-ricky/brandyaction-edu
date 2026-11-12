@@ -1,3 +1,4 @@
+import { questionLearningContexts } from '@/lib/question-learning-context-server';
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -374,6 +375,10 @@ export async function GET(request: Request) {
                 data.curriculum_lessons = rows.flatMap(week => week.curriculum_lessons);
             })()] : []),
         ]);
+        if (adminMode && sectionKey === 'questions' && data.edu_questions?.length) {
+            const labels = await questionLearningContexts(db, data.edu_questions);
+            data.edu_questions = data.edu_questions.map(question => ({ ...question, learning_context: labels.get(question.id) ?? question.learning_context }));
+        }
         for (const banner of data.site_banners || []) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }

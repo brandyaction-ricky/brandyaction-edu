@@ -1,12 +1,14 @@
+import { questionContexts } from './helpers/question-learning-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const id='11111111-1111-4111-8111-111111111111';
-function harness({enabled=true,images=false,hub=false,user={id},operator=true,error=null}={}){
+function harness({enabled=true,images=false,hub=false,user={id},operator=true,error=null,enrich=questionContexts.threadLearningContext}={}){
  const calls=[],out={};const source=ts.transpileModule(fs.readFileSync(new URL('../app/api/platform/question-thread/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  new Function('exports','require','process',source)(out,name=>({
   '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:true},error};},from:()=>({select(){return this;},eq(){return this;},maybeSingle:async()=>({data:{enrollment_id:null},error:null})})})},
+  '@/lib/question-learning-context-server':{threadLearningContext:enrich},
   '@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},
   '@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'members');return operator?user:null;}},
   '@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)},
@@ -56,4 +58,12 @@ test('answer attachments require image capability, remain operator-only, and use
  for(const extra of [{},{assistJobId:id}]){assert.equal((await h.post({...h.body,imageId:id,...extra})).status,200);assert.equal(h.calls.at(-1).name,'edu_add_question_answer_with_image');assert.equal(h.calls.at(-1).args.p_image,id);assert.equal(h.calls.at(-1).args.p_assist_job,extra.assistJobId||null);}
  const student=harness({images:true,operator:false});assert.equal((await student.post({...student.body,imageId:id})).status,403);assert.equal((await student.post({...student.body,action:'followup',imageId:id})).status,400);assert.equal(student.calls.length,0);
  const invalid=harness({images:true});for(const extra of [{imageId:'bad'},{imageId:id,action:'resolve'},{imageId:id,assistJobId:id}])assert.equal((await invalid.post({...invalid.body,...extra})).status,400);assert.equal(invalid.calls.length,0);
+});
+
+test('thread metadata enrichment runs only after a successful authorized read, never on writes or access denial',async()=>{
+ const seen=[],enrich=async(db,data)=>{seen.push(data);return {...data,contextVerified:true};};
+ for(const options of [{user:null},{enabled:false},{error:{message:'QUESTION_NOT_FOUND'}},{error:{message:'MESSAGE_FORBIDDEN'}}])await harness({...options,enrich}).get();
+ assert.equal(seen.length,0);
+ const h=harness({enrich});const result=await h.get();assert.equal((await result.json()).contextVerified,true);assert.equal(seen.length,1);
+ await h.post(h.body);assert.equal(seen.length,1);
 });

@@ -1,3 +1,4 @@
+import { questionContexts } from './helpers/question-learning-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,7 +10,7 @@ function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true }; if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true }; if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} }; if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/member-directory') return load('lib/member-directory.ts'); if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/question-learning-context-server') return questionContexts; if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true }; if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true }; if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} }; if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/member-directory') return load('lib/member-directory.ts'); if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -50,7 +51,7 @@ test('F-03 no admin screen downloads raw journey events', () => {
 });
 test('admin list APIs only load screen dependencies and lightweight relation fields', () => {
   assert.deepEqual(rules.adminTables.questions, ['edu_questions']);
-  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)');
+  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,lesson_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)');
   process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED='true';
   try { assert.match(rules.adminSelectColumns('questions', 'edu_questions'), /,image_id$/); } finally { delete process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED; }
   assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');

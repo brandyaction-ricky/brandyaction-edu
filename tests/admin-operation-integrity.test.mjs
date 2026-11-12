@@ -1,3 +1,4 @@
+import { questionContexts } from './helpers/question-learning-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,7 +10,7 @@ function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
-    if (name === '@/lib/question-deletion-server') return dependencies[name] || { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
+    if (name === '@/lib/question-learning-context-server') return questionContexts; if (name === '@/lib/question-deletion-server') return dependencies[name] || { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
     if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true };
     if (name === '@/lib/member-directory') return load('lib/member-directory.ts');
     if (name === '@/lib/submission-review') return submissionReview;
@@ -47,6 +48,7 @@ function harness({ missions = [], user = admin, deletionReady = false } = {}) {
       const query = {
         select(columns, options) { head = Boolean(options?.head); calls.push({ table, columns }); return this; },
         eq(key, value) { filters.push(row => field(row, key) === value); return this; },
+        in(key, values) { filters.push(row => values.includes(field(row, key))); return this; },
         neq(key, value) { filters.push(row => field(row, key) !== value); return this; },
         is(key) { filters.push(row => field(row, key) == null); return this; },
         not(key) { filters.push(row => field(row, key) != null); return this; },
@@ -186,4 +188,16 @@ test('member directory API forwards validated filters and uses the authenticated
 test('deleted questions are hidden from admin active, archived and direct reads before totals and pagination',async()=>{
  const api=harness({deletionReady:true});api.tables.edu_questions=[{id:id(600),user_id:id(2),status:'open',is_archived:false,deleted_at:null},{id:id(601),user_id:id(2),status:'answered',is_archived:true,deleted_at:'2026-10-11'},{id:id(602),user_id:id(2),status:'answered',is_archived:true,deleted_at:null}];
  for(const [query,ids] of [['section=questions',[id(600)]],['section=questions&questionState=archived',[id(602)]],['section=questions&question='+id(601),[]]]){const response=await api.read(query);assert.equal(response.status,200);const body=await response.json();assert.deepEqual(body.data.edu_questions.map(q=>q.id),ids);assert.equal(body.pagination.total,ids.length);}
+});
+
+
+test('authorized question list decorates existing snapshots with the same cumulative learner day', async () => {
+  const api = harness();
+  api.tables.curriculum_weeks = [{id:id(11),course_id:id(101),week_number:0},{id:id(12),course_id:id(101),week_number:1},{id:id(13),course_id:id(101),week_number:2}];
+  api.tables.curriculum_lessons = [{id:id(21),week_id:id(11),day_number:2},{id:id(22),week_id:id(12),day_number:1},{id:id(23),week_id:id(12),day_number:2},{id:id(24),week_id:id(13),day_number:1}];
+  api.tables.edu_questions = [{id:id(40),user_id:id(2),lesson_id:id(24),learning_context:'문샷 · 5기 · 2주차 · 실행',status:'open',is_archived:false},{id:id(41),user_id:id(2),lesson_id:id(21),learning_context:'문샷 · 5기 · 0주차 · 준비',status:'open',is_archived:false}];
+  const response=await api.read('section=questions');assert.equal(response.status,200);
+  const data=await response.json();assert.deepEqual(data.data.edu_questions.map(q=>q.learning_context),['문샷 · 5기 · 2주차 · 3일차 · 실행','문샷 · 5기 · 0주차 · 2일차 · 준비']);
+  assert.equal(api.tables.edu_questions[0].learning_context,'문샷 · 5기 · 2주차 · 실행');assert.equal(api.writes.length,0);
+  for(const user of [null,{...admin,role:'student'}]){const blocked=harness({user});assert.equal((await blocked.read('section=questions')).status,user?403:401);assert.equal(blocked.calls.length,0);}
 });

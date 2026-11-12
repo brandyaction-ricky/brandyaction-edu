@@ -1,3 +1,4 @@
+import { questionContexts } from './helpers/question-learning-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,7 +10,7 @@ function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
-    if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
+    if (name === '@/lib/question-learning-context-server') return questionContexts; if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
     if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true };
     if (name === '@/lib/member-directory') return load('lib/member-directory.ts');
     if (name === '@/lib/submission-review') return submissionReview;

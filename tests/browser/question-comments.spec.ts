@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 const questionId = '22222222-2222-4222-8222-222222222222', head = '33333333-3333-4333-8333-333333333333';
-async function backend(context: BrowserContext, fail = false) {
+async function backend(context: BrowserContext, fail = false, learningContext = '예시 과정 · 5기 · 2주차 · 6일차 · 예시 수업') {
   let failed = fail, reads = 0;
   const writes: Record<string, unknown>[] = [];
   const answers = [
@@ -12,7 +12,7 @@ async function backend(context: BrowserContext, fail = false) {
       reads++;
       if (failed) { await route.fulfill({ status: 503, json: { error: '댓글을 읽지 못했습니다.' } }); return; }
       const before = new URL(route.request().url()).searchParams.get('before');
-      await route.fulfill({ json: { question: { id: questionId, title: '예시 학습 질문', content: '예시 질문 본문', status: writes.length ? 'answered' : 'open', headId: writes.length ? writes.at(-1)!.requestId : head, resolved: false, archived: false }, canAnswer: true, canFollowUp: true, answers: before ? [{ id: 'older', authorName: '예시 운영자', source: 'operator', content: '이전 페이지의 답변', createdAt: '2026-10-11T01:00:00Z' }] : answers, nextCursor: before ? null : '10' } });
+      await route.fulfill({ json: { question: { learningContext, id: questionId, title: '예시 학습 질문', content: '예시 질문 본문', status: writes.length ? 'answered' : 'open', headId: writes.length ? writes.at(-1)!.requestId : head, resolved: false, archived: false }, canAnswer: true, canFollowUp: true, answers: before ? [{ id: 'older', authorName: '예시 운영자', source: 'operator', content: '이전 페이지의 답변', createdAt: '2026-10-11T01:00:00Z' }] : answers, nextCursor: before ? null : '10' } });
       return;
     }
     const body = route.request().postDataJSON(); writes.push(body);
@@ -69,4 +69,15 @@ test('failed comment reads show a retry instead of the stale answer, and recover
   server.recover(); await comments.getByRole('button', { name: '답변 다시 불러오기', exact: true }).click();
   await expect(comments.getByText('후속 질문: 다음 단계도 설명해 주세요.', { exact: true })).toBeVisible();
   expect(server.writes).toHaveLength(0);
+});
+
+for (const prep of [false,true]) test(`question location includes cohort, week and day in the card and answer drawer (${prep?'prep':'regular'})`,async({page,context},info)=>{
+  const label=prep?'예시 과정 · 5기 · 0주차 · 2일차 · 준비 안내':'예시 과정 · 5기 · 2주차 · 6일차 · 예시 수업';
+  const server=await backend(context,false,label);await page.goto('/question-comments-test'+(prep?'?prep=1':''));
+  await expect(page.locator('.question-learning-context')).toContainText(label);
+  await page.getByRole('region',{name:'후속 질문과 답변 댓글'}).getByRole('button',{name:'답글 달기',exact:true}).click();
+  await expect(page.getByRole('dialog').getByText(label,{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect(server.writes).toHaveLength(0);
+  await page.screenshot({path:info.outputPath('question-day-'+(prep?'prep':'regular')+'.png'),fullPage:true});
 });

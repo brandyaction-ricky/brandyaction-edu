@@ -11,7 +11,9 @@ import '../../../features/admin-ui/styles/admin-system.css';
 import '../../../app/ui/final/integration.css';
 function Fixture() {
   const [active, setActive] = useState<Row | null>(null), [revision, setRevision] = useState(0), [render, setRender] = useState(0);
+  const learningContext = new URLSearchParams(location.search).has('prep') ? '예시 과정 · 5기 · 0주차 · 2일차 · 준비 안내' : '예시 과정 · 5기 · 2주차 · 6일차 · 예시 수업';
   const question: Row = {
+    learning_context: learningContext,
     id: '22222222-2222-4222-8222-222222222222', title: '예시 학습 질문', content: '예시: 다음 학습 단계가 궁금합니다.',
     answer: '목록에 저장된 이전 답변', answer_head_id: '33333333-3333-4333-8333-333333333333',
     updated_at: 'revision-' + revision, created_at: '2026-10-13', status: revision ? 'answered' : 'open', is_archived: false,
