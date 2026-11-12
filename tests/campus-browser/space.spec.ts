@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 const space=(p:Page)=>p.getByRole('region',{name:'문샷 캠퍼스 공간',exact:true});
-async function enter(p:Page,lightweight=false){await p.goto('/space');await p.getByLabel('공간 화면',{exact:true}).selectOption('classic');if(lightweight)await light(p);await p.getByRole('button',{name:'동료와 함께하기',exact:true}).click();await expect(p.getByRole('button',{name:'동료 연결 끊기',exact:true})).toBeVisible();}
+async function enter(p:Page,lightweight=false){if(lightweight)await p.emulateMedia({reducedMotion:'reduce'});await p.goto('/space');if(lightweight)await expect(space(p)).toHaveAttribute('data-compact','true');await p.getByLabel('공간 화면',{exact:true}).selectOption('classic');if(lightweight)await light(p);await p.getByRole('button',{name:'동료와 함께하기',exact:true}).click();await expect(p.getByRole('button',{name:'동료 연결 끊기',exact:true})).toBeVisible();}
 async function light(p:Page){const b=p.getByRole('button',{name:'가벼운 공간 메뉴',exact:true});if(await b.count())await b.click();}
 async function noOverflow(p:Page){expect(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();}
 
@@ -14,7 +14,7 @@ test('space preferences and private desk notes persist without altering progress
 });
 
 test('two real browser tabs see each other, arbitrate a seat, exchange and delete chat, then leave',async({page,context})=>{
- // Exercise the same light-mode entry a member can choose before connecting.
+ // Exercise the real reduced-motion preference, which starts in light mode.
  // Keep the separate 3D boot/reopen checks below out of this two-client chat budget.
  await enter(page,true);const other=await context.newPage();await enter(other,true);
  await expect(space(page).getByText('2명 연결됨 · 체험 탭',{exact:true})).toBeVisible();
