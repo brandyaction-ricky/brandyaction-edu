@@ -37,7 +37,7 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  async function add(){
   if(locked.current)return;locked.current=true;setBusy(true);setMessage('');
   try{const p=await register({name,telegram,duties},local);if(demo)setLocal([...local,p]);
-   setName('');setTelegram('');setDuties('');dir.first();changed();setMessage('직원을 등록했어요.');
+   setName('');setTelegram('');setDuties('');dir.first();changed();setMessage('직원을 등록했어요. 아래 ‘전체 직원 목록’에서 ‘빈자리에 배치’를 누르면 사무실 자리에 앉아요.');
   }catch(e){setMessage((e as Error).message);}finally{locked.current=false;setBusy(false);}
  }
  // 여러 명을 한 번에 등록하고 빈자리에 앉힌다. 이미 등록한 봇은 등록을 건너뛰고 자리만 잡는다.
