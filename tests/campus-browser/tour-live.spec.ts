@@ -57,3 +57,19 @@ test('a browser without 3D shows the office as a flat seat list with Korean guid
  await seats.nth(1).getByRole('button',{name:'공지 직원 · 검토할 결과 업무 열기'}).click();
  await expect(page.getByRole('article',{name:'선택한 AI 직원 작업'})).toContainText('3D 없이도 열리는 결과 본문');
 });
+test('live job inbox names the employee, titles the result by the task and points revisions back to Telegram',async({page})=>{
+ await setup(page);
+ await page.route('**/api/campus/library**',r=>r.fulfill({json:{resources:[]}}));
+ const job={id:'80000000-0000-4000-8000-000000000003',employee_id:'writer',objective:'첫 수업 공지 작성',status:'revision_requested',revision:5,draft_text:'# 공지\n**목요일** 저녁 8시\n- 링크는 당일 발송',review_note:'시간을 9시로 고쳐 주세요.',material_urls:[],output_type:'copy',updated_at:'2026-11-12T00:00:00Z'};
+ const writer={employeeId:'writer',name:'공지 직원',telegramUrl:'https://t.me/moonshot_notice_bot',duties:'',appearanceSeed:1,seatIndex:1};
+ await page.route('**/api/campus/space**',r=>r.fulfill({json:{profile:defaultProfile('동료'),peers:[],messages:[],seats:[]}}));
+ await page.route('**/api/campus/office/agents?**',r=>r.fulfill({json:{document:{profiles:[writer]},desks:[],employees:[writer],next:null}}));
+ await page.route('**/api/campus/office?**',r=>r.fulfill({json:{jobs:[job],detail:new URL(r.request().url()).searchParams.get('job')===job.id?job:null,history:[],connection:'incoming_adapter_registered'}}));
+ await page.goto('/campus/workspace?tourLive=1&enrollmentId='+eid);await room(page,'내 AI 사무실');await task(page,'업무 관리');
+ await expect(page.getByRole('heading',{name:'새 작업 요청'})).toHaveCount(0);
+ const card=page.getByRole('button',{name:/첫 수업 공지 작성/});await expect(card).toContainText('공지 직원 · 문구 초안');await card.click();
+ const detail=page.getByRole('article',{name:'선택한 AI 직원 작업'});await expect(detail.getByRole('heading',{name:'첫 수업 공지 작성'})).toBeVisible();await expect(detail).toBeInViewport();
+ await expect(detail).toContainText('수정을 요청한 초안');await expect(detail).toContainText('공지\n목요일 저녁 8시\n• 링크는 당일 발송');await expect(detail).not.toContainText('**');
+ await expect(detail.getByRole('link',{name:'Telegram에서 다시 맡기기 ↗'})).toHaveAttribute('href','https://t.me/moonshot_notice_bot');
+ await expect(page.getByRole('navigation',{name:'업무 페이지'})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});

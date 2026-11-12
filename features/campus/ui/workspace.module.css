@@ -17,3 +17,18 @@
 @media(max-height:500px){.campusWindow{max-height:calc(100dvh - 16px);width:calc(100vw - 24px)}.windowHeader{padding:8px 14px}.windowHeader small{display:none}.windowHeader h2{font-size:18px}.windowBody{padding:14px}.smallWindow{margin:auto}}
 
 .campusWindow{overflow:hidden}.windowHeader button{touch-action:manipulation;-webkit-user-select:none;user-select:none}.windowBody{overflow-y:auto;-webkit-overflow-scrolling:touch}@media(max-width:700px){.windowHeader button{min-width:68px;min-height:48px}.windowHeader{padding-top:max(12px,env(safe-area-inset-top))}}
+/* 캠퍼스 창 공통: 한글이 단어 중간에서 끊기지 않게, 접이식 칸은 누를 수 있다는 것이 보이게 */
+.windowBody{word-break:keep-all;overflow-wrap:anywhere}
+.windowBody details>summary{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;list-style:none;font-weight:600;color:#22344d}
+.windowBody details>summary::-webkit-details-marker{display:none}
+.windowBody details>summary::before{content:'';flex:none;width:7px;height:7px;margin:0 6px 0 3px;border-right:2px solid #5b6f88;border-bottom:2px solid #5b6f88;transform:rotate(-45deg);transition:transform .15s}
+.windowBody details[open]>summary::before{transform:rotate(45deg)}
+.windowBody details>summary:hover{color:#214ed1}
+/* 실행 수첩: 제목과 새로고침을 한 줄 양끝에 */
+.journalActions{align-items:center;justify-content:space-between}
+.journalActions h3{margin:0}
+.journalActions button{font-size:13px;min-height:40px;padding:8px 12px}
+/* AI 조교: 수업 화면용 버튼이 캠퍼스 창에서도 같은 모양이 되게 */
+.ai :global(button.btn),.ai :global(label.btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border:1px solid #c8d2e2;border-radius:10px;background:#fff;color:#22344d;font-size:13px;font-weight:600;cursor:pointer;box-shadow:none}
+.ai :global(button.btn.primary){width:100%;min-height:48px;border-color:var(--ba-red,#c9232d);background:var(--ba-red,#c9232d);color:#fff;font-size:15px}
+.ai :global(button.btn:disabled){opacity:.5;cursor:default}

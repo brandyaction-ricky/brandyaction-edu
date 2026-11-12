@@ -1,7 +1,7 @@
 'use client';
 import {studentReportingAvailable} from '../student-reporting';
 import {useEffect,useRef,useState} from 'react';
-import {StudentConnections} from '../student-connections';
+import {ConnectionSetup,connectionLabel,useStudentConnections} from '../student-connections';
 import {BotOfficeModel,normalizeTelegramBot,type BotDocument,type BotProfile} from '@/public/campus/world/office/bot-profile.mjs';
 import {parseEmployeeLines,pickSeat} from './bulk';
 import {useCampusDraftGuard} from '../../ui/draft-guard';
@@ -14,7 +14,8 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  const [loaded,setLoaded]=useState(demo);
  const [saved,setSaved]=useState<Saved>({document:new BotOfficeModel().getDocument(),revision:null,updated_at:null}),[loading,setLoading]=useState(!demo),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[name,setName]=useState(''),[telegram,setTelegram]=useState(''),[duties,setDuties]=useState(''),[bulk,setBulk]=useState('');const locked=useRef(false),notice=useRef<HTMLParagraphElement>(null),onChangeRef=useRef(onChange);useEffect(()=>{onChangeRef.current=onChange;},[onChange]);
  const [statusFirst,setStatusFirst]=useState<boolean|null>(demo?false:null);
- const [epoch,setEpoch]=useState(0),[gone,setGone]=useState(0),[local,setLocal]=useState<BotProfile[]>([]);
+ const [epoch,setEpoch]=useState(0),[local,setLocal]=useState<BotProfile[]>([]);
+ const conn=useStudentConnections(enrollmentId,!demo&&(pilot||studentReportingAvailable()));
  const dir=useDirectory(enrollmentId,!demo,epoch);
  const desks=saved.document.profiles.filter(p=>p.employeeId!=='manager');
  // 자리에 앉은 순서대로(총괄 관리자 자리부터), 앉지 않은 직원은 이름순으로 뒤에.
@@ -68,8 +69,12 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
   if(locked.current)return;locked.current=true;setBusy(true);setMessage('');
   try{if(demo)setLocal(old=>old.filter(v=>v.employeeId!==p.employeeId));
    else{const r=await fetch('/api/campus/office/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',enrollmentId,employeeId:p.employeeId})});const d=await r.json();if(!r.ok)throw Error(d.error||'삭제하지 못했어요.');}
-   dir.first();changed();setGone(v=>v+1);setMessage('‘'+p.name+'’을(를) 직원 목록에서 삭제했어요.');
+   dir.first();changed();void conn.refresh();setMessage('‘'+p.name+'’을(를) 직원 목록에서 삭제했어요.');
   }catch(e){setMessage((e as Error).message);}finally{locked.current=false;setBusy(false);}
+ }
+ async function release(p:BotProfile,id:string){
+  if(!window.confirm('‘'+p.name+'’의 보고 연결을 해제할까요?\n다시 연결하려면 연결 코드를 새로 받아야 해요. 받은 업무 기록은 작업함에 남아요.'))return;
+  setMessage(await conn.revoke(id)?'‘'+p.name+'’의 보고 연결을 해제했어요.':'연결을 해제하지 못했어요. 아래 ‘연결 상태 새로고침’을 눌러 확인해 주세요.');
  }
  function place(p:BotProfile){
   // The lead desk (0) is offered last so it stays free for the 총괄 employee.
@@ -87,18 +92,25 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  <form onSubmit={e=>{e.preventDefault();add();}}><h3>직원 추가</h3><label>직원 이름<input required maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="예: 콘텐츠 기획 담당"/></label><label>텔레그램 봇 주소<input required value={telegram} maxLength={200} onChange={e=>setTelegram(e.target.value)} placeholder="https://t.me/my_marketing_bot"/></label><label>담당 업무<textarea maxLength={500} value={duties} onChange={e=>setDuties(e.target.value)} placeholder="예: 이번 주 콘텐츠 아이디어 정리"/></label><button className={styles.primary} disabled={busy}>{busy?'저장 중…':'직원 등록하기'}</button></form>
  <details><summary>여러 명 한 번에 등록</summary><p>한 줄에 한 명씩 <strong>이름, 봇 주소, 담당 업무</strong> 순서로 적어 주세요. 담당 업무는 비워도 돼요. 등록한 직원은 빈자리에 바로 앉고, 이름이 &lsquo;총괄&rsquo;로 시작하는 직원은 총괄 관리자 자리에 앉아요. 이미 등록한 봇은 이름과 담당 업무를 그대로 두고 자리만 잡아요.</p><label>직원 목록 (최대 10명)<textarea rows={10} maxLength={8000} value={bulk} onChange={e=>setBulk(e.target.value)} placeholder={'제 2의 뇌, @my_brain_bot, 자료 정리와 기억\nGEO 담당자, https://t.me/my_geo_bot, AI 검색 노출 점검'}/></label><button type="button" className={styles.primary} disabled={busy||!bulk.trim()} onClick={()=>void addMany()}>{busy?'등록 중…':'한 번에 등록하고 자리에 앉히기'}</button></details>
  </>;
- const links=!demo&&(pilot || studentReportingAvailable()) && <StudentConnections key={enrollmentId+':'+gone} enrollmentId={enrollmentId} employees={employees} onJobs={onJobs}/>;
+ const links=conn.enabled&&<ConnectionSetup enrollmentId={enrollmentId} employees={employees} conn={conn}/>;
  const seatBoard=<>
  <section aria-label="사무실 좌석"><h3>사무실 좌석 <small>{desks.length} / 10</small></h3>
  <p>총괄 관리자 자리는 29일차에 채용하는 총괄 관리자의 자리예요. 자리를 비워도 직원의 보고 연결과 업무 기록은 그대로 남아요.</p>
  <ol className={styles.seats}>{[0,1,2,3,4,5,6,7,8,9].map(n=>{const p=desks.find(d=>d.seatIndex===n),free=employees.filter(e=>!desks.some(d=>d.employeeId===e.employeeId));return <li key={n} data-empty={p?undefined:''} data-lead={n?undefined:''}><small>{n?n+'번 자리':'총괄 관리자 자리'}</small><strong>{p?.name||'빈자리'}</strong>{p?<button type="button" disabled={busy} onClick={()=>unseat(p)}>자리 비우기</button>:!n&&free.length>0&&<select aria-label="총괄 관리자 자리에 앉힐 직원" value="" disabled={busy} onChange={e=>{const chosen=free.find(f=>f.employeeId===e.target.value);if(chosen)seatAt(chosen,0);}}><option value="">직원 선택</option>{free.map(f=><option key={f.employeeId} value={f.employeeId}>{f.name}</option>)}</select>}</li>;})}</ol></section>
  </>;
  const roster=<>
- <h3>전체 직원 목록</h3>{dir.error&&<p role="alert">{dir.error}</p>}
- <div className={styles.roster}>{employees.map(p=>{const seat=desks.find(d=>d.employeeId===p.employeeId);return <article key={p.employeeId}><div><strong>{p.name}</strong><span>{seat?(seat.seatIndex?seat.seatIndex+'번 자리':'총괄 관리자 자리'):'미배치'}</span></div>{p.duties&&<p>{p.duties}</p>}<div className={styles.controls}>
+ <h3>전체 직원 목록 <small>{employees.length}명</small></h3>{dir.error&&<p role="alert">{dir.error}</p>}{!employees.length&&<p className={styles.note}>아직 등록한 직원이 없어요. 아래 ‘직원 추가’에서 수업에서 만든 봇을 등록해 보세요.</p>}
+ <div className={styles.roster}>{employees.map(p=>{const seat=desks.find(d=>d.employeeId===p.employeeId),link=conn.rows?.find(r=>r.employeeId===p.employeeId);return <article key={p.employeeId}>
+ <div className={styles.cardHead}><strong>{p.name}</strong><div className={styles.chips}><span>{seat?(seat.seatIndex?seat.seatIndex+'번 자리':'총괄 관리자 자리'):'미배치'}</span>{conn.rows&&<span data-status={link?.status||'none'}>{link?connectionLabel(link.status):'보고 미연결'}</span>}</div></div>
+ {p.duties&&<p>{p.duties}</p>}
+ {link?.confirmation&&<p className={styles.confirm}>같은 Telegram 대화에 보내세요. <code>캠퍼스 연결 확인 {link.confirmation}</code></p>}
+ {link?.status==='expired'&&<p className={styles.confirm}>확인 기간이 지났어요. 연결을 해제한 뒤 다시 연결하세요.</p>}
+ <div className={styles.controls}>
  {onJobs&&!demo&&<button type="button" onClick={()=>onJobs({id:p.employeeId,name:p.name})}>업무·결과 보기</button>}
+ {p.telegramUrl&&<a href={p.telegramUrl} target="_blank" rel="noopener noreferrer">{link?.status==='active'?'Telegram에서 업무 맡기기 ↗':'텔레그램 열기 ↗'}</a>}
  {!seat&&<button type="button" disabled={busy||desks.length>=10} onClick={()=>place(p)}>빈자리에 배치</button>}
- {p.telegramUrl&&<a href={p.telegramUrl} target="_blank" rel="noopener noreferrer">텔레그램 열기 ↗</a>}
+ <span className={styles.spacer}/>
+ {link&&<button type="button" className={styles.quiet} disabled={busy||conn.busy} onClick={()=>void release(p,link.id)}>연결 해제</button>}
  <button type="button" className={styles.danger} disabled={busy} onClick={()=>void remove(p)}>직원 삭제</button></div></article>;})}</div>
  {!demo&&(dir.page>1||!!dir.data?.next)&&<><div className={styles.controls}><button disabled={dir.page===1} onClick={dir.prev}>이전 직원 목록</button><span>{dir.page}페이지</span><button disabled={!dir.data?.next} onClick={dir.next}>다음 직원 목록</button></div>
 </>}

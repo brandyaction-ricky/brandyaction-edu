@@ -81,3 +81,8 @@
 .journalForm>p{margin:2px 0 4px;font-size:12px;line-height:1.6;color:#526981}
 .journalForm .field{margin:8px 0 0}
 .journalForm .controls{justify-content:flex-end;margin-top:12px}
+/* 공부방 도구 화면 머리말: 안내 문장과 동료 연결 버튼을 한 줄에 */
+.toolStatus{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:0 0 16px;padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff}
+.toolStatus .caption,.toolStatus .demo{margin:0;font-size:13px}
+.toolStatus .controls{display:flex;margin:0;gap:10px;justify-content:flex-end;font-size:13px}
+.toolStatus .controls>button{flex:none}
