@@ -16,3 +16,4 @@
 .header[data-live] .icon{display:none}
 .header[data-live] h2{font-size:19px;margin:4px 0}
 .header[data-live] h2 br{display:none}
+.root>details{margin-top:16px}
