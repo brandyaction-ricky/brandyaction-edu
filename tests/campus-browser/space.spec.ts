@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 const space=(p:Page)=>p.getByRole('region',{name:'문샷 캠퍼스 공간',exact:true});
-async function enter(p:Page){await p.goto('/space');await p.getByLabel('공간 화면',{exact:true}).selectOption('classic');await p.getByRole('button',{name:'동료와 함께하기',exact:true}).click();await expect(p.getByRole('button',{name:'동료 연결 끊기',exact:true})).toBeVisible();}
+async function enter(p:Page,lightweight=false){await p.goto('/space');await p.getByLabel('공간 화면',{exact:true}).selectOption('classic');if(lightweight)await light(p);await p.getByRole('button',{name:'동료와 함께하기',exact:true}).click();await expect(p.getByRole('button',{name:'동료 연결 끊기',exact:true})).toBeVisible();}
 async function light(p:Page){const b=p.getByRole('button',{name:'가벼운 공간 메뉴',exact:true});if(await b.count())await b.click();}
 async function noOverflow(p:Page){expect(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();}
 
@@ -14,7 +14,9 @@ test('space preferences and private desk notes persist without altering progress
 });
 
 test('two real browser tabs see each other, arbitrate a seat, exchange and delete chat, then leave',async({page,context})=>{
- await enter(page);await light(page);const other=await context.newPage();await enter(other);await light(other);
+ // Exercise the same light-mode entry a member can choose before connecting.
+ // Keep the separate 3D boot/reopen checks below out of this two-client chat budget.
+ await enter(page,true);const other=await context.newPage();await enter(other,true);
  await expect(space(page).getByText('2명 연결됨 · 체험 탭',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'1번 자리에 앉기',exact:true}).click();await expect(other.getByRole('button',{name:'1번 자리 · 사용 중',exact:true})).toBeDisabled();
  await Promise.all([page.getByRole('tab',{name:'라운지',exact:true}).click(),other.getByRole('tab',{name:'라운지',exact:true}).click()]);
@@ -81,13 +83,15 @@ test('exported mini focus keeps time outside the space and returns without shari
 });
 
 test('slow world boot and reopening 3D preserve the chosen character profile',async({page})=>{
+ // Three real software-rendered boots plus a deliberate delayed asset request.
+ test.setTimeout(90000);
  await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');const snapshot=await(await page.request.get('/api/campus')).json();await page.evaluate(({id})=>localStorage.setItem(`moonshot-space-demo-profile:${id}`,JSON.stringify({nickname:'은하 검수 동료',gender:'female',coat:'#165ed6',status:'quiet',lowMotion:false,photoOptIn:false,note:'',desk:''})),{id:snapshot.viewer.id});
  await page.route('**/moon-nasa-lroc-2k.jpg',async route=>{await new Promise(resolve=>setTimeout(resolve,1200));await route.continue();});await page.reload();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
  const world=page.frameLocator('iframe[title="문샷 우주선 3D 공간"]');await expect(world.locator('#ms-loading')).toBeHidden({timeout:30000});await expect(world.locator('svg.lucide')).toHaveCount(7);await expect(world.locator('#ms-me')).toHaveText('은하 검수 동료');await page.getByRole('button',{name:'가벼운 공간 메뉴',exact:true}).click();await page.getByRole('button',{name:'3D 공간 보기',exact:true}).click();await expect(world.locator('#ms-loading')).toBeHidden({timeout:30000});await expect(world.locator('#ms-me')).toHaveText('은하 검수 동료');
 });
 
 test('participation preferences control nearby ephemeral chat and do not replace cohort chat',async({page,context})=>{
- await enter(page);await light(page);await page.getByRole('button',{name:'함께 공부',exact:true}).click();const other=await context.newPage();await enter(other);await light(other);await other.getByRole('button',{name:'함께 공부',exact:true}).click();
+ await enter(page,true);await page.getByRole('button',{name:'함께 공부',exact:true}).click();const other=await context.newPage();await enter(other,true);await other.getByRole('button',{name:'함께 공부',exact:true}).click();
  await Promise.all([page.getByRole('tab',{name:'라운지',exact:true}).click(),other.getByRole('tab',{name:'라운지',exact:true}).click()]);await page.getByLabel('근처 한마디',{exact:true}).fill('지금 같이 한 걸음 해봐요');await page.getByRole('button',{name:'근처에 보내기',exact:true}).click();await expect(other.getByLabel('가까운 동료 대화')).toContainText('지금 같이 한 걸음 해봐요');await expect(other.getByLabel('라운지 대화')).not.toContainText('지금 같이 한 걸음 해봐요');
  const keys=await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('campus-demo-support-v1:')).map(k=>JSON.parse(localStorage.getItem(k)!).preferences.mode));expect(keys).toContain('together');await other.getByRole('button',{name:'조용히 집중',exact:true}).click();await expect(other.getByLabel('가까운 동료 대화')).toContainText('받거나 보내지 않아요');await expect(other.getByLabel('근처 한마디',{exact:true})).toHaveCount(0);await other.close();
 });

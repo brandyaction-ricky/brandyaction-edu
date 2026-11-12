@@ -1,17 +1,20 @@
 import {test,expect,type Page} from '@playwright/test';
 test.setTimeout(120000);
 async function room(page:Page,name:string){const map=page.getByRole('dialog',{name:'공간 이동',exact:true});if(!await map.isVisible())await page.getByRole('button',{name:'공간 이동',exact:true}).click();await map.getByRole('button',{name:name+' 입장',exact:true}).click();await expect(page.getByRole('button',{name:'내 캐릭터',exact:true})).toBeEnabled({timeout:90000});}
-test('all rooms retain camera modes, zoom, drag and movement without drag-to-walk',async({page,isMobile})=>{
+// Give each room its own bounded scenario instead of sharing one four-room budget.
+for(const [name,id]of [['문샷 공부방','study'],['문샷 라이브홀','live'],['문샷 웰컴 존','welcome'],['내 AI 사무실','office']]){
+test(`${name} retains camera modes, zoom, drag and movement without drag-to-walk`,async({page,isMobile})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/campus-tour');const world=page.frameLocator('iframe'),root=world.locator('#office');
- for(const [name,id]of [['문샷 공부방','study'],['문샷 라이브홀','live'],['문샷 웰컴 존','welcome'],['내 AI 사무실','office']]){
   await room(page,name);await expect(root).toHaveAttribute('data-room',id);await page.getByRole('button',{name:'3인칭으로 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','third');await page.getByRole('button',{name:'1인칭으로 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','first');await page.getByRole('button',{name:'공간 전체 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','overall');
   const box=(await root.boundingBox())!,x=box.x+box.width*.5,y=box.y+box.height*.6;await page.mouse.move(x,y);const zoom=await root.getAttribute('data-camera-zoom');await page.mouse.wheel(0,-200);await expect(root).not.toHaveAttribute('data-camera-zoom',zoom!);
   const px=await root.getAttribute('data-player-x'),py=await root.getAttribute('data-player-y'),camera=await root.getAttribute('data-camera-position');await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+80,y-25,{steps:10});await page.mouse.up();await expect(root).not.toHaveAttribute('data-camera-position',camera!);await page.waitForTimeout(600);await expect(root).toHaveAttribute('data-player-x',px!);await expect(root).toHaveAttribute('data-player-y',py!);
   if(!isMobile){await root.focus();await page.keyboard.down('d');try{await expect(root).not.toHaveAttribute('data-player-x',px!,{timeout:10000});}finally{await page.keyboard.up('d');}}
- }
- await page.getByRole('button',{name:'3인칭으로 보기',exact:true}).click();await room(page,'문샷 공부방');await expect(root).toHaveAttribute('data-camera-mode','third');expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.getByRole('button',{name:'3인칭으로 보기',exact:true}).click();await room(page,name==='문샷 공부방'?'문샷 라이브홀':'문샷 공부방');await expect(root).toHaveAttribute('data-camera-mode','third');expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
+}
 test('original full character editor saves, cancels and persists across rooms and reload',async({page})=>{
+ // Twelve model previews, four room visits and a reload on software graphics.
+ test.setTimeout(180000);
  const errors:string[]=[],writes:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()!=='GET')writes.push(r.url());});await page.goto('/campus-tour');await room(page,'문샷 공부방');const world=page.frameLocator('iframe'),dialog=world.getByRole('dialog',{name:'캐릭터 꾸미기',exact:true});
  await page.getByRole('button',{name:'내 캐릭터',exact:true}).click();await expect(dialog).toBeVisible();
  for(const gender of ['male','female']){await dialog.getByLabel('캐릭터 유형').selectOption(gender);for(let i=0;i<6;i++){await dialog.getByLabel('외형 스타일').selectOption(String(i));await expect(world.locator('#avatar-preview')).toHaveAttribute('data-model',`${gender}:${i}`);}}

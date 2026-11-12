@@ -1,5 +1,7 @@
 import {test,expect} from '@playwright/test';
-test.setTimeout(90000);
+// Includes Chromium/page startup and real software-rendered room preparation.
+// The per-action readiness limits and interaction assertions are unchanged.
+test.setTimeout(120000);
 async function enter(page:import('@playwright/test').Page){await page.goto('/webinar?library=1');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:80000});}
 test('customer discovery is a three-question OX flow and popup close returns to movement',async({page})=>{
  await enter(page);await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await page.getByRole('button',{name:'고객 발견 체험',exact:true}).click();
