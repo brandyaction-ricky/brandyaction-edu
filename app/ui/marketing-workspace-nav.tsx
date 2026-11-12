@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link, { useLinkStatus } from 'next/link';
 import { ChevronDown, CircleHelp, ChartLine, Send, Settings2 } from 'lucide-react';
 import { marketingContextHref, recruitmentContext } from '@/lib/marketing-context';
@@ -82,21 +83,22 @@ function NavigationHint() {
 }
 
 export function MarketingWorkspaceNav({ current, available, search = "", prefetchSection }: { current: string; available: Section[]; search?: string; prefetchSection: (section: string) => void }) {
+  const [relatedOpen, setRelatedOpen] = useState(false);
   if (!destinations.some(([key]) => key === current)) return null;
   const guide = guides[current];
   const selectedRecruitment = recruitmentContext(new URLSearchParams(search).get("recruitment"));
   const conversionHref = marketingContextHref('conversion', search);
   const inquiryHref = `${conversionHref}${conversionHref.includes('?') ? '&' : '?'}view=inquiries`;
 
-  return <section className="marketing-workspace" aria-label="마케팅·전환 작업 공간">
-    <div className="marketing-workspace-heading"><strong>마케팅·전환</strong><span>관련 메뉴 빠른 이동</span></div>
+  return <section className={`marketing-workspace${relatedOpen ? " is-expanded" : ""}`} aria-label="마케팅·전환 작업 공간">
+    <div className="marketing-workspace-heading"><strong>마케팅·전환</strong><span>관련 메뉴 빠른 이동</span><button type="button" className="btn marketing-related-toggle" aria-expanded={relatedOpen} aria-controls="marketing-task-links" onClick={() => setRelatedOpen(open => !open)}>{relatedOpen ? "관련 메뉴 접기" : "관련 메뉴 펼치기"}</button></div>
     {selectedRecruitment && <p>선택한 모집 <strong>{selectedRecruitment}</strong></p>}
-    <nav className="marketing-task-nav" aria-label="마케팅 작업 빠른 이동">
+    <nav id="marketing-task-links" className="marketing-task-nav" aria-label="마케팅 작업 빠른 이동">
       {[
         { title: '모집·성과', keys: ['conversion', 'landing', 'links', 'analytics'], icon: ChartLine },
         { title: '메시지', keys: ['templates', 'campaigns', 'automations'], icon: Send },
         { title: '설정', keys: ['seo', 'settings'], icon: Settings2 },
-      ].filter(group => group.keys.some(key => available.some(section => section.key === key))).map(group => <div key={group.title} className="marketing-task-group"><span><group.icon size={14} aria-hidden="true"/>{group.title}</span><div>{destinations.filter(([key]) => group.keys.includes(key) && available.some(section => section.key === key)).map(([key,,description]) => <Link key={key} prefetch scroll={false} href={key === 'conversion' || key === 'landing' ? marketingContextHref(key, search) : '/admin/' + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{adminNavigationTitles[key]}<NavigationHint/></Link>)}</div></div>)}
+      ].filter(group => group.keys.some(key => available.some(section => section.key === key))).map(group => <div key={group.title} className={`marketing-task-group${group.keys.includes(current) ? " is-current" : ""}`}><span><group.icon size={14} aria-hidden="true"/>{group.title}</span><div>{destinations.filter(([key]) => group.keys.includes(key) && available.some(section => section.key === key)).map(([key,,description]) => <Link key={key} prefetch scroll={false} href={key === 'conversion' || key === 'landing' ? marketingContextHref(key, search) : '/admin/' + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{adminNavigationTitles[key]}<NavigationHint/></Link>)}</div></div>)}
     </nav>
     {current === 'conversion' && <Link className="marketing-workspace-inquiry-link" href={inquiryHref} scroll={false}>문의·Jev 검토 바로가기 →</Link>}
     {guide && <details className="marketing-workspace-help" key={current} id="marketing-workspace-help">

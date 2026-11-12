@@ -70,6 +70,11 @@ function DiagnosisManagementScope({member}:{member?:string}){
   const reportsKnown=!!data&&!error&&data.remoteAvailable&&data.rows.every(row=>!row.attemptId||row.state==='in_progress'||row.state==='preparing'||(row.statusAvailable&&!!row.report));
   return <AdminPage width="wide" className="diagnosis-management">
     <AdminPageHeader title="N6 진단 관리" description="수강생에게 진단을 공개하고, 검사와 보고서 진행 상태를 확인하세요." actions={<><AdminLinkButton href="/admin/diagnosis" target="_blank" rel="noopener noreferrer"><Compass size={17}/>N6 진단 받기 (새 탭)<ArrowRight size={16}/></AdminLinkButton>{!member&&<AdminButton aria-expanded={publicationOpen} aria-controls="diagnosis-publication-settings" onClick={()=>setPublicationOpen(open=>!open)}>공개 설정</AdminButton>}</>}/>
+    {!member&&<form className="diagnosis-management-toolbar" onSubmit={e=>{e.preventDefault();setCursors([null]);setQuery(search.trim());}}>
+      <AdminInput label="수강생 검색" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="가입·결제 이름 / 이메일 / 연락처 / 주문번호"/>
+      <AdminButton type="submit" disabled={saving}>검색</AdminButton><AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>
+      <span>한국 시간(KST) · 페이지당 최대 100명 · 30초마다 자동 확인</span>
+    </form>}
     <div className={usability.scopeGroups}>
       <section className={usability.scopeSection} aria-label="진단 대상 범위 요약">
         <div className={usability.scopeHeading}><h2>진단 대상 범위</h2><p>현재 페이지 상태 집계와 기준이 다릅니다.</p></div>
@@ -94,11 +99,7 @@ function DiagnosisManagementScope({member}:{member?:string}){
         <AdminButton tone="primary" disabled={publicationDisabled} onClick={()=>cohort?cohortPublication(true):publication(true)}>{cohort?'선택 기수 공개':'한 번에 모두 공개'}</AdminButton>
         <AdminButton disabled={publicationDisabled} onClick={()=>cohort?cohortPublication(false):publication(false)}>{cohort?'선택 기수 닫기':'한 번에 모두 닫기'}</AdminButton></div>
     </section>}
-    {!member&&<form className="diagnosis-management-toolbar" onSubmit={e=>{e.preventDefault();setCursors([null]);setQuery(search.trim());}}>
-      <AdminInput label="수강생 검색" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="가입·결제 이름 / 이메일 / 연락처 / 주문번호"/>
-      <AdminButton type="submit" disabled={saving}>검색</AdminButton><AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>
-      <span>한국 시간(KST) · 페이지당 최대 100명 · 30초마다 자동 확인</span>
-    </form>}
+
     {member&&<AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>}
     {error&&<AdminInlineError onRetry={()=>void load()}>{error} 현재 상태를 다시 확인한 후 변경해 주세요.</AdminInlineError>}
     {notice&&<p className="diagnosis-management-notice" role="status">{notice}</p>}

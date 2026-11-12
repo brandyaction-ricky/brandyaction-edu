@@ -340,9 +340,7 @@ function StaffPermissions({ data, send, pending }: Props) {
               </label>
             ))}
           </div>
-          <AdminButton variant="primary" type="submit" className="mt24" loading={pending}>
-            권한 저장
-          </AdminButton>
+          <div className="admin-permission-save mt24"><div><strong>{named(selected) || "선택 회원"} · {t(selected, "email")}</strong><p className="meta">저장할 권한: {Object.entries(permissionLabels).filter(([scope]) => permissions[scope]).map(([, label]) => label).join(" · ") || "없음 · 저장하면 일반 회원으로 전환됩니다."}</p></div><AdminButton variant="primary" type="submit" loading={pending}>권한 저장</AdminButton></div>
         </>
       ) : null}
       <Status message={message} />
@@ -1335,7 +1333,7 @@ function Participants() {
             <label>정렬 <select aria-label="회원 정렬" value={sortKey} onChange={(event) => setSortKey(event.target.value as typeof sortKey)}><option value="priority">처리 우선순</option><option value="name">이름순</option><option value="progress">학습진도순</option><option value="missions">미션 제출순</option></select></label>
           </div>
           {loading ? <div className="participant-table-skeleton" role="status" aria-label="회원 현황 불러오는 중">{Array.from({ length: 6 }, (_, index) => <div key={index}><span /><span /><span /><span /><span /></div>)}</div> : (
-          <><AdminDataTable label="회원별 미션 현황 표" density="standard">
+          <><AdminDataTable label="회원별 미션 현황 표" density="standard" tableClassName="admin-mobile-cards">
             <thead><tr>
               <th aria-sort={sortKey === "name" ? "ascending" : undefined}><button type="button" onClick={() => setSortKey("name")}>회원</button></th>
               <th aria-sort={sortKey === "progress" ? "descending" : undefined}><button type="button" onClick={() => setSortKey("progress")}>학습진도</button></th>
@@ -1351,14 +1349,14 @@ function Participants() {
             const manageLabel = statsForMember.state === "review" ? "검토하기" : statsForMember.state === "followup" ? "재제출 확인" : statsForMember.state === "missing" || statsForMember.state === "unconfigured" ? "미션 설정하기" : statsForMember.state === "submitted" || statsForMember.state === "done" ? "제출물 보기" : "상세보기";
             return (
               <tr key={memberId} className={`participant-table-row ${statsForMember.state === "review" ? "needs-review" : ""}`} tabIndex={0} aria-label={`${t(r, "full_name") || "회원"}, ${stateLabels[statsForMember.state]}`} onClick={(event) => openMember(memberId, event.currentTarget)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); openMember(memberId, event.currentTarget); } }}>
-                <td><button type="button" className="participant-member-link" onClick={(event) => openMember(memberId, event.currentTarget.closest("tr") as HTMLElement)}><strong>{t(r, "full_name") || "회원"}</strong><span>{t(r, "email") || "이메일 정보 없음"}</span></button></td>
-                <td><span className="participant-table-progress">{Number(t(r, "learning_percent") || 0)}%</span></td>
-                <td>{statsForMember.total ? `${statsForMember.approved}/${statsForMember.total}` : "—"}</td>
-                <td>{statsForMember.submitted}</td>
-                <td>{statsForMember.review ? <span className="participant-review-count">{statsForMember.review}</span> : "—"}</td>
-                <td className="participant-last-activity" title={r.last_activity ? timeLabel(r.last_activity) : "활동 기록 없음"}>{r.last_activity ? timeLabel(r.last_activity) : "활동 없음"}</td>
-                <td><AdminStatusBadge status={statsForMember.state} label={stateLabels[statsForMember.state]} tone={statsForMember.state === "review" || statsForMember.state === "unconfigured" || statsForMember.state === "followup" ? "warning" : statsForMember.state === "done" ? "success" : statsForMember.state === "progress" || statsForMember.state === "submitted" ? "info" : "neutral"} /></td>
-                <td>{manageHref ? <Link className={`participant-row-action ${statsForMember.state === "review" ? "primary" : ""}`} href={manageHref} onClick={(event) => event.stopPropagation()}>{manageLabel}</Link> : <button type="button" className="participant-row-action" onClick={(event) => { event.stopPropagation(); openMember(memberId, event.currentTarget); }}>{manageLabel}</button>}</td>
+                <td data-label="회원"><button type="button" className="participant-member-link" onClick={(event) => openMember(memberId, event.currentTarget.closest("tr") as HTMLElement)}><strong>{t(r, "full_name") || "회원"}</strong><span>{t(r, "email") || "이메일 정보 없음"}</span></button></td>
+                <td data-label="학습진도"><span className="participant-table-progress">{Number(t(r, "learning_percent") || 0)}%</span></td>
+                <td data-label="미션 진행">{statsForMember.total ? `${statsForMember.approved}/${statsForMember.total}` : "—"}</td>
+                <td data-label="제출">{statsForMember.submitted}</td>
+                <td data-label="검토 필요">{statsForMember.review ? <span className="participant-review-count">{statsForMember.review}</span> : "—"}</td>
+                <td data-label="최근 활동" className="participant-last-activity" title={r.last_activity ? timeLabel(r.last_activity) : "활동 기록 없음"}>{r.last_activity ? timeLabel(r.last_activity) : "활동 없음"}</td>
+                <td data-label="상태"><AdminStatusBadge status={statsForMember.state} label={stateLabels[statsForMember.state]} tone={statsForMember.state === "review" || statsForMember.state === "unconfigured" || statsForMember.state === "followup" ? "warning" : statsForMember.state === "done" ? "success" : statsForMember.state === "progress" || statsForMember.state === "submitted" ? "info" : "neutral"} /></td>
+                <td data-label="관리">{manageHref ? <Link className={`participant-row-action ${statsForMember.state === "review" ? "primary" : ""}`} href={manageHref} onClick={(event) => event.stopPropagation()}>{manageLabel}</Link> : <button type="button" className="participant-row-action" onClick={(event) => { event.stopPropagation(); openMember(memberId, event.currentTarget); }}>{manageLabel}</button>}</td>
               </tr>
             );
           })}
@@ -2028,7 +2026,7 @@ function OrdersPanel({
       <div className={usability.scopeHeading}><h2>주문 목록 검색</h2><p>기간 조회를 누르면 결제 요약과 주문 목록을 함께 갱신합니다.</p></div>
       <AdminFilterBar
         className="admin-pilot-filter admin-orders-filter"
-        filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { changeScope({ course: event.target.value }); }}><option value="">전체 상품</option>{course && !registeredCourses.some(item => item.id === course) && <option value={course}>선택한 상품</option>}{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { changeScope({ status: event.target.value }); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
+        filters={<><AdminSelect label="상품" value={course} onChange={event => { changeScope({ course: event.target.value }); }}><option value="">전체 상품</option>{course && !registeredCourses.some(item => item.id === course) && <option value={course}>선택한 상품</option>}{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" value={status} onChange={event => { changeScope({ status: event.target.value }); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
         date={<><AdminDatePicker label="주문일 시작 · KST" value={from} error={dateError || undefined} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="주문일 종료 · KST" value={to} onChange={event => setTo(event.target.value)} /></>}
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
         onReset={resetFilters}
@@ -2037,7 +2035,7 @@ function OrdersPanel({
       />
       <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
         <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { changeScope({ quick: value }); }} items={[{ value: "all", label: "전체", count: Number(quickCounts?.all || 0) }, { value: "failed", label: "결제 실패", count: Number(quickCounts?.failed || 0) }, { value: "refund", label: "환불 확인", count: Number(quickCounts?.refund || 0) }, { value: "access", label: "수강권 확인", count: Number(quickCounts?.access || 0) }]} />
-        <AdminDataTable label="주문·결제·환불·수강권 연결 목록" density="standard" loading={loading}>
+        <AdminDataTable label="주문·결제·환불·수강권 연결 목록" tableClassName="admin-mobile-cards" density="standard" loading={loading}>
             <thead>
               <tr>
                 {[

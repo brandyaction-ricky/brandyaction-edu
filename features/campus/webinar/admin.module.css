@@ -92,3 +92,7 @@
 .eventStatus[data-status=paused]{background:#fbefd7;color:#805918}
 .eventPanel .removeEvent:hover:not(:disabled){color:#a32e37;background:#fff0f1}
 @media(max-width:800px){.layout{grid-template-columns:minmax(0,1fr)}.eventList{max-height:clamp(240px,40vh,400px)}}
+@media(max-width:720px){
+ .quickLinks{gap:8px}
+ .saveBar strong{flex-basis:100%;overflow-wrap:anywhere}
+}

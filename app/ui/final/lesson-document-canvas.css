@@ -3,8 +3,10 @@
 .edu-admin .ldc-editor:focus-within { box-shadow:none; }
 .edu-admin .panel:has(.ldc-root) { overflow:visible; }
 .edu-admin .curriculum-editor-page .learning-editor--embedded .panel:has(.ldc-layout) { overflow:visible; }
-.ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; border:1px solid #e2e6ec; border-radius:14px; background:#fff; box-shadow:0 4px 16px #17223808; }
-.ldc-sticky-toolbar .lesson-format-controls { border-radius:14px 14px 0 0; }
+.ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; border:1px solid var(--adm-border,#e2e5e9); border-radius:var(--adm-radius-lg,10px); background:var(--adm-surface,#fff); box-shadow:0 4px 16px #17223808; }
+.ldc-sticky-toolbar .lesson-format-controls { border-radius:var(--adm-radius-lg,10px) var(--adm-radius-lg,10px) 0 0; }
+.edu-admin .ldc-sticky-toolbar .ldc-tools .btn { min-width:var(--adm-control,36px); min-height:var(--adm-control,36px); border-radius:var(--adm-radius-md,6px); }
+@media(max-width:720px) { .edu-admin .ldc-sticky-toolbar .ldc-tools .btn { min-width:44px; min-height:44px; } }
 .ldc-sticky-toolbar .ldc-insert-menu { max-height:40vh; overflow:auto; }
 /* Keep tools available in long lessons without covering the editing target. */
 @media(max-width:720px) { .ldc-sticky-toolbar { max-height:min(35dvh,calc(50dvh - 80px)); overflow-y:auto; } }

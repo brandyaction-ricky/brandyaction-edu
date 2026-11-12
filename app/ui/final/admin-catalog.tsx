@@ -28,7 +28,7 @@ import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AdminButton, AdminDataTable, AdminEmptyState, AdminFilterBar, AdminLinkButton, AdminPagination, AdminSearchField, AdminSelect, AdminStatusBadge, AdminSummaryCard } from "@/features/admin-ui";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { Empty, courseType } from "./primitives";
@@ -98,6 +98,8 @@ export function AdminCatalog({
     [tagMode, setTagMode] = useState(""),
     [now] = useState(Date.now);
   const [localMissionState, setLocalMissionState] = useState<MissionScope["state"]>("active");
+  const questionDetailRef = useRef<HTMLElement>(null);
+  const questionListRef = useRef<HTMLElement>(null);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState("");
   const course = memberScope?.course ?? missionScope?.courseId ?? localCourse, week = missionScope?.weekId ?? localWeek;
@@ -853,6 +855,7 @@ export function AdminCatalog({
           {s.key === "questions" && <nav className="question-state-tabs" aria-label="질문 처리 상태">
             {([["open", "답변 대기"], ["answered", "답변 완료"], ["archived", "보관"], ["active", "전체 운영 질문"]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={questionState === value} disabled={loading} onClick={() => changeQuestionState(value)}>{label}</button>)}
           </nav>}
+          {pagination && !["questions","missions"].includes(s.key) && <p className="meta admin-search-scope">검색 범위: {memberScope ? "전체 회원" : "현재 페이지에 불러온 항목"}{!memberScope && " · 다른 페이지의 항목은 페이지를 이동해 확인하세요."}</p>}
           {s.key === "products" && <AdminFilterBar
             className="admin-pilot-filter"
             filters={<><AdminSelect label="상품 유형" labelHidden value={type} onChange={event => { setType(event.target.value); setSelection([]); }}><option value="">전체 유형</option>{["무료 클래스", "유료 클래스", "디지털 상품"].map(value => <option key={value}>{value}</option>)}</AdminSelect><AdminSelect label="상품 표시 범위" labelHidden value={productVisibility} onChange={event => { setProductVisibility(event.target.value as "active" | "archived"); setSelection([]); }}><option value="active">판매 상품</option><option value="archived">삭제된 상품</option></AdminSelect></>}
@@ -935,16 +938,16 @@ export function AdminCatalog({
           ) : s.key === "questions" ? (
             <div className="stack question-admin-list">{process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' && <AdminAiUsage/>}{process.env.NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <QuestionAiBatch changed={onQuestionChanged}/>}
               {q && <div className="question-inbox">
-                <section className="question-inbox-list" aria-label="질문 목록">
+                <section ref={questionListRef} className="question-inbox-list" aria-label="질문 목록">
                   <div className="question-inbox-list-heading"><strong>질문 목록</strong><span>{filtered.length}개 표시</span></div>
-                  {filtered.map((question) => <button className="question-inbox-item" type="button" key={question.id} aria-pressed={question.id === q.id} onClick={() => setSelectedQuestionId(String(question.id))}>
+                  {filtered.map((question) => <button className="question-inbox-item" type="button" key={question.id} aria-pressed={question.id === q.id} onClick={() => { setSelectedQuestionId(String(question.id)); if (window.matchMedia('(max-width: 720px)').matches) requestAnimationFrame(() => { questionDetailRef.current?.focus({preventScroll:true}); questionDetailRef.current?.scrollIntoView({block:'start'}); }); }}>
                     <strong>{t(question, "title") || "제목 없는 질문"}</strong>
                     <span>{t(object(question, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(question, 'courses') as Row, 'title') || '일반 질문'}</span>
                     <span className="question-inbox-item-meta"><AdminStatusBadge status={question.is_archived ? "archived" : t(question, "status")} label={question.is_archived ? "보관" : labels[t(question, "status")]} /><time>{date(question.created_at)}</time></span>
                   </button>)}
                 </section>
-                <article className="question-admin-card question-inbox-detail" key={q.id} aria-label="선택한 질문 상세">
-                  <div className="panel-head">
+                <article ref={questionDetailRef} tabIndex={-1} className="question-admin-card question-inbox-detail" key={q.id} aria-label="선택한 질문 상세">
+                  <button type="button" className="btn question-list-return" onClick={() => { const selected = questionListRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]'); selected?.focus({preventScroll:true}); selected?.scrollIntoView({block:'center'}); }}>← 질문 목록으로</button><div className="panel-head">
                     <div>
                       <p className="meta">{t(object(q, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(q, 'profiles') as Row, 'email')} · {t(object(q, 'courses') as Row, 'title') || '일반 질문'}</p>
                       <AdminStatusBadge status={q.is_archived ? "archived" : t(q, "status")} label={q.is_archived ? "보관" : labels[t(q, "status")]} />
