@@ -19,17 +19,17 @@ import {OfficePanel} from '../office/panel';
 import {useMemo,useEffect,useState} from 'react';
 import {LiveAiPanel} from '../ui/live-ai-panel';
 export {SpacePanel};
-export default function FeaturePanel({id,snapshot,adminSnapshot,onOpen,onAsk,onNavigate,handoff,onNotice,active=true,demo=true,onRefresh,onSelect}:{demo?:boolean;onRefresh?:()=>void;onSelect?:(id:string)=>void;active?:boolean;id:string;snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;onOpen:(id:string,missionId?:string)=>void;onAsk:(value:{lessonId:string;context:string})=>void;onNavigate:(id:string)=>void;handoff?:{lessonId:string;context:string}|null;onNotice:(text:string)=>void}){
+export default function FeaturePanel({archive=true,officeFilter,id,snapshot,adminSnapshot,onOpen,onAsk,onNavigate,handoff,onNotice,active=true,demo=true,onRefresh,onSelect}:{archive?:boolean;officeFilter?:{id:string;name:string;jobId?:string}|null;demo?:boolean;onRefresh?:()=>void;onSelect?:(id:string)=>void;active?:boolean;id:string;snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;onOpen:(id:string,missionId?:string)=>void;onAsk:(value:{lessonId:string;context:string})=>void;onNavigate:(id:string)=>void;handoff?:{lessonId:string;context:string}|null;onNotice:(text:string)=>void}){
  const cohort=snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId)?.cohortId||'';
  const demoCohorts=useMemo(()=>snapshot.scopes.map(s=>({id:s.cohortId,name:s.cohortName,course_id:s.courseId,courses:{title:s.courseTitle,slug:'moonshot-demo'}})),[snapshot.scopes]);
  if(id==='growth')return <LearnerDashboard snapshot={snapshot} demo={demo} onOpen={onOpen} onRefresh={onRefresh||(()=>onNotice('가상 학습 기록입니다.'))} onSelect={onSelect||(()=>onNotice('예시 기수입니다.'))}/>;
- if(id==='office')return <OfficePanel snapshot={snapshot} demo={demo} active={active}/>;
+ if(id==='office')return <OfficePanel initialEmployee={officeFilter} snapshot={snapshot} demo={demo} active={active}/>;
  if(id==='ai'&&!demo)return <LiveAiPanel snapshot={snapshot} demo={false} handoff={handoff} active={active}/>;
  if(id==='ai')return <DemoAi snapshot={snapshot} handoff={handoff} active={active}/>;
- if(id==='journal')return <JournalPanel snapshot={snapshot} demo={demo} active/>;
+ if(id==='journal')return <JournalPanel snapshot={snapshot} demo={demo} active onOpen={id=>onOpen(id)}/>;
  if(id==='feedback'||id.startsWith('community:'))return <CommunityPanel snapshot={snapshot} demo={demo} onOpen={onOpen} initialTab={id==='feedback'?'feedback':id.split(':')[1] as 'mine'|'talent'|'demo_day'}/>;
  if(id.startsWith('business:'))return <BusinessPanel snapshot={snapshot} demo={demo} view={id.slice(9) as BusinessView} onOpenLesson={onOpen} onAsk={onAsk}/>;
- if(id.startsWith('support:'))return <SupportPanel snapshot={snapshot} demo={demo} initialTab={id.slice(8)} focused onOpen={onOpen} onAsk={onAsk}/>;
+ if(id.startsWith('support:'))return <SupportPanel snapshot={snapshot} demo={demo} initialTab={id.slice(8)} focused archive={archive} onOpen={onOpen} onAsk={onAsk}/>;
  if(id==='archive')return <PersonalArchive demo={demo}/>;
  if(id==='legacy-space')return <SpacePanel snapshot={snapshot} demo={demo} initialRenderer="classic" onNavigate={onNavigate} onOpenLesson={onOpen}/>;
  if(id==='admin:dashboard'&&!demo)return <LiveAdminDashboard cohortId={cohort}/>;

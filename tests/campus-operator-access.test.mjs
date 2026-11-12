@@ -23,6 +23,8 @@ test('welcome links route staff and admins to the requested room before enrollme
 test('direct operator entry rejects students, inactive staff and missing sessions',async()=>{
  let user, productAccess=false;const jsx=(type,props)=>({type,props});
  const mocks={'@/lib/operator-permissions':{getOperatorUser:async(scope,actor)=>{assert.equal(scope,'products');assert.equal(actor,user);return actor.role==='admin'||productAccess?actor:null;}},'@/features/campus/webinar/server':{readWebinar:async()=>({cohortId:'event-cohort'})},'@/features/campus/welcome/server':{readWelcome:async()=>({settings:{},resources:[]})},'react/jsx-runtime':{jsx,jsxs:jsx},'@/features/campus/operator-access':policy,'next/navigation':{notFound:()=>{throw Error('404')},redirect:path=>{throw Error('REDIRECT '+path)}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/features/campus/tour/preview':{FourSpacesPreview:'tour'},'@/features/campus/snapshot':{isCampusId:()=>true},'@/features/campus/tour/model':{rooms:[{id:'welcome'},{id:'study'}]}};
+ const entry={};new Function('exports','require',ts.transpileModule(await readFile('features/campus/entry-user.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(entry,name=>mocks[name]);
+ mocks['@/features/campus/entry-user']=entry;
  const mod={};new Function('exports','require',ts.transpileModule(await readFile('app/campus/operator/page.tsx','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(mod,name=>{assert.ok(name in mocks,name);return mocks[name]});
  const before=process.env.EDU_CAMPUS_ENABLED;process.env.EDU_CAMPUS_ENABLED='true';
  const render=()=>mod.default({searchParams:Promise.resolve({room:'welcome'})});
@@ -30,7 +32,7 @@ test('direct operator entry rejects students, inactive staff and missing session
   for(const role of ['admin','staff']){user={id:role,role,status:'active'};const result=await render();assert.equal(result.props.review.room,'welcome');assert.equal(result.props.review.studyPreview,role==='admin');assert.deepEqual(result.props.snapshot.scopes,[]);assert.equal(result.props.snapshot.viewer.id,role);}
   productAccess=true;assert.equal((await render()).props.review.studyPreview,true);
   for(const candidate of [{role:'student',status:'active'},{role:'staff',status:'suspended'}]){user=candidate;await assert.rejects(render(),/404/);}
-  user=null;await assert.rejects(render(),/REDIRECT \/login/);
+  user=null;await assert.rejects(render(),e=>new URL(e.message.slice(9),'https://dev.example').searchParams.get('next')==='/campus/operator?room=welcome');
  }finally{if(before===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=before;}
 });
 test('future buyer can read welcome while refunded and expired buyers cannot',async()=>{
@@ -52,6 +54,7 @@ test('future buyer can read welcome while refunded and expired buyers cannot',as
 test('real attendance display is enabled only by the authorized operator preview route',async()=>{
  let allowed=false,reads=0;const jsx=(type,props)=>({type,props});
  const mocks={'react/jsx-runtime':{jsx,jsxs:jsx},'next/navigation':{notFound:()=>{throw Error('404')}},'@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'marketing');return allowed?{id:'admin'}:null}},'@/features/campus/webinar/room':{WebinarRoom:'room'},'@/features/campus/webinar/server':{readWebinar:async()=>{reads++;return null}},'@/features/campus/webinar/domain':{projectWebinar:w=>w}};
+ mocks['@/features/campus/entry-user']={campusUser:async()=>({id:'operator'})};
  const mod={};new Function('exports','require',ts.transpileModule(await readFile('app/admin/campus/preview/page.tsx','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(mod,name=>{assert.ok(name in mocks,name);return mocks[name]});
  await assert.rejects(mod.default({searchParams:Promise.resolve({slug:'example'})}),/404/);assert.equal(reads,0);allowed=true;const result=await mod.default({searchParams:Promise.resolve({})});assert.equal(result.type,'room');assert.equal(result.props.operatorReview,true);
 });

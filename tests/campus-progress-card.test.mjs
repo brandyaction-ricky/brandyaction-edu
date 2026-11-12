@@ -63,8 +63,7 @@ test('demo export has a visible watermark while real export retains the scope di
 test('export uses current lesson and required-mission denominators, excluding optional approvals', () => {
   const svg = progressCardSvg(snapshot());
   assert.match(svg, /완료한 수업  2 \/ 3/);
-  assert.match(svg, /승인된 필수 과제  2 \/ 4/);
-  assert.match(svg, /의견 대기 1개 · 수정 필요 1개/);
+  assert.doesNotMatch(svg, /승인된 필수 과제|의견 대기|수정 필요/);
 });
 
 test('card records KST as-of date and makes no invented revenue, XP or study-time claim', () => {
@@ -79,6 +78,5 @@ test('empty curriculum exports zero denominators without a fake percentage', () 
   const input = snapshot(); input.lessons = [];
   const svg = progressCardSvg(input);
   assert.match(svg, /완료한 수업  0 \/ 0/);
-  assert.match(svg, /승인된 필수 과제  0 \/ 0/);
   assert.doesNotMatch(svg, /100%|NaN|Infinity/);
 });

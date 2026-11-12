@@ -4,6 +4,13 @@
   "git": {
     "deploymentEnabled": {
       "codex/campus-admin-session": false,
+      "codex/campus-guided-lessons": false,
+      "codex/campus-cohort-reader": false,
+      "codex/office-student-connect": false,
+      "codex/campus-office-report-https": false,
+      "codex/campus-aside-skill-20261107": false,
+      "codex/campus-office-auto-20261107": false,
+      "codex/campus-office-pilot-20261106": false,
       "codex/edu-site-stabilization-20261029": false,
       "codex/edu-readable-view-20261027": false,
       "codex/edu-alumni-practice-20261013": false,
@@ -130,7 +137,8 @@
       "codex/campus-event-zone-20261105": false,
       "codex/campus-private-release-20261105": false,
       "codex/edu-partial-refund-stackable-coupons-20261106": false,
-      "codex/edu-refund-stackable-prod-20261106": false
+      "codex/edu-refund-stackable-prod-20261106": false,
+      "codex/campus-yoonik-audit-20261107": false
     }
   },
   "regions": [

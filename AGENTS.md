@@ -35,3 +35,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - 제품: BrandyAction EDU
 - 기존 Next.js 지침 블록을 유지하고 개발 시 설치 버전의 문서를 확인한다.
+
+- 관리자 화면을 추가·수정할 때는 [관리자 UI 검수 기준](docs/ADMIN_DESIGN_SYSTEM_V1_KO.md#관리자-작업-화면-검수)을 적용한다. 독립 경로도 관리자 스타일 범위를 확인하고 실제 데스크톱·모바일 화면에서 검수한다.

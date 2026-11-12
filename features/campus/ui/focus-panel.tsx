@@ -8,7 +8,7 @@ import {createFocusTransport,type FocusResponse,type FocusWrite} from '../focus-
 import {useCampusDraftGuard} from './draft-guard';
 import styles from './focus-panel.module.css';
 
-export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:boolean;onOpen:(lessonId:string)=>void}){
+export function FocusPanel({snapshot,demo,onOpen,onSaved}:{snapshot:CampusSnapshot;demo:boolean;onOpen:(lessonId:string)=>void;onSaved?:()=>void}){
   const transport=useMemo(()=>createFocusTransport(snapshot,demo),[snapshot,demo]);
   const next=learnerMetrics(snapshot).nextActions[0];
   const [data,setData]=useState<FocusResponse|null>(null);
@@ -38,7 +38,7 @@ export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:
   useEffect(()=>{if(!data||session?.status!=='running')return;const base=Date.parse(data.serverNow),anchor=performance.now();const timer=setInterval(()=>setServerClock(base+performance.now()-anchor),1000);return()=>clearInterval(timer);},[data,session?.status]);
   async function write(command:FocusWrite){
     if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');setSaved(false);const token=generation.current;
-    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start')setAction('');if(command.kind==='finish'){setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
+    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start')setAction('');if(command.kind==='finish'){onSaved?.();setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
     catch(err){if(token===generation.current){const e=err as Error&{status?:number};setError(e.message);if(e.status===401||e.status===403){setData(null);setResult('');setNextStep('');}}}
     finally{if(token===generation.current){inFlight.current=false;setBusy(false);}}
   }
@@ -58,6 +58,6 @@ export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:
       {finishing&&<form className={styles.finishForm} onSubmit={e=>{e.preventDefault();void write({kind:'finish',sessionId:session.id,expectedRevision:session.revision,resultNote:result,nextStep});}}><h3>다음에 돌아올 나에게</h3><label htmlFor="focus-result">오늘 어디까지 했나요?</label><textarea id="focus-result" disabled={busy} value={result} onChange={e=>setResult(e.target.value)} maxLength={1000} rows={3} required placeholder="예: 제안서 첫 문장을 고객이 얻는 변화 중심으로 고쳤어요."/><label htmlFor="focus-next">다음에 시작할 일은?</label><textarea id="focus-next" disabled={busy} value={nextStep} onChange={e=>setNextStep(e.target.value)} maxLength={500} rows={2} required placeholder="예: 실제 고객 한 명에게 이 문장이 이해되는지 물어보기"/><div className={styles.controls}><button type="button" onClick={()=>setFinishing(false)} disabled={busy}>계속 작업하기</button><button className={styles.primary} disabled={busy||!result.trim()||!nextStep.trim()||!!error}>{busy?'저장 중…':'기록 저장하고 마무리'}</button></div></form>}
     </>}
     </>}
-    <p className={styles.footnote}>개인 실행 메모입니다. 타이머는 학습 시간을 인증하지 않으며 과제 제출·승인·점수를 바꾸지 않습니다. 개인정보는 적지 마세요.</p>
+    <p className={styles.footnote}>나만 보는 기록이에요. 개인정보는 적지 마세요.</p>
   </section>;
 }

@@ -8,19 +8,19 @@ test('space preferences and private desk notes persist without altering progress
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await enter(page);await light(page);
  await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('닉네임',{exact:true}).fill('별빛 동료');await page.getByRole('button',{name:'여성형',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('고객 소개 페이지 하나 완성');await page.getByLabel('가벼운 공간 메뉴를 기본으로 사용').check();await page.getByRole('button',{name:'내 자리 저장'}).click();
  await expect(space(page).getByRole('status')).toContainText('내 자리 설정을 저장');
- await page.getByRole('tab',{name:'집중과 휴식'}).click();await page.getByLabel('나만 보는 메모',{exact:true}).fill('개인 검수 메모. 다른 동료에게 보이면 안 됩니다.');await page.getByRole('button',{name:'내 메모 저장'}).click();await page.reload();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
+ await page.reload();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
  await page.getByRole('tab',{name:'내 자리',exact:true}).click();await expect(page.getByLabel('닉네임',{exact:true})).toHaveValue('별빛 동료');await expect(page.getByRole('button',{name:'여성형'})).toHaveAttribute('aria-pressed','true');
- await page.getByRole('tab',{name:'집중과 휴식'}).click();await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('개인 검수 메모. 다른 동료에게 보이면 안 됩니다.');await noOverflow(page);expect(errors).toEqual([]);
+ await page.getByRole('tab',{name:'집중과 휴식'}).click();await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveCount(0);await noOverflow(page);expect(errors).toEqual([]);
 });
 
 test('two real browser tabs see each other, arbitrate a seat, exchange and delete chat, then leave',async({page,context})=>{
  await enter(page);await light(page);const other=await context.newPage();await enter(other);await light(other);
  await expect(space(page).getByText('2명 연결됨 · 체험 탭',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'1번 빈자리',exact:true}).click();await expect(other.getByRole('button',{name:'1번 사용 중',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'1번 자리에 앉기',exact:true}).click();await expect(other.getByRole('button',{name:'1번 자리 · 사용 중',exact:true})).toBeDisabled();
  await Promise.all([page.getByRole('tab',{name:'라운지',exact:true}).click(),other.getByRole('tab',{name:'라운지',exact:true}).click()]);
  await page.getByLabel('라운지 메시지',{exact:true}).fill('오늘 첫 고객 인터뷰를 준비했어요.');await page.getByRole('button',{name:'보내기',exact:true}).click();await expect(other.getByLabel('라운지 대화')).toContainText('오늘 첫 고객 인터뷰를 준비했어요.');
  await page.getByRole('button',{name:'내 메시지 삭제',exact:true}).click();await expect(other.getByLabel('라운지 대화')).not.toContainText('오늘 첫 고객 인터뷰를 준비했어요.');
- await page.getByRole('button',{name:'동료 연결 끊기',exact:true}).click();await expect(space(other).getByText('1명 연결됨 · 체험 탭',{exact:true})).toBeVisible();await other.getByRole('tab',{name:'집중과 휴식'}).click();await expect(other.getByRole('button',{name:'1번 빈자리',exact:true})).toBeEnabled();await noOverflow(other);await other.close();
+ await page.getByRole('button',{name:'동료 연결 끊기',exact:true}).click();await expect(space(other).getByText('1명 연결됨 · 체험 탭',{exact:true})).toBeVisible();await other.getByRole('tab',{name:'집중과 휴식'}).click();await expect(other.getByRole('button',{name:'1번 자리에 앉기',exact:true})).toBeEnabled();await noOverflow(other);await other.close();
 });
 
 test('focus supports 25/50/free, pause/resume, 3/5 minute breaks and reload',async({page})=>{
@@ -69,7 +69,7 @@ test('procedural sound requires user choice and can be changed and muted',async(
 
 test('community-derived demo rewards reach the character without inventing XP on entry',async({page})=>{
  await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await expect(space(page).getByText('체험 성장 기록',{exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('검증된 성장 기록')).toBeVisible();await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await expect(space(page).getByText('체험 성장 기록',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('작업실 보기')).toBeVisible();await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await expect(space(page).getByText('체험 성장 기록',{exact:true})).toBeVisible();
  const world=page.frameLocator('iframe[title="문샷 우주선 3D 공간"]');await expect(world.locator('#ms-loading')).toBeHidden({timeout:30000});await expect(world.locator('#ms-me')).toContainText('레벨 ');await expect(space(page).getByRole('button',{name:'내 로켓 발사 기록 재생',exact:true})).toHaveCount(0);
 });
 
@@ -126,11 +126,13 @@ test('space idle and background rendering stay bounded while the focus clock con
  const timer=await page.getByLabel('집중 타이머',{exact:true}).textContent();expect(timer).not.toBe('25:00');expect(failures).toEqual([]);const observed={sample:'local Chromium, 30s idle + 8s moving + 15s simulated visibility hidden',idleRequestedFrames:idle,idleRenderedFrames:idleDraws,hiddenRequestedFrames:0,timer,pageErrors:failures.length,externalLoadTest:false};const {writeFile}=await import('node:fs/promises');await writeFile(info.outputPath('space-local-performance.json'),JSON.stringify(observed,null,2));await info.attach('space-local-performance.json',{body:JSON.stringify(observed),contentType:'application/json'});
 });
 
- test('space demo-day action opens the correct community host view',async({page})=>{
+ // Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
+ test.fixme('space demo-day action opens the correct community host view',async({page})=>{
  await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await page.getByRole('button',{name:'문샷 결과물 발표회 열기',exact:true}).click();await expect(page.getByRole('button',{name:'결과물 발표회',exact:true})).toHaveAttribute('aria-pressed','true');
  });
 
- test('world uses actual host progress and presentation state, and timer completion never awards XP',async({page})=>{
+ // Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
+ test.fixme('world uses actual host progress and presentation state, and timer completion never awards XP',async({page})=>{
  await enter(page);const world=page.frameLocator('iframe[title="문샷 우주선 3D 공간"]');await expect(world.locator('#ms-loading')).toBeHidden({timeout:30000});
  const send=async(type:string,payload:Record<string,unknown>)=>page.locator('iframe[title="문샷 우주선 3D 공간"]').evaluate((element,{type,payload})=>{const iframe=element as HTMLIFrameElement;iframe.contentWindow!.postMessage({source:'moonshot-host',token:new URL(iframe.src).hash.slice(8),type,payload},location.origin);},{type,payload});
  await expect(world.locator('#ms-cohort-progress')).toBeHidden();await expect(world.locator('#ms-live-demo')).toBeHidden();await expect(world.locator('#ms-focus-finish')).toBeHidden();
@@ -157,7 +159,7 @@ test('space idle and background rendering stay bounded while the focus clock con
  });
 
  test('joining with saved participation does not create a false unsaved profile warning',async({page})=>{
- const dialogs:string[]=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});await enter(page);await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('검증된 성장 기록')).toBeVisible();expect(dialogs).toEqual([]);await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await light(page);await page.getByLabel('나만 보는 메모',{exact:true}).fill('저장 전 메모');await page.getByRole('button',{name:'결과물·의견',exact:true}).click();expect(dialogs).toHaveLength(1);await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('저장 전 메모');
+ const dialogs:string[]=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});await enter(page);await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('작업실 보기')).toBeVisible();expect(dialogs).toEqual([]);await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await light(page);await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('저장 전 메모');await page.getByRole('button',{name:'결과물·의견',exact:true}).click();expect(dialogs).toHaveLength(1);await expect(page.getByLabel('나만 보는 책상 메모')).toHaveValue('저장 전 메모');
  });
 
 

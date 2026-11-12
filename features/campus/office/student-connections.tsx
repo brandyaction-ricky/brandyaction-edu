@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import styles from './agents/panel.module.css';
 import { createClient } from '@/lib/supabase/client';
 
 type Employee = { employeeId: string; name: string; telegramUrl: string | null };
 type Connection = { id: string; employeeId: string; status: 'pending'|'active'|'expired'; confirmation: string | null };
 
-export function StudentConnections({enrollmentId,employees}:{enrollmentId:string;employees:Employee[]}) {
+export function StudentConnections({enrollmentId,employees,onJobs}:{enrollmentId:string;employees:Employee[];onJobs?:(employee:{id:string;name:string})=>void}) {
   const [rows,setRows]=useState<Connection[]|null>(null);
   const [employee,setEmployee]=useState(''), [code,setCode]=useState(''), [message,setMessage]=useState(''), [busy,setBusy]=useState(false);
   const locked=useRef(false);
@@ -43,10 +44,18 @@ export function StudentConnections({enrollmentId,employees}:{enrollmentId:string
       <button type="submit" disabled={busy||!/^MS1-\d{10}-[\da-f]{64}$/.test(code.trim())}>연결 요청</button>
     </form>}
     {rows&&!rows.length&&!available.length&&<p>텔레그램 봇 주소가 있는 직원을 먼저 추가하세요.</p>}
-    {rows?.map(r=><div key={r.id}><strong>{employees.find(p=>p.employeeId===r.employeeId)?.name||'이전 직원'}</strong>
+    {rows?.map(r=>{
+      const profile=employees.find(p=>p.employeeId===r.employeeId);
+      const name=profile?.name||r.employeeId;
+      return <div key={r.id}><strong>{name}</strong>
       <p>{r.status==='active'?'업무 보고 연결됨':r.status==='expired'?'확인 기간 만료 · 해제 후 다시 연결하세요.':'직원 확인 대기'}</p>
       {r.confirmation&&<p>같은 Telegram 대화에 보내세요. <code>캠퍼스 연결 확인 {r.confirmation}</code></p>}
-      <button disabled={busy} onClick={()=>void act('revoke',r.id)}>연결 해제</button></div>)}
+      {r.status==='active'&&<div className={styles.controls}>
+        {profile?.telegramUrl&&<a href={profile.telegramUrl} target="_blank" rel="noopener noreferrer">Telegram에서 업무 맡기기 ↗</a>}
+        {onJobs&&<button type="button" onClick={()=>onJobs({id:r.employeeId,name})}>이 직원의 작업함 열기</button>}
+      </div>}
+      <button disabled={busy} onClick={()=>void act('revoke',r.id)}>연결 해제</button></div>;
+    })}
     <button disabled={busy} onClick={()=>void act('list')}>연결 상태 새로고침</button>
     {message&&<p role="status">{message}</p>}
   </section>;

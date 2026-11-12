@@ -171,3 +171,15 @@ test('older email-change links guide members when their code opened in a differe
   const oauthFailure = await exports.GET(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy%2Fprofile&provider=kakao'));
   assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback&next=%2Fmy%2Fprofile');
 });
+
+test('a same-host PKCE fallback returns to the selected campus page', () => {
+  const input = { pathname: '/', code: '015bc889-bec6-4abd-b920-827370ec2605', cookieNames: ['sb-dev-auth-token-code-verifier'] };
+  for (const target of ['/campus/workspace?enrollmentId=a', '/admin/campus/preview?slug=welcome', '/admin/campus/study?lesson=b']) {
+    const path = oauthCallbackRecoveryPath({ ...input, campusReturn: target });
+    assert.equal(new URL(path, 'https://edu.example').searchParams.get('next'), target);
+  }
+  for (const target of ['//outside.example', '/campus/workspace/../other', '/admin']) {
+    const path = oauthCallbackRecoveryPath({ ...input, campusReturn: target });
+    assert.equal(new URL(path, 'https://edu.example').searchParams.get('next'), '/my');
+  }
+});

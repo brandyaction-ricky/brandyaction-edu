@@ -9,8 +9,8 @@
     {
       "path": "office3d.js",
       "sourceSha256": "b45dd4c5cba821669a53bdb666b0ea6b21ca8b16a163a7a1c5c6e6bb9b7ab748",
-      "importSha256": "5e07f48b00a88c80998af9bf5c5db39b1085ea2bf3ebc95e03553f8fd48daffe",
-      "localPatch": "Export existing bundled InstancedMesh and SphereGeometry classes for the campus adapter. Original avatar models and bundled licenses remain unchanged."
+      "importSha256": "3033de614326bfa4eff642bb283f14ebff03f261be05f02db124180399adcadd",
+      "localPatch": "Export existing bundled MeshBasicMaterial, InstancedMesh and SphereGeometry classes for the campus adapter. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
     },
     {
       "path": "campus-plan.js",
@@ -431,6 +431,21 @@
       "path": "licenses/THREE-LICENSE.txt",
       "sourceSha256": "97de7ac302052bcea7f20e5ae89635c10e049614f56409288d554d63fceb614f",
       "importSha256": "97de7ac302052bcea7f20e5ae89635c10e049614f56409288d554d63fceb614f"
+    },
+    {
+      "path": "ambient-mixer.js",
+      "sourceSha256": "94c162216ebd4b110a9bf6f86dc6e401cfd1bbe1e25a459c0adfe2095fcae623",
+      "importSha256": "94c162216ebd4b110a9bf6f86dc6e401cfd1bbe1e25a459c0adfe2095fcae623"
+    },
+    {
+      "path": "recorded-ambience.js",
+      "sourceSha256": "824c70cf06616714099192028192eeccee6894328b701d72af31ab919d3da564",
+      "importSha256": "2dc78d78120df15929607ef7ac83405d3313bb650dbe1c4e567146cae3337561"
+    },
+    {
+      "path": "interior-interactions.js",
+      "sourceSha256": "0eee02ee4af291548c234ee2ef5c5a7b251377efa83c36195c929dfad27de95e",
+      "importSha256": "0eee02ee4af291548c234ee2ef5c5a7b251377efa83c36195c929dfad27de95e"
     }
   ]
 }

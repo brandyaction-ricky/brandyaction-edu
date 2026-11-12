@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {build} from 'esbuild';
 async function moduleFrom(path){const b=await build({entryPoints:[path],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(b.outputFiles[0].text).toString('base64'));}
-const {tourTasks,roomTasks}=await moduleFrom('features/campus/tour/tasks.ts');
+const {tourTasks,roomTasks,taskOpen}=await moduleFrom('features/campus/tour/tasks.ts');
 const coverage=JSON.parse(readFileSync('features/campus/tour/coverage.json','utf8'));
 test('all 78 original requirements have an explicit destination and completion boundary',()=>{
  assert.deepEqual(coverage.features.map(f=>f.number),Array.from({length:78},(_,i)=>i+1));
@@ -24,4 +24,14 @@ test('preview archive validates updates and stores only locally with revision pr
  await assert.rejects(()=>demoArchiveCall('',undefined,{...command,enrollmentId:'00000000-0000-4000-8000-000000000088'}));
  await assert.rejects(()=>demoArchiveCall('',undefined,{...command,url:'javascript:alert(1)'}));
  delete globalThis.localStorage;
+});
+test('tasks behind a switched-off server module leave the study menu, the rest stay',()=>{
+ const off={focus:false,support:false,community:false},study=roomTasks('study','student');
+ assert.deepEqual(study.filter(t=>taskOpen(t.id,off)).map(t=>t.id),['learning','growth','focus','ai','lounge','sound']);
+ const on={focus:true,support:true,community:true},kept=['learning','growth','focus','journal','ai','feedback','lounge','sound'];
+ // The CEO's utility review left eight study tasks; the rest stay out with every switch on and in the demo tour.
+ assert.deepEqual(study.filter(t=>taskOpen(t.id,on)).map(t=>t.id),kept);assert.deepEqual(study.filter(t=>taskOpen(t.id)).map(t=>t.id),kept);
+ assert.equal(taskOpen('admin:support',on),false);assert.equal(taskOpen('admin:moderation',on),true);
+ assert.equal(taskOpen('admin:moderation',off),false);assert.equal(taskOpen('admin:support',off),false);assert.equal(taskOpen('admin:dashboard',off),true);
+ for(const room of ['live','welcome','office'])assert.ok(roomTasks(room,'student').every(t=>taskOpen(t.id,off)));
 });

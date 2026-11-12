@@ -1,5 +1,47 @@
 # Personal AI Office adapter v1
 
+## Telegram / Aside development pilot (2026-11-06)
+
+`scripts/campus-aside-watch.mjs` observes one explicitly selected local Aside
+session using documented CLI/REPL APIs. It does not consume Telegram updates,
+replace a webhook, execute AI tasks, or collect a vault. The employee receives
+instructions through its Telegram channel. The watcher reports the exact matched
+request, actual turn lifecycle and final answer to the signed webhook. A received
+answer remains **review**, never approval.
+
+1. Use verified DEV Supabase/Vercel and the owner's active QA enrollment. Create
+   the task in the office and note its ID (revision 1).
+2. Register one connector/owner mapping and a fresh signing key. Keep the local
+   key in a private file (600 on macOS/Linux), outside Git. Telegram credentials
+   remain in Aside's OS secure storage.
+3. Record the real Aside account, channel connection and session ID. Hash the
+   **exact** next Telegram task text with `promptDigest`; set `notBefore` before
+   sending it. Put the job ID in the message. Follow-ups or repeated identical
+   requests require reconciliation; the watcher does not guess.
+4. Prepare a private config with `environment: "development"`, `endpoint`,
+   `connectorId`, `keyVersion`, `secretFile`, `jobId`, `account` (e.g. `u0`),
+   `connectionId`, `sessionId`, `promptHash`, `notBefore` and `reportDir`.
+   Run `node scripts/campus-aside-watch.mjs /absolute/private/config.json`.
+   Optional `transport: "vercel-cli"` reuses the operator's existing Vercel login
+   for protected Preview access; it is not a student deployment requirement.
+5. Send the task in Telegram. Verify queued/running/review and the actual result
+   in the office, then reopen it. The panel polls every five seconds only while
+   active and visible, pauses during mutations, and reports refresh failures.
+6. On a transport failure, inspect saved reports and rerun the same config.
+   Persisted event IDs/bodies and server receipts prevent duplicate reports.
+   Never reset revisions or auto-approve a result to pass QA.
+
+`campus-office-report.mjs prepare INPUT_JSON SAVED_REPORT` and
+`send CONFIG_JSON SAVED_REPORT` also support explicit employee reports.
+A signature authenticates the reporter; it does not independently prove the work.
+
+Pilot limits: one existing job at revision 1, one exact Telegram request and
+Aside turn, latest 100 transcript messages, 30-minute observation, final answer
+of 10–10,000 characters. Missing/ambiguous evidence fails visibly. No self-service
+pairing, daemon, heartbeat, multi-employee dispatch or production rollout is
+implemented here. Disable the connector mapping/key when retiring the pilot.
+Local fixtures are synthetic; real DEV/Telegram evidence belongs in the OS log.
+
 Status (2026-11-05): Yoonik’s ZIP has been received and its character/space renderer is integrated. Personal bot profiles can be imported, saved and synchronized under the EDU account. The campus is deployed privately for active administrators; existing students cannot enter. The ZIP contains frontend desktop API calls, but no executable desktop worker backend or production worker credentials. Actual Telegram worker execution/live state is therefore not connected, and outbound dispatch remains OFF.
 
 ## EDU boundary
@@ -196,3 +238,23 @@ late callback fencing, key rotation/mapping drift, status reconciliation and fai
 against that worker. Keep the feature off if any guarantee is missing. Rollback must preserve
 outbox/receipts and pending/uncertain dispatches; do not remove the cancellation fence while
 such records or in-flight worker requests exist.
+
+### DEV 검수 직원의 직접 HTTPS 보고
+
+개인 사무실 등록 한 건에 만료 시간이 있는 256비트 HMAC 키를 발급한다. 운영자가 DEV 함수의 `CAMPUS_OFFICE_REPORT_DEV_BINDING`에 `connectorId, keyVersion, ownerId, enrollmentId, secret, expiresAt`을 설정하고, 동일한 연결 ID·버전을 기존 DB 연결 테이블에 활성화한다. 이 단일 직원용 설정을 학생 전체에 공유하지 않는다. 학생 측 기존 Aside 스킬은 HTTPS 서명에 필요한 키만 로컬 비공개 파일에서 읽는다. 배포·DB 관리 키는 필요하지 않다.
+
+DEV 함수는 기존 webhook 검증기를 공유한다. 배포용 임시 프로젝트의 `supabase/functions/campus-office-report/index.ts`를 저장소 루트에서 다음과 같이 빌드한다.
+
+```sh
+node_modules/.bin/esbuild supabase/functions/campus-office-report/index.ts --bundle --platform=node --format=esm --outfile="$STAGING/supabase/functions/campus-office-report/index.ts"
+```
+
+해당 DEV 함수만 `verify_jwt = false`로 설정한다. 대신 모든 보고에 HMAC, 5분 서명 시각, 유효한 개인 연결, 수강 및 업무 소유권 검사를 적용한다. 운영 프로젝트에서는 함수가 요청을 거절한다. 회수는 해당 DB 연결의 `enabled=false`로 처리하고, 전용 함수 비밀 설정을 해제한다. 다음 검수에는 새 키를 발급한다. 이전 업무 보고 파일은 원래 연결에 보관한다.
+
+### DEV 수강생 직접 연결
+
+내 AI 직원에서 본인이 등록한 직원과 수강권을 선택한다. Aside 보고 스킬의 `캠퍼스 연결 준비` 명령은 Telegram 개인 대화별로 기기 키를 만들고, 10분짜리 연결 코드만 돌려준다. 학생이 코드를 입력하면 캠퍼스에서 확인번호를 보여준다. 같은 직원 대화에서 `캠퍼스 연결 확인 <확인번호>`가 성공한 뒤부터 업무를 보고할 수 있다. 기기 키는 해당 계정의 비공개 디렉터리에 보관한다. 스킬 ZIP에는 학생 정보나 키가 들어가지 않는다.
+
+브라우저의 관리 RPC는 현재 로그인과 유효 수강권 및 저장된 직원 프로필을 확인한다. 보고 전용 DEV 함수는 기기 키의 해시만 DB에 전달한다. DB는 연결 레코드를 잠근 상태에서 소유자·직원·수강권과 해당 직원이 등록한 업무를 확인하고 기존 등록/이력 RPC를 사용한다. 연결을 해제하거나 직원 프로필을 제거하면 키를 재사용할 수 없다. 과거 업무와 초안은 본인 작업함에 남는다. 서비스 역할에만 보고 RPC 실행 권한이 있다.
+
+마이그레이션 뒤 새 경로는 기본 비활성이다. 검증된 DEV 프로젝트에서만 private.campus_student_reporting_enabled에 true 한 행을 등록한다. 이를 비우면 학생 직접 연결과 보고를 중단할 수 있다. DEV Edge Function campus-student-report는 앞 절과 같은 esbuild 명령으로 동명의 소스를 번들하고 해당 함수만 verify_jwt=false로 배포한다. 서버 프로젝트 주소와 개별 기기 키를 검사한다.

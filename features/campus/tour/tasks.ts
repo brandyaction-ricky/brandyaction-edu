@@ -5,20 +5,20 @@ export const tourTasks:TourTask[]=[
  task('library:all','library','무료로 배우기','자료·다시보기','무료 자료와 다시보기를 한 화면에서 선택'),
  task('library:files','library','무료로 배우기','무료 자료','공개 자료 보기와 다운로드'),task('library:replay','library','무료로 배우기','다시보기','공개 유튜브 영상으로 복습하기'),
  task('learning','study','배우고 실행하기','수업·과제','오늘 할 수업과 제출할 과제'),
- task('growth','study','배우고 실행하기','성장·미션 지도','일차별 진행, 이정표와 성장 카드'),
+ task('growth','study','배우고 실행하기','성장·미션 지도','일차별 진행과 완료한 수업'),
  task('focus','study','배우고 실행하기','집중과 휴식','25분·50분·자유 집중과 짧은 휴식'),
- task('journal','study','배우고 실행하기','실행 수첩','오늘 한 일과 다음 행동 다시 보기'),
- task('ai','study','질문하고 도움받기','AI 조교·멘토','수업 선택, 캡처 첨부와 질문 흐름',false,true),
+ task('journal','study','배우고 실행하기','실행 수첩','15분 실행과 지난 기록'),
+ task('ai','study','질문하고 도움받기','AI 조교·멘토','AI에게 묻고, 풀리지 않으면 멘토에게',false,true),
  task('support:request','study','질문하고 도움받기','도움 요청','시도한 방법과 막힌 부분 정리'),
  task('support:history','study','질문하고 도움받기','내 지원 기록','요청한 도움과 담당자 답변'),
  task('support:sessions','study','질문하고 도움받기','공부 약속·질문 상담','같이 공부할 시간과 상담 예약'),
  task('support:library','study','질문하고 도움받기','수업 자료 찾기','막힌 상황에 맞는 공개 수업 찾기'),
- task('feedback','study','동료와 함께하기','결과물·동료 피드백','파일·사이트 공유, 의견과 수정 비교'),
+ task('feedback','study','동료와 함께하기','결과물·동료 피드백','결과물 올리기, 의견 주고받기, 고친 버전 비교'),
  task('community:mine','study','동료와 함께하기','내 결과물·로켓','내 작업 모음, 성장 점수와 발사 조건'),
  task('community:talent','study','동료와 함께하기','재능 교환','서로 필요한 도움을 제안하고 완료하기'),
  task('community:demo_day','study','동료와 함께하기','결과물 발표회','발표 일정, 동료 질문과 발표 기록'),
  task('lounge','study','동료와 함께하기','동료와 대화','공부방에 함께 있는 동료를 보고 인사하기'),
- task('sound','study','나에게 맞추기','공간 소리·참여 방식','빗소리·바람·무음, 조용히 또는 함께'),
+ task('sound','study','나에게 맞추기','조명·배경음','조명과 빗소리·키보드 소리 고르기'),
  task('legacy-space','study','나에게 맞추기','기존 우주선·기념사진','기존 달·로켓 공간과 사진·발사 연출'),
  task('desk','study','나에게 맞추기','내 자리 설정','개인 책상 메모와 사진 참여 설정'),
  task('support:settings','study','나에게 맞추기','참여 설정·수업 변경','알림 선택과 바뀐 수업 확인'),
@@ -39,5 +39,11 @@ export const tourTasks:TourTask[]=[
  task('admin:cases','office','관리자 전용','성과 사례 검토','사례 동의·보완·공개 준비',true),
  task('admin:links','live','관리자 전용','입장 링크 관리','웨비나·웰컴·수강생 링크 설정',true),
 ];
+// Server switches (EDU_CAMPUS_*_ENABLED) behind each task. A task whose switch is off can only answer "준비 중인 기능입니다", so the menu leaves it out.
+export type TourModules={focus:boolean;support:boolean;community:boolean;business?:boolean};
+export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')||id==='admin:support'?'support':undefined;
+// Left out after the CEO's utility review (2026-11-11): they need staff to answer or run them, or repeat another task. Code and tables stay; remove an id here to bring it back.
+export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:library','support:settings','admin:support','community:mine','community:talent','community:demo_day','desk','legacy-space']);
+export const taskOpen=(id:string,modules?:TourModules)=>{if(retiredTasks.has(id))return false;const m=taskModule(id);return !modules||!m||modules[m];};
 export function roomTasks(room:TourRoom,role:TourRole){return tourTasks.filter(t=>t.room===room&&(!t.admin||role==='admin'));}
 export const taskById=(id:string)=>tourTasks.find(t=>t.id===id);
