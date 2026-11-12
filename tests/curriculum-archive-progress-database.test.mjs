@@ -100,6 +100,16 @@ test('archived ordinals are independent, restore preserves records, and insertin
   // Archived mappings retain history but cannot cause active duplicate errors.
   await archive(learning.lesson,true);assert.equal(await gate(learningNext.lesson),true);await f.parity();
  });
+ await t.test('batch care status preserves the live lightweight receipt projection',async()=>{
+  const cells=async()=>(await f.db.query('select edu_private.edu_learning_care_cells($1) as r',[f.enrollment])).rows[0].r;
+  const before=await cells();
+  const original=(await f.db.query("select pg_get_functiondef('public.edu_block_submission_receipt(public.edu_lesson_block_submissions)'::regprocedure) as definition")).rows[0].definition;
+  try {
+   await owner(`create or replace function public.edu_block_submission_receipt(p_row public.edu_lesson_block_submissions)
+    returns jsonb language plpgsql security definer set search_path='' as $$begin raise exception 'FULL_RECEIPT_MUST_NOT_BE_LOADED'; end$$;`);
+   assert.deepEqual(await cells(),before,'care projection must not hydrate complete answers and block documents per cell');
+  } finally { await owner(original); }
+ });
  await t.test('restore permissions, archived parent and function execution grants remain enforced',async()=>{
   await assert.rejects(archive(archived,false,true,f.student),/CURRICULUM_FORBIDDEN/);
   await archive(f.week,true,false,f.admin,'week');

@@ -304,9 +304,15 @@ begin
   from gates g left join tracked_predecessors t on t.ordinal=g.ordinal-1
   left join untracked_sequence u on u.id=g.id
  ), with_receipts as (
-  select g.*,s.id as submission_id,case when s.id is not null then public.edu_block_submission_receipt(s) end as receipt
+  -- Preserve the live batch projection: do not fetch complete submission receipts
+  -- (answers and block documents) for every learner/lesson cell.
+  select g.*,s.id as submission_id,case when s.id is not null then jsonb_build_object(
+   'state',case when r.decision='auto_approved' then 'approved' else coalesce(r.decision,s.outcome) end,
+   'createdAt',s.created_at,'reviewedAt',r.created_at) end as receipt
   from with_timing g left join lateral (select * from public.edu_lesson_block_submissions s
    where s.enrollment_id=e.id and s.lesson_id=g.id order by s.sequence desc limit 1) s on true
+  left join lateral (select decision,created_at from public.edu_lesson_block_reviews r
+   where r.submission_id=s.id order by sequence desc limit 1) r on true
  ), states as (
   select *,case
    when not published then 'scheduled'
