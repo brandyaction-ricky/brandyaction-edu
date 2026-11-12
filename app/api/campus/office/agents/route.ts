@@ -5,12 +5,13 @@ import {readSpaceJson} from '@/features/campus/space/body';
 import {privateReply,problem} from '@/features/campus/webinar/server';
 import {fail,uuid} from '@/features/campus/webinar/domain';
 import {BotOfficeModel,type BotDocument} from '@/public/campus/world/office/bot-profile.mjs';
+import {canReviewCampus} from '@/features/campus/operator-access';
 import {hasOfficePilot} from '@/features/campus/office/pilot';
 async function access(enrollment:unknown, includePilot=false) {
  if(process.env.EDU_CAMPUS_ENABLED!=='true')fail('공간이 준비 중입니다.',404);
  if(!uuid(enrollment))fail('수강권을 확인해 주세요.');
  const user=await getAuthenticatedUser();if(!user)fail('로그인이 필요합니다.',401);
- const enabled=process.env.EDU_CAMPUS_OFFICE_ENABLED==='true';
+ const enabled=process.env.EDU_CAMPUS_OFFICE_ENABLED==='true'||canReviewCampus(user);
  const pilot=(!enabled || includePilot) && await hasOfficePilot(enrollment);
  if(!enabled&&!pilot)fail('공간이 준비 중입니다.',404);
  const db=await createClient();
