@@ -24,3 +24,19 @@ test('business record uses the authenticated API and reopens from server data',a
  await page.route('**/api/campus/business**',r=>{if(r.request().method()==='POST'){const b=r.request().postDataJSON();writes.push(b);const record={...b,user_id:student.viewer.id,enrollment_id:eid,revision:1,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),archived_at:null};records=[record];return r.fulfill({json:{record}});}return r.fulfill({json:{records,nextCursor:null,links:[],replies:[],cases:[]}});});
  await page.goto('/campus/workspace?tourLive=1&enrollmentId='+eid);await room(page,'내 AI 사무실');await task(page,'내 사업 계획');const form=page.getByRole('form',{name:'내 사업 계획 작성'});await form.getByLabel('기록 제목').fill('DEV 연결 계획');await form.getByLabel('상품·서비스').fill('QA 상담');await form.getByLabel('핵심 고객').fill('QA 고객');await form.getByLabel('고객이 해결하고 싶은 문제').fill('입장 흐름 검수');await form.getByLabel('판매 가격').fill('1000');await form.getByRole('button',{name:'내 기록에 저장',exact:true}).click();await expect.poll(()=>writes.length).toBe(1);expect(writes[0].enrollmentId).toBe(eid);await expect(page.getByRole('status').filter({hasText:'내 비공개 기록에 저장했어요.'})).toBeVisible();await page.getByRole('button',{name:'내 사업 계획 닫기',exact:true}).click();await task(page,'내 사업 계획');await expect(page.getByText('DEV 연결 계획',{exact:true})).toBeVisible();expect(await page.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('moonshot-business-demo')))).toBe(false);
 });
+
+test('office result remains openable after first desks paint and before the room is ready',async({page})=>{
+ await setup(page);
+ await page.route('**/api/campus/library**',r=>r.fulfill({json:{resources:[]}}));
+ const job={id:'80000000-0000-4000-8000-000000000001',employee_id:'writer',objective:'첫 수업 공지 작성',status:'review',revision:4,draft_text:'수강생에게 보낼 실제 공지 본문',material_urls:[],output_type:'copy',updated_at:'2026-11-12T00:00:00Z'};
+ await page.route('**/campus/world/tour/index.html*',r=>r.fulfill({contentType:'text/html',body:`<button>책상만 표시</button><script>const token=new URLSearchParams(location.hash.slice(1)).get('bridge');document.querySelector('button').onclick=()=>parent.postMessage({source:'moonshot-tour',token,type:'office-desks-visible',payload:{visible:true}},location.origin)</script>`}));
+ await page.route('**/api/campus/space**',r=>r.fulfill({json:{profile:defaultProfile('동료'),peers:[],messages:[],seats:[]}}));
+ await page.route('**/api/campus/office/agents?**',r=>r.fulfill({json:{document:{profiles:[{employeeId:'writer',name:'공지 직원'}]},desks:[{employeeId:'writer',jobId:job.id,status:'review'}],employees:[],next:null}}));
+ await page.route('**/api/campus/office?**',r=>r.fulfill({json:{jobs:[job],detail:new URL(r.request().url()).searchParams.get('job')===job.id?job:null,history:[],connection:'incoming_adapter_registered'}}));
+ await page.goto('/campus/workspace?tourLive=1&enrollmentId='+eid);await room(page,'내 AI 사무실');
+ const result=page.getByRole('region',{name:'직원 업무'}).getByRole('button',{name:'공지 직원 · 검토할 결과 업무 열기'});
+ await expect(result).toBeVisible();
+ await page.frameLocator('iframe').getByRole('button',{name:'책상만 표시'}).click();
+ await expect(page.getByRole('button',{name:'공간 전체 보기',exact:true})).toBeDisabled();
+ await result.click();await expect(page.getByRole('article',{name:'선택한 AI 직원 작업'})).toContainText(job.draft_text);
+});

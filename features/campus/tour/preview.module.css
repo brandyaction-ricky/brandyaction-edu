@@ -74,13 +74,28 @@ p.loading{pointer-events:none}
   pointer-events:none;
 }
 
+.deskShortcuts {
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(19rem, calc(100vw - 24px));
+  margin: 0 0 6px;
+  padding: 7px 9px;
+  border: 1px solid #51738f;
+  border-radius: 12px;
+  background: #102438f5;
+  color: #edf6ff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.deskShortcuts > strong { font-size: 12px; color: #c1d4e5; }
+.deskShortcuts button:focus-visible { outline: 2px solid #9dd3ff; outline-offset: -3px; }
 .loadingDeskList {
   display: grid;
   gap: 4px;
   margin: 4px 0 0;
   padding: 0;
   list-style: none;
-  max-height: 42dvh;
+  max-height: min(23dvh, 9rem);
   overflow: auto;
 }
 .loadingDeskList button {
@@ -89,6 +104,7 @@ p.loading{pointer-events:none}
   justify-content: space-between;
   gap: 14px;
   min-height: 44px;
+  width: 100%;
   max-width: 100%;
   padding: 6px 10px;
   border: 1px solid #51738f;

@@ -95,7 +95,10 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
   if(studentOffice){
    // Give the signed-in desk read and its first paint priority over WebGL startup.
    if(tool)return;
-   const delay=deskLoaded?80:1800;
+   // On touch screens give the HTML actions a brief input window before WebGL
+   // can occupy the main thread. Selecting a job cancels this timer.
+   const touch=window.matchMedia('(pointer: coarse), (max-width: 600px)').matches;
+   const delay=deskLoaded?(touch?900:80):1800;
    const timer=setTimeout(()=>setSceneStarted(true),delay);
    return ()=>clearTimeout(timer);
   }
@@ -250,16 +253,16 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  },[sceneStarted,startTourFrame]);
  const pendingDeskJobs=desksVisible&&role==='student'&&deskList?.enrollment===snapshot.selectedEnrollmentId&&
    visibleTasks('office',role).some(task=>task.id==='office') ? deskList?.jobs : undefined;
- const loadingDeskList=pendingDeskJobs?.length ? <section className={styles.loading} aria-label="직원 업무">
-   <strong>직원 업무</strong><ul className={styles.loadingDeskList}>{pendingDeskJobs.map(job=>{
+ const deskShortcuts=!editing&&pendingDeskJobs?.length ? <section className={styles.deskShortcuts} aria-label="직원 업무">
+   <strong>직원 업무</strong><ul className={styles.loadingDeskList}>{pendingDeskJobs.slice().sort((a,b)=>Number(b.status==='review')-Number(a.status==='review')).map(job=>{
      const label=job.status==='running'?'진행 중':'검토할 결과';
      return <li key={job.jobId}><button type="button" aria-label={job.name+' · '+label+' 업무 열기'} onClick={()=>{
        setOfficeFilter(job);selectTask('office');
      }}><span>{job.name}</span><strong>{label} →</strong></button></li>;
    })}</ul>
  </section> : null;
- const sceneLoading=!ready&&!(studentOffice&&deskFrameVisible)&&!mapOpen&&tool!=='legacy-space'
-  ? loadingDeskList ?? (!failed&&<p className={styles.loading} role="status">공간과 캐릭터를 준비하고 있어요…</p>) : null;
+ const sceneLoading=!ready&&!deskShortcuts&&!(studentOffice&&deskFrameVisible)&&!mapOpen&&tool!=='legacy-space'
+  ? !failed&&<p className={styles.loading} role="status">공간과 캐릭터를 준비하고 있어요…</p> : null;
  return <div ref={shell} className={styles.root} data-room={room} data-editing={editing}>
  {room==='welcome'&&accountWelcome&&(welcomeSaving>0||welcomeError)&&<div className={styles.accountSave} role={welcomeError?'alert':'status'}>{welcomeError||'준비 기록을 저장하고 있어요…'}{welcomeError&&<button onClick={()=>{if(welcomeLoaded.current){for(const command of welcomeFailed.current.values())void saveWelcome(command).catch(()=>{});}else window.location.reload();}}>다시 시도</button>}</div>}<LibraryScreen roomLabel={room==='welcome'?'웰컴 존':'자료실'} video={screenVideo} onClose={()=>{setScreenVideo(null);setTool(room==='welcome'?'video':'library:replay');}}/><header className={styles.top} data-campus-chrome><div className={styles.brand}><Orbit size={23}/><div><strong>{roomName(room)}</strong>{room==='office'&&live&&role==='student'?<button type="button" className={styles.officeHelp} aria-label="개인 사무실 이용 안내" onClick={()=>{if(mayLeave()){setTool('office-guide');setActivityMenu(false);}}}>사무실 이용 안내 →</button>:<small>{room==='library'?'누구나 꺼내 보는 무료 자료':room==='office'?'나만의 개인 공간':room==='live'?(visitor?'AI 마케팅을 배우고 실행하는 곳':'모두에게 열린 공간'):room==='welcome'?welcomeSettings.title:'함께 실행하는 수강생 공간'}</small>}</div></div><div className={styles.topButtons}><button disabled={editing} className={styles.primary} onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setActivityMenu(false);setMapOpen(true);}}><Map size={17}/>공간 이동</button><button disabled={editing} aria-label={fullscreen?'전체화면 종료':'전체화면'} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else if(shell.current?.requestFullscreen)void shell.current.requestFullscreen().catch(()=>setNotice('이 브라우저에서는 현재 화면 크기로 이용해 주세요.'));else setNotice('이 브라우저에서는 전체화면을 지원하지 않아요. 현재 화면에서 모든 기능을 이용할 수 있어요.');}}>{fullscreen?<Minimize size={18}/>:<Maximize size={18}/>}</button><button disabled={editing} className={styles.exitButton} aria-label="캠퍼스 나가기" onClick={()=>void exitCampus()}><DoorOpen size={18}/><span>나가기</span></button></div></header>
  <div className={styles.scene}>{bridge&&(sceneStarted||studentOffice&&!mapOpen&&!tool)&&!deferSceneForChat&&tool!=='legacy-space'&&<iframe title="문샷 캠퍼스 3D 미리보기" ref={frame} src={'/campus/world/tour/index.html'+(process.env.NEXT_PUBLIC_CAMPUS_LOCAL_MEETUP==='true'&&typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('meet')==='1'?'?previewMeetup=1'+(new URLSearchParams(window.location.search).get('qaChat')==='1'?'&qaChat=1':''):'')+'#bridge='+bridge} sandbox="allow-scripts allow-same-origin" onLoad={()=>{if(sceneStarted)startTourFrame();else waitingForOffice.current=true;}}/>}</div>
@@ -272,6 +275,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
    {!mapOpen&&!tool&&!gate&&!editing&&!activityMenu&&managedTask('learning')&&<StudyLessonShortcut snapshot={snapshot} onOpen={openLesson}/>}
    {sceneLoading}
   </div>}
+  {deskShortcuts}
   {canEnter(role,'study')&&<MiniFocus snapshot={snapshot} demo={demo} onReturn={()=>selectTask('focus')}/>}
  </div>
  {activityMenu&&<section className={styles.activity} aria-label="이 공간에서 할 일"><header><strong>{roomName(room)}에서 할 일</strong><button aria-label="할 일 목록 닫기" onClick={()=>setActivityMenu(false)}>×</button></header>{room==='welcome'&&<p>{welcomeSettings.description}</p>}<input aria-label="할 일 검색" placeholder="예: 피드백, 성과, 질문" value={taskQuery} onChange={e=>setTaskQuery(e.target.value)}/>{Array.from(new Set(visibleTasks(room,role).map(t=>t.group))).map(group=>{const items=visibleTasks(room,role).filter(t=>t.group===group&&(!taskQuery||(t.title+' '+t.description).includes(taskQuery)));return items.length?<section key={group}><h3>{group}</h3>{items.map(t=><button key={t.id} aria-label={t.title} onClick={()=>open(t.id)}><span><strong>{t.title}</strong><small>{t.description}</small></span><ArrowUpRight size={16}/></button>)}</section>:null;})}{!visibleTasks(room,role).some(t=>!taskQuery||(t.title+' '+t.description).includes(taskQuery))&&<p>다른 단어로 찾아보세요.</p>}{!visitor&&<details><summary>기존 기능 연결 현황</summary><p>화면 연결과 실제 서비스 검수는 구분합니다.</p><ul>{coverage.features.filter(f=>{const t=taskById(f.destination);return t?.room===room&&(!t.admin||role==='admin');}).map(f=><li key={f.number}>{f.number}. {f.name}{f.status!=='preview'?' · 실제 연결 검수 별도':''}</li>)}</ul></details>}</section>}
