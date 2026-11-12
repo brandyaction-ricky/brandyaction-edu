@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Check, ChevronRight, FilePlus2, Flag, History, LockKeyhole, MessageSquare, Rocket, ShieldCheck, Sparkles, ThumbsUp, Users, X } from 'lucide-react';
+import { ArrowUpRight, Check, ChevronRight, FilePlus2, Flag, History, LockKeyhole, MessageSquare, Sparkles, ThumbsUp, Users, X } from 'lucide-react';
 import type { CampusSnapshot } from '../contracts';
 import { openKinds, kindLabels, validateCommunityCommand, type CommunityState, type CommunityPost, type CommunityCommand, type CommunityComment, type CommunityRewards } from './domain';
 import { createCommunityDemo, demoPeerId, mutateCommunityDemo } from './demo';
@@ -86,12 +86,7 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
   return <section className={styles.root} aria-labelledby="community-title">
     <header className={styles.header}><div><span className={styles.eyebrow}>MOONSHOT · 함께 만드는 변화</span><h2 id="community-title">작업물은 쌓이고,<br className={styles.mobileBreak} /> 함께 더 좋아져요.</h2><p>작은 초안부터 공유하고, 받은 의견을 다음 버전으로 연결해 보세요.</p></div><button type="button" className={styles.primary} onClick={() => compose()} disabled={busy || loading}><FilePlus2 size={18} /> 결과물 남기기</button></header>
     {demo && <div className={styles.demo}><Sparkles size={17} /> 예시 체험 · 아래 동료와 기록은 가상입니다. 새로고침하면 초기화됩니다.</div>}
-    {rewards && <div className={styles.stats} aria-label="검증된 성장 기록">
-      <div><span>필수 과제 승인</span><strong>{rewards.approvedMissions}<small> / {rewards.requiredMissions}</small></strong><p>현재 공개 커리큘럼 기준</p></div>
-      <div><span>도움이 된 동료</span><strong>{rewards.usefulFeedback}<small>명</small></strong><p>받은 사람이 확인한 의견</p></div>
-      <div><span>내 성장 레벨</span><strong>레벨 {rewards.level}<small> · {rewards.xp} 성장 점수</small></strong><p>과제 승인 + 유용한 기여</p></div>
-      <div><span>함께 발사한 동료</span><strong>{rewards.cohortLaunches}<small> / {rewards.cohortGoal}명</small></strong><p>기수 공동 로켓 · 누적 발사</p></div>
-    </div>}
+    {!!rewards?.usefulFeedback && <p className={styles.hint}>내 의견이 도움이 됐다고 확인한 동료 {rewards.usefulFeedback}명</p>}
     <div className={styles.toolbar}><nav className={styles.tabs} aria-label="작업실 보기">{tabs.map(([id, label]) => <button type="button" key={id} aria-pressed={tab === id} className={tab === id ? styles.activeTab : ''} onClick={() => { setTab(id); setSelected(null); setFocusPost(null); }}>{label}</button>)}</nav><button type="button" className={styles.textButton} onClick={() => void refresh()} disabled={demo || busy || loading}>새로고침</button></div>
     {error && <div role="alert" className={styles.error}>{error}{pending && !busy && <button type="button" onClick={() => pending && void send(pending)}>같은 요청 다시 확인</button>}</div>}
     {notice && <p role="status" className={styles.notice}><Check size={16} />{notice}</p>}
@@ -132,7 +127,6 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
     </div>}
     {state?.pageInfo?.hasNext && <div className={styles.formActions}><button type="button" className={styles.secondary} disabled={busy || loading} onClick={() => void refresh(state.pageInfo!.page + 1)}>작업물 더 보기</button></div>}
     {report && <form className={styles.report} onSubmit={async e => { e.preventDefault(); if (await send(command({ action: 'report', postId: report.post.id, commentId: report.commentId, reason: reportReason }))) setReport(null); }}><div className={styles.sectionHeader}><h3>운영자에게 확인 요청</h3><button type="button" aria-label="신고 닫기" className={styles.iconButton} onClick={() => setReport(null)}><X size={18} /></button></div><label>확인이 필요한 이유<textarea required minLength={5} maxLength={1000} value={reportReason} onChange={e => setReportReason(e.target.value)} /></label><p className={styles.hint}>신고 내용은 운영자와 작성자 본인에게만 보입니다.</p><button className={styles.primary} disabled={busy}>신고 접수</button></form>}
-    {rewards && <section className={styles.launch} aria-label="로켓 발사 조건"><div className={styles.rocketIcon}><Rocket size={30} /></div><div className={styles.launchCopy}><h3>{rewards.claimedAt ? '한 번의 도약이 기록되었어요.' : '결과물을 개선하면, 발사가 가까워져요.'}</h3><p>필수 과제 승인 · 다른 동료의 도움됨 · 받은 의견의 새 버전 반영</p>{rewards.badges.length > 0 && <div className={styles.badges}>{rewards.badges.map(b => <span key={b}><ShieldCheck size={14} />{b}</span>)}</div>}{rewards.reasons.length > 0 && <ul>{rewards.reasons.map(r => <li key={r}>{r}</li>)}</ul>}<small>타이머·접속 횟수는 성장 점수가 되지 않아요. 발사 기록은 당시 조건 충족 이력입니다.</small></div><button className={styles.primary} type="button" disabled={busy || !rewards.eligible || !!rewards.claimedAt} onClick={() => void send(command({ action: 'launch' }))}>{rewards.claimedAt ? '발사 기록 완료' : '나의 로켓 발사'}</button></section>}
     {!!state?.blockedIds.length && <details className={styles.blocked}><summary>차단 관리 · {state.blockedIds.length}명</summary>{state.blockedIds.map((id, i) => <button key={id} type="button" disabled={busy} onClick={() => void send(command({ action: 'unblock', targetId: id }))}>차단한 동료 {i + 1} 해제</button>)}</details>}
   </section>;
 }

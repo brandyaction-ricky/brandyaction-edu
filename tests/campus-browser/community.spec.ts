@@ -46,7 +46,6 @@ test('recipient verifies useful feedback and applies it only to a new portfolio 
  await page.getByRole('textbox',{name:'반영 내용 또는 유지한 이유',exact:true}).fill('첫 문장에 대상과 결과를 반영한 두 번째 버전입니다.');
  await page.getByRole('button',{name:'확인 기록 저장'}).click();
  await expect(page.getByText('v2에 반영했어요',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'나의 로켓 발사'})).toBeDisabled();
  await noOverflow(page);
 });
 

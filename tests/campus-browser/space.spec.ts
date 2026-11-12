@@ -69,7 +69,7 @@ test('procedural sound requires user choice and can be changed and muted',async(
 
 test('community-derived demo rewards reach the character without inventing XP on entry',async({page})=>{
  await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await expect(space(page).getByText('체험 성장 기록',{exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('검증된 성장 기록')).toBeVisible();await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await expect(space(page).getByText('체험 성장 기록',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('작업실 보기')).toBeVisible();await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await expect(space(page).getByText('체험 성장 기록',{exact:true})).toBeVisible();
  const world=page.frameLocator('iframe[title="문샷 우주선 3D 공간"]');await expect(world.locator('#ms-loading')).toBeHidden({timeout:30000});await expect(world.locator('#ms-me')).toContainText('레벨 ');await expect(space(page).getByRole('button',{name:'내 로켓 발사 기록 재생',exact:true})).toHaveCount(0);
 });
 
@@ -159,7 +159,7 @@ test('space idle and background rendering stay bounded while the focus clock con
  });
 
  test('joining with saved participation does not create a false unsaved profile warning',async({page})=>{
- const dialogs:string[]=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});await enter(page);await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('검증된 성장 기록')).toBeVisible();expect(dialogs).toEqual([]);await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await light(page);await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('저장 전 메모');await page.getByRole('button',{name:'결과물·의견',exact:true}).click();expect(dialogs).toHaveLength(1);await expect(page.getByLabel('나만 보는 책상 메모')).toHaveValue('저장 전 메모');
+ const dialogs:string[]=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});await enter(page);await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('작업실 보기')).toBeVisible();expect(dialogs).toEqual([]);await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await light(page);await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('저장 전 메모');await page.getByRole('button',{name:'결과물·의견',exact:true}).click();expect(dialogs).toHaveLength(1);await expect(page.getByLabel('나만 보는 책상 메모')).toHaveValue('저장 전 메모');
  });
 
 

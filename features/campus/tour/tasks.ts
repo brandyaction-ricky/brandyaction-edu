@@ -13,7 +13,7 @@ export const tourTasks:TourTask[]=[
  task('support:history','study','질문하고 도움받기','내 지원 기록','요청한 도움과 담당자 답변'),
  task('support:sessions','study','질문하고 도움받기','공부 약속·질문 상담','같이 공부할 시간과 상담 예약'),
  task('support:library','study','질문하고 도움받기','수업 자료 찾기','막힌 상황에 맞는 공개 수업 찾기'),
- task('feedback','study','동료와 함께하기','결과물·동료 피드백','파일·사이트 공유, 의견과 수정 비교'),
+ task('feedback','study','동료와 함께하기','결과물·동료 피드백','결과물 올리기, 의견 주고받기, 고친 버전 비교'),
  task('community:mine','study','동료와 함께하기','내 결과물·로켓','내 작업 모음, 성장 점수와 발사 조건'),
  task('community:talent','study','동료와 함께하기','재능 교환','서로 필요한 도움을 제안하고 완료하기'),
  task('community:demo_day','study','동료와 함께하기','결과물 발표회','발표 일정, 동료 질문과 발표 기록'),
@@ -43,7 +43,7 @@ export const tourTasks:TourTask[]=[
 export type TourModules={focus:boolean;support:boolean;community:boolean;business?:boolean};
 export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')||id==='admin:support'?'support':undefined;
 // Left out after the CEO's utility review (2026-11-11): they need staff to answer or run them, or repeat another task. Code and tables stay; remove an id here to bring it back.
-export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:library','support:settings','admin:support','community:talent','community:demo_day','legacy-space']);
+export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:library','support:settings','admin:support','community:mine','community:talent','community:demo_day','legacy-space']);
 export const taskOpen=(id:string,modules?:TourModules)=>{if(retiredTasks.has(id))return false;const m=taskModule(id);return !modules||!m||modules[m];};
 export function roomTasks(room:TourRoom,role:TourRole){return tourTasks.filter(t=>t.room===room&&(!t.admin||role==='admin'));}
 export const taskById=(id:string)=>tourTasks.find(t=>t.id===id);
