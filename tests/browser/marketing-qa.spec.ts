@@ -37,3 +37,21 @@ test('campaign scheduling uses KST on a non-Korean device and exposes the single
   await page.getByLabel('예약 시각 (한국시간 KST)',{exact:true}).fill('2030-01-01T12:00');
   await page.getByRole('button',{name:'캠페인 예약',exact:true}).click();await expect.poll(()=>writes.length).toBe(1);expect(writes[0].scheduledAt).toBe('2030-01-01T03:00:00.000Z');
 });
+
+test('retention form scopes cohort and elapsed days, only offers Alimtalk and states OFF without sending',async({page},info)=>{
+ const writes:Record<string,unknown>[]=[];await page.route('**/api/platform/workflows',r=>{writes.push(r.request().postDataJSON());return r.fulfill({json:{ok:true}});});
+ await page.goto('/marketing-qa-test?section=automations');
+ await page.getByRole('row').filter({hasText:'QA 미접속 독려'}).getByRole('button',{name:'수정',exact:true}).click();
+ await page.getByText('처리 사유 1건',{exact:true}).click();
+ await expect(page.getByText('승인된 정보성 알림톡의 채널·번호·본문을 확인하지 못해 발송하지 않았습니다.',{exact:false})).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'실행 조건',exact:true})).toHaveValue('member_inactive');
+ await expect(page.getByRole('combobox',{name:'대상 기수',exact:true})).toHaveValue('55555555-5555-4555-8555-555555555555');
+ await expect(page.getByRole('combobox',{name:'템플릿',exact:true}).locator('option')).toHaveText(['선택하세요','QA 수강 독려 (가상) · ALIMTALK']);
+ await expect(page.getByText(/수강 독려 발송 설정은 꺼져 있습니다/)).toBeVisible();
+ await page.getByRole('combobox',{name:'실행 조건',exact:true}).selectOption('learning_stalled');
+ await page.getByRole('spinbutton',{name:'기준 일수 (24시간 기준)',exact:true}).fill('5');
+ await page.screenshot({path:info.outputPath('retention-form.png'),fullPage:true});
+ await page.getByRole('button',{name:'저장하기',exact:true}).click();await expect.poll(()=>writes.length).toBe(1);
+ expect(writes[0]).toMatchObject({triggerType:'learning_stalled',cohortId:'55555555-5555-4555-8555-555555555555',thresholdDays:5,templateId:'approved'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});

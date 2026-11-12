@@ -24,8 +24,8 @@ test('recording uses authenticated identity only and forbids bodies, staff and f
  for(const body of ['{}',JSON.stringify({member:id(2),at:'2000-01-01'}),'x'.repeat(10000)])assert.equal((await h.post(body)).status,400);
  assert.equal(h.calls.length,0);const response=await h.post();assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.deepEqual(h.calls,[{name:'edu_record_member_visit',args:{p_member:id(1)}}]);
 });
-test('feature gate prevents every read/write while off',async()=>{
- const h=harness();process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='false';try{assert.equal((await h.post()).status,404);assert.equal((await h.get()).status,404);assert.equal(h.calls.length,0);}finally{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='true';}
+test('visit recording is independent of the lesson editor flag; the old admin read gate stays unchanged',async()=>{
+ const h=harness();process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='false';try{assert.equal((await h.post()).status,200);assert.equal((await h.get()).status,404);assert.equal(h.calls.length,1);}finally{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='true';}
 });
 test('member read checks authorization and validates member, date, and page before RPC',async()=>{
  for(const [options,status] of [[{user:null},401],[{operator:false},403]]){const h=harness(options);assert.equal((await h.get()).status,status);assert.equal(h.calls.length,0);}

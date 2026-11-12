@@ -34,6 +34,7 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
         select: () => query,
         eq: () => query,
         lte: () => query,
+        not: () => query,
         like: (column, value) => { runFilters.push({ column, value }); return query; },
         order: () => query,
         limit: () => query,
@@ -184,4 +185,11 @@ test('purchase room notices render the assigned link for SMS and Alimtalk withou
       assert.deepEqual(qa.sentMessages[0].kakaoOptions.variables, { '#{이름}': buyer.full_name, '#{공지방링크}': room });
     }
   }
+});
+
+test('retention Alimtalk reuses provider delivery but never falls back to a paid SMS',async()=>{
+ const qa=dispatchFixture();
+ await qa.sendBatch({id:'approved',channel:'alimtalk',purpose:'transactional',content:'#{이름}님, 학습을 이어가요.',alimtalk_template_id:'provider-approved',is_active:true},[{...member,full_name:'가상 학생'}],{retention:true,automationRuns:{[member.id]:'run'}},{senderPhone:'0200000000',transactionalEnabled:true});
+ assert.equal(qa.sentMessages.length,1);
+ assert.deepEqual(qa.sentMessages[0].kakaoOptions,{pfId:'pf',templateId:'provider-approved',disableSms:true,variables:{'#{이름}':'가상 학생'}});
 });

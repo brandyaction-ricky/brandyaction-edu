@@ -3,7 +3,6 @@ import { getAuthenticatedUser } from '@/lib/server-auth';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 export async function POST(request: Request) {
-  if (process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED !== 'true') return reply({ error: '사용하지 않는 기능입니다.' }, 404);
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '허용되지 않은 요청입니다.' }, 403);
   // No client-supplied member, time, URL, IP, or device information is accepted.
   if (request.body !== null) { await request.body.cancel(); return reply({ error: '요청 본문을 사용할 수 없습니다.' }, 400); }
