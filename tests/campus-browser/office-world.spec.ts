@@ -21,7 +21,7 @@ test('imported world loads locally; movement, camera, EDU seat and fallback work
  await expect.poll(()=>page.evaluate(()=>(window as typeof window & {moves:unknown[]}).moves.length)).toBeGreaterThan(0);
  await page.getByRole('button',{name:'전체 지도',exact:true}).click();
  await expect(world.locator('#office')).not.toHaveAttribute('data-study-camera','third');
- await page.getByRole('button',{name:'1번 빈자리',exact:true}).click();
+ await page.getByRole('button',{name:'1번 자리에 앉기',exact:true}).click();
  await expect(world.locator('#status')).toContainText('자리에 앉았어요');
  await expect(page.getByRole('button',{name:'자리에서 일어나기',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'자리에서 일어나기',exact:true}).click();

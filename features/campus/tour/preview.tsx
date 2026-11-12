@@ -37,7 +37,7 @@ import {canEnter,rooms,roleNames,type TourRole,type TourRoom} from './model';
 import styles from './preview.module.css';
 type Progress={video:boolean;quiz:(boolean|null)[];level:number[]};
 const emptyProgress=():Progress=>({video:false,quiz:DEFAULT_ASSESSMENT.quiz.map(()=>null),level:DEFAULT_ASSESSMENT.level.map(()=>-1)});
-const titles:Record<string,string>={'office-guide':'개인 사무실 이용 안내','story:study':'체험 대화 · 함께 실행하기','story:office':'체험 대화 · 내 AI 사무실','story:welcome':'체험 대화 · 첫 시작',video:'라이브 다시보기',notices:'공지사항',basics:'AI 기초 지식 배우기',quiz:'OX 퀴즈',level:'AI 수준 확인',checklist:'내 준비 현황',office:'내 AI 사무실 · 업무 관리',bots:'내 AI 직원',learning:'수업·과제',focus:'앉아서 집중',feedback:'동료 피드백','live-video':'문샷 라이브',experience:'고객 발견 체험',offer:'문샷에서 배우는 것',lesson:'예시 수업',character:'내 캐릭터'};
+const titles:Record<string,string>={'office-guide':'개인 사무실 이용 안내','story:study':'체험 대화 · 함께 실행하기','story:office':'체험 대화 · 내 AI 사무실','story:welcome':'체험 대화 · 첫 시작',video:'라이브 다시보기',notices:'공지사항',basics:'AI 기초 지식 배우기',quiz:'OX 퀴즈',level:'AI 수준 확인',checklist:'내 준비 현황',office:'내 AI 사무실 · 업무 관리',bots:'내 AI 직원',learning:'수업·과제',focus:'집중과 휴식',feedback:'동료 피드백','live-video':'문샷 라이브',experience:'고객 발견 체험',offer:'문샷에서 배우는 것',lesson:'예시 수업',character:'내 캐릭터'};
 for(const task of tourTasks)if(!titles[task.id])titles[task.id]=task.title;
 const isFeature=(id:string)=>['growth','journal','ai','office','feedback','archive','legacy-space'].includes(id)||/^(business|support|community|admin):/.test(id);
 const spacePane=(id:string)=>({focus:'focus',lounge:'lounge',sound:'settings',desk:'profile'} as const)[id as 'focus'];

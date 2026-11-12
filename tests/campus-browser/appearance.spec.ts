@@ -32,6 +32,6 @@ test('saved night desk keeps labels, timer and inputs readable',async({page})=>{
  await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
  await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('내 집중 책상 분위기',{exact:true}).selectOption('night');await page.getByRole('button',{name:'내 자리 저장',exact:true}).click();
  await page.getByRole('tab',{name:'집중과 휴식',exact:true}).click();
- await readable(page.getByLabel('집중 시간',{exact:true}));await readable(page.getByLabel('나만 보는 메모',{exact:true}));await readable(page.getByLabel('집중 타이머',{exact:true}));await readable(page.getByRole('heading',{name:'오늘은 무엇을 만들까요?'}));
- await page.reload();await readable(page.getByLabel('나만 보는 메모',{exact:true}));
+ await readable(page.getByLabel('집중 시간',{exact:true}));await readable(page.getByLabel('집중 타이머',{exact:true}));await readable(page.getByRole('heading',{name:'오늘은 무엇을 만들까요?'}));
+ await page.reload();await readable(page.getByLabel('집중 시간',{exact:true}));
 });

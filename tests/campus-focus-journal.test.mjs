@@ -6,7 +6,7 @@ const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 test('finishing a focus block opens the journal form only when the journal is available',()=>{
  const panel=read('features/campus/space/panel.tsx'),preview=read('features/campus/tour/preview.tsx');
  assert.match(panel,/if\(journal&&spent!==null\)\{setJournaling\(spent\);/);
- assert.match(panel,/else setNotice\('오늘 한 일과 다음 시작점을 내 메모에 남겨 보세요\.'\)/);
+ assert.match(panel,/else setNotice\('집중을 마무리했어요\.'\)/);
  assert.match(preview,/<SpaceTools journal=\{live\?!!live\.modules\?\.focus:true\}/);
 });
 test('the journal form finishes an open run or starts one, and needs a result and a next step',()=>{

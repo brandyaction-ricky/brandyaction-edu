@@ -8,19 +8,19 @@ test('space preferences and private desk notes persist without altering progress
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await enter(page);await light(page);
  await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('닉네임',{exact:true}).fill('별빛 동료');await page.getByRole('button',{name:'여성형',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('고객 소개 페이지 하나 완성');await page.getByLabel('가벼운 공간 메뉴를 기본으로 사용').check();await page.getByRole('button',{name:'내 자리 저장'}).click();
  await expect(space(page).getByRole('status')).toContainText('내 자리 설정을 저장');
- await page.getByRole('tab',{name:'집중과 휴식'}).click();await page.getByLabel('나만 보는 메모',{exact:true}).fill('개인 검수 메모. 다른 동료에게 보이면 안 됩니다.');await page.getByRole('button',{name:'내 메모 저장'}).click();await page.reload();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
+ await page.reload();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
  await page.getByRole('tab',{name:'내 자리',exact:true}).click();await expect(page.getByLabel('닉네임',{exact:true})).toHaveValue('별빛 동료');await expect(page.getByRole('button',{name:'여성형'})).toHaveAttribute('aria-pressed','true');
- await page.getByRole('tab',{name:'집중과 휴식'}).click();await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('개인 검수 메모. 다른 동료에게 보이면 안 됩니다.');await noOverflow(page);expect(errors).toEqual([]);
+ await page.getByRole('tab',{name:'집중과 휴식'}).click();await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveCount(0);await noOverflow(page);expect(errors).toEqual([]);
 });
 
 test('two real browser tabs see each other, arbitrate a seat, exchange and delete chat, then leave',async({page,context})=>{
  await enter(page);await light(page);const other=await context.newPage();await enter(other);await light(other);
  await expect(space(page).getByText('2명 연결됨 · 체험 탭',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'1번 빈자리',exact:true}).click();await expect(other.getByRole('button',{name:'1번 사용 중',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'1번 자리에 앉기',exact:true}).click();await expect(other.getByRole('button',{name:'1번 자리 · 사용 중',exact:true})).toBeDisabled();
  await Promise.all([page.getByRole('tab',{name:'라운지',exact:true}).click(),other.getByRole('tab',{name:'라운지',exact:true}).click()]);
  await page.getByLabel('라운지 메시지',{exact:true}).fill('오늘 첫 고객 인터뷰를 준비했어요.');await page.getByRole('button',{name:'보내기',exact:true}).click();await expect(other.getByLabel('라운지 대화')).toContainText('오늘 첫 고객 인터뷰를 준비했어요.');
  await page.getByRole('button',{name:'내 메시지 삭제',exact:true}).click();await expect(other.getByLabel('라운지 대화')).not.toContainText('오늘 첫 고객 인터뷰를 준비했어요.');
- await page.getByRole('button',{name:'동료 연결 끊기',exact:true}).click();await expect(space(other).getByText('1명 연결됨 · 체험 탭',{exact:true})).toBeVisible();await other.getByRole('tab',{name:'집중과 휴식'}).click();await expect(other.getByRole('button',{name:'1번 빈자리',exact:true})).toBeEnabled();await noOverflow(other);await other.close();
+ await page.getByRole('button',{name:'동료 연결 끊기',exact:true}).click();await expect(space(other).getByText('1명 연결됨 · 체험 탭',{exact:true})).toBeVisible();await other.getByRole('tab',{name:'집중과 휴식'}).click();await expect(other.getByRole('button',{name:'1번 자리에 앉기',exact:true})).toBeEnabled();await noOverflow(other);await other.close();
 });
 
 test('focus supports 25/50/free, pause/resume, 3/5 minute breaks and reload',async({page})=>{
@@ -157,7 +157,7 @@ test('space idle and background rendering stay bounded while the focus clock con
  });
 
  test('joining with saved participation does not create a false unsaved profile warning',async({page})=>{
- const dialogs:string[]=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});await enter(page);await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('검증된 성장 기록')).toBeVisible();expect(dialogs).toEqual([]);await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await light(page);await page.getByLabel('나만 보는 메모',{exact:true}).fill('저장 전 메모');await page.getByRole('button',{name:'결과물·의견',exact:true}).click();expect(dialogs).toHaveLength(1);await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('저장 전 메모');
+ const dialogs:string[]=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});await enter(page);await page.getByRole('button',{name:'결과물·의견',exact:true}).click();await expect(page.getByLabel('검증된 성장 기록')).toBeVisible();expect(dialogs).toEqual([]);await page.getByRole('button',{name:'문샷 공간',exact:true}).click();await light(page);await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('저장 전 메모');await page.getByRole('button',{name:'결과물·의견',exact:true}).click();expect(dialogs).toHaveLength(1);await expect(page.getByLabel('나만 보는 책상 메모')).toHaveValue('저장 전 메모');
  });
 
 
