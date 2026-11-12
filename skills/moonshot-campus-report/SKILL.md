@@ -23,12 +23,38 @@ description: "Telegram 개인 대화의 '캠퍼스 연결 준비'와 '캠퍼스 
 
 ## 실행 절차
 
-1. 현재 작업 폴더에 보고 입력 JSON을 만든다. `context`는 `{platform:'telegram', sessionId:session.id, connectionId:session.trigger.connectionId, channelId:channel.current().channelId, messageId:channel.current().messageId, requestedAt:사용자요청.timestamp}`이다. 같은 업무에서는 이 값을 고정해 재사용한다.
-2. 실제 업무에 착수하기 직전 `{action:'start', context, requestText:실제사용자요청본문}`을 저장한다. 접두어 없이 맡긴 일에는 `taskObjective`에 업무와 결과물만 설명하는 한 문장(10~2,000자)을 함께 넣는다. 예를 들어 “공지 써줘”의 업무 요약은 “수강생에게 보낼 공지 초안 작성”이다. 요청 원문에 접두어를 붙이거나 대화 이력을 전송하지 않는다. 아래 명령을 실행한다. 성공 응답을 확인해야 캠퍼스에 시작을 보고했다고 말할 수 있다.
-   `node <this-skill-dir>/scripts/report.mjs <accountRoot>/campus-office/connection.json <입력JSON절대경로>`
-3. 사용자가 요청한 업무를 실제로 수행한다. 중간 진행은 채팅으로 설명할 수 있지만 가짜 완료율이나 외부 실행 성공을 만들지 않는다. 이번 연결은 시작·결과 두 시점 보고이며 세부 단계별 진척률은 지원하지 않는다.
-4. 최종 답변을 완성하면 `{action:'result', context, resultText:최종답변원문}`을 별도 JSON에 저장하고 같은 명령을 실행한다. 결과는 10~10,000자다. 캠퍼스에는 사용자 검토 대상으로 저장되며 승인이 아니다. 성공을 확인한 뒤 Telegram에도 같은 결과를 답한다. 보고용 메타 설명은 결과 본문과 구분한다.
-5. 실제 오류로 업무를 수행하지 못했다면 `{action:'failed', context, failureNote:확인한오류설명}`을 전송한다. 강제 종료로 보고가 불가능했던 일을 보고했다고 주장하지 않는다.
+**시작 보고를 먼저 보낸다.** 위 기준에 맞는 업무라면 초안 작성, 자료 조회, 부가 스킬 선택은 시작 보고가 성공한 뒤 진행한다. 이미 읽은 공식 Aside·channel 안내는 같은 세션에서 재사용한다.
+
+1. 공식 REPL에서 아래 블록을 한 번 실행한다. `expected`에 현재 사용자가 실제 보낸 문장, `objective`에 개인정보를 뺀 업무 요약(10~2,000자)을 넣는다. 가장 최근 사용자 메시지가 현재 문장과 다르면 중단한다. 이전 업무 파일을 사용하지 않는다.
+
+   ```js
+   {
+     const expected = '현재 요청 원문', objective = '업무와 결과물 요약';
+     const session = await aside.sessions.current(), channelInfo = await channel.current();
+     const rows = await aside.sessions.messages(session.id, {limit:20, order:'desc'});
+     const user = rows.find(row => row.role === 'user');
+     const text = typeof user?.content === 'string' ? user.content : user?.content?.filter(c=>c.type==='text').map(c=>c.text).join('\n');
+     if (text !== expected || channelInfo.platform !== 'telegram' || !/^telegram:[1-9]\d*$/.test(channelInfo.channelId) || !session.trigger?.connectionId || !channelInfo.messageId || !Number.isFinite(user.timestamp)) throw Error('현재 개인 대화의 요청을 확인하세요.');
+     const context = {platform:'telegram', sessionId:session.id, connectionId:session.trigger.connectionId, channelId:channelInfo.channelId, messageId:String(channelInfo.messageId), requestedAt:user.timestamp};
+     const file = path.join(pwd, 'campus-start-'+encodeURIComponent(session.id)+'-'+encodeURIComponent(context.messageId)+'.json');
+     await fs.writeFile(file, JSON.stringify({action:'start', context, requestText:text, taskObjective:objective}), {flag:'wx', mode:0o600});
+     console.log(file);
+   }
+   ```
+
+2. 방금 출력된 파일로 다음 명령을 실행한다. 이후 같은 턴에서 동일한 파일 경로를 사용한다. 같은 요청 재시도는 기존 파일을 보존하고 아래 재시도 절차를 따른다.
+
+   `node <this-skill-dir>/scripts/report.mjs <accountRoot>/campus-office/connection.json <이번-시작-파일>`
+
+3. 시작 영수증을 받은 뒤 실제 업무를 수행한다. 시작·결과 두 시점만 보고한다. 최종 원문을 별도 파일에 다시 쓰거나 대화 식별자를 다시 조회할 필요 없이 한 번의 bash 호출로 제출한다. 아래 종료 구분자는 결과 본문 어느 줄과도 겹치지 않게 선택하며, 따옴표를 유지해 본문을 셸이 해석하지 않도록 한다.
+
+   ```sh
+   node <this-skill-dir>/scripts/report.mjs <accountRoot>/campus-office/connection.json <이번-시작-파일> --result-stdin <<'CAMPUS_RESULT_END'
+   사용자에게 줄 실제 완성 원문
+   CAMPUS_RESULT_END
+   ```
+
+4. 성공 영수증을 확인하고 Telegram에도 같은 결과를 답한다. 결과는 10~10,000자로 사용자 검토 대상이다. 파일 기반 기존 result·failed·retry 입력과 동일한 권한 확인·중복 방지를 사용한다. 실제 실패는 기존 JSON 형식 `{action:'failed',context,failureNote}`로 확인한 오류만 보고한다.
 
 ## 재시도·중단
 

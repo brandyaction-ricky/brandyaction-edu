@@ -64,10 +64,25 @@ async function privateFile(file) {
   const info=await stat(file);
   if(!info.isFile() || (process.platform!=='win32' && (info.mode&0o077))) throw Error('Connection and secret files must be private');
 }
-async function main(configPath,inputPath) {
+// Reuse the verified request context when the same Telegram turn submits its draft.
+export async function resultFromStart(start, chunks) {
+  if (start?.action !== 'start' || !start.context) throw Error('Expected the start file for this task');
+  const parts = [];
+  let bytes = 0;
+  for await (const chunk of chunks) {
+    const part = Buffer.from(chunk);
+    bytes += part.length;
+    if (bytes > 40002) throw Error('Result too large');
+    parts.push(part);
+  }
+  return {action:'result', context:start.context, resultText:Buffer.concat(parts).toString('utf8').trim()};
+}
+async function main(configPath,inputPath,mode) {
   if(!configPath||!inputPath)throw Error('Usage: report.mjs PRIVATE_CONFIG INPUT_JSON');
   if((await stat(inputPath)).size>64000)throw Error('Input too large');
-  const input=JSON.parse(await readFile(inputPath,'utf8'));
+  if (mode !== undefined && mode !== '--result-stdin') throw Error('Unknown reporting mode');
+  const saved=JSON.parse(await readFile(inputPath,'utf8'));
+  const input=mode ? await resultFromStart(saved,process.stdin) : saved;
   // New device connections take precedence over the legacy one-employee pilot.
   let selectedPath=configPath;
   if (input.context?.platform==='telegram' && /^telegram:[1-9]\d*$/.test(input.context.channelId)) {
