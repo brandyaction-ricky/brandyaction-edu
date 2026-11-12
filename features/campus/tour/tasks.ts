@@ -43,7 +43,7 @@ export const tourTasks:TourTask[]=[
 export type TourModules={focus:boolean;support:boolean;community:boolean;business?:boolean};
 export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')||id==='admin:support'?'support':undefined;
 // Left out after the CEO's utility review (2026-11-11): they need staff to answer or run them, or repeat another task. Code and tables stay; remove an id here to bring it back.
-export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:library','support:settings','admin:support','community:mine','community:talent','community:demo_day','legacy-space']);
+export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:library','support:settings','admin:support','community:mine','community:talent','community:demo_day','desk','legacy-space']);
 export const taskOpen=(id:string,modules?:TourModules)=>{if(retiredTasks.has(id))return false;const m=taskModule(id);return !modules||!m||modules[m];};
 export function roomTasks(room:TourRoom,role:TourRole){return tourTasks.filter(t=>t.room===room&&(!t.admin||role==='admin'));}
 export const taskById=(id:string)=>tourTasks.find(t=>t.id===id);

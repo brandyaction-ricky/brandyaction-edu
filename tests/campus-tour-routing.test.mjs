@@ -27,9 +27,9 @@ test('preview archive validates updates and stores only locally with revision pr
 });
 test('tasks behind a switched-off server module leave the study menu, the rest stay',()=>{
  const off={focus:false,support:false,community:false},study=roomTasks('study','student');
- assert.deepEqual(study.filter(t=>taskOpen(t.id,off)).map(t=>t.id),['learning','growth','focus','ai','lounge','sound','desk']);
- const on={focus:true,support:true,community:true},kept=['learning','growth','focus','journal','ai','feedback','lounge','sound','desk'];
- // The CEO's utility review left nine study tasks; the rest stay out with every switch on and in the demo tour.
+ assert.deepEqual(study.filter(t=>taskOpen(t.id,off)).map(t=>t.id),['learning','growth','focus','ai','lounge','sound']);
+ const on={focus:true,support:true,community:true},kept=['learning','growth','focus','journal','ai','feedback','lounge','sound'];
+ // The CEO's utility review left eight study tasks; the rest stay out with every switch on and in the demo tour.
  assert.deepEqual(study.filter(t=>taskOpen(t.id,on)).map(t=>t.id),kept);assert.deepEqual(study.filter(t=>taskOpen(t.id)).map(t=>t.id),kept);
  assert.equal(taskOpen('admin:support',on),false);assert.equal(taskOpen('admin:moderation',on),true);
  assert.equal(taskOpen('admin:moderation',off),false);assert.equal(taskOpen('admin:support',off),false);assert.equal(taskOpen('admin:dashboard',off),true);
