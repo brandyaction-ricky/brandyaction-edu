@@ -374,7 +374,10 @@ function CrmManager({ section, data, send, pending }: Props) {
   const courses = rows(data, "courses");
   const [editing, setEditing] = useState<Row | null>(null);
   const [trigger, setTrigger] = useState("member_joined");
-  useEffect(()=>setTrigger(String(editing?.trigger_type || "member_joined")),[editing]);
+  const selectEditing = (item: Row | null) => {
+    setEditing(item);
+    setTrigger(String(item?.trigger_type || "member_joined"));
+  };
   const [dirty, setDirty] = useState(false);
   const editorRef = useRef<HTMLFormElement>(null);
   const focusEditor = () => requestAnimationFrame(() => {
@@ -448,7 +451,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           "자동 메시지를 저장했습니다.",
         );
       }
-      setEditing(null);
+      selectEditing(null);
       setDirty(false);
       setFormVersion(value=>value+1);
       setMessage(
@@ -489,7 +492,7 @@ function CrmManager({ section, data, send, pending }: Props) {
               {overlappingAutomations(item, items).length > 0 && <small className="meta" style={{display:"block"}}>조건 중복 확인 필요</small>}</div>;
           } }] : []),
           { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? retentionTrigger(item.trigger_type) && !delivery?.retentionEnabled ? "발송 꺼짐 · 규칙 저장" : "자동 실행 중" : "중지" : undefined} /> },
-          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; setEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
+          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; selectEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
         ]}
         empty={<AdminEmptyState title={listSearch.trim() ? "검색 결과가 없습니다." : section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
       />
@@ -534,7 +537,7 @@ function CrmManager({ section, data, send, pending }: Props) {
         {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
       </form>
       </details> : <p className="meta mb24"><Link className="conversion-link" href="/admin/campaigns#sms-settings">문자 발송 설정 관리 →</Link> · 모든 메시지에 같은 발신번호·수신거부 설정을 사용합니다.</p>}
-      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); focusEditor(); }}/>}
+      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { selectEditing(value); setMessage(""); focusEditor(); }}/>}
       <form ref={editorRef} key={formKey} className="panel pad mb24 admin-crm-editor" onChange={()=>setDirty(true)} onSubmit={submit}>
         <div className="between">
           <h2>
@@ -547,7 +550,7 @@ function CrmManager({ section, data, send, pending }: Props) {
               size="sm" variant="outline"
               onClick={() => {
                 if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 새로 등록할까요?"))) return;
-                setEditing(null);
+                selectEditing(null);
                 setDirty(false);
                 setFormVersion(value=>value+1);
                 setMessage("");
