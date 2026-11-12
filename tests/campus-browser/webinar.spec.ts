@@ -119,14 +119,14 @@ test('admin event list and empty selection share the neutral admin layout withou
  });
  await page.goto('/webinar-admin');
  await expect(page.getByRole('heading',{name:'관리할 행사를 선택하세요.'})).toBeVisible();
- await expect(page.getByRole('button',{name:/합성 행사/})).toHaveCount(3);
+ await expect(page.locator('button[aria-pressed]',{hasText:/합성 행사/})).toHaveCount(3);
  for(const width of isMobile?[390,320]:[1440,2560]){
   await page.setViewportSize({width,height:isMobile?844:1247});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:info.outputPath(`campus-${width}.png`),fullPage:true});
  }
- await page.getByRole('button',{name:/합성 행사 2/}).click();
+ await page.locator('button[aria-pressed]',{hasText:/합성 행사 2/}).click();
  await expect(page.getByRole('navigation',{name:'관리 항목'})).toBeVisible();
- await expect(page.getByRole('button',{name:/합성 행사 2/})).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('button[aria-pressed]',{hasText:/합성 행사 2/})).toHaveAttribute('aria-pressed','true');
  expect(writes).toEqual([]);
 });
