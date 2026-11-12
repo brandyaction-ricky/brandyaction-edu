@@ -19,13 +19,16 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   try {
-    const [crm, purchase] = await Promise.allSettled([
+    const [crm, purchase, retention] = await Promise.allSettled([
       crmEnabled ? dispatchDueCrm() : paused,
       purchaseEnabled ? dispatchPurchaseBuyerDelivery() : undefined,
+      crmEnabled && process.env.CRM_RETENTION_ENABLED === 'true'
+        ? import('@/lib/crm-retention-server').then(module=>module.dispatchRetentionCrm()) : undefined,
     ]);
     if (purchase.status === "rejected") console.error("purchase buyer delivery queue failed");
+    if (retention.status === 'rejected') console.error('retention delivery queue failed');
     if (crm.status === "rejected") throw crm.reason;
-    return Response.json({ ok: true, ...crm.value, purchaseQueueOk: purchase.status === "fulfilled" });
+    return Response.json({ ok: true, ...crm.value, purchaseQueueOk: purchase.status === "fulfilled", ...(process.env.CRM_RETENTION_ENABLED === 'true' ? {retentionQueueOk:retention.status==='fulfilled'} : {}) });
   } catch (error) {
     console.error(
       "crm cron",
