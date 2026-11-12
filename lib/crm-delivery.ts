@@ -29,6 +29,7 @@ export type Member = {
   purchaseBatch?: boolean;
   purchaseRoomLink?: string | null;
   retention?: boolean;
+  retentionAccount?: string;
 };
 
 const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
@@ -74,8 +75,11 @@ function message(
 ): MessageSchema {
   if (template.is_active === false)
     throw new Error("사용 중지된 템플릿은 발송할 수 없습니다.");
+  if (template.content.includes('#{수강계정}') && (!member.retention || !member.retentionAccount))
+    throw new Error('수강권이 연결된 로그인 계정을 확인하지 못해 발송하지 않았습니다.');
   const raw = member.recruitment ? recruitmentMessageLinks(template.content, member.entry_channel) : template.content;
-  const content = literalContent ? raw : render(member.purchaseRoomLink ? raw.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : raw, member);
+  const rendered = member.retention && member.retentionAccount ? raw.replaceAll('#{수강계정}',member.retentionAccount) : raw;
+  const content = literalContent ? raw : render(member.purchaseRoomLink ? rendered.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : rendered, member);
   if (template.channel === "alimtalk") {
     if (template.purpose === "marketing")
       throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.");
@@ -94,6 +98,7 @@ function message(
           variables: {
             ...(template.content.includes("#{이름}") ? { "#{이름}": member.full_name || "회원" } : {}),
             ...(member.purchaseRoomLink ? { "#{공지방링크}": member.purchaseRoomLink } : {}),
+            ...(member.retention && template.content.includes('#{수강계정}') ? { '#{수강계정}': member.retentionAccount! } : {}),
           },
         } : {}),
       },

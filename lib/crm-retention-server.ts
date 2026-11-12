@@ -4,14 +4,25 @@ import { sendBatch, type Template, type Member } from '@/lib/crm-delivery';
 import { loadSmsSettings, marketingAllowedNow } from '@/lib/crm-sms-settings';
 import { retentionFailure } from '@/lib/crm-retention';
 
+// Use the current enrollment owner's Auth identity, never a contact email or
+// last-login account. Only a masked hint leaves the server in an Alimtalk.
+export function retentionLoginAccount(user: {id:string;email?:string;identities?:{provider:string}[];app_metadata?:Record<string,unknown>} | null, memberId:string) {
+  if (!user || user.id !== memberId || !user.email || user.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) return null;
+  const [local,domain]=user.email.split('@');
+  const labels=new Map([['kakao','카카오'],['google','구글'],['email','이메일']]);
+  const providers=user.identities?.length ? user.identities.map(identity=>identity.provider) : [String(user.app_metadata?.provider || '')];
+  const methods=[...new Set(providers.map(provider=>labels.get(provider)).filter(Boolean))].join(' · ');
+  return `${local[0]}***@${domain}${methods ? ` (${methods})` : ''}`;
+}
+
 // A template ID entered by an operator is not evidence of provider approval.
 export function verifiedRetentionTemplate(local: Template, remote: KakaoAlimtalkTemplate, channel: string) {
   return local.is_active === true && local.channel === 'alimtalk' && local.purpose === 'transactional'
     && remote.status === 'APPROVED' && !remote.isHidden && remote.channelId === channel
     && remote.templateId === local.alimtalk_template_id && ['BA','EX'].includes(remote.messageType)
     && typeof remote.content === 'string' && remote.content.replaceAll('\r\n','\n') === local.content.replaceAll('\r\n','\n')
-    && [...local.content.matchAll(/#\{[^}]+\}|\{\{[^}]+\}\}/g)].every(match => match[0] === '#{이름}')
-    && (!remote.variables || remote.variables.every(variable => ['이름','#{이름}'].includes(variable.name)));
+    && [...local.content.matchAll(/#\{[^}]+\}|\{\{[^}]+\}\}/g)].every(match => ['#{이름}','#{수강계정}'].includes(match[0]))
+    && (!remote.variables || remote.variables.every(variable => ['이름','#{이름}','수강계정','#{수강계정}'].includes(variable.name)));
 }
 
 export async function syncRetentionReceipts(db: ReturnType<typeof createAdminClient>, service: SolapiMessageService) {
@@ -80,10 +91,18 @@ export async function dispatchRetentionCrm() {
     const member=claim.data as Member;
     let accepted=false,groupId:string|null=null,reason:string|null=null;
     try {
+      if(template.content.includes('#{수강계정}')) {
+        reason='수강권이 연결된 로그인 계정을 확인하지 못해 발송하지 않았습니다.';
+        const identity=await db.auth.admin.getUserById(member.id);
+        const account=identity.error ? null : retentionLoginAccount(identity.data.user,member.id);
+        if(!account)throw new Error('수강 계정 확인 불가');
+        member.retentionAccount=account;
+        reason=null;
+      }
       const delivery=await sendBatch(template,[member],{retention:true,automationRuns:{[member.id]:row.id}},settings);
       accepted=delivery.sent===1;groupId=delivery.groupId || null;
       if(!accepted)reason='발송업체 접수 실패 또는 연락처·발송 설정을 확인해 주세요.';
-    }catch {reason=retentionFailure.PROVIDER_UNKNOWN;}
+    }catch {reason ??= retentionFailure.PROVIDER_UNKNOWN;}
     // Processing is intentionally not reclaimed after crashes/network uncertainty.
     // Provider delivery receipts resolve accepted separately in syncRetentionReceipts.
     const finished=await db.from('crm_automation_runs').update({status:accepted?'accepted':'failed',provider_group_id:groupId,error_message:reason,executed_at:new Date().toISOString()}).eq('id',row.id).eq('status','processing');

@@ -193,3 +193,18 @@ test('retention Alimtalk reuses provider delivery but never falls back to a paid
  assert.equal(qa.sentMessages.length,1);
  assert.deepEqual(qa.sentMessages[0].kakaoOptions,{pfId:'pf',templateId:'provider-approved',disableSms:true,variables:{'#{이름}':'가상 학생'}});
 });
+test('retention account hints render only for verified retention recipients and missing hints cannot reach Solapi',async()=>{
+ const template={id:'approved',channel:'alimtalk',purpose:'transactional',content:'#{이름}님 수강 계정 #{수강계정}',alimtalk_template_id:'provider-approved',is_active:true};
+ const settings={senderPhone:'0200000000',transactionalEnabled:true};
+ const qa=dispatchFixture();
+ await qa.sendBatch(template,[{...member,full_name:'가상 학생',retentionAccount:'s***@example.com (구글)'}],{retention:true},settings);
+ assert.equal(qa.sentMessages.length,1);
+ assert.equal(qa.sentMessages[0].text,'가상 학생님 수강 계정 s***@example.com (구글)');
+ assert.equal(qa.sentMessages[0].kakaoOptions.variables['#{수강계정}'],'s***@example.com (구글)');
+ assert.equal(qa.sentMessages[0].kakaoOptions.disableSms,true);
+ for(const [recipient,context] of [[member,{retention:true}],[{...member,retentionAccount:'s***@example.com'},{}]]){
+  const rejected=dispatchFixture();
+  await assert.rejects(rejected.sendBatch(template,[recipient],context,settings),/로그인 계정/);
+  assert.equal(rejected.sentMessages.length,0);
+ }
+});
