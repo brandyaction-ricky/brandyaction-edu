@@ -33,5 +33,9 @@ test('tasks behind a switched-off server module leave the study menu, the rest s
  assert.deepEqual(study.filter(t=>taskOpen(t.id,on)).map(t=>t.id),kept);assert.deepEqual(study.filter(t=>taskOpen(t.id)).map(t=>t.id),kept);
  assert.equal(taskOpen('admin:support',on),false);assert.equal(taskOpen('admin:moderation',on),true);
  assert.equal(taskOpen('admin:moderation',off),false);assert.equal(taskOpen('admin:support',off),false);assert.equal(taskOpen('admin:dashboard',off),true);
- for(const room of ['live','welcome','office'])assert.ok(roomTasks(room,'student').every(t=>taskOpen(t.id,off)));
+ for(const room of ['live','welcome'])assert.ok(roomTasks(room,'student').every(t=>taskOpen(t.id,off)));
+ // Staff review before the 11-13 live demo: with the business switch off the office menu keeps only what works.
+ const office=roomTasks('office','student');
+ assert.deepEqual(office.filter(t=>taskOpen(t.id,off)).map(t=>t.id),['office','bots','business:resources']);
+ assert.ok(office.every(t=>taskOpen(t.id,{...on,business:true})));assert.ok(office.every(t=>taskOpen(t.id)));
 });

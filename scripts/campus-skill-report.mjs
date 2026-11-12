@@ -36,12 +36,14 @@ export async function reportSkill(config, input, state, send, persist) {
       throw Error('Only assigned work from a paired employee can be reported');
     }
     const objective = marked ? text.slice(prefix.length).trim() : input.taskObjective.trim();
-    const registered=envelope({event:'registered',enrollmentId:config.enrollmentId,objective,outputType:'analysis'});
+    // The employee names the kind of result; anything else falls back to the general kind.
+    const outputType=['plan','copy','checklist','analysis'].includes(input.outputType)?input.outputType:'analysis';
+    const registered=envelope({event:'registered',enrollmentId:config.enrollmentId,objective,outputType});
     if(state && state.requestHash!==hash(input.requestText)) throw Error('Request changed after registration');
     if(!state) {
       state={...binding,requestHash:hash(input.requestText),events:[registered,
         envelope({event:'accepted',expectedRevision:1,note:'Aside 직원이 캠퍼스 보고 스킬로 지정 업무의 접수를 보고했습니다.'}),
-        envelope({event:'started',expectedRevision:2,note:'Aside 직원이 작업을 시작한다고 보고했습니다. 시스템 감시·현재 온라인 상태를 뜻하지 않습니다.'})].map(report=>({report,delivered:false})),terminal:null};
+        envelope({event:'started',expectedRevision:2,note:'Aside 직원이 작업을 시작한다고 보고했습니다.'})].map(report=>({report,delivered:false})),terminal:null};
       await persist(state);
     }
   } else if(!state) throw Error('No saved start report for this request');

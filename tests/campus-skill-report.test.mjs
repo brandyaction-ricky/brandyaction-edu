@@ -55,7 +55,16 @@ test('a newly paired employee reports one natural-language assignment without pu
   await reportSkill(paired, {action: 'result', context, resultText: '이번 주 수업은 금요일 오후에 시작합니다.'}, saved, send, persist);
   assert.deepEqual(events.map(event => event.event), ['registered', 'accepted', 'started', 'draft']);
   assert.equal(events[0].objective, request.taskObjective);
+  assert.equal(events[0].outputType, 'analysis');
   assert.ok(!JSON.stringify(events).includes(request.requestText));
+  // The employee may name the kind of result; an unknown kind falls back instead of failing the report.
+  for (const [given, stored] of [['copy', 'copy'], ['checklist', 'checklist'], ['essay', 'analysis']]) {
+    const typed = [];
+    await reportSkill(paired, {...request, context: {...context, messageId: 'kind-' + given}, outputType: given}, null,
+      async (_config, envelope) => typed.push(JSON.parse(envelope.raw)), async () => {});
+    assert.equal(typed[0].outputType, stored);
+    assert.ok(!JSON.stringify(typed).includes('시스템 감시'));
+  }
 });
 
 test('a stdin draft keeps the original start context and literal Unicode across chunks',async()=>{

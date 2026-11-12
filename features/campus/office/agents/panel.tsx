@@ -93,6 +93,6 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  {!demo&&<><div className={styles.controls}><button disabled={dir.page===1} onClick={dir.prev}>이전 직원 목록</button><span>{dir.page}페이지</span><button disabled={!dir.data?.next} onClick={dir.next}>다음 직원 목록</button></div>
 </>}
 
- <details><summary>기존 사무실 직원 목록 가져오기</summary><p>윤익님 프로그램의 직원 목록 JSON을 가져오면 같은 외형과 좌석으로 배치됩니다. 좌석 배치만 교체하며, 기존 직원과 기록은 유지합니다.</p><label>직원 목록 JSON<input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void importFile(f);e.target.value='';}}/></label></details>
+ {demo&&<details><summary>기존 사무실 직원 목록 가져오기</summary><p>윤익님 프로그램의 직원 목록 JSON을 가져오면 같은 외형과 좌석으로 배치됩니다. 좌석 배치만 교체하며, 기존 직원과 기록은 유지합니다.</p><label>직원 목록 JSON<input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void importFile(f);e.target.value='';}}/></label></details>}
  <footer><span>자리 {desks.length}/10 · {demo?'미리보기':saved.updated_at?'계정에 저장됨':'아직 저장 전'}</span><button disabled={busy||demo} onClick={()=>void refresh().then(changed).catch(e=>setMessage(e.message))}>다른 기기의 변경 불러오기</button></footer><p className={styles.note}>연결한 직원의 업무와 결과는 자리 배치와 관계없이 작업함에서 확인할 수 있어요. 봇 비밀키를 입력할 필요는 없습니다.</p></>}</section>;
 }

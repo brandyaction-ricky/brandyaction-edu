@@ -11,7 +11,10 @@ export function makeDeskMarkers(layer, seats, profiles, jobs, openJob) {
     button.dataset.status = job.status;
     const label = job.status === 'review' ? '검토할 결과' : '진행 중';
     button.setAttribute('aria-label', profile.name + ' · ' + label + ' 업무 열기');
-    button.textContent = (profile.seatIndex ? profile.seatIndex + '번' : '총괄 관리자') + ' · ' + label;
+    // Show who it is, not the seat number: the name on top, the status under it.
+    const who = document.createElement('strong'), what = document.createElement('small');
+    who.textContent = profile.name; what.textContent = label;
+    button.append(who, what);
     button.title = profile.name + ' · ' + label;
     button.onclick = () => openJob(job.jobId);
     layer.append(button);
@@ -28,8 +31,11 @@ export function positionDeskMarkers(office, markers) {
     b.hidden = !point;
     if (point) wings[wing].push({b, ...point});
   }
-  const width = 102;
-  const height = 36;
+  // Narrow screens get a smaller, name-only marker (status stays in the color) so ten desks do not cover the room.
+  const compact = office.cw < 560;
+  const width = compact ? 92 : 128;
+  const height = compact ? 28 : 42;
+  for (const {b} of markers) b.dataset.compact = String(compact);
   for (const [wing, group] of Object.entries(wings)) {
     if (!group.length) continue;
     group.sort((a, b) => a.y - b.y);

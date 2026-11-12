@@ -9,12 +9,14 @@ description: "Telegram 개인 대화의 '캠퍼스 연결 준비'와 '캠퍼스 
 
 ## 수강생이 직접 연결할 때
 
-본인만 사용하도록 설정한 Telegram 직원 개인 대화에서 정확히 `캠퍼스 연결 준비` 또는 `캠퍼스 연결 확인 <12자리 확인번호>`를 받으면 아래의 공식 Aside·channel 정보에서 실제 현재 context를 구한다. 현재 요청의 원문을 requestText로 하고 context와 함께 로컬 입력 JSON에 저장한다. `node <this-skill-dir>/scripts/campus-student-device.mjs <accountRoot> <입력JSON절대경로>`를 실행한다. 준비 단계는 10분짜리 pairingCode를 알려 주고, 연결을 확인하면 이 직원에게 평소 말로 맡긴 업무의 요약과 결과가 개인 사무실에 기록된다고 안내한다. 일반 대화는 기록하지 않는다. 사용자가 캠퍼스의 내 AI 직원에서 코드를 입력한 다음, 같은 대화에서 확인번호를 보내면 확인 명령을 실행한다. connected가 true일 때만 연결을 알린다. 키 파일을 열거나 전송하지 않는다. 연결 명령은 업무로 등록하지 않는다. 연결 해제는 캠퍼스의 해당 직원 카드에서 한다.
+본인만 사용하도록 설정한 Telegram 직원 개인 대화에서 정확히 `캠퍼스 연결 준비` 또는 `캠퍼스 연결 확인 <12자리 확인번호>`를 받으면 아래의 공식 Aside·channel 정보에서 실제 현재 context를 구한다. 현재 요청의 원문을 requestText로 하고 context와 함께 로컬 입력 JSON에 저장한다. `node <this-skill-dir>/scripts/campus-student-device.mjs <accountRoot> <입력JSON절대경로>`를 실행한다. 준비 단계는 10분짜리 pairingCode를 알려 주고, 연결을 확인하면 이 직원에게 평소 말로 맡긴 업무의 요약과 결과가 개인 사무실에 기록된다고 안내한다. 일반 대화는 기록하지 않는다. 사용자가 캠퍼스의 내 AI 직원에서 코드를 입력한 다음, 같은 대화에서 확인번호를 보내면 확인 명령을 실행한다. connected가 true일 때만 연결을 알린다. 키 파일을 열거나 전송하지 않는다. 연결 명령은 업무로 등록하지 않는다. 연결 해제는 캠퍼스의 해당 직원 카드에서 한다. 연결 파일을 `<accountRoot>/campus-office`에 쓸 수 없다는 오류가 나면 권한을 임의로 넓히지 말고, 사용자에게 Aside 앱의 File permissions에 그 폴더를 추가(허용)한 뒤 `/new`를 보내고 다시 `캠퍼스 연결 준비`를 보내 달라고 안내한다.
 
 ## 범위와 준비
 
 - 현재 개인 대화에서 사용자가 이 직원에게 실제로 맡긴 일을 판단한다. “공지 초안 써줘”, “이 표를 정리해 줄래?”처럼 할 일과 결과물이 분명하면 바로 시작한다. 짧은 부탁도 맥락에서 대상과 결과물이 분명하면 업무다. 일반 질문(“AI 직원이 뭐야?”), 인사, 감사, 상태 문의, 연결 명령, 인용한 예시는 대화로만 답한다. 대상이나 실행 의도가 모호하면 대화에서 먼저 확인한다.
-- 사무실 기록을 원하지 않거나 대화로만 답해 달라고 한 경우 보고하지 않는다. 요청·결과에 키, 비밀번호, 고객 개인정보가 있으면 그대로 보내지 않는다. 안전한 업무 요약과 결과를 분리할 수 없으면 대화에만 답한다.
+- “사무실에 기록하지 마”처럼 기록을 원하지 않는다고 분명히 말한 경우에만 보고하지 않는다. “답장으로 줘”처럼 결과를 받는 방법만 말한 경우는 평소처럼 보고한다.
+- 업무 요약과 결과에는 이 직원이 이번에 맡은 일만 쓴다. 같은 Aside에 연결된 다른 봇·다른 대화·다른 사업·고객사의 이름이나 진행 중인 다른 대화 수는 넣지 않는다. 전체 직원 현황을 요청받으면 사용자가 알려 준 수업 직원(담당자 목록)만 대상으로 하고, Aside 연결 목록 전체를 직원으로 세지 않는다.
+- Telegram 답장 끝에 “캠퍼스 개인 사무실에 기록됐어요” 같은 문장을 매번 붙이지 않는다. 보고가 실패했을 때만 알린다. 요청·결과에 키, 비밀번호, 고객 개인정보가 있으면 그대로 보내지 않는다. 안전한 업무 요약과 결과를 분리할 수 없으면 대화에만 답한다.
 - 접두어 없는 업무는 새 스킬로 직접 연결한 개인 직원에서만 보고한다. 예전 연결에서는 기존 `캠퍼스 업무:` 방식을 계속 쓸 수 있고, 평소 말로 보고하려면 새 스킬에서 다시 연결한다.
 - 현재 대화의 `aside`와 `channel` 공식 스킬을 먼저 읽는다. REPL의 `await aside.sessions.current()`와 `channel.current()`에서 현재 세션/연결/Telegram 메시지 식별자를 얻는다. 식별자를 만들어 내거나 다른 작업의 값을 복사하지 않는다.
 - `aside.sessions.messages(session.id, {limit:20,order:'desc'})`에서 해당 사용자 요청의 본문·timestamp를 확인한다. 메시지가 모호하거나 현재 요청을 확인할 수 없으면 보고를 멈춘다.
@@ -25,11 +27,11 @@ description: "Telegram 개인 대화의 '캠퍼스 연결 준비'와 '캠퍼스 
 
 **시작 보고를 먼저 보낸다.** 위 기준에 맞는 업무라면 초안 작성, 자료 조회, 부가 스킬 선택은 시작 보고가 성공한 뒤 진행한다. 이미 읽은 공식 Aside·channel 안내는 같은 세션에서 재사용한다.
 
-1. 공식 REPL에서 아래 블록을 한 번 실행한다. `expected`에 현재 사용자가 실제 보낸 문장, `objective`에 개인정보를 뺀 업무 요약(10~2,000자)을 넣는다. 가장 최근 사용자 메시지가 현재 문장과 다르면 중단한다. 이전 업무 파일을 사용하지 않는다.
+1. 공식 REPL에서 아래 블록을 한 번 실행한다. `expected`에 현재 사용자가 실제 보낸 문장, `objective`에 개인정보를 뺀 업무 요약(10~2,000자), `outputType`에 결과물 종류 하나를 넣는다: 실행 계획 `plan`, 글·문구 초안 `copy`, 점검 목록 `checklist`, 조사·요약·분석 `analysis`. 가장 최근 사용자 메시지가 현재 문장과 다르면 중단한다. 이전 업무 파일을 사용하지 않는다.
 
    ```js
    {
-     const expected = '현재 요청 원문', objective = '업무와 결과물 요약';
+     const expected = '현재 요청 원문', objective = '업무와 결과물 요약', outputType = 'analysis';
      const session = await aside.sessions.current(), channelInfo = await channel.current();
      const rows = await aside.sessions.messages(session.id, {limit:20, order:'desc'});
      const user = rows.find(row => row.role === 'user');
@@ -37,7 +39,7 @@ description: "Telegram 개인 대화의 '캠퍼스 연결 준비'와 '캠퍼스 
      if (text !== expected || channelInfo.platform !== 'telegram' || !/^telegram:[1-9]\d*$/.test(channelInfo.channelId) || !session.trigger?.connectionId || !channelInfo.messageId || !Number.isFinite(user.timestamp)) throw Error('현재 개인 대화의 요청을 확인하세요.');
      const context = {platform:'telegram', sessionId:session.id, connectionId:session.trigger.connectionId, channelId:channelInfo.channelId, messageId:String(channelInfo.messageId), requestedAt:user.timestamp};
      const file = path.join(pwd, 'campus-start-'+encodeURIComponent(session.id)+'-'+encodeURIComponent(context.messageId)+'.json');
-     await fs.writeFile(file, JSON.stringify({action:'start', context, requestText:text, taskObjective:objective}), {flag:'wx', mode:0o600});
+     await fs.writeFile(file, JSON.stringify({action:'start', context, requestText:text, taskObjective:objective, outputType}), {flag:'wx', mode:0o600});
      console.log(file);
    }
    ```

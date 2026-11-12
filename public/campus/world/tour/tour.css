@@ -80,6 +80,11 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 
 #environment-open{position:absolute;bottom:125px;left:14px;z-index:5;min-height:44px;font-size:12px}#environment-open[hidden]{display:none}#environment-editor{max-height:calc(100dvh - 120px);touch-action:pan-y}#environment-editor header{touch-action:pan-y}@media(max-width:650px){#environment-open{bottom:205px;left:10px;font-size:11px}#environment-editor{max-height:calc(100dvh - 28px)}}
 
-.office-desk-job{box-sizing:border-box;width:102px;height:36px;min-height:36px;align-items:center;z-index:1;padding:5px 9px;border-radius:8px;border:1px solid #72d8b2;background:#103c35;color:#ecfff8;font-size:12px;font-weight:700}
+.office-desk-job{box-sizing:border-box;width:128px;height:42px;min-height:42px;align-content:center;justify-items:start;gap:1px;z-index:1;padding:4px 9px;border-radius:8px;border:1px solid #72d8b2;background:#103c35;color:#ecfff8;text-align:start}
+.office-desk-job strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:12px;line-height:1.25}
+.office-desk-job small{display:block;color:inherit;opacity:.85;font-size:11px;line-height:1.2}
+.office-desk-job[data-compact="true"]{width:92px;height:28px;min-height:28px;padding:3px 7px}
+.office-desk-job[data-compact="true"] strong{font-size:11px}
+.office-desk-job[data-compact="true"] small{display:none}
 .office-desk-job[data-status="review"]{border-color:#f8ce74;background:#483717;color:#fff2cf}
 .office-desk-job:after{pointer-events:none;left:var(--line-start);top:50%;width:var(--line-length);height:0;border:0;border-top:1px solid currentColor;opacity:.75;transform:rotate(var(--line-angle));transform-origin:left center}

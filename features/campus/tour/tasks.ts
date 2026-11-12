@@ -41,7 +41,7 @@ export const tourTasks:TourTask[]=[
 ];
 // Server switches (EDU_CAMPUS_*_ENABLED) behind each task. A task whose switch is off can only answer "준비 중인 기능입니다", so the menu leaves it out.
 export type TourModules={focus:boolean;support:boolean;community:boolean;business?:boolean};
-export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')||id==='admin:support'?'support':undefined;
+export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')||id==='admin:support'?'support':id==='archive'||id==='admin:cases'||id.startsWith('business:')&&id!=='business:resources'?'business':undefined;
 // Left out after the CEO's utility review (2026-11-11): they need staff to answer or run them, or repeat another task. Code and tables stay; remove an id here to bring it back.
 export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:library','support:settings','admin:support','community:mine','community:talent','community:demo_day','desk','legacy-space']);
 export const taskOpen=(id:string,modules?:TourModules)=>{if(retiredTasks.has(id))return false;const m=taskModule(id);return !modules||!m||modules[m];};
