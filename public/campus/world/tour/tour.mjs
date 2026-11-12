@@ -4,7 +4,7 @@ import {attachEnvironmentControls} from '../office/environment-controls.mjs';
 import {libraryPortal} from './library-wayfinding.mjs';
 import {paintLibrarySign} from './library-signs.mjs';
 import {BotOfficeModel} from '../office/bot-profile.mjs';
-import {useDeskPreviewMaterials} from './desk-preview-materials.mjs';
+import {useDeskPreviewMaterials as applyDeskPreviewMaterials} from './desk-preview-materials.mjs';
 import {makeDeskMarkers,positionDeskMarkers} from './office-desk-markers.mjs';
 import {toBotOfficeSessions} from '../office/office-view-adapter.mjs';
 import {applyRenderProfile} from './render-profile.mjs';
@@ -182,7 +182,7 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
   const dispose=office.disposeCampusArchitecture;
   office.disposeCampusArchitecture=()=>{batch.dispose();dispose?.();};
   const touchDesk=matchMedia('(pointer: coarse), (max-width: 600px)').matches;
-  const restoreMaterials=touchDesk?useDeskPreviewMaterials(office.campusRoomGroups.get('office'),CampusBasicMaterial):null;
+  const restoreMaterials=touchDesk?applyDeskPreviewMaterials(office.campusRoomGroups.get('office'),CampusBasicMaterial):null;
   try {
    // Process queued reports before submitting the first draw, and present the
    // interactive desks before decoding character models.

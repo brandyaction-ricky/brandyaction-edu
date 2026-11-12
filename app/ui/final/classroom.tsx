@@ -1,5 +1,6 @@
 "use client";
 import './classroom-surface.css';
+import { legacyLessonUnlocked } from '@/lib/lesson-completion';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';
@@ -122,7 +123,8 @@ export function Classroom({
   ]);
   const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
-  const canOpen = (id: string) => graduate || (blockLearningEnabled ? progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true : completedIds.has(id) || allLessons.slice(0, allLessons.findIndex(item => item.id === id)).every(item => completedIds.has(item.id)));
+  const preservedIds = new Set((data.preserved_lesson_access || []).map(row => String(row.lesson_id)));
+  const canOpen = (id: string) => graduate || (blockLearningEnabled ? progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true : legacyLessonUnlocked(allLessons, completedIds, id, preservedIds));
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
