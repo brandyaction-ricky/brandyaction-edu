@@ -6,12 +6,13 @@ import {privateReply,problem} from '@/features/campus/webinar/server';
 import {fail,uuid} from '@/features/campus/webinar/domain';
 import {BotOfficeModel,type BotDocument} from '@/public/campus/world/office/bot-profile.mjs';
 import {hasOfficePilot} from '@/features/campus/office/pilot';
-async function access(enrollment:unknown) {
+async function access(enrollment:unknown, includePilot=false) {
  if(process.env.EDU_CAMPUS_ENABLED!=='true')fail('공간이 준비 중입니다.',404);
  if(!uuid(enrollment))fail('수강권을 확인해 주세요.');
  const user=await getAuthenticatedUser();if(!user)fail('로그인이 필요합니다.',401);
- const pilot=await hasOfficePilot(enrollment);
- if(process.env.EDU_CAMPUS_OFFICE_ENABLED!=='true'&&!pilot)fail('공간이 준비 중입니다.',404);
+ const enabled=process.env.EDU_CAMPUS_OFFICE_ENABLED==='true';
+ const pilot=(!enabled || includePilot) && await hasOfficePilot(enrollment);
+ if(!enabled&&!pilot)fail('공간이 준비 중입니다.',404);
  const db=await createClient();
  const scope=await db.rpc('edu_campus_office_access',{p_enrollment:enrollment});
  if(scope.error)throw scope.error;
@@ -19,7 +20,7 @@ async function access(enrollment:unknown) {
  return {db,user,pilot};
 }
 export async function GET(request:Request){try{const params=new URL(request.url).searchParams;
- const{db,user,pilot}=await access(params.get('enrollmentId'));
+ const{db,user,pilot}=await access(params.get('enrollmentId'),!params.has('directory')&&!params.has('desks'));
  if(params.has('directory')){
   let q=db.from('edu_campus_office_employees').select('employee_id,profile').eq('owner_id',user.id).order('employee_id').limit(25);
   const after=params.get('after');if(after)q=q.gt('employee_id',after);
