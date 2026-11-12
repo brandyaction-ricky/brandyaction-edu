@@ -131,3 +131,14 @@
   .edu-front .floating-learning-question-trigger{border-radius:8px;box-shadow:none;min-height:44px}
   .floating-learning-question-panel{max-width:100%;max-height:min(64dvh,calc(100dvh - 80px - env(safe-area-inset-bottom)))}
 }
+.floating-learning-question-panel:has(.curriculum-ai){max-height:min(84dvh,780px)}
+.floating-learning-question-body .ai-conversation-heading h3{margin:0}
+.floating-learning-question-body .curriculum-ai-turns:not(:empty){max-height:clamp(9rem,28dvh,17rem);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;gap:10px}
+.floating-learning-question-body .curriculum-ai-turn{padding:12px;gap:4px}
+.floating-learning-question-body .curriculum-ai-turn p{margin:0}
+.floating-learning-question-body .curriculum-ai-turn time{font-size:11px}
+.floating-learning-question-body .curriculum-ai-toolbar:not(:has(button)){display:none}
+.floating-learning-question-body .curriculum-ai .question-image-dropzone{border-top:1px solid #dce2eb;padding-top:10px}
+.floating-learning-question-body .curriculum-ai textarea{box-sizing:border-box;width:100%;min-height:56px;height:62px}
+.floating-learning-question-body .curriculum-ai .curriculum-ai-empty{margin:0}
+@media(max-width:680px){.floating-learning-question-panel:has(.curriculum-ai){width:calc(100vw - 24px);max-height:84dvh}}
