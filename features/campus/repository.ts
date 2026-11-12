@@ -19,7 +19,7 @@ const ids = (values: unknown[]) => [...new Set(values.map(String))];
 export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from'> | Promise<Pick<Database, 'from'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
-    .eq('user_id', viewer.id).eq('status', 'active').limit(200))).filter(e => hasLearningAccess(e, now));
+    .eq('user_id', viewer.id).eq('status', 'active').order('created_at', { ascending: false }).limit(200))).filter(e => hasLearningAccess(e, now));
   if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   const [courses, cohorts] = enrollments.length ? await Promise.all([
     rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),

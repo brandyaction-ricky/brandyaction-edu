@@ -13,3 +13,6 @@ test('staff and administrators always have the office, students only behind the 
  const sql=readFileSync('supabase/migrations/20261112093000_campus_staff_reporting_access.sql','utf8');
  assert.match(sql,/s\.role in \('admin','staff'\) and s\.status='active'/);
 });
+test('the campus opens on the newest enrollment when none is requested',()=>{
+ assert.match(readFileSync('features/campus/repository.ts','utf8'),/\.eq\('status', 'active'\)\.order\('created_at', \{ ascending: false \}\)\.limit\(200\)/);
+});
