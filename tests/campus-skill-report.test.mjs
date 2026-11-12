@@ -57,3 +57,14 @@ test('a newly paired employee reports one natural-language assignment without pu
   assert.equal(events[0].objective, request.taskObjective);
   assert.ok(!JSON.stringify(events).includes(request.requestText));
 });
+
+test('a stdin draft keeps the original start context and literal Unicode across chunks',async()=>{
+  const {resultFromStart}=await import('../scripts/campus-skill-report.mjs');
+  const start={action:'start',context:{messageId:'17'}};
+  const text='제목\n\n$HOME과 `기호`까지 원문 그대로';
+  const bytes=Buffer.from(text+'\n');
+  assert.deepEqual(await resultFromStart(start,[bytes.subarray(0,2),bytes.subarray(2)]),
+    {action:'result',context:start.context,resultText:text});
+  await assert.rejects(resultFromStart({action:'retry'},[]),/start file/);
+  await assert.rejects(resultFromStart(start,[Buffer.alloc(40003)]),/too large/);
+});
