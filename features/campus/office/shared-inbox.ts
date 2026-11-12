@@ -9,6 +9,11 @@ type Join = (signal: AbortSignal, ready: () => void, failed: () => void, changed
 type Session = { views: Set<View>; connected: boolean; sync: ReturnType<typeof startInboxSync> };
 const sessions = new Map<string, Session>();
 
+// A newly painted desk view shares the current read queue and subscription.
+export function invalidateOfficeView(enrollment: string) {
+  sessions.get(enrollment)?.sync.invalidate();
+}
+
 // One transport per enrollment in this tab. Each view owns its cancellable read.
 export function observeOffice(enrollment: string, view: View, join?: Join, readVersion?: (signal: AbortSignal) => Promise<number>) {
   let session = sessions.get(enrollment);

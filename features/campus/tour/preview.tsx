@@ -1,4 +1,5 @@
 'use client';
+import {invalidateOfficeView} from '../office/shared-inbox';
 import {useOfficeLive} from '../office/use-office-live';
 import type {BotDocument} from '@/public/campus/world/office/bot-profile.mjs';
 import {StudyLessonShortcut} from '../ui/study-lesson-shortcut';
@@ -71,6 +72,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const [role,setRole]=useState<TourRole>(visitor?'guest':review?(review.role||'admin'):live?.role||'student'),[room,setRoom]=useState<TourRoom>(visitor?'live':review?.room||live?.initialRoom||(live?.role==='waiting'?'welcome':'study')),[mapOpen,setMapOpen]=useState(!visitor&&!review&&!live?.initialRoom),[tool,setTool]=useState(review?.lessonContent ? 'learning' : ''),[gate,setGate]=useState<TourRoom|null>(null),[ready,setReady]=useState(false),[failed,setFailed]=useState(false),[notice,setNotice]=useState(''),[progress,setProgress]=useState<Progress>(emptyProgress),[storageReady,setStorageReady]=useState(false),[editing,setEditing]=useState(false),[camera,setCamera]=useState(visitor?'third':'overall'),[activityMenu,setActivityMenu]=useState(false);
  const [studyCardHost,setStudyCardHost]=useState<HTMLDivElement|null>(null);
  const [enteredStudy,setEnteredStudy]=useState(false);
+ const firstDeskRead=useRef(false);
  const [deskFrameVisible,setDeskFrameVisible]=useState(false);
  const [deskList,setDeskList]=useState<{enrollment:typeof snapshot.selectedEnrollmentId;jobs:OfficeDeskJob[]}|null>(null);
  const studentOffice=!!live&&role==='student'&&room==='office';
@@ -90,13 +92,19 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const deferSceneForChat=sharedStudy&&tool==='lounge'&&!ready;
  useEffect(()=>{
   if(sceneStarted||studentMap)return;
-  if(studentOffice&&tool)return;
+  if(studentOffice){
+   // Give the signed-in desk read and its first paint priority over WebGL startup.
+   if(tool)return;
+   const delay=deskLoaded?80:1800;
+   const timer=setTimeout(()=>setSceneStarted(true),delay);
+   return ()=>clearTimeout(timer);
+  }
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Mirror room/map state; the roster session must precede the 3D scene.
   if(!sharedStudy){setSceneStarted(true);return;}
   if(mapOpen)return;
   const fallback=setTimeout(()=>setSceneStarted(true),1800);
   return ()=>clearTimeout(fallback);
- },[sceneStarted,sharedStudy,mapOpen,studentMap,studentOffice,tool]);
+ },[sceneStarted,sharedStudy,mapOpen,studentMap,studentOffice,deskLoaded,tool]);
  const track=useCampusAnalytics(visitor?.analyticsScope||(!visitor&&live?'member':undefined),room);
  useEffect(()=>{if(tool)track('tool_open',tool);},[tool]); // eslint-disable-line react-hooks/exhaustive-deps
  useEffect(()=>{if(gate)track('room_gate',gate);},[gate]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -166,7 +174,12 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  function ask(value:{lessonId:string;context:string}){if(!mayLeave(true))return;setPrevious(tool);setHandoff(value);setAiVisited(true);setTool('ai');}
  function navigate(id:string){selectTask(({community:'feedback',business:'business:brief',support:'support:request',learning:'learning'} as Record<string,string>)[id]||id);}
  useEffect(()=>{state.current={role,room,tool,mapOpen,gate,camera};},[role,room,tool,mapOpen,gate,camera]);
- useEffect(()=>{const receive=(event:MessageEvent)=>{const m=event.data;if(event.source!==frame.current?.contentWindow||event.origin!==location.origin||m?.source!=='moonshot-tour'||m.token!==token.current||!token.current)return;const s=state.current;if(m.type==='office-desks-visible'&&s.room==='office'&&s.role==='student')setDeskFrameVisible(m.payload?.visible===true);if(m.type==='error')setDeskFrameVisible(false);if(m.type==='office-desk-job'&&liveRef.current&&s.role==='student'&&s.room==='office'&&!s.tool&&!s.mapOpen&&visibleTasks('office',s.role).some(t=>t.id==='office')){
+ useEffect(()=>{const receive=(event:MessageEvent)=>{const m=event.data;if(event.source!==frame.current?.contentWindow||event.origin!==location.origin||m?.source!=='moonshot-tour'||m.token!==token.current||!token.current)return;const s=state.current;
+ if(m.type==='office-desk-check'&&liveRef.current&&s.role==='student'&&s.room==='office'&&!s.mapOpen&&!s.tool&&snapshot.selectedEnrollmentId){
+  firstDeskRead.current=true;
+  invalidateOfficeView(snapshot.selectedEnrollmentId);
+ }
+ if(m.type==='office-desks-visible'&&s.room==='office'&&s.role==='student')setDeskFrameVisible(m.payload?.visible===true);if(m.type==='error')setDeskFrameVisible(false);if(m.type==='office-desk-job'&&liveRef.current&&s.role==='student'&&s.room==='office'&&!s.tool&&!s.mapOpen&&visibleTasks('office',s.role).some(t=>t.id==='office')){
    const desk=deskTargets.current.get(m.payload?.jobId);
    if(desk){setOfficeFilter(desk);setOfficeVisited(true);setTool('office');}
  }if(m.type==='activity')window.dispatchEvent(new Event('campus:activity-pulse'));if(m.type==='ready'){setReady(true);setFailed(false);post('role',{role:s.role});post('room',{id:s.room});post('camera',{mode:s.camera});post('appearance',liveRef.current?(liveRef.current.avatar||tourAvatar({nickname:snapshot.viewer.displayName})):readAvatar());post('progress',{level:liveRef.current?liveRef.current.level||0:getCommunityDemoRewards(snapshot.selectedEnrollmentId||'')?.level||0});post('blocked',{value:!!(s.mapOpen||s.tool||s.gate)});}if(m.type==='dev-visitor-move'&&(visitorRef.current?.devPresence||liveRef.current?.publicPresence))devConnection.current?.move(m.payload);if(m.type==='visitor-reaction')window.dispatchEvent(new CustomEvent('campus:activity',{detail:{action:'reaction'}}));if(m.type==='visitor-reaction'&&(visitorRef.current?.devPresence||liveRef.current?.publicPresence)&&['live','library'].includes(s.room))devConnection.current?.react(m.payload?.code);if(m.type==='visitor-story'&&visitorRef.current&&['study','office','welcome'].includes(m.payload?.id)){setTool('story:'+m.payload.id);visitorRef.current.onActivity('experience');}if(m.type==='camera'&&['overall','third','first'].includes(m.payload?.mode)){if(s.camera!==m.payload.mode)window.dispatchEvent(new CustomEvent('campus:activity',{detail:{action:'camera_switch',target:m.payload.mode}}));setCamera(m.payload.mode);}if(m.type==='editor')setEditing(m.payload?.open===true);if(m.type==='appearance-save'){if(accountWelcome&&s.room==='welcome'){void saveAccountAvatar(m.payload);return;}window.dispatchEvent(new CustomEvent('campus:activity',{detail:{action:'avatar_save'}}));if(liveRef.current){void liveRef.current.saveAvatar(tourAvatar(m.payload)).then(value=>{post('appearance',value);post('appearance-result',{ok:true});setNotice('캐릭터를 내 계정에 저장했어요. 다시 입장해도 유지돼요.');}).catch((e:Error)=>post('appearance-result',{ok:false,error:e.message||'저장하지 못했어요. 다시 시도해 주세요.'}));return;}try{const value=tourAvatar(m.payload);localStorage.setItem(avatarKey,JSON.stringify(value));post('appearance',value);post('appearance-result',{ok:true});setNotice('캐릭터를 이 브라우저에 저장했어요. 다시 열어도 유지돼요.');if(visitorRef.current)visitorEntered();}catch{post('appearance-result',{ok:false,error:'브라우저 저장이 차단되어 저장하지 못했어요. 저장 허용 후 다시 시도해 주세요.'});}}if(m.type==='destination'&&['live','library','study','office','welcome'].includes(m.payload?.id)){enter(m.payload.id);}if(m.type==='error'){setFailed(true);setNotice('3D 로딩에 문제가 있어도 공간 이동과 활동 메뉴로 흐름을 확인할 수 있어요.');}if(m.type==='action'&&canEnter(s.role,s.room)&&visibleTasks(s.room,s.role).some(t=>t.id===m.payload?.id)){setTool(m.payload.id);visitorRef.current?.onActivity(m.payload.id);if(m.payload.id==='office'){setOfficeFilter(null);setOfficeVisited(true);}if(m.payload.id==='focus'){setToolsPane('focus');setToolsVisited(true);post('sit');}}};window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);},[snapshot.selectedEnrollmentId,snapshot.viewer.displayName,avatarKey,accountWelcome,managed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -185,25 +198,32 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const previousDeskView=useRef('');
  const deskTargets=useRef(new globalThis.Map<string,OfficeDeskJob>());
  const refreshDesks=useCallback(async(signal?:AbortSignal)=>{
-   const params=new URLSearchParams({enrollmentId:snapshot.selectedEnrollmentId||''});
-   if(role==='student')params.set('desks','1');
-   const response=await fetch('/api/campus/office/agents?'+params,{cache:'no-store',signal});
-   if(!response.ok)throw Error('사무실 좌석을 읽지 못했습니다.');
-   const data=await response.json() as {document:BotDocument;desks?:{jobId:string;employeeId:string;status:OfficeDeskJob['status']}[]};
-   if(signal?.aborted)return;
-   const nextView=JSON.stringify(data);
-   if(nextView===previousDeskView.current)return;
-   previousDeskView.current=nextView;
-   const targets=new globalThis.Map<string,OfficeDeskJob>();
-   for(const desk of data.desks||[]){
-     const profile=data.document.profiles.find(p=>p.employeeId===desk.employeeId);
-     if(profile)targets.set(desk.jobId,{id:profile.employeeId,name:profile.name,jobId:desk.jobId,status:desk.status});
+   const confirmFirstDesk=firstDeskRead.current;
+   if(confirmFirstDesk)firstDeskRead.current=false;
+   try {
+    const params=new URLSearchParams({enrollmentId:snapshot.selectedEnrollmentId||''});
+    if(role==='student')params.set('desks','1');
+    const response=await fetch('/api/campus/office/agents?'+params,{cache:'no-store',signal});
+    if(!response.ok)throw Error('사무실 좌석을 읽지 못했습니다.');
+    const data=await response.json() as {document:BotDocument;desks?:{jobId:string;employeeId:string;status:OfficeDeskJob['status']}[]};
+    if(signal?.aborted)return;
+    const nextView=JSON.stringify(data);
+    if(nextView===previousDeskView.current)return;
+    previousDeskView.current=nextView;
+    const targets=new globalThis.Map<string,OfficeDeskJob>();
+    for(const desk of data.desks||[]){
+      const profile=data.document.profiles.find(p=>p.employeeId===desk.employeeId);
+      if(profile)targets.set(desk.jobId,{id:profile.employeeId,name:profile.name,jobId:desk.jobId,status:desk.status});
+    }
+    deskTargets.current=targets;
+    setDeskList({enrollment:snapshot.selectedEnrollmentId,jobs:[...targets.values()]});
+    post('personal-office',{document:data.document,desks:data.desks});
+   } finally {
+    if(confirmFirstDesk&&!signal?.aborted)post('office-desk-check-done');
    }
-   deskTargets.current=targets;
-   setDeskList({enrollment:snapshot.selectedEnrollmentId,jobs:[...targets.values()]});
-   post('personal-office',{document:data.document,desks:data.desks});
  },[snapshot.selectedEnrollmentId,role]);
  const clearDesks=useCallback(()=>{
+   firstDeskRead.current=false;
    previousDeskView.current='';
    deskTargets.current.clear();
    setDeskList(null);
@@ -218,10 +238,16 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const quizDone=assessment.quiz.every((_,i)=>typeof progress.quiz[i]==='boolean'),levelDone=assessment.level.every((_,i)=>progress.level[i]>=0),done=Number(progress.video)+Number(quizDone)+Number(levelDone);
  const welcomeResources=welcome?.resources||live?.libraryResources||[];
  const welcomeBody=['video','notices','basics'].includes(tool)?<WelcomePanel initialArticle={firstNotice&&tool==='notices'?welcomeSettings.notices.find(a=>a.published)?.id:undefined} onNavigate={setTool} completed={progress.video} onComplete={()=>updateProgress(p=>({...p,video:!p.video}))} key={tool} action={tool} settings={welcomeSettings} resources={welcomeResources} onPlay={playLibraryVideo}/>:tool==='quiz'||tool==='level'?<AssessmentPanel key={tool} kind={tool} assessment={assessment} progress={progress} onChange={updateProgress} onNavigate={setTool}/>:<><p>{accountWelcome?'준비 기록은 내 계정에 저장됩니다. 다른 기기에서도 이어서 확인할 수 있어요.':'미리보기 준비 기록은 이 브라우저에만 남아요.'}</p><div className={styles.progressTrack}><span style={{width:done/3*100+'%'}}/></div><h3>{done}/3 준비 완료</h3>{[['video','라이브 다시보기',progress.video],['quiz','OX 퀴즈',quizDone],['level','AI 수준 확인',levelDone]].map(([id,label,finished])=><button key={String(id)} className={styles.checklist} onClick={()=>setTool(String(id))}><span>{finished?'✓':'○'} {label}</span><span>{finished?'다시 보기':'시작하기'} →</span></button>)}{done===3&&<div className={styles.result}><h3>첫 도약 준비 완료!</h3><p>{role==='waiting'?'개강 전 구매자는 준비를 마쳐도 정규 공부방이 열리지 않아요. 수강 시작일에 입장할 수 있어요.':'이제 공부방에서 첫 실행을 시작해 보세요.'}</p><button disabled={editing} className={styles.primary} onClick={()=>{setTool('');setMapOpen(true);}}>공간 이동</button></div>}</>;
- const startTourFrame=()=>{
+ const waitingForOffice=useRef(false);
+ const startTourFrame=useCallback(()=>{
   setDeskFrameVisible(false);
   post('init',{studentOffice,personalOffice:studentOffice&&desksVisible&&deskLoaded&&previousDeskView.current?JSON.parse(previousDeskView.current):null,visitor:!!visitor,devPresence:visitor?.devPresence===true||live?.publicPresence===true,qaCrowd:visitor?.qaCrowd===true,ambientCount:visitor?.ambientCount||0,operatorReview:visitor?.operatorReview===true});
- };
+ },[studentOffice,desksVisible,deskLoaded,visitor,live?.publicPresence]);
+ useEffect(()=>{
+  if(sceneStarted&&waitingForOffice.current&&frame.current){
+   waitingForOffice.current=false;startTourFrame();
+  }
+ },[sceneStarted,startTourFrame]);
  const pendingDeskJobs=desksVisible&&role==='student'&&deskList?.enrollment===snapshot.selectedEnrollmentId&&
    visibleTasks('office',role).some(task=>task.id==='office') ? deskList?.jobs : undefined;
  const loadingDeskList=pendingDeskJobs?.length ? <section className={styles.loading} aria-label="직원 업무">
@@ -236,7 +262,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
   ? loadingDeskList ?? (!failed&&<p className={styles.loading} role="status">공간과 캐릭터를 준비하고 있어요…</p>) : null;
  return <div ref={shell} className={styles.root} data-room={room} data-editing={editing}>
  {room==='welcome'&&accountWelcome&&(welcomeSaving>0||welcomeError)&&<div className={styles.accountSave} role={welcomeError?'alert':'status'}>{welcomeError||'준비 기록을 저장하고 있어요…'}{welcomeError&&<button onClick={()=>{if(welcomeLoaded.current){for(const command of welcomeFailed.current.values())void saveWelcome(command).catch(()=>{});}else window.location.reload();}}>다시 시도</button>}</div>}<LibraryScreen roomLabel={room==='welcome'?'웰컴 존':'자료실'} video={screenVideo} onClose={()=>{setScreenVideo(null);setTool(room==='welcome'?'video':'library:replay');}}/><header className={styles.top} data-campus-chrome><div className={styles.brand}><Orbit size={23}/><div><strong>{roomName(room)}</strong>{room==='office'&&live&&role==='student'?<button type="button" className={styles.officeHelp} aria-label="개인 사무실 이용 안내" onClick={()=>{if(mayLeave()){setTool('office-guide');setActivityMenu(false);}}}>사무실 이용 안내 →</button>:<small>{room==='library'?'누구나 꺼내 보는 무료 자료':room==='office'?'나만의 개인 공간':room==='live'?(visitor?'AI 마케팅을 배우고 실행하는 곳':'모두에게 열린 공간'):room==='welcome'?welcomeSettings.title:'함께 실행하는 수강생 공간'}</small>}</div></div><div className={styles.topButtons}><button disabled={editing} className={styles.primary} onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setActivityMenu(false);setMapOpen(true);}}><Map size={17}/>공간 이동</button><button disabled={editing} aria-label={fullscreen?'전체화면 종료':'전체화면'} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else if(shell.current?.requestFullscreen)void shell.current.requestFullscreen().catch(()=>setNotice('이 브라우저에서는 현재 화면 크기로 이용해 주세요.'));else setNotice('이 브라우저에서는 전체화면을 지원하지 않아요. 현재 화면에서 모든 기능을 이용할 수 있어요.');}}>{fullscreen?<Minimize size={18}/>:<Maximize size={18}/>}</button><button disabled={editing} className={styles.exitButton} aria-label="캠퍼스 나가기" onClick={()=>void exitCampus()}><DoorOpen size={18}/><span>나가기</span></button></div></header>
- <div className={styles.scene}>{bridge&&sceneStarted&&!deferSceneForChat&&tool!=='legacy-space'&&<iframe title="문샷 캠퍼스 3D 미리보기" ref={frame} src={'/campus/world/tour/index.html'+(process.env.NEXT_PUBLIC_CAMPUS_LOCAL_MEETUP==='true'&&typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('meet')==='1'?'?previewMeetup=1'+(new URLSearchParams(window.location.search).get('qaChat')==='1'?'&qaChat=1':''):'')+'#bridge='+bridge} sandbox="allow-scripts allow-same-origin" onLoad={startTourFrame}/>}</div>
+ <div className={styles.scene}>{bridge&&(sceneStarted||studentOffice&&!mapOpen&&!tool)&&!deferSceneForChat&&tool!=='legacy-space'&&<iframe title="문샷 캠퍼스 3D 미리보기" ref={frame} src={'/campus/world/tour/index.html'+(process.env.NEXT_PUBLIC_CAMPUS_LOCAL_MEETUP==='true'&&typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('meet')==='1'?'?previewMeetup=1'+(new URLSearchParams(window.location.search).get('qaChat')==='1'?'&qaChat=1':''):'')+'#bridge='+bridge} sandbox="allow-scripts allow-same-origin" onLoad={()=>{if(sceneStarted)startTourFrame();else waitingForOffice.current=true;}}/>}</div>
  {!sharedStudy&&sceneLoading}
  <footer className={styles.bottom} data-campus-chrome>{!live&&!visitor&&!review&&<details className={styles.qa}><summary>미리보기 · {roleNames[role]}</summary><label>입장 권한 체험<select disabled={editing} aria-label="입장 권한 체험" value={role} onChange={e=>changeRole(e.target.value as TourRole)}>{Object.entries(roleNames).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><p>가상 계정입니다. 실제 권한·결제·서버 기록은 바뀌지 않아요.</p></details>}{live&&<Link className={styles.backLink} href="/my/classes">내 클래스로</Link>}{review&&<span className={styles.reviewLabel}>{review.returnHref?<Link href={review.returnHref}>수업 검수로 돌아가기</Link>:review.role==='waiting'?<Link href="/my/classes">내 클래스 · 개강 전 준비</Link>:'운영자 둘러보기 · 모든 공간 입장 가능'}</span>}<div className={styles.bottomActions}><button disabled={!ready||editing} onClick={()=>{setActivityMenu(false);post('camera',{mode:'overall'});}}>공간 전체 보기</button><button disabled={!ready||editing} onClick={()=>{setActivityMenu(false);post('camera',{mode:camera==='third'?'first':'third'});}}>{camera==='third'?'1인칭으로 보기':'3인칭으로 보기'}</button><button disabled={editing} aria-expanded={room==='library'?undefined:activityMenu} onClick={()=>{if(room==='library'){open('library:all');return;}setTaskQuery('');setActivityMenu(v=>!v);}}>{room==='library'?'자료·다시보기':'이 공간에서 할 일'}</button><button disabled={!ready||editing||!!live&&!visitor&&!review&&!live.avatar} aria-label="내 캐릭터" onClick={()=>{setActivityMenu(false);post('blocked',{value:false});post('appearance-open');}}><Users size={17}/><span>내 캐릭터</span></button></div></footer>
  {visitor&&arrival&&!editing&&<section className={styles.arrival} aria-label="방문자 입장"><small>MOONSHOT OPEN CAMPUS</small><h1>{visitor.title}</h1><p>10% 더 나아지는 것을 넘어,<br/>내 일을 10배 다르게 바꿔볼 가능성.<br/>AI 마케팅 기지를 직접 둘러보세요.</p><p className={styles.arrivalGuide}>바닥의 파란 화살표를 따라 문샷 자료실로 가면<br/>무료 자료와 라이브 다시보기를 만날 수 있어요.</p><button className={styles.primary} disabled={!ready} onClick={()=>{post('blocked',{value:false});post('appearance-open');}}>캐릭터 꾸미고 입장</button><button disabled={!ready&&!failed} onClick={visitorEntered}>{failed?'공간 안내로 입장':'이 캐릭터로 바로 입장'}</button><small>가입 없이 체험 · 캐릭터는 이 브라우저에만 저장돼요.<br/>닉네임에 개인정보를 넣지 마세요.</small></section>}
