@@ -296,7 +296,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     try {
       const result = await send({ action: "save", section: "learning", values: {
         week_id: selectedWeekId,
-        day_number: Math.max(0, ...lessons.map((lesson) => num(lesson, "day_number")), ...(curriculum.curriculum_lessons || []).filter((lesson) => lesson.week_id === selectedWeekId).map((lesson) => num(lesson, "day_number"))) + 1,
+        day_number: Math.max(0, ...lessons.filter((lesson) => lesson.week_id === selectedWeekId).map((lesson) => num(lesson, "day_number"))) + 1,
         title,
         content_type: "text",
         is_published: false,
@@ -355,22 +355,27 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     if (archived && selectedIsAffected && contentDirty && !window.confirm("저장하지 않은 학습 내용이 있습니다. 목록에서 삭제하면 이 변경사항은 버려집니다. 계속할까요?")) return;
     const label = kind === "week" ? `${num(row, "week_number")}주차 · ${t(row, "title")}` : `Day ${curriculumDay(curriculum, row)} · ${t(row, "title")}`;
     if (archived && !window.confirm(`「${label}」을 현재 커리큘럼 목록에서 삭제할까요? 학습 진도·미션 제출 기록·자료는 지우지 않고 보관하며, 삭제한 항목에서 복구할 수 있습니다.${kind === "week" ? " 주차 안의 학습도 함께 숨겨집니다." : ""}`)) return;
-    const numberInUse = kind === "week" && !archived && weeks.some(week => String(week.id) !== String(row.id) && num(week, "week_number") === num(row, "week_number"));
-    const reassignOnConflict = Boolean(numberInUse && window.confirm(`복구하려는 ${num(row, "week_number")}주차 번호는 이미 사용 중입니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.`));
+    const numberInUse = !archived && (kind === "week"
+      ? weeks.some(week => String(week.id) !== String(row.id) && num(week, "week_number") === num(row, "week_number"))
+      : (curriculum.curriculum_lessons || []).some(lesson => !lesson.archived_at && lesson.week_id === row.week_id && lesson.id !== row.id && num(lesson, "day_number") === num(row, "day_number")));
+    const restoreQuestion = kind === "week"
+      ? `복구하려는 ${num(row, "week_number")}주차 번호는 이미 사용 중입니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.`
+      : "복구하려는 학습 순서는 이미 사용 중입니다. 이 주차의 마지막 순서에 비공개로 복구할까요? 현재 수업 순서와 학습 기록은 그대로 유지됩니다.";
+    const reassignOnConflict = Boolean(numberInUse && window.confirm(restoreQuestion));
     if (numberInUse && !reassignOnConflict) return;
     setBusy(true);
     setError("");
     try {
       const request = (reassign: boolean) => send(
         { action: "set-curriculum-archive", courseId: course.id, kind, id: row.id, archived, reassignOnConflict: reassign },
-        archived ? "커리큘럼 목록에서 삭제했습니다. 기록은 보관되었습니다." : reassign ? "빈 주차 번호로 옮겨 복구했습니다. 학습 기록 연결은 유지됩니다." : "커리큘럼 항목을 복구했습니다. 비공개 상태로 복구됩니다."
+        archived ? "커리큘럼 목록에서 삭제했습니다. 기록은 보관되었습니다." : reassign ? kind === "week" ? "빈 주차 번호로 옮겨 복구했습니다. 학습 기록 연결은 유지됩니다." : "주차의 마지막 순서에 비공개로 복구했습니다. 학습 기록 연결은 유지됩니다." : "커리큘럼 항목을 복구했습니다. 비공개 상태로 복구됩니다."
       );
       try {
         await request(reassignOnConflict);
       } catch (cause) {
-        const racedRestore = kind === "week" && !archived && !reassignOnConflict && cause instanceof Error && cause.message.includes("주차 번호가 이미 사용 중입니다");
+        const racedRestore = !archived && !reassignOnConflict && cause instanceof Error && cause.message.includes(kind === "week" ? "주차 번호가 이미 사용 중입니다" : "학습 순서가 이미 사용 중입니다");
         if (!racedRestore) throw cause;
-        const confirmed = window.confirm(`복구 중 ${num(row, "week_number")}주차 번호가 다른 주차에 배정되었습니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.`);
+        const confirmed = window.confirm(kind === "week" ? `복구 중 ${num(row, "week_number")}주차 번호가 다른 주차에 배정되었습니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.` : restoreQuestion);
         if (!confirmed) { setError("복구를 취소했습니다. 기존 주차와 학습 기록은 보관 상태로 유지됩니다."); return; }
         await request(true);
       }
@@ -433,7 +438,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     {(studio || archivedWeeks.length > 0 || archivedLessons.length > 0) && <details ref={archivePanel} className="curriculum-archive">
       <summary>{studio && <span className="studio-chevron"><ChevronRight size={20} aria-hidden="true" /></span>}삭제한 주차·학습 보기 ({archivedWeeks.length + archivedLessons.length})</summary>
       {!archivedWeeks.length && !archivedLessons.length && <p className="meta">삭제한 항목이 없습니다.</p>}
-      <p className="meta">삭제한 항목과 연결된 학습 기록·제출물·자료는 보관되어 있습니다. 복구된 항목은 비공개 상태로 돌아옵니다.</p>
+      <p className="meta">삭제한 항목과 연결된 학습 기록·제출물·자료는 보관되어 있습니다. 삭제한 항목은 현재 커리큘럼의 순서를 차지하지 않습니다. 복구된 항목은 비공개 상태로 돌아옵니다.</p>
       <ul>
         {archivedWeeks.map(week => <li key={`week-${week.id}`}>
           <span>{num(week, "week_number")}주차 · {t(week, "title")} <small>주차</small></span>

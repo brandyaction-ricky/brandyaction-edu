@@ -66,3 +66,17 @@ test('legacy orientation stays reachable beside both imported learning tracks',a
  await expect(page.locator('.learning-nav .lesson-nav')).toHaveCount(1);
  await expect(page.getByRole('link',{name:'다음 학습',exact:true})).toHaveCount(0);
 });
+
+test('inserting an earlier legacy lesson retains ID-based completion and access, without crediting the inserted or archived lesson',async({page})=>{
+ await page.goto('/lesson-progression-test?legacyInserted=1&target=12');
+ await expect(page.getByText('기존 다음 수업 본문',{exact:true})).toBeVisible();
+ await expect(page.getByText(/1개 학습 완료/)).toBeVisible();
+ await expect(page.locator('.learning-nav')).not.toContainText('삭제한 수업');
+ await page.goto('/lesson-progression-test?legacyInserted=1&target=11');
+ await expect(page.locator('.lesson-header')).toContainText('학습 완료');
+ await page.goto('/lesson-progression-test?legacyInserted=1&target=10');
+ await expect(page.getByText('추가된 준비 수업 본문',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'학습 완료하기',exact:true})).toBeEnabled();
+ await page.goto('/lesson-progression-test?legacyInserted=1&target=13');
+ await expect(page.getByText('이후 잠긴 수업 본문',{exact:true})).toHaveCount(0);
+});

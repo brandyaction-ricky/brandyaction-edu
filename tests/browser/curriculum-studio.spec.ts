@@ -73,3 +73,25 @@ test('a restore conflict discovered during the request asks before retrying in a
  await expect(page.getByLabel('합성 보관 시도')).toHaveText('2');
  await expect(page.getByLabel('합성 보관 요청')).toContainText('"reassignOnConflict":true');
 });
+
+for(const confirm of [true,false]) test(`lesson ordinal collision restore requires explicit confirmation (${confirm})`,async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:0,title:'준비 주차'}],curriculum_lessons:[{id:'active-day2',week_id:'synthetic-week',day_number:2,title:'현재 수업',content_type:'text'},{id:'archived-day2',week_id:'synthetic-week',day_number:2,title:'복구 대상',content_type:'text',archived_at:'2026-11-01T00:00:00Z'}]}}}));
+ await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await page.locator('.curriculum-archive > summary').click();
+ await expect(page.locator('.curriculum-archive')).toContainText('현재 커리큘럼의 순서를 차지하지 않습니다');
+ page.once('dialog',async dialog=>{expect(dialog.message()).toContain('마지막 순서에 비공개로 복구');if(confirm)await dialog.accept();else await dialog.dismiss();});
+ await page.getByRole('button',{name:'학습 복구',exact:true}).click();
+ if(confirm) await expect(page.getByLabel('합성 보관 요청')).toContainText('"reassignOnConflict":true');
+ else await expect(page.getByLabel('합성 보관 시도')).toHaveText('0');
+});
+
+test('new lesson ignores archived and other-week ordinals',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:0,title:'준비 주차'},{id:'other-week',course_id:'synthetic-course',week_number:2,title:'본 수업'}],curriculum_lessons:[{id:'other-day50',week_id:'other-week',day_number:50,title:'다른 주차 수업',content_type:'text'},{id:'active-day1',week_id:'synthetic-week',day_number:1,title:'현재 수업',content_type:'text'},{id:'archived-day99',week_id:'synthetic-week',day_number:99,title:'보관 수업',content_type:'text',archived_at:'2026-11-01T00:00:00Z'}]}}}));
+ await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ const week=page.getByRole('region',{name:'0주차 준비 주차'});
+ await week.getByRole('button',{name:'＋ 학습 추가'}).click();
+ await week.getByRole('textbox',{name:'새 일차 제목'}).fill('새 두번째 수업');
+ await week.getByRole('button',{name:'일차 추가',exact:true}).click();
+ await expect(page.getByLabel('합성 커리큘럼 저장 횟수')).toHaveText('1');
+ expect(JSON.parse(await page.getByLabel('합성 커리큘럼 요청').innerText())).toMatchObject({section:'learning',values:{day_number:2}});
+});

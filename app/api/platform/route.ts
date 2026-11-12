@@ -641,7 +641,7 @@ export async function POST(request: Request) {
             if (!uid(courseId) || !uid(body.id) || !['week', 'lesson'].includes(kind) || typeof body.archived !== 'boolean') {
                 fail('삭제하거나 복구할 주차·학습을 확인해 주세요.');
             }
-            if (body.reassignOnConflict !== undefined && typeof body.reassignOnConflict !== 'boolean') fail('주차 복구 방식을 확인해 주세요.');
+            if (body.reassignOnConflict !== undefined && typeof body.reassignOnConflict !== 'boolean') fail('주차·학습 복구 방식을 확인해 주세요.');
             const result = await db.rpc('edu_set_curriculum_archive', {
                 p_actor: user.id,
                 p_course: courseId,
@@ -655,6 +655,7 @@ export async function POST(request: Request) {
                 if (code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
                 if (code.includes('CURRICULUM_NOT_FOUND')) fail('선택한 상품의 주차·학습이 아니거나 이미 변경되었습니다. 목록을 다시 불러와 주세요.', 409);
                 if (code.includes('CURRICULUM_PARENT_ARCHIVED')) fail('먼저 상위 주차를 복구해 주세요.', 409);
+                if (code.includes('CURRICULUM_LESSON_NUMBER_IN_USE')) fail('복구하려는 학습 순서가 이미 사용 중입니다. 주차의 마지막 순서로 옮겨 복구할지 확인해 주세요.', 409);
                 if (code.includes('CURRICULUM_WEEK_NUMBER_IN_USE')) fail('복구하려는 주차 번호가 이미 사용 중입니다. 다른 빈 번호로 옮겨 복구할지 확인해 주세요.', 409);
                 if (code.includes('CURRICULUM_INVALID')) fail('주차·학습 상태를 확인해 주세요.');
                 console.error('curriculum archive', result.error.code || 'unexpected');
