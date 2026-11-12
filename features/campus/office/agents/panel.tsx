@@ -2,7 +2,8 @@
 import {studentReportingAvailable} from '../student-reporting';
 import {useEffect,useRef,useState} from 'react';
 import {StudentConnections} from '../student-connections';
-import {BotOfficeModel,type BotDocument,type BotProfile} from '@/public/campus/world/office/bot-profile.mjs';
+import {BotOfficeModel,normalizeTelegramBot,type BotDocument,type BotProfile} from '@/public/campus/world/office/bot-profile.mjs';
+import {parseEmployeeLines,pickSeat} from './bulk';
 import {useCampusDraftGuard} from '../../ui/draft-guard';
 import {campusActivity} from '../../analytics/client';
 import {useDirectory} from './directory';
@@ -11,27 +12,48 @@ type Saved={document:BotDocument;revision:string|null;updated_at:string|null};
 export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enrollmentId:string;demo?:boolean;onChange?:(document:BotDocument)=>void;onJobs?:(employee:{id:string;name:string})=>void}){
  const [pilot,setPilot]=useState(false);
  const [loaded,setLoaded]=useState(demo);
- const [saved,setSaved]=useState<Saved>({document:new BotOfficeModel().getDocument(),revision:null,updated_at:null}),[loading,setLoading]=useState(!demo),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[name,setName]=useState(''),[telegram,setTelegram]=useState(''),[duties,setDuties]=useState('');const locked=useRef(false),onChangeRef=useRef(onChange);useEffect(()=>{onChangeRef.current=onChange;},[onChange]);
+ const [saved,setSaved]=useState<Saved>({document:new BotOfficeModel().getDocument(),revision:null,updated_at:null}),[loading,setLoading]=useState(!demo),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[name,setName]=useState(''),[telegram,setTelegram]=useState(''),[duties,setDuties]=useState(''),[bulk,setBulk]=useState('');const locked=useRef(false),onChangeRef=useRef(onChange);useEffect(()=>{onChangeRef.current=onChange;},[onChange]);
  const [epoch,setEpoch]=useState(0),[local,setLocal]=useState<BotProfile[]>([]);
  const dir=useDirectory(enrollmentId,!demo,epoch);
  const employees=demo?local:(dir.data?.employees??[]),desks=saved.document.profiles.filter(p=>p.employeeId!=='manager');
  function changed(){setEpoch(v=>v+1);}
- useCampusDraftGuard(!!(name||telegram||duties),busy,'personal-office');
+ useCampusDraftGuard(!!(name||telegram||duties||bulk),busy,'personal-office');
  async function refresh(signal?:AbortSignal){if(demo)return;const r=await fetch('/api/campus/office/agents?enrollmentId='+enrollmentId,{cache:'no-store',signal});const data=await r.json();if(!r.ok)throw Error(data.error||'내 직원을 불러오지 못했어요.');setPilot(data.pilot===true);setSaved(data);setLoaded(true);onChangeRef.current?.(data.document);}
  useEffect(()=>{const c=new AbortController();void Promise.resolve().then(()=>refresh(c.signal)).catch(e=>{if(e.name!=='AbortError')setMessage(e.message);}).finally(()=>{if(!c.signal.aborted)setLoading(false);});return()=>c.abort();},[enrollmentId,demo]); // eslint-disable-line react-hooks/exhaustive-deps
- async function save(document:BotDocument){if(locked.current||!loaded)return;locked.current=true;setBusy(true);setMessage('');try{
+ async function save(document:BotDocument){if(locked.current||!loaded)return false;locked.current=true;setBusy(true);setMessage('');try{
   const clean=new BotOfficeModel().restore(document);let data:Saved;
   if(demo){data={document:clean,revision:crypto.randomUUID(),updated_at:new Date().toISOString()};}
   else{const r=await fetch('/api/campus/office/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enrollmentId,document:clean,revision:crypto.randomUUID(),expectedRevision:saved.revision})});data=await r.json();if(!r.ok)throw Error((data as unknown as {error:string}).error||'저장하지 못했어요.');}
-  setSaved(data);changed();if(demo)setLocal(old=>[...new Map([...old,...clean.profiles.filter(p=>p.employeeId!=='manager')].map(p=>[p.employeeId,p])).values()]);onChangeRef.current?.(clean);window.dispatchEvent(new CustomEvent('campus:office-saved',{detail:clean}));campusActivity('bot_save');setMessage(demo?'미리보기에 배치했어요.':'내 계정에 직원을 저장했어요.');setName('');setTelegram('');setDuties('');
- }catch(e){setMessage((e as Error).message);}finally{locked.current=false;setBusy(false);}}
+  setSaved(data);changed();if(demo)setLocal(old=>[...new Map([...old,...clean.profiles.filter(p=>p.employeeId!=='manager')].map(p=>[p.employeeId,p])).values()]);onChangeRef.current?.(clean);window.dispatchEvent(new CustomEvent('campus:office-saved',{detail:clean}));campusActivity('bot_save');setMessage(demo?'미리보기에 배치했어요.':'내 계정에 직원을 저장했어요.');setName('');setTelegram('');setDuties('');return true;
+ }catch(e){setMessage((e as Error).message);return false;}finally{locked.current=false;setBusy(false);}}
+ async function register(v:{name:string;telegram:string;duties:string},known:BotProfile[]):Promise<BotProfile>{
+  if(demo){const p=new BotOfficeModel().saveEmployee({name:v.name,telegramInput:v.telegram,duties:v.duties}).profiles[0];if(known.some(k=>k.telegramUrl===p.telegramUrl))throw Error('이미 등록한 봇입니다.');return p;}
+  const r=await fetch('/api/campus/office/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'register',enrollmentId,name:v.name,telegram:v.telegram,duties:v.duties})});const d=await r.json();if(!r.ok)throw Error(d.error||'등록하지 못했어요.');return d.employee;
+ }
  async function add(){
   if(locked.current)return;locked.current=true;setBusy(true);setMessage('');
-  try{if(demo){const p=new BotOfficeModel().saveEmployee({name,telegramInput:telegram,duties}).profiles[0];
-    if(local.some(v=>v.telegramUrl===p.telegramUrl))throw Error('이미 등록한 봇입니다.');setLocal([...local,p]);
-   }else{const r=await fetch('/api/campus/office/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'register',enrollmentId,name,telegram,duties})});const d=await r.json();if(!r.ok)throw Error(d.error);}
+  try{const p=await register({name,telegram,duties},local);if(demo)setLocal([...local,p]);
    setName('');setTelegram('');setDuties('');dir.first();changed();setMessage('직원을 등록했어요.');
   }catch(e){setMessage((e as Error).message);}finally{locked.current=false;setBusy(false);}
+ }
+ // 여러 명을 한 번에 등록하고 빈자리에 앉힌다. 이미 등록한 봇은 등록을 건너뛰고 자리만 잡는다.
+ async function addMany(){
+  const rows=parseEmployeeLines(bulk);if(locked.current||!loaded||!rows.length)return;
+  if(rows.length>10){setMessage('한 번에 10명까지 등록할 수 있어요.');return;}
+  locked.current=true;setBusy(true);setMessage('');
+  const lines=bulk.split(/\r?\n/),fresh:BotProfile[]=[],failed:string[]=[],keep:string[]=[],document=structuredClone(saved.document);let seated=0;
+  try{for(const row of rows){let p:BotProfile|undefined;
+    try{p=await register(row,[...local,...fresh]);fresh.push(p);}
+    catch(e){let url='';try{url=normalizeTelegramBot(row.telegram);}catch{}
+     p=[...employees,...fresh].find(k=>k.telegramUrl===url);
+     if(!p){failed.push(row.line+'번째 줄 '+(e as Error).message);keep.push(lines[row.line-1]);continue;}}
+    const id=p.employeeId;if(document.profiles.some(d=>d.employeeId===id))continue;
+    const seat=pickSeat(p.name,document.profiles.map(d=>d.seatIndex));
+    if(seat!==undefined){document.profiles.push({...p,seatIndex:seat});seated++;}
+  }}finally{locked.current=false;setBusy(false);}
+  if(demo&&fresh.length)setLocal(old=>[...old,...fresh]);
+  const placed=!seated||await save(document);dir.first();changed();setBulk(keep.join('\n'));
+  setMessage((placed?fresh.length+'명을 등록하고 '+seated+'명을 자리에 앉혔어요.':fresh.length+'명을 등록했지만 자리 배치는 저장하지 못했어요. 전체 직원 목록에서 "빈자리에 배치"를 눌러 주세요.')+(failed.length?' 확인이 필요한 줄: '+failed.join(' / '):''));
  }
  function place(p:BotProfile){
   // The lead desk (0) is offered last so it stays free for the 총괄 employee.
@@ -45,6 +67,7 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  async function importFile(file:File){try{if(file.size>18000)throw Error('직원 목록 JSON 파일은 18KB 이내로 넣어 주세요.');const raw=JSON.parse(await file.text()),model=new BotOfficeModel();await save(model.restore(raw.botOffice||raw));}catch{setMessage('윤익님 사무실에서 내보낸 직원 목록 JSON 파일을 확인해 주세요. 봇 토큰은 넣지 마세요.');}}
  return <section className={styles.office}><header><small>내가 만든 AI 직원들이 모이는 곳</small><h2>내 AI 직원</h2><p>수업에서 만든 텔레그램 봇을 등록한 뒤 보고를 연결하면, 직원별 업무와 결과를 확인할 수 있어요.</p></header>{message&&<p role="status" className={styles.notice}>{message}</p>}{loading?<p role="status">내 직원을 불러오고 있어요…</p>:!loaded?<div><p>저장된 직원을 확인한 뒤 편집할 수 있어요.</p><button onClick={()=>void refresh().catch(e=>setMessage(e.message))}>내 직원 다시 불러오기</button></div>:<>
  <form onSubmit={e=>{e.preventDefault();add();}}><h3>직원 추가</h3><label>직원 이름<input required maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="예: 콘텐츠 기획 담당"/></label><label>텔레그램 봇 주소<input required value={telegram} maxLength={200} onChange={e=>setTelegram(e.target.value)} placeholder="https://t.me/my_marketing_bot"/></label><label>담당 업무<textarea maxLength={500} value={duties} onChange={e=>setDuties(e.target.value)} placeholder="예: 이번 주 콘텐츠 아이디어 정리"/></label><button className={styles.primary} disabled={busy}>{busy?'저장 중…':'직원 등록하기'}</button></form>
+ <details><summary>여러 명 한 번에 등록</summary><p>한 줄에 한 명씩 <strong>이름, 봇 주소, 담당 업무</strong> 순서로 적어 주세요. 담당 업무는 비워도 돼요. 등록한 직원은 빈자리에 바로 앉고, 이름에 &lsquo;총괄&rsquo;이 들어간 직원은 총괄 자리에 앉아요.</p><label>직원 목록 (최대 10명)<textarea rows={10} maxLength={8000} value={bulk} onChange={e=>setBulk(e.target.value)} placeholder={'제 2의 뇌, @my_brain_bot, 자료 정리와 기억\nGEO 담당자, https://t.me/my_geo_bot, AI 검색 노출 점검'}/></label><button type="button" className={styles.primary} disabled={busy||!bulk.trim()} onClick={()=>void addMany()}>{busy?'등록 중…':'한 번에 등록하고 자리에 앉히기'}</button></details>
  {!demo&&(pilot || studentReportingAvailable()) && <StudentConnections key={enrollmentId} enrollmentId={enrollmentId} employees={employees} onJobs={onJobs}/>}
  <section aria-label="사무실 좌석"><h3>사무실 좌석 <small>{desks.length} / 10</small></h3>
  <p>총괄 자리는 29일차에 채용하는 총괄 직원의 자리예요. 자리를 비워도 직원의 보고 연결과 업무 기록은 그대로 남아요.</p>
@@ -58,5 +81,5 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
 </>}
 
  <details><summary>기존 사무실 직원 목록 가져오기</summary><p>윤익님 프로그램의 직원 목록 JSON을 가져오면 같은 외형과 좌석으로 배치됩니다. 좌석 배치만 교체하며, 기존 직원과 기록은 유지합니다.</p><label>직원 목록 JSON<input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void importFile(f);e.target.value='';}}/></label></details>
- <footer><span>일반 직원 {desks.length}/7 자리 · {demo?'미리보기':saved.updated_at?'계정에 저장됨':'아직 저장 전'}</span><button disabled={busy||demo} onClick={()=>void refresh().then(changed).catch(e=>setMessage(e.message))}>다른 기기의 변경 불러오기</button></footer><p className={styles.note}>연결한 직원의 업무와 결과는 자리 배치와 관계없이 작업함에서 확인할 수 있어요. 봇 비밀키를 입력할 필요는 없습니다.</p></>}</section>;
+ <footer><span>자리 {desks.length}/10 · {demo?'미리보기':saved.updated_at?'계정에 저장됨':'아직 저장 전'}</span><button disabled={busy||demo} onClick={()=>void refresh().then(changed).catch(e=>setMessage(e.message))}>다른 기기의 변경 불러오기</button></footer><p className={styles.note}>연결한 직원의 업무와 결과는 자리 배치와 관계없이 작업함에서 확인할 수 있어요. 봇 비밀키를 입력할 필요는 없습니다.</p></>}</section>;
 }
