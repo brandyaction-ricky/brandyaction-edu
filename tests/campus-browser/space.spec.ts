@@ -126,11 +126,13 @@ test('space idle and background rendering stay bounded while the focus clock con
  const timer=await page.getByLabel('집중 타이머',{exact:true}).textContent();expect(timer).not.toBe('25:00');expect(failures).toEqual([]);const observed={sample:'local Chromium, 30s idle + 8s moving + 15s simulated visibility hidden',idleRequestedFrames:idle,idleRenderedFrames:idleDraws,hiddenRequestedFrames:0,timer,pageErrors:failures.length,externalLoadTest:false};const {writeFile}=await import('node:fs/promises');await writeFile(info.outputPath('space-local-performance.json'),JSON.stringify(observed,null,2));await info.attach('space-local-performance.json',{body:JSON.stringify(observed),contentType:'application/json'});
 });
 
- test('space demo-day action opens the correct community host view',async({page})=>{
+ // Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
+ test.fixme('space demo-day action opens the correct community host view',async({page})=>{
  await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await page.getByRole('button',{name:'문샷 결과물 발표회 열기',exact:true}).click();await expect(page.getByRole('button',{name:'결과물 발표회',exact:true})).toHaveAttribute('aria-pressed','true');
  });
 
- test('world uses actual host progress and presentation state, and timer completion never awards XP',async({page})=>{
+ // Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
+ test.fixme('world uses actual host progress and presentation state, and timer completion never awards XP',async({page})=>{
  await enter(page);const world=page.frameLocator('iframe[title="문샷 우주선 3D 공간"]');await expect(world.locator('#ms-loading')).toBeHidden({timeout:30000});
  const send=async(type:string,payload:Record<string,unknown>)=>page.locator('iframe[title="문샷 우주선 3D 공간"]').evaluate((element,{type,payload})=>{const iframe=element as HTMLIFrameElement;iframe.contentWindow!.postMessage({source:'moonshot-host',token:new URL(iframe.src).hash.slice(8),type,payload},location.origin);},{type,payload});
  await expect(world.locator('#ms-cohort-progress')).toBeHidden();await expect(world.locator('#ms-live-demo')).toBeHidden();await expect(world.locator('#ms-focus-finish')).toBeHidden();

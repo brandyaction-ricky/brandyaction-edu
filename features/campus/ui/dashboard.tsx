@@ -7,7 +7,6 @@ import type { CampusSnapshot } from '../contracts';
 import type { CampusAdminSnapshot } from '../admin-metrics';
 import { learnerMetrics } from '../learner-metrics';
 import { downloadProgressCard } from './progress-card';
-import { FocusPanel } from './focus-panel';
 import styles from './dashboard.module.css';
 
 export function CampusFrame({ children, demo = false, admin = false, immersive = false }: { children: React.ReactNode; demo?: boolean; admin?: boolean; immersive?: boolean }) {
@@ -35,12 +34,12 @@ export function LearnerDashboard({ snapshot, onOpen, onRefresh, onSelect, demo =
   },[report]);
   const steps = metrics.steps.filter(s => filter === 'all' || (filter === 'revision' ? s.status === 'revision' : s.status === 'complete'));
   return <>
-    <div className={styles.heading}><div><span className={styles.eyebrow}>나의 문샷</span><h1>{snapshot.viewer.displayName}님의 다음 도약</h1><p>어디까지 왔는지 확인하고, 오늘의 실행을 이어가세요.</p></div><div className={styles.tools}>
+    <div className={styles.heading}><div><span className={styles.eyebrow}>나의 문샷</span><h1>{snapshot.viewer.displayName}님의 다음 도약</h1><p>어디까지 왔는지 확인하고, 다음 수업을 이어가세요.</p></div><div className={styles.tools}>
       <label className={styles.srOnly} htmlFor="campus-scope">내 수강 기수</label><select id="campus-scope" value={snapshot.selectedEnrollmentId || ''} onChange={e => onSelect(e.target.value)}><option value="" disabled>기수 선택</option>{snapshot.scopes.map(s => <option key={s.enrollmentId} value={s.enrollmentId}>{s.courseTitle} · {s.cohortName}</option>)}</select>
       <button onClick={onRefresh} aria-label="학습 기록 새로고침"><RefreshCw size={17}/></button>{snapshot.scopes.length>0&&<button data-progress-trigger onClick={() => setReport(true)}>내 성장 카드 보기 <ArrowUpRight size={16}/></button>}</div></div>
     {!snapshot.scopes.length ? <div className={styles.empty}><h2>이용 가능한 수업을 확인해 주세요</h2><p>수강권이 연결되면 이곳에서 나의 미션과 실행 기록을 확인할 수 있어요.</p><Link href="/my/classes">내 클래스 보기</Link></div> : <>
         <div className={styles.stats} style={{gridTemplateColumns:'1fr'}}><Stat label="완료한 수업" value={`${metrics.completedLessons} / ${metrics.totalLessons}`} note="수업 완료 표시 기준" icon={<Check/>}/></div>
-    <FocusPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} onOpen={id=>onOpen(id)}/>
+
     <section className={styles.panel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>21일 지도</span><h2>나의 미션 지도</h2><p>일차를 눌러 수업을 이어가세요. 먼저 끝난 날도 자유롭게 다시 볼 수 있어요.</p></div><div className={styles.tabs} role="group" aria-label="미션 상태 필터">{[['all','전체'],['complete','완료']].map(([value,label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div></div>
       <div className={styles.lessonGrid}>{steps.map(step => <button className={styles.lesson} key={step.lessonId} onClick={() => onOpen(step.lessonId)}><div className={styles.lessonTop}><b>DAY {String(step.day).padStart(2,'0')}</b><span className={styles[step.status] || styles.pill}>{({revision:'수정 필요',waiting:'검토 대기',ready:'실행 준비',complete:'완료',not_started:'시작 전',in_progress:'진행 중',unknown:'확인 필요'})[step.status]}</span></div><h3>{step.title}</h3><span className={styles.lessonLink}>수업 열기 <ArrowUpRight size={15}/></span></button>)}</div>{!steps.length && <p className={styles.empty}>이 상태의 수업이 없습니다.</p>}</section>
     <details className={styles.definitions}><summary><CircleHelp size={16}/> 지표는 어떻게 계산하나요?</summary><p>수업 완료는 학습 화면의 완료 표시 기준입니다. 공개된 수업이 바뀌면 전체 개수도 달라집니다.</p><p>집계 시점: {new Date(snapshot.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</p></details>

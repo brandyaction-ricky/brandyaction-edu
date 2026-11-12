@@ -8,7 +8,7 @@ import {createFocusTransport,type FocusResponse,type FocusWrite} from '../focus-
 import {useCampusDraftGuard} from './draft-guard';
 import styles from './focus-panel.module.css';
 
-export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:boolean;onOpen:(lessonId:string)=>void}){
+export function FocusPanel({snapshot,demo,onOpen,onSaved}:{snapshot:CampusSnapshot;demo:boolean;onOpen:(lessonId:string)=>void;onSaved?:()=>void}){
   const transport=useMemo(()=>createFocusTransport(snapshot,demo),[snapshot,demo]);
   const next=learnerMetrics(snapshot).nextActions[0];
   const [data,setData]=useState<FocusResponse|null>(null);
@@ -38,7 +38,7 @@ export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:
   useEffect(()=>{if(!data||session?.status!=='running')return;const base=Date.parse(data.serverNow),anchor=performance.now();const timer=setInterval(()=>setServerClock(base+performance.now()-anchor),1000);return()=>clearInterval(timer);},[data,session?.status]);
   async function write(command:FocusWrite){
     if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');setSaved(false);const token=generation.current;
-    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start')setAction('');if(command.kind==='finish'){setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
+    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start')setAction('');if(command.kind==='finish'){onSaved?.();setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
     catch(err){if(token===generation.current){const e=err as Error&{status?:number};setError(e.message);if(e.status===401||e.status===403){setData(null);setResult('');setNextStep('');}}}
     finally{if(token===generation.current){inFlight.current=false;setBusy(false);}}
   }
