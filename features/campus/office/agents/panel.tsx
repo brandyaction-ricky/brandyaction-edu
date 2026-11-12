@@ -12,7 +12,7 @@ type Saved={document:BotDocument;revision:string|null;updated_at:string|null};
 export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enrollmentId:string;demo?:boolean;onChange?:(document:BotDocument)=>void;onJobs?:(employee:{id:string;name:string})=>void}){
  const [pilot,setPilot]=useState(false);
  const [loaded,setLoaded]=useState(demo);
- const [saved,setSaved]=useState<Saved>({document:new BotOfficeModel().getDocument(),revision:null,updated_at:null}),[loading,setLoading]=useState(!demo),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[name,setName]=useState(''),[telegram,setTelegram]=useState(''),[duties,setDuties]=useState(''),[bulk,setBulk]=useState('');const locked=useRef(false),onChangeRef=useRef(onChange);useEffect(()=>{onChangeRef.current=onChange;},[onChange]);
+ const [saved,setSaved]=useState<Saved>({document:new BotOfficeModel().getDocument(),revision:null,updated_at:null}),[loading,setLoading]=useState(!demo),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[name,setName]=useState(''),[telegram,setTelegram]=useState(''),[duties,setDuties]=useState(''),[bulk,setBulk]=useState('');const locked=useRef(false),notice=useRef<HTMLParagraphElement>(null),onChangeRef=useRef(onChange);useEffect(()=>{onChangeRef.current=onChange;},[onChange]);
  const [epoch,setEpoch]=useState(0),[local,setLocal]=useState<BotProfile[]>([]);
  const dir=useDirectory(enrollmentId,!demo,epoch);
  const employees=demo?local:(dir.data?.employees??[]),desks=saved.document.profiles.filter(p=>p.employeeId!=='manager');
@@ -54,6 +54,8 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
   if(demo&&fresh.length)setLocal(old=>[...old,...fresh]);
   const placed=!seated||await save(document);dir.first();changed();setBulk(keep.join('\n'));
   setMessage((placed?fresh.length+'명을 등록하고 '+seated+'명을 자리에 앉혔어요.':fresh.length+'명을 등록했지만 자리 배치는 저장하지 못했어요. 전체 직원 목록에서 "빈자리에 배치"를 눌러 주세요.')+(failed.length?' 확인이 필요한 줄: '+failed.join(' / '):''));
+  // 결과 안내는 화면 맨 위에 있어서, 아래쪽 입력칸에서 눌렀을 때도 보이도록 올려 준다.
+  requestAnimationFrame(()=>notice.current?.scrollIntoView({block:'nearest',behavior:'smooth'}));
  }
  function place(p:BotProfile){
   // The lead desk (0) is offered last so it stays free for the 총괄 employee.
@@ -65,7 +67,7 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  }
  function unseat(p:BotProfile){void save({...saved.document,profiles:saved.document.profiles.filter(d=>d.employeeId!==p.employeeId)});}
  async function importFile(file:File){try{if(file.size>18000)throw Error('직원 목록 JSON 파일은 18KB 이내로 넣어 주세요.');const raw=JSON.parse(await file.text()),model=new BotOfficeModel();await save(model.restore(raw.botOffice||raw));}catch{setMessage('윤익님 사무실에서 내보낸 직원 목록 JSON 파일을 확인해 주세요. 봇 토큰은 넣지 마세요.');}}
- return <section className={styles.office}><header><small>내가 만든 AI 직원들이 모이는 곳</small><h2>내 AI 직원</h2><p>수업에서 만든 텔레그램 봇을 등록한 뒤 보고를 연결하면, 직원별 업무와 결과를 확인할 수 있어요.</p></header>{message&&<p role="status" className={styles.notice}>{message}</p>}{loading?<p role="status">내 직원을 불러오고 있어요…</p>:!loaded?<div><p>저장된 직원을 확인한 뒤 편집할 수 있어요.</p><button onClick={()=>void refresh().catch(e=>setMessage(e.message))}>내 직원 다시 불러오기</button></div>:<>
+ return <section className={styles.office}><header><small>내가 만든 AI 직원들이 모이는 곳</small><h2>내 AI 직원</h2><p>수업에서 만든 텔레그램 봇을 등록한 뒤 보고를 연결하면, 직원별 업무와 결과를 확인할 수 있어요.</p></header>{message&&<p ref={notice} role="status" className={styles.notice}>{message}</p>}{loading?<p role="status">내 직원을 불러오고 있어요…</p>:!loaded?<div><p>저장된 직원을 확인한 뒤 편집할 수 있어요.</p><button onClick={()=>void refresh().catch(e=>setMessage(e.message))}>내 직원 다시 불러오기</button></div>:<>
  <form onSubmit={e=>{e.preventDefault();add();}}><h3>직원 추가</h3><label>직원 이름<input required maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="예: 콘텐츠 기획 담당"/></label><label>텔레그램 봇 주소<input required value={telegram} maxLength={200} onChange={e=>setTelegram(e.target.value)} placeholder="https://t.me/my_marketing_bot"/></label><label>담당 업무<textarea maxLength={500} value={duties} onChange={e=>setDuties(e.target.value)} placeholder="예: 이번 주 콘텐츠 아이디어 정리"/></label><button className={styles.primary} disabled={busy}>{busy?'저장 중…':'직원 등록하기'}</button></form>
  <details><summary>여러 명 한 번에 등록</summary><p>한 줄에 한 명씩 <strong>이름, 봇 주소, 담당 업무</strong> 순서로 적어 주세요. 담당 업무는 비워도 돼요. 등록한 직원은 빈자리에 바로 앉고, 이름에 &lsquo;총괄&rsquo;이 들어간 직원은 총괄 자리에 앉아요.</p><label>직원 목록 (최대 10명)<textarea rows={10} maxLength={8000} value={bulk} onChange={e=>setBulk(e.target.value)} placeholder={'제 2의 뇌, @my_brain_bot, 자료 정리와 기억\nGEO 담당자, https://t.me/my_geo_bot, AI 검색 노출 점검'}/></label><button type="button" className={styles.primary} disabled={busy||!bulk.trim()} onClick={()=>void addMany()}>{busy?'등록 중…':'한 번에 등록하고 자리에 앉히기'}</button></details>
  {!demo&&(pilot || studentReportingAvailable()) && <StudentConnections key={enrollmentId} enrollmentId={enrollmentId} employees={employees} onJobs={onJobs}/>}
