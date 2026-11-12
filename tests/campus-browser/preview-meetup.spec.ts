@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import fs from 'node:fs';
+import {observeTourFrames} from './frame-probe';
 
 test('opt-in local visitors see each other, chat and leave without entering member rooms',async({browser,baseURL},info)=>{
  test.skip(info.project.name==='mobile','This test creates its own independent desktop and phone contexts.');
@@ -10,9 +10,7 @@ test('opt-in local visitors see each other, chat and leave without entering memb
   const a=await desktop.newPage(),b=await phone.newPage(),errors:string[]=[];
   for(const [page,name]of [[a,'동료 A'],[b,'동료 B']] as const){
    page.on('pageerror',e=>errors.push(e.message));
-   const source=fs.readFileSync('public/campus/world/tour/tour.mjs','utf8');
-   expect(source).toContain('original();meetup?.labels?.();root.dataset.playerX');
-   await page.route('**/campus/world/tour/tour.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('original();meetup?.labels?.();root.dataset.playerX','window.__tourDraws=(window.__tourDraws||0)+1;original();meetup?.labels?.();root.dataset.playerX')}));
+   await observeTourFrames(page);
    // Capture the first actual GL draw, before Office.ready (three frames).
    // Applying the pixel/shadow budget after ready stalls a second software-rendered client.
    await page.addInitScript(()=>{
@@ -37,6 +35,7 @@ test('opt-in local visitors see each other, chat and leave without entering memb
     await expect(world.locator('#office')).toHaveAttribute('data-total-count','1');
     await page.waitForTimeout(2500);
     const draws=()=>world.locator('body').evaluate(()=>(window as Window&{__tourDraws?:number}).__tourDraws||0);
+    await expect.poll(draws).toBeGreaterThan(0);
     const before=await draws();await page.waitForTimeout(7000);
     expect(await draws()-before,'Unchanged live presence must settle to idle rendering').toBeLessThanOrEqual(9);
    }
