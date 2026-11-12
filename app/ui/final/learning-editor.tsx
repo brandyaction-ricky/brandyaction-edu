@@ -1,5 +1,6 @@
 "use client";
 import { curriculumDay } from '@/lib/curriculum-days';
+import { outlineDraft, type OutlineDraft } from '@/lib/curriculum-outline-draft';
 
 import { LessonAuthorHistory } from './lesson-author-history';
 import { useEffect, useId, useImperativeHandle, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
@@ -32,7 +33,7 @@ export type LearningEditorSession = { dirty: boolean; busy: boolean; save: () =>
 function EditorSettings({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
   return embedded ? <details className="studio-lesson-settings"><summary>수업 설정 <span>주차 · 일차 · 공개 범위</span></summary>{children}</details> : <>{children}</>;
 }
-type Props = { courseId?: string; serverDraftsEnabled?: boolean; embedded?: boolean; sessionRef?: Ref<LearningEditorSession>; onSaved?: () => void; data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
+type Props = { courseId?: string; serverDraftsEnabled?: boolean; embedded?: boolean; sessionRef?: Ref<LearningEditorSession>; onSaved?: () => void; onOutlineDraft?: (draft: OutlineDraft) => void; data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
 type ContentType = "text" | "vod" | "material" | "link";
 const formats: { key: ContentType; label: string; icon: typeof FileText }[] = [
   { key: "text", label: "학습 본문", icon: FileText },
@@ -113,7 +114,9 @@ export function LearningEditor(props: Props) {
   }}</LessonAuthorWorkspace>;
 }
 
-function LoadedLearningEditor({ publication, courseId, data, row, pending, send, back, actorId, embedded, sessionRef, onSaved, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props & { publication?: AuthorSession }) {
+function LoadedLearningEditor({ publication, courseId, data, row, pending, send, back, actorId, embedded, sessionRef, onSaved, onOutlineDraft, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props & { publication?: AuthorSession }) {
+  const authorSnapshot = publication?.snapshot;
+  useEffect(() => { if (authorSnapshot) onOutlineDraft?.(outlineDraft(authorSnapshot)); }, [authorSnapshot, onOutlineDraft]);
   const content = (data.lesson_contents || []).find(item => item.lesson_id === row?.id);
   const [lessonId, setLessonId] = useState(row?.id || "");
   const [contentExists, setContentExists] = useState(Boolean(content));
@@ -191,7 +194,7 @@ function LoadedLearningEditor({ publication, courseId, data, row, pending, send,
     setDirty(true); setPreviewOnly(false); setMessage('임시저장본을 불러왔습니다. 내용을 확인한 뒤 학습 저장을 눌러 주세요.');
   }
   const week = (data.curriculum_weeks || []).find(item => item.id === basic.week_id);
-  const displayData = { ...data, curriculum_lessons: [...(data.curriculum_lessons || []).filter(item => item.id !== lessonId), { ...row, id: lessonId || '__new_lesson__', week_id: basic.week_id, day_number: Number(basic.day_number) }] };
+  const displayData = { ...data, curriculum_lessons: [...(data.curriculum_lessons || []).filter(item => item.id !== lessonId), { ...row, id: lessonId || '__new_lesson__', week_id: basic.week_id, day_number: Number(basic.day_number), curriculum_day_number: undefined }] };
   const displayDay = curriculumDay(displayData, displayData.curriculum_lessons.at(-1));
   const course = (data.courses || []).find(item => item.id === (courseId || week?.course_id));
   const cardSources = course ? (data.curriculum_weeks || []).filter(item => item.course_id === course.id)

@@ -4,12 +4,13 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'reac
 import type { Row } from '@/lib/platform';
 import type { Data, WorkflowSend } from '../learning-workflows';
 import { LearningEditor, type LearningEditorSession } from './learning-editor';
+import type { OutlineDraft } from '@/lib/curriculum-outline-draft';
 
 // Load supporting quizzes for the selected lesson; the outline's scoped data is
 // authoritative for the course, weeks, lessons and legacy body (not a paged list).
-export function CurriculumLessonPane({ lesson, course, curriculum, pending, send, actorId, sessionRef, onSaved, blockEditingEnabled }: {
+export function CurriculumLessonPane({ lesson, course, curriculum, pending, send, actorId, sessionRef, onSaved, onOutlineDraft, blockEditingEnabled }: {
   lesson: Row; course: Row; curriculum: Data; pending: boolean; send: WorkflowSend;
-  actorId: string; sessionRef: Ref<LearningEditorSession>; onSaved: () => void; blockEditingEnabled?: boolean;
+  actorId: string; sessionRef: Ref<LearningEditorSession>; onSaved: () => void; onOutlineDraft?: (draft: OutlineDraft) => void; blockEditingEnabled?: boolean;
 }) {
   const [data, setData] = useState<Data | null>(null), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const editor = useRef<LearningEditorSession>(null);
@@ -37,5 +38,5 @@ export function CurriculumLessonPane({ lesson, course, curriculum, pending, send
   };
   if (error) return <p className="notice warning" role="alert">{error} <button className="btn" onClick={() => { setError(''); setRetry(value => value + 1); }}>다시 시도</button></p>;
   if (!data) return <p role="status" className="studio-loading">수업 문서를 불러오고 있습니다…</p>;
-  return <LearningEditor embedded courseId={String(course.id)} actorId={actorId} data={{ ...data, curriculum_weeks: curriculum.curriculum_weeks, curriculum_lessons: curriculum.curriculum_lessons, lesson_contents: curriculum.lesson_contents, courses: [course] }} row={lesson} pending={pending} send={sendWithQuizRefresh} back={() => {}} sessionRef={editor} onSaved={onSaved} blockEditingEnabled={blockEditingEnabled} />;
+  return <LearningEditor embedded courseId={String(course.id)} actorId={actorId} data={{ ...data, curriculum_weeks: curriculum.curriculum_weeks, curriculum_lessons: curriculum.curriculum_lessons, lesson_contents: curriculum.lesson_contents, courses: [course] }} row={lesson} pending={pending} send={sendWithQuizRefresh} back={() => {}} sessionRef={editor} onSaved={onSaved} onOutlineDraft={onOutlineDraft} blockEditingEnabled={blockEditingEnabled} />;
 }
