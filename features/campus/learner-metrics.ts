@@ -126,9 +126,7 @@ export function learnerMetrics(snapshot: CampusSnapshot): LearnerMetrics {
     `${snapshot.viewer.displayName} · ${[scope?.courseTitle, scope?.cohortName].filter(Boolean).join(' / ') || '선택한 과정 없음'}`,
     `조회 기준: ${asOfLabel(snapshot.fetchedAt)}`,
     `수업 완료: ${completedLessons} / ${lessons.length}개`,
-    `필수 미션 승인: ${approvedRequired} / ${totalRequired}개${approvalPercent === null ? ' (필수 미션 없음)' : ` (${approvalPercent}%)`}`,
-    `검토 대기: ${submittedCount}개 · 보완할 과제: ${revisionCount}개 · 상태 확인 필요: ${unknownCount}개`,
-    '현재 공개된 수업과 미션의 최신 제출 상태 기준입니다. 과거 기간의 성과 추이나 실제 사업 매출을 뜻하지 않습니다.',
+    '현재 공개된 수업의 완료 표시 기준입니다. 과거 기간의 성과 추이나 실제 사업 매출을 뜻하지 않습니다.',
   ].join('\n');
   return { completedLessons, totalLessons: lessons.length, approvedRequired, totalRequired, approvalPercent,
     submittedCount, revisionCount, unknownCount, nextActions, milestones, steps, reportText };

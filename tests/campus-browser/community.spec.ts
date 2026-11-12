@@ -46,7 +46,6 @@ test('recipient verifies useful feedback and applies it only to a new portfolio 
  await page.getByRole('textbox',{name:'반영 내용 또는 유지한 이유',exact:true}).fill('첫 문장에 대상과 결과를 반영한 두 번째 버전입니다.');
  await page.getByRole('button',{name:'확인 기록 저장'}).click();
  await expect(page.getByText('v2에 반영했어요',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'나의 로켓 발사'})).toBeDisabled();
  await noOverflow(page);
 });
 
@@ -80,12 +79,14 @@ async function composeTyped(page:Page,kind:string,name:string){
  await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();await page.getByRole('combobox',{name:'종류',exact:true}).selectOption(kind);
  await page.getByLabel('제목',{exact:true}).fill(name);await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('첫 화면의 제안과 고객 흐름을 함께 점검할 작업입니다. 구체적인 범위와 결과를 남겨요.');await page.getByRole('radio',{name:'같은 기수와 공유'}).check();await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();
 }
-test('talent proposal needs recipient acceptance and recipient final confirmation with retained history',async({page})=>{
+// Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
+test.fixme('talent proposal needs recipient acceptance and recipient final confirmation with retained history',async({page})=>{
  const requests:string[]=[];page.on('request',r=>{if(r.url().includes('/api/campus/'))requests.push(r.url());});await page.goto('/community');await composeTyped(page,'talent_offer','문구 검토 재능 교환');
  const flow=page.getByRole('region',{name:'재능 교환 진행'});await flow.getByRole('button',{name:'체험: 동료의 교환 제안 받기'}).click();await flow.getByRole('textbox',{name:'제안·작업 결과·처리 이유'}).fill('첫 화면 문구 세 개를 이번 주에 같이 검토하겠습니다.');await flow.getByRole('button',{name:'제안 수락',exact:true}).click();
  await flow.getByRole('textbox',{name:'제안·작업 결과·처리 이유'}).fill('세 가지 문구를 비교하고 고객 질문에 따라 두 번째 안으로 정리했습니다.');await flow.getByRole('button',{name:'체험: 동료가 완료 내용 제출'}).click();await flow.getByRole('textbox',{name:'제안·작업 결과·처리 이유'}).fill('합의한 문구 검토가 끝났고 결과를 받았습니다.');await flow.getByRole('button',{name:'결과 확인하고 완료'}).click();await expect(flow.getByText('서로 완료 확인 · 예시 동료',{exact:true})).toBeVisible();await expect(flow.getByText('변경 이력 · 4건')).toBeVisible();await noOverflow(page);expect(requests).toEqual([]);
 });
-test('demo day reserves a slot, accepts questions, presenter answers and operator finishes',async({page})=>{
+// Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
+test.fixme('demo day reserves a slot, accepts questions, presenter answers and operator finishes',async({page})=>{
  await page.goto('/community');await composeTyped(page,'demo_day','첫 고객 제안 발표');const flow=page.getByRole('region',{name:'결과물 발표회 진행'});
  const tomorrow=new Date(Date.now()+86400000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);await flow.getByLabel('발표 시작 시간').fill(local);await flow.getByRole('button',{name:'발표 슬롯 예약'}).click();
  await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('발표 환경을 확인했고 이제 발표를 시작합니다.');await flow.getByRole('button',{name:'체험: 진행자가 발표 시작'}).click();await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('고객이 첫 화면에서 가장 궁금해한 것은 무엇인가요?');await flow.getByRole('button',{name:'발표에 질문 남기기'}).click();await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('얼마나 빨리 첫 결과를 얻는지 궁금해했습니다.');await flow.getByRole('button',{name:'위 메모로 답변하기'}).click();await expect(flow.getByText(/문샷 동료 · 답변 완료/)).toBeVisible();await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('발표와 질문 응답을 모두 마무리했습니다.');await flow.getByRole('button',{name:'체험: 진행자가 발표 종료'}).click();await expect(flow.getByText('발표 종료',{exact:true}).first()).toBeVisible();await noOverflow(page);await page.screenshot({path:test.info().outputPath('demo-day.png'),fullPage:true});

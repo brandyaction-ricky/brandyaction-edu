@@ -3,4 +3,4 @@ import { handleOfficeWebhook, readOfficeConnectors } from '@/features/campus/off
 import { ingestOfficeEvent } from '@/features/campus/office/repository';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export function POST(request: Request) { return handleOfficeWebhook(request, { enabled: process.env.EDU_CAMPUS_ENABLED === 'true' && process.env.EDU_CAMPUS_OFFICE_ENABLED === 'true', connectors: readOfficeConnectors(process.env), ingest: verified => ingestOfficeEvent(createAdminClient(), verified) }); }
+export function POST(request: Request) { return handleOfficeWebhook(request, { enabled: process.env.EDU_CAMPUS_ENABLED === 'true' && process.env.EDU_CAMPUS_OFFICE_ENABLED === 'true', registrationEnabled: process.env.EDU_CAMPUS_OFFICE_AUTO_ENABLED === 'true' && process.env.NEXT_PUBLIC_APP_ENV === 'development', connectors: readOfficeConnectors(process.env), ingest: verified => ingestOfficeEvent(createAdminClient(), verified) }); }

@@ -20,3 +20,26 @@
 /* Always-visible view controls; the small tools menu is not a second task dashboard. */
 .spatial-ui .room-tools{display:flex;gap:6px;align-items:center}.spatial-ui .room-tools #map-view,.spatial-ui .room-tools #third-view{display:block;min-height:44px}.spatial-ui #space-guide [data-task="mission"],.spatial-ui #space-guide [data-task="desk"],.spatial-ui #space-guide [data-task="board"],.spatial-ui #space-guide [data-task="chat"],.spatial-ui #space-guide #study,.spatial-ui #space-guide #private-room,.spatial-ui #space-guide #interact{display:none}.spatial-ui #space-guide:not([hidden]){bottom:56px}.spatial-ui #space-guide .guide-grid{grid-template-columns:1fr}.spatial-ui #space-guide .guide-grid button{text-align:left}.spatial-ui .room-tools #space-guide{max-height:calc(100dvh - 180px)}
 @media(max-width:550px){.spatial-ui .room-tools{left:10px;right:10px;justify-content:flex-end}.spatial-ui .room-tools>button{font-size:11px;padding:8px}.spatial-ui .move-pad{bottom:76px}}
+
+#environment-editor{--line:#304855;--blue:#91c9eb;width:min(520px,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto;padding:22px;border:1px solid #48627b;border-radius:16px;background:#11202a;color:#d1e1eb}#environment-editor::backdrop{background:#03101a80}#environment-editor header{display:flex;align-items:center;justify-content:space-between;gap:12px}#environment-editor h2{font-size:20px;margin:0}#environment-editor p{font-size:13px;line-height:1.6;color:#afc5d6}.lighting-field{display:grid;gap:8px;font-size:14px}.lighting-field select{font:inherit;padding:12px;background:#0b1a24;color:#d1e1eb;border:1px solid #48627b;border-radius:8px;width:100%}
+.ambient-track {padding:16px 0;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none}
+.ambient-track-top {display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ambient-track-name {font-size:14px;line-height:1.6;font-weight:500;color:#d1e1eb}
+.ambient-track-description {font-size:12px;line-height:1.6;color:#90a7b7;margin:4px 0 0}
+.ambient-switch {appearance:none;position:relative;width:44px;height:44px;flex-shrink:0;margin:0;padding:0;border:0;border-radius:6px;background:none;cursor:pointer}
+.ambient-switch:before {content:'';position:absolute;left:4px;top:12px;width:36px;height:20px;border-radius:12px;background:#334754}
+.ambient-switch:after {content:'';position:absolute;left:7px;top:15px;width:14px;height:14px;border-radius:50%;background:#b4c5d0;transition:transform .15s}
+.ambient-switch:checked:before {background:var(--blue)}
+.ambient-switch:checked:after {background:#14364b;transform:translateX(16px)}
+.ambient-volume {display:grid;grid-template-columns:auto minmax(0,1fr) 34px;gap:10px;align-items:center;margin-top:6px}
+.ambient-volume-label, .ambient-volume-output {font-size:12px;line-height:1.6;color:#96adbd;font-variant-numeric:tabular-nums}
+.ambient-volume input {width:100%;min-width:0;height:44px;margin:0;accent-color:var(--blue);cursor:pointer}
+.ambient-volume-output {text-align:right}
+.ambient-track-status {font-size:12px;line-height:1.6;color:#91a9b9;margin:0}
+.ambient-track[data-state=playing] .ambient-track-status {color:#c1d9e9}
+.ambient-track[data-state=error] .ambient-track-status {color:#edb6a1}
+.ambient-stop-all {width:100%;min-height:44px;padding:10px 14px;margin-top:16px;border:1px solid #ffffff1c;border-radius:7px;background:none;color:#b9cddc;font-size:14px}
+.ambient-stop-all:hover:not(:disabled) {background:#ffffff06}
+.ambient-stop-all:disabled {color:#627987;opacity:.65}
+
+#environment-editor header{position:sticky;top:-22px;z-index:2;background:#11202a;padding:8px 0}#environment-editor header button{min-height:44px}

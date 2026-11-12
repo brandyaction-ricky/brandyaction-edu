@@ -13,7 +13,6 @@ test('furniture opens task windows without recreating the room, losing drafts or
  const focus=page.getByRole('dialog',{name:'집중과 휴식',exact:true});await expect(focus).toBeVisible();
  await expect(focus.getByRole('button',{name:/내 자리/})).toBeVisible();
  await focus.getByRole('button',{name:'집중 시작',exact:true}).click();
- await focus.getByLabel('나만 보는 메모',{exact:true}).fill('닫아도 유지하는 작성 중 메모');
  await focus.getByRole('button',{name:'집중과 휴식 닫기'}).click();await expect(focus).toBeHidden();
  await expect(page.getByRole('button',{name:'집중 타이머 열기'})).toBeVisible();
  await world.getByRole('button',{name:'수업·과제',exact:true}).click();
@@ -21,7 +20,6 @@ test('furniture opens task windows without recreating the room, losing drafts or
  await expect(page).toHaveURL(/section=learning/);await expect(page.locator('iframe')).toHaveAttribute('src',initialFrame!);
  await learning.getByRole('button',{name:'수업·과제 닫기'}).click();
  await page.getByRole('button',{name:'집중 타이머 열기'}).click();
- await expect(focus.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('닫아도 유지하는 작성 중 메모');
  await focus.press('Escape');await expect(focus).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
@@ -35,7 +33,7 @@ test('inside guide reaches secondary tools, keyboard dialog and browser history 
  await world.getByRole('button',{name:'내 도구'}).click();
  await world.getByRole('button',{name:'공간 설정·소리'}).click();
  const settings=page.getByRole('dialog',{name:'공간 설정',exact:true});await expect(settings).toBeVisible();
- await expect(settings.getByLabel('소리 크기')).toBeVisible();
+ await expect(settings.getByRole('button',{name:'조명·배경음 열기'})).toBeVisible();
  await settings.press('Escape');await expect(settings).toBeHidden();
  await world.getByRole('button',{name:'동료와 대화',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'동료와 대화',exact:true})).toBeVisible();

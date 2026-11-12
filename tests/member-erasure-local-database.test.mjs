@@ -29,9 +29,16 @@ test('seeded learning data erases while financial/consent evidence and other lea
  create table edu_care_deliveries(id uuid primary key,event_id uuid references edu_push_events(id),destination_hash text,receipt text);`);
  await db.exec('grant select,insert,update,delete on all tables in schema public to service_role');
  for(const f of ['20260914013836_manage_member_admin_roles_and_deletion.sql','20261004002124_edu_member_diagnosis_erasure.sql','20261109100648_edu_member_erasure_execution.sql','20261109122930_edu_member_erasure_local_data.sql'])await db.exec(read(f));
+ const presenterMigration=read('20261111072000_erase_campus_presenter_answers.sql');
  const member=id(),other=id(),admin=id(),enrollment=id(),otherEnrollment=id(),q=id(),answer=id(),conversation=id(),request=id(),post=id(),comment=id(),order=id(),payment=id();
  await db.query("insert into profiles(id,email,role,status) values($1,'qa@example.test','student','active'),($2,'other@example.test','student','active'),($3,'admin@example.test','admin','active')",[member,other,admin]);
  await db.query("insert into enrollments(id,user_id,status) values($1,$2,'active'),($3,$4,'active')",[enrollment,member,otherEnrollment,other]);
+ const slot=id(),otherSlot=id(),question=id(),unanswered=id(),unrelated=id();
+ await db.query("insert into edu_campus_demo_slots(id,presenter_id,status,revision) values($1,$2,'finished',1),($3,$4,'finished',1)",[slot,member,otherSlot,other]);
+ await db.query(`insert into edu_campus_demo_questions(id,slot_id,author_id,alias,body,answer,answered_at,revision) values
+   ($1,$2,$3,'질문자','다른 회원의 질문','탈퇴 발표자의 답변',now(),2),
+   ($4,$2,$3,'질문자','아직 답변 없는 질문','',null,1),
+   ($5,$6,$3,'질문자','다른 발표의 질문','유지할 답변',now(),2)`,[question,slot,other,unanswered,unrelated,otherSlot]);
  await db.query('insert into orders values($1,$2,1000)',[order,member]);await db.query('insert into payments values($1,$2,1000)',[payment,order]);await db.query('insert into refunds values($1,$2,1000)',[id(),payment]);await db.query("insert into edu_consent_events values($1,'policy-qa')",[member]);
  await db.query("insert into edu_questions(id,user_id,title,content,status,category,visibility) values($1,$2,'가상 질문','private-question','open','learning','private')",[q,member]);
  await db.query("insert into edu_question_answers(id,question_id,actor_id,source,content) values($1,$2,$3,'learner','private-followup')",[answer,q,member]);
@@ -85,12 +92,18 @@ test('seeded learning data erases while financial/consent evidence and other lea
  await db.exec('reset role');
  await db.exec('create table order_items(id uuid primary key);alter table payments add column cancelled_amount integer;alter table payments add column approved_amount integer;alter table payments add column status text');
  await db.exec(read('20261111003951_edu_member_erasure_completion_and_enrollment_transfer.sql'));
+ await db.exec(presenterMigration);
  await db.exec('set role service_role');
  assert.equal((await call('edu_prepare_member_local_erasure',[accepted.requestId,job.lease])).pending,5);
  assert.deepEqual((await db.query('select event_id,destination_hash,receipt from edu_care_deliveries where id=$1',[care])).rows[0],{event_id:null,destination_hash:null,receipt:'retained-audit-receipt'});
  assert.equal((await db.query('select count(*)::int n from edu_push_deliveries')).rows[0].n,1);
  assert.equal((await db.query('select user_id from edu_push_subscriptions')).rows[0].user_id,other);
  for(const table of ['edu_questions','edu_question_answers','edu_ai_conversation_turns','edu_ai_conversations','edu_question_images','edu_lesson_answer_files','edu_lesson_block_drafts','edu_lesson_block_submissions','edu_lesson_block_reviews','edu_lesson_block_feedback','edu_question_answer_images'])assert.equal((await db.query('select count(*)::int n from '+table)).rows[0].n,0,table);
+ const readQuestion=async key=>(await db.query('select author_id,body,answer,answered_at,revision from edu_campus_demo_questions where id=$1',[key])).rows[0];
+ const expectedQuestion={author_id:other,body:'다른 회원의 질문',answer:'',answered_at:null,revision:3};
+ assert.deepEqual(await readQuestion(question),expectedQuestion);
+ assert.equal((await readQuestion(unanswered)).revision,1);
+ assert.equal((await readQuestion(unrelated)).answer,'유지할 답변');
  assert.equal((await db.query('select content from edu_mission_drafts')).rows[0].content,'other-draft');
  assert.equal((await db.query('select body from edu_campus_comments where id=$1',[comment])).rows[0].body,'another-learner-comment');
  assert.equal((await db.query('select body from edu_campus_posts where id=$1',[post])).rows[0].body,'탈퇴한 회원의 콘텐츠가 삭제되었습니다.');
@@ -135,4 +148,11 @@ test('seeded learning data erases while financial/consent evidence and other lea
  const [immediate]=await call('edu_claim_approved_member_erasure',['dev',1,fresh.requestId]);assert.equal(immediate.subject,newMember);
  await assert.rejects(call('edu_prepare_member_local_erasure',[fresh.requestId,immediate.lease]),/LOCAL_UPLOAD_DRAIN_PENDING/);
  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from storage.objects where name=$1',[other+'/untouched.png'])).rows[0].n,1);assert.equal((await db.query('select count(*)::int n from private.edu_erasure_storage_work where path is not null')).rows[0].n,0);
+ // Simulate a pre-migration survivor on a completed request. A repeat must be a no-op.
+ await db.query("update edu_campus_demo_questions set answer='이전 답변',answered_at=now(),revision=2 where id=$1",[question]);
+ await db.exec(presenterMigration);
+ await db.exec(presenterMigration);
+ assert.deepEqual(await readQuestion(question),expectedQuestion);
+ assert.equal((await readQuestion(unrelated)).answer,'유지할 답변');
+
 });

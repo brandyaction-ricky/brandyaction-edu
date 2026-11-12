@@ -1,6 +1,11 @@
+import {attachAmbientMixer} from '../office/vendor/ambient-mixer.js';
+import {attachInteriorInteractions} from '../office/vendor/interior-interactions.js';
+import {attachEnvironmentControls} from '../office/environment-controls.mjs';
 import {libraryPortal} from './library-wayfinding.mjs';
 import {paintLibrarySign} from './library-signs.mjs';
 import {BotOfficeModel} from '../office/bot-profile.mjs';
+import {useDeskPreviewMaterials} from './desk-preview-materials.mjs';
+import {makeDeskMarkers,positionDeskMarkers} from './office-desk-markers.mjs';
 import {toBotOfficeSessions} from '../office/office-view-adapter.mjs';
 import {applyRenderProfile} from './render-profile.mjs';
 import {attachSceneTouchGuard} from './touch-guard.mjs';
@@ -27,7 +32,7 @@ const root=document.getElementById('office'),layer=document.getElementById('hots
 const token=new URLSearchParams(location.hash.slice(1)).get('bridge')||'';
 const names={library:'문샷 자료실',live:'문샷 라이브홀',welcome:'문샷 웰컴 존',study:'문샷 공부방',office:'내 AI 사무실'};
 let started=false,publicVisitor=false,devPresence=false,qaCrowd=false,ambientCount=0,operatorReview=false;
-let meetup,sceneBatch,meetupWanted=false;
+let meetup,sceneBatch,meetupWanted=false,environment,mixer,interiors;
 let office,view,editor,editing=false,room='live',ready=false,blocked=false,previous=0,target=null,markers=[],currentRole='guest';
 const detachTouchGuard=attachSceneTouchGuard(document);
 window.addEventListener('pagehide',detachTouchGuard,{once:true});
@@ -72,21 +77,167 @@ function actions(){if(room==='library')return [['library:files','무료 자료 �
  office:[['office','업무 관리','요청 · 초안 · 검토',{x:25,y:16,w:4,d:2,height:1.2}],['bots','내 AI 직원','연결 상태 확인',{x:21.8,y:12.3,w:1.6,d:1.4,height:1.5}]],
  }[room].filter(([id])=>!publicVisitor||id!=='live-video');}
 let contentTasks=null;
-function setMarkers(){layer.replaceChildren();markers=actions().filter(([id])=>!contentTasks||id.startsWith('destination:')||contentTasks.some(t=>t.id===id)).map(([id,label,hint,item])=>{const setting=contentTasks?.find(t=>t.id===id);if(setting?.custom){label=setting.title;hint=setting.description;}const b=document.createElement('button');b.className='tour-hotspot';const title=document.createElement('strong'),sub=document.createElement('small');title.textContent=label;sub.textContent=hint;b.append(title,sub);b.setAttribute('aria-label',label);b.onclick=e=>{e.stopPropagation();keys.clear();target=null;office.campusAvatar.moving=false;if(id.startsWith('destination:'))send('destination',{id:id.split(':')[1]});else send('action',{id});};layer.append(b);return{b,item};});}
-function showRoom(id){if(!names[id]||!allowed(id))return;positions.set(room,{x:office.campusAvatar?.x,y:office.campusAvatar?.y});room=id;document.body.dataset.room=id;keys.clear();target=null;const p=positions.get(id);office.campusAvatar={...(Number.isFinite(p?.x)?p:info[id].spawn),roomId:id==='office'?'office':'study',moving:false,yaw:id==='live'?Math.PI+.12:Math.PI,studyPose:null};office.campusAvatar.jumpHeight=room==='live'?atriumHeightAt(office.campusAvatar.x,office.campusAvatar.y):0;setMarkers();view?.roomChanged();meetup?.roomChanged();budget.wake(performance.now());office.draw();status.textContent=matchMedia('(pointer:coarse)').matches?'바닥 터치 · 이동\n드래그 · 둘러보기\n두 손가락 · 확대':(publicVisitor&&id==='live'?'문샷 오픈 캠퍼스':names[id])+' · WASD 이동 · 클릭 이동 · 드래그 시점 · 스크롤 확대' ;send('room',{id});}
+let deskProfiles=[],deskJobs=[],deskMarkers=[];
+const officeSeats=Plan.createCampusPlan().officeSeats;
+let officeFirst=false, pendingOffice=null, initialRoomSync=false;
+let firstDeskFrame=null;
+let finishDeskCheck;
+function checkFirstDeskData(){
+ return new Promise(resolve=>{
+  const timer=setTimeout(complete,1800);
+  function complete(){clearTimeout(timer);finishDeskCheck=undefined;resolve();}
+  finishDeskCheck=complete;
+  send('office-desk-check');
+ });
+}
+
+// Render the original desk meshes with the final camera. Character and prop downloads
+// can finish later without replacing the desks, their seat coordinates or the canvas.
+function showFirstDeskFrame(){
+ let labelsVisible=false;
+ const projectJobs=()=>{
+  layer.replaceChildren();
+  const profiles=pendingOffice?.document?.profiles;
+  const jobs=pendingOffice?.desks;
+  const markers=room==='office'&&!blocked&&Array.isArray(profiles)&&Array.isArray(jobs)
+   ? makeDeskMarkers(layer,officeSeats,profiles,jobs,jobId=>send('office-desk-job',{jobId})) : [];
+  positionDeskMarkers(office,markers);
+  const visible=markers.length>0&&markers.length===jobs.length&&markers.every(({b})=>!b.hidden);
+  if(visible!==labelsVisible){
+   labelsVisible=visible;
+   send('office-desks-visible',{visible});
+  }
+ };
+ const paint=()=>{
+  if(room!=='office'||blocked)return;
+  fit();
+  office.gl.render(office.scene,office.camera);
+  root.dataset.officeStage='desks';
+  projectJobs();
+ };
+ paint();
+ // The observer delivers an initial notification even without a size change.
+ let width=office.cw,height=office.ch;
+ const observer=new ResizeObserver(()=>{
+  if(width===office.cw&&height===office.ch)return;
+  width=office.cw;height=office.ch;paint();
+ });
+ observer.observe(root);
+ return {projectJobs,finish(){observer.disconnect();layer.replaceChildren();delete root.dataset.officeStage;}};
+}
+let atriumMeshType;
+const preparedRooms=new Set(['office']);
+function prepareRoom(id){
+ if(preparedRooms.has(id))return;
+ if(id==='study')applyWarmStudy(office,Plan);
+ else {
+  createScene(id);
+  if(id==='live')sceneBatch=batchAtriumBoxes(groups.get(id),atriumMeshType);
+ }
+ preparedRooms.add(id);
+}
+
+let lastDocument='';
+function applyPersonalOffice(payload){
+ if(!payload || publicVisitor || !['student','admin'].includes(currentRole))return;
+ try{
+  const key=JSON.stringify(payload.document);
+  const changed=key!==lastDocument;
+  if(changed){
+   const document=new BotOfficeModel().restore(payload.document);
+   office.update(toBotOfficeSessions(document));
+   deskProfiles=document.profiles;
+   lastDocument=key;
+  }
+  deskJobs=Array.isArray(payload.desks)?payload.desks:[];
+  return changed;
+ }catch{return;}
+}
+function renderDeskMarkers(){
+ deskMarkers=room==='office'&&currentRole==='student'
+   ? makeDeskMarkers(layer,officeSeats,deskProfiles,deskJobs,jobId=>send('office-desk-job',{jobId})) : [];
+}
+function refreshDeskLabels(){
+ for(const {b} of deskMarkers)b.remove();
+ renderDeskMarkers();
+ positionDeskMarkers(office,deskMarkers);
+}
+function setMarkers(){layer.replaceChildren();markers=actions().filter(([id])=>!contentTasks||id.startsWith('destination:')||contentTasks.some(t=>t.id===id)).map(([id,label,hint,item])=>{const setting=contentTasks?.find(t=>t.id===id);if(setting?.custom){label=setting.title;hint=setting.description;}const b=document.createElement('button');b.className='tour-hotspot';const title=document.createElement('strong'),sub=document.createElement('small');title.textContent=label;sub.textContent=hint;b.append(title,sub);b.setAttribute('aria-label',label);b.onclick=e=>{e.stopPropagation();keys.clear();target=null;office.campusAvatar.moving=false;if(id.startsWith('destination:'))send('destination',{id:id.split(':')[1]});else send('action',{id});};layer.append(b);return{b,item};});renderDeskMarkers();}
+function showRoom(id){if(!names[id]||!allowed(id))return;prepareRoom(id);positions.set(room,{x:office.campusAvatar?.x,y:office.campusAvatar?.y});room=id;document.body.dataset.room=id;if(['study','office'].includes(id)){interiors??=attachInteriorInteractions({office,root,getRoom:()=>room,onMessage:text=>{keys.clear();target=null;budget.wake(performance.now()+4000);status.textContent=text;}});}else{interiors?.destroy();interiors=null;}mixer?.setRoom(id);document.getElementById('environment-open').hidden=!['study','office'].includes(id);office.setEnvironment({lighting:['study','office'].includes(id)?document.getElementById('lighting-select').value:'bright'});keys.clear();target=null;const p=positions.get(id);office.campusAvatar={...(Number.isFinite(p?.x)?p:info[id].spawn),roomId:id==='office'?'office':'study',moving:false,yaw:id==='live'?Math.PI+.12:Math.PI,studyPose:null};office.campusAvatar.jumpHeight=room==='live'?atriumHeightAt(office.campusAvatar.x,office.campusAvatar.y):0;setMarkers();view?.roomChanged();meetup?.roomChanged();if(ready||!officeFirst)budget.wake(performance.now());office.draw();status.textContent=matchMedia('(pointer:coarse)').matches?'바닥 터치 · 이동\n드래그 · 둘러보기\n두 손가락 · 확대':(publicVisitor&&id==='live'?'문샷 오픈 캠퍼스':names[id])+' · WASD 이동 · 클릭 이동 · 드래그 시점 · 스크롤 확대' ;send('room',{id});}
 function free(p){if(room==='study'||room==='office'){const a=office.campusAvatar;return Plan.resolveCampusMovement(a,{x:p.x-a.x,y:p.y-a.y},room).position;}if(room==='live'&&!canWalkAtrium(office.campusAvatar,p))return null;const f=info[room],r=.25;return p.x>f.cx-f.w/2+r&&p.x<f.cx+f.w/2-r&&p.y>f.cy-f.d/2+r&&p.y<f.cy+f.d/2-r&&!obstacles[room].some(o=>p.x>o.x-r&&p.x<o.x+o.w+r&&p.y>o.y-r&&p.y<o.y+o.d+r)?p:null;}
 function move(dt){if(blocked||editing||document.hidden)return;const a=office.campusAvatar;let x=Number(keys.has('right'))-Number(keys.has('left')),y=Number(keys.has('down'))-Number(keys.has('up'));if(x||y){target=null;const length=Math.hypot(x,y);x/=length;y/=length;const v=view.moveVector(x,y);x=v.x;y=v.y;}else if(target){const dx=target.x-a.x,dy=target.y-a.y,d=Math.hypot(dx,dy);if(d<.15)target=null;else{x=dx/d;y=dy/d;}}a.moving=!!(x||y);if(!a.moving)return;a.studyPose=null;const before={x:a.x,y:a.y},step=dt*4;const px=free({x:a.x+x*step,y:a.y});if(px)Object.assign(a,px);const py=free({x:a.x,y:a.y+y*step});if(py)Object.assign(a,py);if(Math.hypot(a.x-before.x,a.y-before.y)<.001)target=null;a.jumpHeight=room==='live'?atriumHeightAt(a.x,a.y):0;a.yaw=Math.atan2(x,y);}
-async function start(){if(started)return;started=true;try{window.CampusPlan=Plan;window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry}=await import('../office/vendor/office3d.js');office=new Office3D(root,{showAgent:false,deskCapacity:8});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);if(!await office.ready)throw Error('renderer');office.avatarNameplate=drawAvatarNameplate;attachOfficeEnvironment(office,root);attachAvatarAppearance(office);office.campusIdentity={displayId:'나 · 미리보기',gender:'male',coat:'#386eb4',hairColor:'#302825',skinColor:'#e8b68b',pantsColor:'#36485d',model:0};
- office.campusHeightAt=(x,y)=>room==='live'?atriumHeightAt(x,y):0;applyWarmStudy(office,Plan);createScene('welcome');createScene('library');createScene('live');sceneBatch=batchAtriumBoxes(groups.get('live'),CampusInstancedMesh);office.getCampusVisibleRoom=()=>room==='office'?'office':'study';office.drawCampusRoomLabels=()=>{};office.updateCampusVisibility=()=>{for(const [id,g]of office.campusRoomGroups)g.visible=id===room;for(const [id,g]of groups)g.visible=id===room;office.plan.observationWindows=[];};office.fitCamera3D=fit;office.pauseCampusInput=()=>{editing=true;keys.clear();target=null;view?.refresh();};office.resumeCampusInput=()=>{editing=false;view?.refresh();budget.wake(performance.now());};
+async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry,CampusBasicMaterial}=await import('../office/vendor/office3d.js');office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
+ let configuringOffice=officeFirst;
+ if(officeFirst){
+  if(!office.gl)throw Error('renderer');
+  // Configure the destination, camera and roster before paying for the first draw.
+  const draw=office.draw.bind(office);
+  office.draw=(...args)=>configuringOffice?false:draw(...args);
+  office.getCampusVisibleRoom=()=>room==='office'?'office':'study';
+  office.prepareRoomGeometry();
+  // Only the stationary lab architecture is present here. Furnishings, lights and
+  // animated actors are installed afterwards and keep their individual meshes.
+  for(const screen of office.screens.values())screen.userData.campusDynamicMaterial=true;
+  const batch=batchAtriumBoxes(office.campusRoomGroups.get('office'));
+  const dispose=office.disposeCampusArchitecture;
+  office.disposeCampusArchitecture=()=>{batch.dispose();dispose?.();};
+  const touchDesk=matchMedia('(pointer: coarse), (max-width: 600px)').matches;
+  const restoreMaterials=touchDesk?useDeskPreviewMaterials(office.campusRoomGroups.get('office'),CampusBasicMaterial):null;
+  try {
+   // Process queued reports before submitting the first draw, and present the
+   // interactive desks before decoding character models.
+   if(touchDesk)await new Promise(resolve=>requestAnimationFrame(resolve));
+   firstDeskFrame=showFirstDeskFrame();
+   // Reconcile the initial snapshot through the existing session while loading assets.
+   const checked=touchDesk?checkFirstDeskData():undefined;
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   if(!await office.loadModels())throw Error('renderer');
+   if(checked){
+    await checked;
+    // Present the reconciled marker before entering the full lighting/actor pass.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   }
+  } finally {
+   restoreMaterials?.();
+  }
+  firstDeskFrame.finish();firstDeskFrame=null;
+  office.installCampusInterior();
+ }else if(!await office.ready)throw Error('renderer');
+ office.avatarNameplate=drawAvatarNameplate;attachOfficeEnvironment(office,root);attachAvatarAppearance(office);office.campusIdentity={displayId:'나 · 미리보기',gender:'male',coat:'#386eb4',hairColor:'#302825',skinColor:'#e8b68b',pantsColor:'#36485d',model:0};
+ office.campusHeightAt=(x,y)=>room==='live'?atriumHeightAt(x,y):0;atriumMeshType=CampusInstancedMesh;if(!officeFirst)for(const id of ['study','welcome','library','live'])prepareRoom(id);office.getCampusVisibleRoom=()=>room==='office'?'office':'study';office.drawCampusRoomLabels=()=>{};office.updateCampusVisibility=()=>{for(const [id,g]of office.campusRoomGroups)g.visible=id===room;for(const [id,g]of groups)g.visible=id===room;office.plan.observationWindows=[];};office.fitCamera3D=fit;office.pauseCampusInput=()=>{editing=true;keys.clear();target=null;view?.refresh();};office.resumeCampusInput=()=>{editing=false;view?.refresh();budget.wake(performance.now());};
+ mixer=attachAmbientMixer(document.getElementById('ambient-host'));mixer.setRoom(room);environment=attachEnvironmentControls({office,root,isBlocked:()=>blocked,wake:()=>budget.wake(performance.now()),onOpenChange:open=>send('editor',{open})});
  view=attachTourView({office,root,fitMap:fit,wake:()=>budget.wake(performance.now()),onChange:mode=>send('camera',{mode}),isBlocked:()=>blocked||editing||document.hidden});
  editor=attachAppearanceEditor(office,(type,payload)=>{if(type==='appearance-cancel'){send('editor',{open:false});view.refresh();}if(type==='appearance-save')send(type,payload);});
  meetup=((publicVisitor||devPresence)&&!new URLSearchParams(location.search).has('qaChat')?attachVisitorExperience:attachPreviewMeetup)({send,devPresence,qaCrowd,ambientCount,operatorReview,showStories:publicVisitor,office,root,CampusInstancedMesh,CampusSphereGeometry,getRoom:()=>room,getRole:()=>currentRole,wake:()=>budget.wake(performance.now())});
- const recordFrame=previewFrameMetrics(root,office.gl,new URLSearchParams(location.search).has('previewMeetup'));const original=office.draw.bind(office);office.draw=()=>{if(blocked||editing||document.hidden)return;const frameStart=performance.now();original();meetup?.labels?.();root.dataset.playerX=office.campusAvatar?.x?.toFixed(2);recordFrame(frameStart,performance.now(),office.campusAvatar?.moving);root.dataset.playerY=office.campusAvatar?.y?.toFixed(2);root.dataset.playerHeight=String(office.campusAvatar?.jumpHeight||0);root.dataset.room=room;for(const {b,item}of markers){const p=office.projectInteriorPoint(item);b.hidden=!p;if(p)b.style.transform=`translate(${p.x}px,${p.y-24}px) translate(-50%,-100%)`;}};
+ const recordFrame=previewFrameMetrics(root,office.gl,new URLSearchParams(location.search).has('previewMeetup'));const drawScene=office.draw.bind(office);const paintScene=()=>{if(!ready||blocked||(editing&&!environment?.isOpen())||document.hidden)return;const frameStart=performance.now();drawScene();meetup?.labels?.();root.dataset.playerX=office.campusAvatar?.x?.toFixed(2);recordFrame(frameStart,performance.now(),office.campusAvatar?.moving);root.dataset.playerY=office.campusAvatar?.y?.toFixed(2);root.dataset.playerHeight=String(office.campusAvatar?.jumpHeight||0);root.dataset.room=room;if(deskMarkers.length)positionDeskMarkers(office,deskMarkers);for(const {b,item}of markers){const p=office.projectInteriorPoint(item);b.hidden=!p;if(p)b.style.transform=`translate(${p.x}px,${p.y-24}px) translate(-50%,-100%)`;}};
+ // Host state (role, camera, avatar and panel visibility) arrives in a burst.
+ // Project labels immediately, but submit at most one office render per frame.
+ let paintRequest=0;
+ office.draw=()=>{
+  if(!ready)return;
+  if(room!=='office'){if(paintRequest)cancelAnimationFrame(paintRequest);paintRequest=0;paintScene();return;}
+  if(!paintRequest)paintRequest=requestAnimationFrame(()=>{paintRequest=0;paintScene();});
+ };
  const frame=office.frame.bind(office);office.frame=now=>{const elapsed=(now-previous)/1000||.016;previous=now;advanceMovement(elapsed,move);meetup?.tick(now);if(budget.shouldDraw(now,{moving:!!office.campusAvatar?.moving||!!meetup?.moving(),hidden:blocked||editing||document.hidden}))frame(now);};
- ready=true;showRoom('live');send('ready');}catch{status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
-window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.origin||e.source!==parent||m?.source!=='moonshot-tour-host'||m.token!==token||token.length<32)return;const p=m.payload||{};if(m.type==='init'){if(!office){publicVisitor=p.visitor===true;operatorReview=p.operatorReview===true;devPresence=p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};void start();}else if(ready)send('ready');return;}if(m.type==='meetup-start'){meetupWanted=true;void meetup?.join();return;}if(!ready)return;if(m.type==='dev-visitor-state')meetup?.receive?.(p);if(m.type==='personal-office'&&!publicVisitor&&['student','admin'].includes(currentRole)){try{const model=new BotOfficeModel();const doc=model.restore(p.document);office.update(toBotOfficeSessions(doc));office.draw();}catch{}}if(m.type==='content-config'&&Array.isArray(p.tasks)){contentTasks=p.tasks.filter(t=>typeof t.id==='string'&&typeof t.title==='string'&&typeof t.description==='string');setMarkers();}if(m.type==='room')showRoom(p.id);if(m.type==='role'){currentRole=['guest','waiting','student','admin','expired'].includes(p.role)?p.role:'guest';if(!allowed(room))showRoom('live');meetup?.roleChanged();}if(m.type==='blocked'){blocked=!!p.value;root.inert=blocked;layer.hidden=blocked;view.refresh();keys.clear();target=null;if(!blocked){budget.wake(performance.now());office.draw();if(!editing)root.focus({preventScroll:true});}}if(m.type==='sit'&&room==='study'){const p=Plan.getStudySeats()[0];Object.assign(office.campusAvatar,p,{studyPose:'sit',moving:false});target=null;keys.clear();office.draw();}if(m.type==='appearance'){office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.nickname||'나 · 미리보기').slice(0,24)};office.draw();if(meetupWanted)void meetup?.join();}if(m.type==='progress'){office.campusIdentity={...office.campusIdentity,level:Number.isSafeInteger(p.level)?Math.max(0,Math.min(30,p.level)):0};root.dataset.level=String(office.campusIdentity.level);office.draw();}if(m.type==='camera'){view.set(p.mode);root.focus({preventScroll:true});}if(m.type==='appearance-open'&&!blocked){editor.open();send('editor',{open:true});}if(m.type==='appearance-result'){editor.result(p);if(p.ok){send('editor',{open:false});view.refresh();budget.wake(performance.now());office.draw();}}});
+ if(officeFirst)applyPersonalOffice(pendingOffice);
+ pendingOffice=null;
+ // showRoom also configures lighting and camera; paint once after both are set.
+ showRoom(room);configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
+window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.origin||e.source!==parent||m?.source!=='moonshot-tour-host'||m.token!==token||token.length<32)return;const p=m.payload||{};if(m.type==='init'){if(!started){publicVisitor=p.visitor===true;operatorReview=p.operatorReview===true;devPresence=p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=p.studentOffice===true&&!publicVisitor&&!operatorReview;
+ if(officeFirst){room='office';currentRole='student';pendingOffice=p.personalOffice;}
+ void start();}else if(ready)send('ready');return;}if(m.type==='meetup-start'){meetupWanted=true;void meetup?.join();return;}if(!ready){
+ if(m.type==='office-desk-check-done')finishDeskCheck?.();
+ if(officeFirst && m.type==='personal-office')pendingOffice=p;
+ if(officeFirst && m.type==='office-desks-clear')pendingOffice=null;
+ if(officeFirst && m.type==='room' && names[p.id] && allowed(p.id))room=p.id;
+ if(officeFirst && m.type==='blocked')blocked=!!p.value;
+ if(['personal-office','office-desks-clear','room','blocked'].includes(m.type))firstDeskFrame?.projectJobs();
+ return;
+}if(m.type==='dev-visitor-state')meetup?.receive?.(p);if(m.type==='personal-office'){
+ const seatsChanged=applyPersonalOffice(p);refreshDeskLabels();if(seatsChanged)office.draw();
+}if(m.type==='office-desks-clear'){deskJobs=[];refreshDeskLabels();}if(m.type==='content-config'&&Array.isArray(p.tasks)){contentTasks=p.tasks.filter(t=>typeof t.id==='string'&&typeof t.title==='string'&&typeof t.description==='string');setMarkers();}if(m.type==='room'){if(!initialRoomSync||p.id!==room)showRoom(p.id);initialRoomSync=false;}if(m.type==='role'){currentRole=['guest','waiting','student','admin','expired'].includes(p.role)?p.role:'guest';if(!allowed(room))showRoom('live');meetup?.roleChanged();}if(m.type==='environment-open'&&['study','office'].includes(room))environment?.open();if(m.type==='blocked'){blocked=!!p.value;root.inert=blocked||environment?.isOpen()===true;layer.hidden=blocked;view.refresh();keys.clear();target=null;if(!blocked){budget.wake(performance.now());office.draw();if(!editing)root.focus({preventScroll:true});}}if(m.type==='sit'&&room==='study'){const p=Plan.getStudySeats()[0];Object.assign(office.campusAvatar,p,{studyPose:'sit',moving:false});target=null;keys.clear();office.draw();}if(m.type==='appearance'){office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.nickname||'나 · 미리보기').slice(0,24)};office.draw();if(meetupWanted)void meetup?.join();}if(m.type==='progress'){office.campusIdentity={...office.campusIdentity,level:Number.isSafeInteger(p.level)?Math.max(0,Math.min(30,p.level)):0};root.dataset.level=String(office.campusIdentity.level);office.draw();}if(m.type==='camera'){view.set(p.mode);root.focus({preventScroll:true});}if(m.type==='appearance-open'&&!blocked){editor.open();send('editor',{open:true});}if(m.type==='appearance-result'){editor.result(p);if(p.ok){send('editor',{open:false});view.refresh();budget.wake(performance.now());office.draw();}}});
 const direction=e=>({KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[e.code]);
 document.addEventListener('keydown',e=>{const d=direction(e);if(!d||blocked||editing||!ready||e.target.closest('button,input,textarea,select'))return;e.preventDefault();keys.add(d);budget.wake(performance.now());});document.addEventListener('keyup',e=>{keys.delete(direction(e));});window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{keys.clear();target=null;});
 root.addEventListener('pointerup',e=>{if(!ready||blocked||editing||!view.isClick()||e.button!==0)return;const rect=root.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top,near=office.camera.position.clone().set(mx/office.cw*2-1,1-my/office.ch*2,-1).unproject(office.camera),far=office.camera.position.clone().set(mx/office.cw*2-1,1-my/office.ch*2,1).unproject(office.camera);const p=room==='live'?intersectAtriumRay(near,far):office.campusFloorAt(mx,my);if(p){target=p;root.focus();budget.wake(performance.now());}});
 for(const b of document.querySelectorAll('[data-direction]')){b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(b.dataset.direction);budget.wake(performance.now());});for(const name of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(name,()=>keys.delete(b.dataset.direction));}
-window.addEventListener('resize',()=>{if(ready){applyRenderProfile(office.gl,root);view.resize();budget.wake(performance.now());office.draw();}});window.addEventListener('pagehide',()=>{meetup?.destroy();sceneBatch?.dispose();editor?.destroy();view?.destroy();office?.destroy();});
+window.addEventListener('resize',()=>{if(ready){applyRenderProfile(office.gl,root);view.resize();budget.wake(performance.now());office.draw();}});window.addEventListener('pagehide',()=>{environment?.destroy();mixer?.destroy();interiors?.destroy();meetup?.destroy();sceneBatch?.dispose();editor?.destroy();view?.destroy();office?.destroy();});

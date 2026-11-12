@@ -2,6 +2,7 @@ import {validateCampusContent,visibleCampusContent,type CampusContent} from '../
 import {validateWelcome,type WelcomeSettings} from '../welcome/content';
 import {validateResources,type CampusResource} from './resources';
 export const WEBINAR_PREFIX = 'edu_campus_webinar_v1_';
+export const ARCHIVED_WEBINAR_PREFIX = 'edu_campus_archived_webinar_v1_';
 export const WEBINAR_TAG = 'edu-campus-webinars-v1';
 export const slugPattern = /^[a-z0-9][a-z0-9-]{2,59}$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

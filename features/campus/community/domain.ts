@@ -2,6 +2,8 @@ import { campusError, isCampusId } from '../snapshot';
 
 export const communityKinds = ['portfolio', 'feedback', 'process', 'failure', 'talent_offer', 'talent_request', 'demo_day'] as const;
 export type CommunityKind = typeof communityKinds[number];
+/** Kinds a student can start now. Talent exchange and demo day left the study room with their menu tasks (tour/tasks.ts retiredTasks); stored posts of those kinds still read. */
+export const openKinds = communityKinds.filter(k => !k.startsWith('talent_') && k !== 'demo_day');
 export const kindLabels: Record<CommunityKind, string> = { portfolio: '내 결과물 모음', feedback: '의견 요청', process: '작업 과정', failure: '실패에서 배운 점', talent_offer: '도움 드려요', talent_request: '도움 구해요', demo_day: '문샷 결과물 발표회' };
 export type CommunityPost = { id: string; owner_id: string; enrollment_id: string; cohort_id: string; alias: string; kind: CommunityKind; title: string; body: string; url: string; image_urls: string[]; lesson_id: string | null; visibility: 'private' | 'cohort'; revision: number; hidden: boolean; created_at: string; updated_at: string };
 export type CommunityRevision = Pick<CommunityPost, 'id' | 'title' | 'body' | 'url' | 'image_urls' | 'visibility' | 'revision' | 'created_at'> & { post_id: string; change_note: string };

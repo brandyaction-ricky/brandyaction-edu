@@ -14,7 +14,7 @@ export function campusLoginReturn(value?: string | null) {
   if (!value || value.length > 1600) return null;
   const separator = value.indexOf('?');
   const path = separator < 0 ? value : value.slice(0, separator);
-  if (!isCampusAdminPage(path)) return null;
+  if (!isCampusAdminPage(path) && !['/campus/enter', '/campus/workspace', '/campus/operator', '/admin/campus/preview'].includes(path)) return null;
   const query = new URLSearchParams(separator < 0 ? '' : value.slice(separator + 1));
   return path + (query.size ? '?' + query : '');
 }

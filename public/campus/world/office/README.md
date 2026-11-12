@@ -10,8 +10,10 @@ remain outside this repository.
 
 Excluded: API/backend, Blob/Redis clients, upstream app entry point, snapshots,
 local browser identity/progress/feedback stores, upstream privacy notice,
-node_modules and the two large original audio recordings. Optimized audio is
-preserved as an asset but is not automatically played or preloaded.
+node_modules and the two large original audio recordings. Optimized audio is connected through the original independent rain/keyboard mixer.
+It is loaded only after the user enables a track; volume is a local cosmetic preference.
+The original synthesized melody and bright/normal/night lighting controls are available.
+Six furniture interactions are local visual effects, with no curriculum XP or shared writes.
 
 ## Local patches to imported modules
 
@@ -75,3 +77,13 @@ Next integration gates: actual owner-scoped bot catalog, signed worker task /
 receipt round trip, actual authenticated DEV cross-account tests, and measured
 multi-user load. Do not reinterpret local bot registration or an animated actor
 as proof of a real Telegram task running or completing.
+
+The 2026-11-07 source comparison revalidated all 86 existing provenance entries
+against the supplied ZIP, then added three modules (89 entries total).
+`environment-controls.mjs` integrates lighting with the current dialog/input lifecycle.
+The source feedback-credit unlock and local checklist-derived level are not imported:
+EDU retains its authenticated, versioned feedback and server-verified growth rules.
+
+The main `tour/` campus and legacy `office/` study renderer both attach these
+controls. Study/office room transitions preserve playback; live/welcome/library
+pause it. Other campus rooms retain their original lighting.

@@ -2,6 +2,7 @@ import {EventFixture} from './event';
 import {cohortFiveWelcome} from '../../features/campus/welcome/content';
 import {DEFAULT_WELCOME} from '../../features/campus/welcome/content';
 import {CampusAnalyticsPanel} from '../../features/campus/analytics/panel';
+import {OfficePanel} from '../../features/campus/office/panel';
 import {PersonalOffice} from '../../features/campus/office/agents/panel';
 import '../../app/ui/final/tokens.css';
 import '../../app/ui/final/frontend.css';
@@ -33,6 +34,7 @@ import {CampusWorkspace,WorkspaceLive} from '../../features/campus/ui/workspace'
 function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
 if((location.pathname==='/campus-tour-live'||location.pathname==='/campus/workspace'&&new URLSearchParams(location.search).get('tourLive')==='1'))return <FourSpacesLive operator={new URLSearchParams(location.search).get('operator')==='1'}/>;
 if(location.pathname==='/campus-analytics')return <CampusAnalyticsPanel/>;
+if(location.pathname==='/office'&&new URLSearchParams(location.search).has('api'))return <OfficePanel snapshot={student} demo={false}/>;
 if(location.pathname==='/personal-office')return <div style={{padding:24,maxWidth:900,margin:'auto'}}><PersonalOffice enrollmentId={student.selectedEnrollmentId!} demo/></div>;
 if(location.pathname==='/welcome-account-preview')return <FourSpacesPreview snapshot={student} review={{room:'welcome',role:'waiting'}} welcome={{settings:cohortFiveWelcome(),resources:[]}}/>;
 if(location.pathname==='/welcome-five-preview')return <FourSpacesPreview snapshot={student} review={{room:'welcome'}} welcome={{settings:cohortFiveWelcome(),resources:[]}}/>;

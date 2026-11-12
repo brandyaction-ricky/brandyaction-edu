@@ -8,6 +8,11 @@ const uid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 async function load(path){const r=await build({entryPoints:[fileURLToPath(new URL(path,import.meta.url))],write:false,bundle:true,platform:'node',format:'esm'});return import('data:text/javascript;base64,'+Buffer.from(r.outputFiles[0].text).toString('base64'));}
 const domain=await load('../features/campus/support/domain.ts');
 const {handleSupport}=await load('../features/campus/support/handler.ts');
+test('study time form names the broken rule before the server answers a generic conflict',()=>{
+ const now=Date.UTC(2026,10,11,9),h=3600000,p=domain.studyTimeProblem;
+ assert.equal(p(now+h,now+2*h,now),'');assert.equal(p(now+h,now+4*h,now),'');
+ assert.match(p(now+h,now+4*h+60000,now),/최대 3시간/);assert.match(p(now+2*h,now+h,now),/뒤여야/);assert.match(p(now-2*60000,now+h,now),/이미 지났/);assert.match(p(now+31*24*h,now+31*24*h+h,now),/30일 이내/);assert.match(p(NaN,now,now),/확인해/);
+});
 test('support validates actual category, safe URLs, plain bounded notes and specific public lesson',()=>{
  const b={id:uid(1),enrollmentId:uid(2),lessonId:null,category:'tool',title:'오류 확인',tried:'다시 실행',question:'도구 실행 방법을 확인하고 싶습니다.',contextUrl:'https://example.com/a'};
  assert.equal(domain.parseIntake(b).context_url,'https://example.com/a');

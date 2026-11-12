@@ -77,3 +77,9 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 .visitor-ambience-note{display:block;color:#bacce0;font-size:11px;line-height:1.55;margin-top:10px}.visitor-ambience-note[hidden]{display:none}
 
 .visitor-population{margin:0 0 5px;font-size:13px;font-weight:700;color:#f3f8ff}.visitor-population[hidden]{display:none}
+
+#environment-open{position:absolute;bottom:125px;left:14px;z-index:5;min-height:44px;font-size:12px}#environment-open[hidden]{display:none}#environment-editor{max-height:calc(100dvh - 120px);touch-action:pan-y}#environment-editor header{touch-action:pan-y}@media(max-width:650px){#environment-open{bottom:205px;left:10px;font-size:11px}#environment-editor{max-height:calc(100dvh - 28px)}}
+
+.office-desk-job{box-sizing:border-box;width:102px;height:36px;min-height:36px;align-items:center;z-index:1;padding:5px 9px;border-radius:8px;border:1px solid #72d8b2;background:#103c35;color:#ecfff8;font-size:12px;font-weight:700}
+.office-desk-job[data-status="review"]{border-color:#f8ce74;background:#483717;color:#fff2cf}
+.office-desk-job:after{pointer-events:none;left:var(--line-start);top:50%;width:var(--line-length);height:0;border:0;border-top:1px solid currentColor;opacity:.75;transform:rotate(var(--line-angle));transform-origin:left center}

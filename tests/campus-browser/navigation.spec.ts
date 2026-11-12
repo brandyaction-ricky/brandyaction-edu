@@ -55,11 +55,11 @@ test('native fullscreen can be entered and exited with visible controls',async({
 });
 test('cancelled navigation keeps an unsaved space note',async({page})=>{
  await page.goto('/space?view=immersive');await page.getByRole('button',{name:'집중·대화·내 자리'}).click();
- await page.getByLabel('나만 보는 메모',{exact:true}).fill('아직 저장하지 않은 메모');
+ await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('나만 보는 책상 메모').fill('아직 저장하지 않은 메모');
  await page.getByRole('button',{name:'이동 메뉴',exact:true}).click();
  page.once('dialog',d=>d.dismiss());
  await page.getByRole('navigation',{name:'문샷 기능'}).getByRole('button',{name:'실행 수첩',exact:true}).click();
- await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('아직 저장하지 않은 메모');
+ await expect(page.getByLabel('나만 보는 책상 메모')).toHaveValue('아직 저장하지 않은 메모');
  await expect(page.getByRole('heading',{name:'문샷 공간',exact:true})).toBeVisible();
 });
 

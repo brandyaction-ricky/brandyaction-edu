@@ -36,6 +36,8 @@ export async function saveSupport(db:Database,admin:()=>Database,actor:string,b:
  }else if(b.kind==='study-create'){
   const data=parseSession({...b,cohortId:member.cohort_id,sessionKind:'study',locationUrl:''});if(b.shareGoal!==true)campusError(400,'기수 공유 범위를 확인해 주세요.');
   const r=await admin().rpc('edu_campus_create_study',{p_actor:actor,p_enrollment:enrollment,p_id:data.id,p_title:data.title,p_goal:text(b.goal,300),p_start:data.starts_at,p_end:data.ends_at,p_capacity:data.capacity});if(r.error){if(r.error.code==='23514')campusError(409,'일정 조건을 확인해 주세요.');unavailable();}
+  // The host joins their own study; reserve is idempotent, so a retried create ends in the same state.
+  const own=await admin().rpc('edu_campus_reserve_office',{p_actor:actor,p_session:data.id,p_request:crypto.randomUUID(),p_cancel:false});if(own.error)unavailable();
  }else if(b.kind==='study-cancel'){
   const r=await admin().from('edu_campus_office_sessions').update({status:'cancelled'}).eq('id',id(b.sessionId)).eq('cohort_id',member.cohort_id).eq('created_by',actor).eq('student_created',true).select('id').maybeSingle();if(r.error)unavailable();if(!r.data)campusError(404,'일정을 확인해 주세요.');
  }else if(b.kind==='queue'){
