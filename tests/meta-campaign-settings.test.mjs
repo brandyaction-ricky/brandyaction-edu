@@ -131,6 +131,33 @@ test('Meta registration count and result cost are copied from action arrays with
   finally{global.fetch=original;}
 });
 
+test('delivered zero-result Insights rows are available, malformed values and absent delivery stay unknown',async()=>{
+ const original=global.fetch;
+ const variants=[
+  {impressions:'100'},
+  {impressions:'100',actions:[]},
+  {impressions:'100',actions:[{action_type:'link_click',value:'3'}]},
+  {impressions:'100',actions:[{action_type:'complete_registration',value:'0'}]},
+  {impressions:'100',actions:[{action_type:'complete_registration',value:''}]},
+  {impressions:'100',actions:[{action_type:'complete_registration',value:'broken'}]},
+  {impressions:'100',actions:[{action_type:'complete_registration',value:'-1'}]},
+  {impressions:'0'}, {}, {impressions:'broken'},
+  {impressions:'100',actions:[{action_type:'complete_registration',value:'35'}]},
+ ];
+ global.fetch=async input=>{const parts=new URL(input).pathname.split('/'),id=parts[2];
+  if(parts.length===3)return Response.json({id,account_id:'123'});
+  if(parts[3]==='ads')return Response.json({data:[]});
+  return Response.json({data:variants.map((v,i)=>({date_start:'2026-09-15',campaign_id:id,adset_id:'1',ad_id:String(i),spend:'100',...v}))});
+ };
+ try {
+  const api=load('lib/meta-marketing.ts');
+  const rows=await api.fetchMetaCampaigns({version:'v99.0',token:'test',accountId:'act_123',campaignIds:[idA],startDay:'2026-09-15',endDay:'2026-09-15'});
+  assert.deepEqual(rows.map(r=>r.registration_available),[true,true,true,true,false,false,false,false,false,false,true]);
+  assert.equal(rows[10].registrations,35);
+  for(const row of rows.slice(0,4)){assert.equal(row.registrations,0);assert.equal(row.registration_cost,null);assert.equal(row.landing_page_views,0);assert.equal(row.landing_page_view_available,true);}
+ } finally {global.fetch=original;}
+});
+
 test('list and detail always use common account for null and stale campaign rows',async()=>{
   for(const account of [null,'act_999']){
     const h=setup({initial:{...campaign,meta_ad_account_id:account}});
