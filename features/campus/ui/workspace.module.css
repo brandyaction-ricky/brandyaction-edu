@@ -21,7 +21,7 @@
 .windowBody{word-break:keep-all;overflow-wrap:anywhere}
 .windowBody details>summary{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;list-style:none;font-weight:600;color:#22344d}
 .windowBody details>summary::-webkit-details-marker{display:none}
-.windowBody details>summary::before{content:'';flex:none;width:7px;height:7px;margin:0 6px 0 3px;border-right:2px solid #5b6f88;border-bottom:2px solid #5b6f88;transform:rotate(-45deg);transition:transform .15s}
+.windowBody details>summary::before{content:'';display:inline-block;flex:none;width:7px;height:7px;margin:0 6px 0 3px;border-right:2px solid #5b6f88;border-bottom:2px solid #5b6f88;transform:rotate(-45deg);transition:transform .15s}
 .windowBody details[open]>summary::before{transform:rotate(45deg)}
 .windowBody details>summary:hover{color:#214ed1}
 /* 실행 수첩: 제목과 새로고침을 한 줄 양끝에 */
@@ -32,3 +32,4 @@
 .ai :global(button.btn),.ai :global(label.btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border:1px solid #c8d2e2;border-radius:10px;background:#fff;color:#22344d;font-size:13px;font-weight:600;cursor:pointer;box-shadow:none}
 .ai :global(button.btn.primary){width:100%;min-height:48px;border-color:var(--ba-red,#c9232d);background:var(--ba-red,#c9232d);color:#fff;font-size:15px}
 .ai :global(button.btn:disabled){opacity:.5;cursor:default}
+.ai :global(.curriculum-ai-guide)>summary{display:flex;min-height:44px}
