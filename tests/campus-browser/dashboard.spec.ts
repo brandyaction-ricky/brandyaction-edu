@@ -3,7 +3,7 @@ test('student next action, map filtering and private export',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');await expect(page.getByRole('heading',{name:'문샷 동료님의 다음 도약'})).toBeVisible();
  await page.getByRole('button',{name:/DAY 0\d/}).first().click();await expect(page.getByRole('status')).toBeVisible();
- await page.getByRole('button',{name:'수정 필요',exact:true}).click();await expect(page.getByRole('button',{name:/DAY 03/})).toBeVisible();await expect(page.getByRole('button',{name:/DAY 01/})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'수정 필요',exact:true})).toHaveCount(0);await expect(page.getByRole('heading',{name:'실행으로 얻은 이정표'})).toHaveCount(0);await page.getByRole('button',{name:'완료',exact:true}).click();await page.getByRole('button',{name:'전체',exact:true}).click();
  await page.getByRole('button',{name:'내 성장 카드 보기'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toContainText('가상 예시');
  const saved=page.waitForEvent('download');await page.getByRole('button',{name:'성장 카드 이미지 저장'}).click();expect((await saved).suggestedFilename()).toBe('moonshot-demo-progress.svg');
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);expect(errors).toEqual([]);

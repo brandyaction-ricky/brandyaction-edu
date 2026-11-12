@@ -65,8 +65,6 @@ test('timer expiry asks for an explicit finish without changing lesson or missio
   const initialMissions=await missionButtons.allTextContents();
   const completedLessons=page.getByText('수업 완료 표시 기준',{exact:true}).locator('..');
   const initialCompletion=await completedLessons.innerText();
-  const milestones=page.locator('section').filter({has:page.getByRole('heading',{name:'실행으로 얻은 이정표',exact:true})});
-  const initialMilestones=await milestones.innerText();
   await start(page);
   await page.clock.fastForward(900_000);
   await expect(page.getByLabel('남은 실행 시간')).toHaveText('00:00');
@@ -75,7 +73,6 @@ test('timer expiry asks for an explicit finish without changing lesson or missio
   await expect(page.getByRole('heading',{name:'지난번에 남겨둔 다음 한 걸음',exact:true})).toHaveCount(0);
   expect(await missionButtons.allTextContents()).toEqual(initialMissions);
   expect(await completedLessons.innerText()).toBe(initialCompletion);
-  expect(await milestones.innerText()).toBe(initialMilestones);
   await page.reload();
   await expect(page.getByLabel('남은 실행 시간')).toHaveText('00:00');
   await expect(page.getByRole('button',{name:'오늘 한 일 남기기',exact:true})).toBeVisible();

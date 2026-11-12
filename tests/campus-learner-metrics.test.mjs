@@ -18,7 +18,7 @@ test('empty curriculum has no false completion percentage or milestones', () => 
   assert.equal(result.totalLessons, 0);
   assert.deepEqual(result.nextActions, []);
   assert.ok(result.milestones.every(m => !m.earned));
-  assert.match(result.reportText, /필수 미션 없음/);
+  assert.doesNotMatch(result.reportText, /필수 미션|검토 대기/);
 });
 
 test('optional approvals never inflate required mission results', () => {
@@ -90,7 +90,6 @@ test('report names the as-of date in KST, scope and denominators, not an earned 
   assert.match(result.reportText, /KST/);
   assert.match(result.reportText, /문샷 \/ 3기/);
   assert.match(result.reportText, /수업 완료: 1 \/ 2개/);
-  assert.match(result.reportText, /필수 미션 승인: 1 \/ 1개 \(100%\)/);
   assert.match(result.reportText, /실제 사업 매출을 뜻하지 않습니다/);
   assert.ok(!result.reportText.includes('XP'));
 });
