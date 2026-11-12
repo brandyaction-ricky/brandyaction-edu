@@ -26,3 +26,21 @@ test('Meta connector requires server-only token/version and preserves rows on fa
 test('common Meta account stays private and is the server source of truth',()=>{const sql=fs.readFileSync('supabase/migrations/20260914142335_common_meta_ad_account.sql','utf8');const api=fs.readFileSync('app/api/landing/performance/route.ts','utf8');assert.match(sql,/edu_meta_marketing/);assert.match(sql,/is_public[^\n]*false/i);assert.match(api,/commonMetaAccountId/);assert.match(api,/const account = await commonMetaAccountId\(db\)/);});
 
 test('ended campaign retains a full recent window rather than collapsing to one day',()=>{assert.deepEqual(logic.presetRange('7d',campaign,new Date('2026-10-12T00:00:00Z')),{startDay:'2026-09-24',endDay:'2026-09-30'});});
+
+test('current Kakao headcount and measurement date stay independent from period increase and unavailable values',()=>{
+ const {OperationsSummary}=load('app/ui/landing/performance-dashboard.tsx');
+ const ui={errors:{},current_kakao:{members:7505,day:'2026-09-15'},period_actuals:{kakao_members:null,kakao_delta:120}};
+ const html=renderToStaticMarkup(React.createElement(OperationsSummary,{report:{...report,ui}}));
+ assert.match(html,/7,505명/);assert.match(html,/2026-09-15 입력 기준/);assert.match(html,/\+120명/);
+ const unknown=renderToStaticMarkup(React.createElement(OperationsSummary,{report:{...report,ui:{...ui,current_kakao:null}}}));
+ assert.match(unknown,/<dt>현재 카카오톡방 인원<\/dt><dd>—<\/dd>/);
+ assert.doesNotMatch(unknown,/7,505|450명/);
+});
+test('mismatched campaign collection ranges warn without claiming missing days are zero',()=>{
+ const {CollectionRangeNotice}=load('app/ui/landing/performance-dashboard.tsx');
+ const ranges={edu:{start:'2026-09-10',end:'2026-09-15'},meta:{start:'2026-09-01',end:'2026-09-15'}};
+ const html=renderToStaticMarkup(React.createElement(CollectionRangeNotice,{report:{...report,ui:{errors:{},collection_ranges:ranges}}}));
+ assert.match(html,/수집 기간을 확인/);assert.match(html,/같은 기간의 전환율로 비교하지/);assert.match(html,/중간 날짜의 누락 여부/);
+ const covered=renderToStaticMarkup(React.createElement(CollectionRangeNotice,{report:{...report,range:{...report.range,startDay:'2026-09-11'},ui:{errors:{},collection_ranges:ranges}}}));
+ assert.doesNotMatch(covered,/수집 기간을 확인/);
+});

@@ -51,3 +51,25 @@ test('production summary remains authoritative and avoids source session scans',
  db.rpc=()=>({abortSignal:async()=>({data:null,error:{message:'unavailable'}})});
  const failed=await performanceUiDetails(db,{id:'campaign',landing_id:'landing'},params,new AbortController().signal,'actor',base);assert.equal(failed.insights,null);assert.deepEqual(failed.daily_a,base.daily_a);assert.ok(failed.errors.insights);
 });
+
+test('supplement reads latest nonfuture headcount and bounded collection edges without altering selected-period snapshot',async()=>{
+ const {performanceUiDetails}=load('lib/landing-performance-ui-server.ts');
+ const reads=[];
+ const tables={
+  landing_campaign_actuals:[{campaign_id:'campaign',day:'2020-10-20',kakao_members:0},{campaign_id:'campaign',day:'2020-11-04',kakao_members:7505},{campaign_id:'campaign',day:'2099-01-01',kakao_members:99999}],
+  funnel_sessions:[{landing_id:'landing',created_at:'2020-10-30T15:01:00Z'},{landing_id:'landing',created_at:'2020-11-04T01:00:00Z'},{landing_id:'another',created_at:'2019-01-01T00:00:00Z'}],
+  landing_campaign_meta_daily:[{campaign_id:'campaign',meta_campaign_id:'123',day:'2020-10-20'},{campaign_id:'campaign',meta_campaign_id:'123',day:'2020-11-04'},{campaign_id:'campaign',meta_campaign_id:'unlinked',day:'2019-01-01'}],
+ };
+ const db={from(table){const read={table,limit:null,filters:[]};reads.push(read);let rows=tables[table];const q={
+  select(){return q},eq(k,v){read.filters.push([k,v]);rows=rows.filter(r=>r[k]===v);return q},in(k,vs){rows=rows.filter(r=>vs.includes(r[k]));return q},
+  not(k,_op,v){rows=rows.filter(r=>r[k]!==v);return q},lte(k,v){rows=rows.filter(r=>r[k]<=v);return q},
+  order(k,{ascending=true}={}){rows=[...rows].sort((a,b)=>(a[k]<b[k]?-1:a[k]>b[k]?1:0)*(ascending?1:-1));return q},
+  limit(n){read.limit=n;rows=rows.slice(0,n);return q},abortSignal(signal){assert.equal(signal.aborted,false);return Promise.resolve({data:rows,error:null})},
+ };return q;}};
+ const base={daily_a:[],last_collected_at:null,period_actuals:{kakao_members:null,kakao_delta:null},errors:{}};
+ const result=await performanceUiDetails(db,{id:'campaign',landing_id:'landing',meta_campaign_ids:['123']},new URLSearchParams('start=2020-10-20&end=2020-11-05'),new AbortController().signal,undefined,base);
+ assert.deepEqual(result.current_kakao,{members:7505,day:'2020-11-04'});
+ assert.deepEqual(result.collection_ranges,{edu:{start:'2020-10-31',end:'2020-11-04'},meta:{start:'2020-10-20',end:'2020-11-04'}});
+ assert.deepEqual(result.period_actuals,base.period_actuals);assert.deepEqual(result.errors,{});
+ assert.equal(reads.length,5);assert.ok(reads.every(r=>r.limit===1));
+});

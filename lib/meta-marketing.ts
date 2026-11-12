@@ -22,8 +22,16 @@ export function metaActionValue(rows: ActionStat[] | undefined, action: string) 
 const REGISTRATION_ACTIONS = new Set(['complete_registration', 'offsite_conversion.fb_pixel_complete_registration']);
 export function metaRegistrationValue(rows: ActionStat[] | undefined) {
   const exact = rows?.find(row => REGISTRATION_ACTIONS.has(row.action_type));
-  const value = Number(exact?.value);
+  const value = exact && typeof exact.value === 'string' && exact.value.trim() !== '' ? Number(exact.value) : NaN;
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+// A successful, delivered Insights row omits action types whose result is zero.
+// A present but malformed metric is still unavailable, as is an undelivered row.
+function actionForInsight(row: MetaInsight, value: number | null, matches: (action: ActionStat) => boolean) {
+  if (value !== null) return value;
+  const actionsValid = row.actions === undefined || Array.isArray(row.actions);
+  const present = Array.isArray(row.actions) && row.actions.some(matches);
+  return actionsValid && !present && Number.isFinite(Number(row.impressions)) && Number(row.impressions) > 0 ? 0 : null;
 }
 export function metaLandingPageViews(rows: ActionStat[] | undefined) {
   const exact = rows?.find(row => row.action_type === 'landing_page_view');
@@ -89,7 +97,9 @@ export async function fetchMetaCampaign(input: { version: string; token: string;
   const insights = await graphPages<MetaInsight>(insightsUrl, input.token, 'insights');
   return insights.map(row => {
     if (row.campaign_id !== input.campaignId) throw new MetaSyncError('invalid_campaign', 'insights', false, null, null, null);
-    const ad = adsById.get(row.ad_id), linkClicks = metaActionValue(row.actions, 'link_click') || 0, registrationValue = metaRegistrationValue(row.actions), landingViews = metaLandingPageViews(row.actions);
+    const ad = adsById.get(row.ad_id), linkClicks = metaActionValue(row.actions, 'link_click') || 0;
+    const registrationValue = actionForInsight(row, metaRegistrationValue(row.actions), action => REGISTRATION_ACTIONS.has(action.action_type));
+    const landingViews = actionForInsight(row, metaLandingPageViews(row.actions), action => action.action_type === 'landing_page_view');
     return { day: row.date_start, campaign_name: row.campaign_name || identity.name || input.campaignId, adset_name: row.adset_name || row.adset_id,
       creative_name: row.ad_name || ad?.name || row.ad_id, meta_campaign_id: row.campaign_id, meta_adset_id: row.adset_id, meta_ad_id: row.ad_id,
       meta_creative_id: ad?.creative?.id || null, impressions: Math.max(0, Number(row.impressions || 0)), link_clicks: Math.max(0, linkClicks),
