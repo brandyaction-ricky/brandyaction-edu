@@ -11,6 +11,6 @@ test('bulk employee lines accept commas or tabs, keep commas inside duties and g
   {line:1,name:'제 2의 뇌',telegram:'@brain_bot',duties:'자료 정리, 기억'},
   {line:3,name:'총괄',telegram:'https://t.me/lead_bot',duties:'전체 조율'},
   {line:4,name:'이름만',telegram:'',duties:''}]);
- assert.equal(pickSeat('총괄',[1,2]),0);assert.equal(pickSeat('총괄 관리자',[1,2]),0);assert.equal(pickSeat('총괄관리자',[]),0);assert.equal(pickSeat('총괄',[0]),1);assert.equal(pickSeat('GEO 담당자',[]),1);
+ assert.equal(pickSeat('총괄',[1,2]),0);assert.equal(pickSeat('고객 총괄 상담',[]),1);assert.deepEqual(parseEmployeeLines('광고 담당자，@ads_bot，집행，보고'),[{line:1,name:'광고 담당자',telegram:'@ads_bot',duties:'집행,보고'}]);assert.equal(pickSeat('총괄 관리자',[1,2]),0);assert.equal(pickSeat('총괄관리자',[]),0);assert.equal(pickSeat('총괄',[0]),1);assert.equal(pickSeat('GEO 담당자',[]),1);
  assert.equal(pickSeat('GEO 담당자',[1,2,3,4,5,6,7,8,9]),0);assert.equal(pickSeat('GEO 담당자',[0,1,2,3,4,5,6,7,8,9]),undefined);
 });

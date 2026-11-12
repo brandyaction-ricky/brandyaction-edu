@@ -48,6 +48,14 @@ export async function POST(request:Request){try{
   const r=await db.from('edu_campus_office_employees').insert({owner_id:user.id,employee_id:profile.employeeId,profile});
   if(r.error?.code==='23505')fail('이미 등록한 텔레그램 봇입니다.',409);if(r.error)throw r.error;return privateReply({employee:profile},201);
  }
+ if(body.action==='remove'){
+  const {db,user}=await access(body.enrollmentId);const id=body.employeeId;if(typeof id!=='string'||!id||id.length>128)fail('삭제할 직원을 확인해 주세요.');
+  // A seated profile would be written back into the directory by the desk sync on the next save, so the desk goes first.
+  const office=await db.from('edu_campus_personal_offices').select('document').eq('owner_id',user.id).maybeSingle();if(office.error)throw office.error;
+  if((office.data?.document as BotDocument|undefined)?.profiles.some(p=>p.employeeId===id))fail('자리를 먼저 비워 주세요.',409);
+  const r=await db.from('edu_campus_office_employees').delete().eq('owner_id',user.id).eq('employee_id',id).select('employee_id');
+  if(r.error)throw r.error;if(!r.data.length)fail('이미 삭제된 직원입니다.',404);return privateReply({removed:id});
+ }
  if(Object.keys(body).some(k=>!['enrollmentId','document','revision','expectedRevision'].includes(k))||!uuid(body.revision)||body.expectedRevision!==null&&!uuid(body.expectedRevision))fail('저장 요청을 확인해 주세요.');
  const{db,user}=await access(body.enrollmentId);let document;try{document=new BotOfficeModel().restore(body.document);}catch{fail('직원 이름·텔레그램 주소·좌석을 확인해 주세요.');}
  const row={owner_id:user.id,document,revision:body.revision,updated_at:new Date().toISOString()};

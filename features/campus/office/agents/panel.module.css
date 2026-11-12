@@ -13,3 +13,5 @@
 @media(max-width:900px){.seats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:600px){.seats{grid-template-columns:repeat(2,minmax(0,1fr))}.seats li{min-height:0}.office .seats button,.office .seats select{min-height:44px}}
 .office p{word-break:keep-all;overflow-wrap:anywhere}
+.office .danger{margin-left:auto;min-height:40px;padding:6px 10px;font-size:13px;color:#b42318;background:transparent;border-color:transparent}
+.office .danger:hover{border-color:#f3c5bf;background:#fff5f4}
