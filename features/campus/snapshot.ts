@@ -24,6 +24,8 @@ export function campusSnapshot(input: {
   scopes: CampusScope[];
   enrollmentId: string | null;
   weeks?: Row[]; lessons?: Row[]; missions?: Row[]; submissions?: Row[]; progress?: Row[];
+  /** Course-wide day ordinals (lib/curriculum-days); week-local day_number is the fallback. */
+  dayNumbers?: Map<string, number>;
   now: number;
 }): CampusSnapshot {
   const { viewer, scopes, enrollmentId, now } = input;
@@ -37,7 +39,7 @@ export function campusSnapshot(input: {
     selectedEnrollmentId: scope?.enrollmentId || null,
     lessons: lessons.sort((a, b) => (weeks.get(str(a.week_id))! - weeks.get(str(b.week_id))!) || Number(a.day_number) - Number(b.day_number) || a.id.localeCompare(b.id)).map(l => {
       const href = `/learn/${scope!.enrollmentId}/${l.id}`;
-      return { id: l.id, title: str(l.title), day: Number(l.day_number) || 0, week: weeks.get(str(l.week_id)), version: str(l.updated_at), href,
+      return { id: l.id, title: str(l.title), day: input.dayNumbers?.get(str(l.id)) ?? (Number(l.day_number) || 0), week: weeks.get(str(l.week_id)), version: str(l.updated_at), href,
         completed: (input.progress || []).some(p => p.enrollment_id === scope!.enrollmentId && p.lesson_id === l.id && !!p.completed_at),
         missions: (input.missions || []).filter(m => m.lesson_id === l.id && m.is_published === true && !m.archived_at && isCampusId(m.id)).map(m => {
           const latest = (input.submissions || []).filter(s => s.enrollment_id === scope!.enrollmentId && s.mission_id === m.id)

@@ -18,6 +18,7 @@ export type LearnerMilestone = {
 export type LearnerProgressStep = {
   lessonId: string;
   day: number;
+  week?: number;
   title: string;
   href: string;
   completed: boolean;
@@ -68,7 +69,8 @@ function uniqueLessons(source: Lesson[]): Lesson[] {
       }
     }
   }
-  return [...lessons.values()].sort((a, b) => a.day - b.day || a.id.localeCompare(b.id));
+  // Preparation week first, then course weeks; day is the course-wide ordinal the classroom shows.
+  return [...lessons.values()].sort((a, b) => (a.week ?? 1) - (b.week ?? 1) || a.day - b.day || a.id.localeCompare(b.id));
 }
 
 function asOfLabel(value: string): string {
@@ -94,7 +96,7 @@ export function learnerMetrics(snapshot: CampusSnapshot): LearnerMetrics {
   const steps: LearnerProgressStep[] = lessons.map(lesson => {
     const needed = lesson.missions.filter(mission => mission.required);
     const approved = needed.filter(mission => mission.status === 'approved').length;
-    const base = { lessonId: lesson.id, day: lesson.day };
+    const base = { lessonId: lesson.id, day: lesson.day, week: lesson.week };
     for (const mission of lesson.missions) {
       if (revising(mission)) nextActions.push({ ...base, missionId: mission.id, kind: 'revision', title: mission.title,
         description: '검토 의견을 확인하고 과제를 보완해 주세요.', href: mission.href });

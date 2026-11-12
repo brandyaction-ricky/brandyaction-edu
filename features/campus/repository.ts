@@ -1,4 +1,5 @@
 import { cohortReaderEnabled } from './cohort-reader';
+import { curriculumDayNumbers } from '@/lib/curriculum-days';
 import type { createClient } from '@/lib/supabase/server';
 import type { Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -44,6 +45,10 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
     .select('id,week_id,title,day_number,updated_at,is_published,archived_at', { count: 'exact' })
     .in('week_id', weeks.map(w => w.id)).eq('is_published', true).is('archived_at',null).order('day_number').limit(500)) : [];
   const lessons=allLessons.filter(l=>cohortLessonVisible(visibility,scope.cohortId,l));
+  // Course-wide day ordinals like the classroom, counted over every published lesson before cohort visibility.
+  // Read with the member's own client: the elevated client stays limited to visibility settings.
+  const courseLessons=allWeeks.length?await rows(db.from('curriculum_lessons').select('id,week_id,day_number,archived_at',{count:'exact'}).in('week_id',allWeeks.map(w=>w.id)).eq('is_published',true).is('archived_at',null).limit(2000)):[];
+  const dayNumbers=curriculumDayNumbers({curriculum_weeks:allWeeks,curriculum_lessons:courseLessons});
   const [missions, progress] = lessons.length ? await Promise.all([
     rows(db.from('curriculum_missions').select('id,lesson_id,title,updated_at,is_required,is_published,archived_at', { count: 'exact' })
       .in('lesson_id', lessons.map(l => l.id)).eq('is_published', true).is('archived_at', null).limit(500)),
@@ -53,5 +58,5 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   const submissions = missions.length ? await rows(db.from('mission_submissions')
     .select('id,enrollment_id,mission_id,attempt_number,status', { count: 'exact' })
     .eq('enrollment_id', scope.enrollmentId).in('mission_id', missions.map(m => m.id)).limit(1000)) : [];
-  return { ...campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now }), guidedLessons };
+  return { ...campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now, dayNumbers }), guidedLessons };
 }
