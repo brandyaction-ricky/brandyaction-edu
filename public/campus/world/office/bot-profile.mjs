@@ -1,4 +1,5 @@
-export const OFFICE_CAPACITY = 8;
+// Ten desks: seat 0 is the lead (총괄) desk, seats 1-9 the other employees. No built-in character.
+export const OFFICE_CAPACITY = 10;
 export const MANAGER_ID = 'manager';
 export const MANAGER_APPEARANCE_SEED = 0x42524e44;
 export const DEFAULT_ENVIRONMENT = Object.freeze({ lighting: 'bright', weather: 'clear', rainSound: true });
@@ -82,46 +83,35 @@ export class BotOfficeModel {
   constructor({ makeId = makeDefaultId, makeSeed = makeDefaultSeed } = {}) {
     this._makeId = makeId;
     this._makeSeed = makeSeed;
-    this._document = { schemaVersion: 1, environment: { ...DEFAULT_ENVIRONMENT }, profiles: [{
-      employeeId: MANAGER_ID, name: '총괄관리자', telegramUrl: null, duties: '',
-      appearanceSeed: MANAGER_APPEARANCE_SEED, seatIndex: 0,
-    }] };
+    this._document = { schemaVersion: 1, environment: { ...DEFAULT_ENVIRONMENT }, profiles: [] };
   }
 
   getDocument() { return copy(this._document); }
 
   restore(document) {
-    if (document?.schemaVersion !== 1 || !Array.isArray(document.profiles) ||
-        document.profiles.length < 1 || document.profiles.length > OFFICE_CAPACITY) {
-      fail('저장된 직원 정보를 읽을 수 없습니다.');
-    }
+    if (document?.schemaVersion !== 1 || !Array.isArray(document.profiles)) fail('저장된 직원 정보를 읽을 수 없습니다.');
+    // Documents saved before the lead desk opened carry a fixed placeholder at seat 0; it is dropped on read.
+    const stored = document.profiles.filter(profile => !(profile && profile.employeeId === MANAGER_ID &&
+      profile.seatIndex === 0 && profile.appearanceSeed === MANAGER_APPEARANCE_SEED && profile.telegramUrl === null));
+    if (stored.length > OFFICE_CAPACITY) fail('저장된 직원 정보를 읽을 수 없습니다.');
     const environment = Object.hasOwn(document, 'environment')
       ? environmentValue(document.environment) : { ...DEFAULT_ENVIRONMENT };
     const ids = new Set(), seats = new Set(), urls = new Set();
-    let managers = 0;
-    const profiles = document.profiles.map(profile => {
+    const profiles = stored.map(profile => {
       if (!profile || !validId(profile.employeeId) || !validSeed(profile.appearanceSeed) ||
           !Number.isInteger(profile.seatIndex) || profile.seatIndex < 0 || profile.seatIndex >= OFFICE_CAPACITY ||
           ids.has(profile.employeeId) || seats.has(profile.seatIndex)) fail('저장된 직원 정보를 읽을 수 없습니다.');
-      const isManager = profile.employeeId === MANAGER_ID;
-      if (isManager) {
-        managers += 1;
-        if (profile.seatIndex !== 0 || profile.appearanceSeed !== MANAGER_APPEARANCE_SEED) fail('총괄관리자 정보를 확인해 주세요.');
-      } else if (profile.seatIndex === 0) fail('총괄관리자 자리는 고정되어 있습니다.');
-      let telegramUrl = null;
-      if (profile.telegramUrl !== null) {
-        telegramUrl = normalizeTelegramBot(profile.telegramUrl);
-        if (telegramUrl !== profile.telegramUrl) fail('저장된 텔레그램 주소를 확인해 주세요.');
-        if (urls.has(telegramUrl)) fail('같은 텔레그램 봇이 중복 등록되어 있습니다.');
-        urls.add(telegramUrl);
-      } else if (!isManager) fail('저장된 텔레그램 주소를 확인해 주세요.');
+      if (profile.employeeId === MANAGER_ID || profile.telegramUrl === null) fail('저장된 텔레그램 주소를 확인해 주세요.');
+      const telegramUrl = normalizeTelegramBot(profile.telegramUrl);
+      if (telegramUrl !== profile.telegramUrl) fail('저장된 텔레그램 주소를 확인해 주세요.');
+      if (urls.has(telegramUrl)) fail('같은 텔레그램 봇이 중복 등록되어 있습니다.');
+      urls.add(telegramUrl);
       const name = nameValue(profile.name), duties = dutiesValue(profile.duties);
       if (name !== profile.name || duties !== profile.duties) fail('저장된 직원 정보를 읽을 수 없습니다.');
       ids.add(profile.employeeId); seats.add(profile.seatIndex);
       return { employeeId: profile.employeeId, name, telegramUrl, duties,
         appearanceSeed: profile.appearanceSeed, seatIndex: profile.seatIndex };
     });
-    if (managers !== 1) fail('총괄관리자 정보를 확인해 주세요.');
     profiles.sort((a, b) => a.seatIndex - b.seatIndex);
     this._document = { schemaVersion: 1, environment, profiles };
     return this.getDocument();
@@ -136,25 +126,23 @@ export class BotOfficeModel {
       existing = profiles.find(profile => profile.employeeId === input.employeeId);
       if (!existing) fail('수정할 직원을 찾지 못했습니다.');
     }
-    const isManager = existing?.employeeId === MANAGER_ID;
     const name = nameValue(Object.hasOwn(input, 'name') ? input.name : existing?.name);
     const duties = dutiesValue(Object.hasOwn(input, 'duties') ? input.duties : existing?.duties ?? '');
     const telegramInput = Object.hasOwn(input, 'telegramInput') ? input.telegramInput : existing?.telegramUrl;
-    const telegramUrl = isManager && (telegramInput === null || (typeof telegramInput === 'string' && !telegramInput.trim()))
-      ? null : normalizeTelegramBot(telegramInput);
+    const telegramUrl = normalizeTelegramBot(telegramInput);
     if (telegramUrl && profiles.some(profile => profile.employeeId !== existing?.employeeId && profile.telegramUrl === telegramUrl)) {
       fail('이미 사무실에 등록된 텔레그램 봇입니다.');
     }
     if (existing) {
       Object.assign(existing, { name, telegramUrl, duties });
     } else {
-      if (profiles.length >= OFFICE_CAPACITY) fail('일반 직원 7자리가 모두 채워졌습니다.');
+      if (profiles.length >= OFFICE_CAPACITY) fail('사무실 10자리가 모두 채워졌습니다.');
       const employeeId = this._makeId(), appearanceSeed = this._makeSeed();
       if (!validId(employeeId) || profiles.some(profile => profile.employeeId === employeeId) || !validSeed(appearanceSeed)) {
         fail('직원을 준비하지 못했습니다. 다시 시도해 주세요.');
       }
       const used = new Set(profiles.map(profile => profile.seatIndex));
-      const seatIndex = Array.from({ length: OFFICE_CAPACITY - 1 }, (_, i) => i + 1).find(index => !used.has(index));
+      const seatIndex = [...Array.from({ length: OFFICE_CAPACITY - 1 }, (_, i) => i + 1), 0].find(index => !used.has(index));
       profiles.push({ employeeId, name, telegramUrl, duties, appearanceSeed, seatIndex });
     }
     profiles.sort((a, b) => a.seatIndex - b.seatIndex);

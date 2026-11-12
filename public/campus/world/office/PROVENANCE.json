@@ -15,7 +15,8 @@
     {
       "path": "campus-plan.js",
       "sourceSha256": "cce3c2f280cd1301b350584d4aae17b3b40ed7fe9e864273daa26fc701dd9428",
-      "importSha256": "cce3c2f280cd1301b350584d4aae17b3b40ed7fe9e864273daa26fc701dd9428"
+      "importSha256": "fc27ebdebe0cf5510f281a06950d7a5f2ecdc2d17fe7bc16c4e8677d5a8b09c5",
+      "localPatch": "Ten office desks (two wings of five, 2.15 apart) instead of eight, so every course employee including the lead has a seat."
     },
     {
       "path": "campus-navigation.js",

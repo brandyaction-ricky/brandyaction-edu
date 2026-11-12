@@ -31,7 +31,7 @@ export async function GET(request:Request){try{const params=new URL(request.url)
  const r=await db.from('edu_campus_personal_offices').select('document,revision,updated_at').eq('owner_id',user.id).maybeSingle();if(r.error)throw r.error;
  const office=r.data||{document:new BotOfficeModel().getDocument(),revision:null,updated_at:null};
  if(!params.has('desks'))return privateReply({...office,pilot});
- const employees=(office.document as BotDocument).profiles.filter(profile=>profile.seatIndex>0);
+ const employees=(office.document as BotDocument).profiles.filter(profile=>profile.employeeId!=='manager');
  const desks=await Promise.all(employees.map(async profile=>{
    const {data,error}=await db.from('edu_campus_office_jobs').select('id,status')
      .eq('owner_id',user.id).eq('enrollment_id',params.get('enrollmentId')).eq('employee_id',profile.employeeId)
@@ -44,7 +44,7 @@ export async function POST(request:Request){try{
  if(request.headers.get('origin')!==new URL(request.url).origin)fail('요청 출처를 확인해 주세요.',403);
  const body=await readSpaceJson(request,18000);if(body.action==='register'){
   const {db,user}=await access(body.enrollmentId);let profile;
-  try{profile=new BotOfficeModel().saveEmployee({name:body.name,telegramInput:body.telegram,duties:body.duties}).profiles[1];}catch{fail('직원 이름과 텔레그램 주소를 확인해 주세요.');}
+  try{profile=new BotOfficeModel().saveEmployee({name:body.name,telegramInput:body.telegram,duties:body.duties}).profiles[0];}catch{fail('직원 이름과 텔레그램 주소를 확인해 주세요.');}
   const r=await db.from('edu_campus_office_employees').insert({owner_id:user.id,employee_id:profile.employeeId,profile});
   if(r.error?.code==='23505')fail('이미 등록한 텔레그램 봇입니다.',409);if(r.error)throw r.error;return privateReply({employee:profile},201);
  }

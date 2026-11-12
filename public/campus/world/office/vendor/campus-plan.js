@@ -45,8 +45,8 @@ export function createCampusPlan() {
   study.viewCenter=point(study.center.x,(study.bounds.minY+study.bounds.maxY)/2);
   study.viewRadiusY=(study.bounds.maxY-study.bounds.minY)/2;
   const officeSeats=[];
-  for(let index=0;index<8;index++) {
-    const row=index%4,wing=index<4?'left':'right',x=wing==='left'?21.8:30.8,y=12.3+row*2.7;
+  for(let index=0;index<10;index++) {
+    const row=index%5,wing=index<5?'left':'right',x=wing==='left'?21.8:30.8,y=12.1+row*2.15;
     officeSeats.push({x,y,side:wing==='left'?'n':'s',wing,index,lab:true,
       yaw:wing==='left'?-Math.PI/2:Math.PI/2,
       seat:point(wing==='left'?23.7:30.3,y+.6)});
