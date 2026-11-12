@@ -4,7 +4,7 @@ import { koreanDay, VISIT_INTERVAL_MS } from '@/lib/member-visits';
 
 // Shared between route remounts; nothing is kept in cookies/localStorage.
 const receipts = new Map<string, { day: string; lastSuccess: number; lastAttempt: number; pending: boolean }>();
-export function MemberVisitRecorder({ member, enabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: { member: string; enabled?: boolean }) {
+export function MemberVisitRecorder({ member, enabled = true }: { member: string; enabled?: boolean }) {
   useEffect(() => {
     if (!enabled || !member) return;
     const record = () => {

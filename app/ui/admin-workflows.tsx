@@ -2,6 +2,7 @@
 import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
+import { retentionTrigger } from "@/lib/crm-retention";
 import { kstInput, kstToIso, kstLabel, overlappingAutomations } from "@/lib/marketing-qa";
 import { emptyOrderListScope, orderDatePresets, orderDateRange, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
@@ -349,7 +350,7 @@ function StaffPermissions({ data, send, pending }: Props) {
     </form>
   );
 }
-const crmTriggerLabels: Record<string, string> = { member_joined: '회원 가입', marketing_consent: '수신 동의', tag_assigned: '태그 지정', purchase_completed: '결제 완료' };
+const crmTriggerLabels: Record<string, string> = { member_joined: '회원 가입', marketing_consent: '수신 동의', tag_assigned: '태그 지정', purchase_completed: '결제 완료', member_inactive: '마지막 접속 후 경과', learning_stalled: '마지막 일차 완료 후 경과' };
 function CrmManager({ section, data, send, pending }: Props) {
   const [defaultSchedule] = useState(() =>
     new Date(Date.now() + 15 * 60000).toISOString(),
@@ -368,9 +369,15 @@ function CrmManager({ section, data, send, pending }: Props) {
   const templates = rows(data, "crm_templates").filter(
     (item) => item.is_active,
   );
+  const cohorts = rows(data, "cohorts");
   const tags = rows(data, "crm_tags");
   const courses = rows(data, "courses");
   const [editing, setEditing] = useState<Row | null>(null);
+  const [trigger, setTrigger] = useState("member_joined");
+  const selectEditing = (item: Row | null) => {
+    setEditing(item);
+    setTrigger(String(item?.trigger_type || "member_joined"));
+  };
   const [dirty, setDirty] = useState(false);
   const editorRef = useRef<HTMLFormElement>(null);
   const focusEditor = () => requestAnimationFrame(() => {
@@ -424,7 +431,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           "캠페인을 예약했습니다.",
         );
       } else {
-        const overlap = overlappingAutomations({ id: editing?.id, is_active: form.get("is_active") === "on", trigger_type: form.get("trigger_type"), trigger_tag_id: form.get("trigger_tag_id"), trigger_course_id: form.get("trigger_course_id") }, items);
+        const overlap = overlappingAutomations({ id: editing?.id, is_active: form.get("is_active") === "on", trigger_type: form.get("trigger_type"), trigger_tag_id: form.get("trigger_tag_id"), trigger_course_id: form.get("trigger_course_id"), trigger_cohort_id: form.get("trigger_cohort_id") }, items);
         if (overlap.length && !window.confirm(`같은 대상에게 실행될 수 있는 자동 메시지 ${overlap.length}개가 있습니다. 중복 발송 가능성을 확인했으며 저장할까요?`)) return;
         await send(
           {
@@ -436,13 +443,15 @@ function CrmManager({ section, data, send, pending }: Props) {
             triggerType: form.get("trigger_type"),
             tagId: form.get("trigger_tag_id"),
             courseId: form.get("trigger_course_id"),
+            cohortId: form.get("trigger_cohort_id"),
+            thresholdDays: Number(form.get("threshold_days")),
             delayMinutes: Number(form.get("delay_minutes")),
             isActive: form.get("is_active") === "on",
           },
           "자동 메시지를 저장했습니다.",
         );
       }
-      setEditing(null);
+      selectEditing(null);
       setDirty(false);
       setFormVersion(value=>value+1);
       setMessage(
@@ -471,11 +480,19 @@ function CrmManager({ section, data, send, pending }: Props) {
         getRowId={item => item.id}
         columns={[
           { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
-          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? kstLabel(item.scheduled_at) : "예약 미정" : `${crmTriggerLabels[t(item, "trigger_type")] || "조건 확인 필요"} · ${Number(item.delay_minutes || 0) === 0 ? "즉시" : `${Number(item.delay_minutes)}분 후`}` },
+          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? kstLabel(item.scheduled_at) : "예약 미정" : `${crmTriggerLabels[t(item, "trigger_type")] || "조건 확인 필요"}${retentionTrigger(item.trigger_type) ? ` · ${named(cohorts.find(c=>c.id===item.trigger_cohort_id))} · ${item.threshold_days}일` : ""} · ${Number(item.delay_minutes || 0) === 0 ? "즉시" : `${Number(item.delay_minutes)}분 후`}` },
           ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
-          ...(section === "automations" ? [{ id: "recent", header: "최근 실행 기록", render: (item: Row) => { const runs = rows(data, "crm_automation_runs").filter(run => run.automation_id === item.id); const last = runs.filter(run => run.executed_at).map(run => String(run.executed_at)).sort().at(-1); return <div><span>처리 완료 {runs.filter(run => run.status === "completed").length} · 접수 {runs.filter(run => run.status === "accepted").length} · 실패 {runs.filter(run => run.status === "failed").length}</span><small className="meta">{last ? kstLabel(last) : "실행 기록 없음"}</small>{overlappingAutomations(item, items).length > 0 && <small className="meta">조건 중복 확인 필요</small>}</div>; } }] : []),
-          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
-          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; setEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
+          ...(section === "automations" ? [{ id: "recent", header: "최근 실행 기록", render: (item: Row) => {
+            const runs = rows(data, "crm_automation_runs").filter(run => run.automation_id === item.id);
+            const last = runs.filter(run => run.executed_at).map(run => String(run.executed_at)).sort().at(-1);
+            const errors = runs.filter(run=>run.error_message).slice(0,3);
+            return <div><span>{retentionTrigger(item.trigger_type) ? "수신 확인" : "처리 완료"} {runs.filter(run => run.status === "completed").length} · 접수 {runs.filter(run => run.status === "accepted").length} · 실패 {runs.filter(run => run.status === "failed").length}</span>
+              <small className="meta" style={{display:"block"}}>{last ? kstLabel(last) : "실행 기록 없음"}</small>
+              {errors.length>0 && <details style={{maxWidth:360,whiteSpace:"normal"}}><summary>처리 사유 {errors.length}건</summary>{errors.map(run=><p className="meta" key={run.id}>{kstLabel(run.executed_at || run.created_at)} · {String(run.error_message)}</p>)}</details>}
+              {overlappingAutomations(item, items).length > 0 && <small className="meta" style={{display:"block"}}>조건 중복 확인 필요</small>}</div>;
+          } }] : []),
+          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? retentionTrigger(item.trigger_type) && !delivery?.retentionEnabled ? "발송 꺼짐 · 규칙 저장" : "자동 실행 중" : "중지" : undefined} /> },
+          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; selectEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
         ]}
         empty={<AdminEmptyState title={listSearch.trim() ? "검색 결과가 없습니다." : section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
       />
@@ -520,7 +537,7 @@ function CrmManager({ section, data, send, pending }: Props) {
         {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
       </form>
       </details> : <p className="meta mb24"><Link className="conversion-link" href="/admin/campaigns#sms-settings">문자 발송 설정 관리 →</Link> · 모든 메시지에 같은 발신번호·수신거부 설정을 사용합니다.</p>}
-      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); focusEditor(); }}/>}
+      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { selectEditing(value); setMessage(""); focusEditor(); }}/>}
       <form ref={editorRef} key={formKey} className="panel pad mb24 admin-crm-editor" onChange={()=>setDirty(true)} onSubmit={submit}>
         <div className="between">
           <h2>
@@ -533,7 +550,7 @@ function CrmManager({ section, data, send, pending }: Props) {
               size="sm" variant="outline"
               onClick={() => {
                 if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 새로 등록할까요?"))) return;
-                setEditing(null);
+                selectEditing(null);
                 setDirty(false);
                 setFormVersion(value=>value+1);
                 setMessage("");
@@ -612,7 +629,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                   defaultValue={String(editing?.template_id || "")}
                 >
                   <option value="">선택하세요</option>
-                  {templates.map((item) => (
+                  {templates.filter(item=>!retentionTrigger(trigger) || (item.channel==="alimtalk" && item.purpose==="transactional" && item.alimtalk_template_id)).map((item) => (
                     <option key={item.id} value={item.id}>
                       {named(item)} · {String(item.channel).toUpperCase()}
                     </option>
@@ -622,16 +639,21 @@ function CrmManager({ section, data, send, pending }: Props) {
               <Field label="실행 조건">
                 <select
                   name="trigger_type"
-                  defaultValue={
-                    t(editing || undefined, "trigger_type") || "member_joined"
-                  }
+                  value={trigger} onChange={event=>setTrigger(event.target.value)}
                 >
                   <option value="member_joined">회원 가입</option>
                   <option value="marketing_consent">마케팅 수신 동의</option>
                   <option value="tag_assigned">태그 지정</option>
                   <option value="purchase_completed">결제 완료</option>
+                  <option value="member_inactive">마지막 접속 후 N일 경과</option>
+                  <option value="learning_stalled">마지막 일차 완료 후 N일 경과</option>
                 </select>
               </Field>
+              {retentionTrigger(trigger) && <>
+                <Field label="대상 기수"><select name="trigger_cohort_id" required defaultValue={String(editing?.trigger_cohort_id || "")}><option value="">기수를 선택하세요</option>{cohorts.filter(c=>!["cancelled","completed"].includes(String(c.status))).map(c=><option key={c.id} value={c.id}>{named(c)}</option>)}</select></Field>
+                <Field label="기준 일수 (24시간 기준)"><input name="threshold_days" type="number" min={1} max={365} required defaultValue={Number(editing?.threshold_days || 3)}/></Field>
+
+              </>}
               <Field label="지연 시간 (분)">
                 <input
                   name="delay_minutes"
@@ -642,7 +664,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                   defaultValue={Number(editing?.delay_minutes || 0)}
                 />
               </Field>
-              <Field label="조건 태그 (태그 지정 시)">
+              {!retentionTrigger(trigger) && <><Field label="조건 태그 (태그 지정 시)">
                 <select
                   name="trigger_tag_id"
                   defaultValue={String(editing?.trigger_tag_id || "")}
@@ -667,8 +689,12 @@ function CrmManager({ section, data, send, pending }: Props) {
                     </option>
                   ))}
                 </select>
-              </Field>
+              </Field></>}
             </div>
+            {retentionTrigger(trigger) && <div className="mt16">
+                <p className="meta">방문 기록이 없으면 미접속 알림에서 제외합니다. 일반 학습의 완료 시각을 사용하며, 완료 이력이 없으면 수강 시작일과 수강권 부여일 중 늦은 날부터 계산합니다. 데일리 미션·0주차는 제외합니다.</p>
+                <p className="meta">같은 정체 상태는 한 번만, 같은 계정은 하루 한 번만 안내합니다. 발송 전 카카오 승인 상태·본문을 다시 확인합니다. 템플릿 변수는 #{"{이름}"}만 지원합니다. {delivery?.retentionEnabled ? "수강 독려 발송 설정이 켜져 있습니다." : "수강 독려 발송 설정은 꺼져 있습니다. 저장해도 발송되지 않습니다."}</p>
+            </div>}
             <label className="checkline">
               <input
                 name="is_active"
