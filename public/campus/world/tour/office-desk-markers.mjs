@@ -11,7 +11,7 @@ export function makeDeskMarkers(layer, seats, profiles, jobs, openJob) {
     button.dataset.status = job.status;
     const label = job.status === 'review' ? '검토할 결과' : '진행 중';
     button.setAttribute('aria-label', profile.name + ' · ' + label + ' 업무 열기');
-    button.textContent = (profile.seatIndex ? profile.seatIndex + '번' : '총괄') + ' · ' + label;
+    button.textContent = (profile.seatIndex ? profile.seatIndex + '번' : '총괄 관리자') + ' · ' + label;
     button.title = profile.name + ' · ' + label;
     button.onclick = () => openJob(job.jobId);
     layer.append(button);

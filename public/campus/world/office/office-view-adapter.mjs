@@ -71,7 +71,7 @@ export function toBotOfficeSessions(document) {
     name: profile.name,
     fullName: profile.name,
     project: profile.name,
-    role: profile.seatIndex === 0 ? '총괄' : '텔레그램 직원',
+    role: profile.seatIndex === 0 ? '총괄 관리자' : '텔레그램 직원',
     agent: 'present', status: 'present', activity: null,
     title: profile.duties || null,
     appearanceSeed: profile.appearanceSeed,

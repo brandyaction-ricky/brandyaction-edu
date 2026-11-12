@@ -7,7 +7,7 @@ export function parseEmployeeLines(text:string):EmployeeLine[]{
   return [{line:index+1,name:name.trim(),telegram:telegram.trim(),duties:rest.join(tab?' ':',').trim()}];
  });
 }
-/** 총괄 직원은 총괄 자리(0)에 먼저, 나머지는 1~9번을 채운 뒤 마지막에 총괄 자리. */
+/** 이름에 총괄이 들어간 직원(총괄 관리자)은 총괄 관리자 자리(0)에 먼저, 나머지는 1~9번을 채운 뒤 마지막에 그 자리. */
 export function pickSeat(name:string,taken:number[]):number|undefined{
  return [...(name.includes('총괄')?[0]:[]),1,2,3,4,5,6,7,8,9,0].find(seat=>!taken.includes(seat));
 }

@@ -10,11 +10,11 @@ test('personal bot roster registers independently of seats and preserves the emp
 test('several employees register at once, take free desks, and lines that fail stay in the box',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/personal-office');
  await page.getByText('여러 명 한 번에 등록',{exact:true}).click();const box=page.getByLabel('직원 목록 (최대 10명)');
- await box.fill('제 2의 뇌, @moonshot_brain_bot, 자료 정리, 기억\n총괄\thttps://t.me/moonshot_lead_bot\t전체 조율\n주소 없는 직원\nGEO 담당자, https://t.me/moonshot_geo_bot');
+ await box.fill('제 2의 뇌, @moonshot_brain_bot, 자료 정리, 기억\n총괄 관리자\thttps://t.me/moonshot_lead_bot\t전체 조율\n주소 없는 직원\nGEO 담당자, https://t.me/moonshot_geo_bot');
  await page.getByRole('button',{name:'한 번에 등록하고 자리에 앉히기',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('3명을 등록하고 3명을 자리에 앉혔어요.');await expect(page.getByRole('status')).toContainText('3번째 줄');await expect(box).toHaveValue('주소 없는 직원');
  const seats=page.getByRole('region',{name:'사무실 좌석',exact:true}).getByRole('listitem');
- await expect(seats.nth(0)).toContainText('총괄 자리');await expect(seats.nth(0)).toContainText('총괄');await expect(seats.nth(1)).toContainText('제 2의 뇌');await expect(seats.nth(2)).toContainText('GEO 담당자');
+ await expect(seats.nth(0)).toContainText('총괄 관리자 자리');await expect(seats.nth(0).getByRole('strong')).toHaveText('총괄 관리자');await expect(seats.nth(1)).toContainText('제 2의 뇌');await expect(seats.nth(2)).toContainText('GEO 담당자');
  await expect(page.getByText('자리 3/10',{exact:false})).toBeVisible();await expect(page.getByRole('article').filter({hasText:'제 2의 뇌'})).toContainText('자료 정리, 기억');
  await box.fill('GEO 담당자, @moonshot_geo_bot\n광고 담당자, @moonshot_ads_bot');await page.getByRole('button',{name:'한 번에 등록하고 자리에 앉히기',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('1명을 등록하고 1명을 자리에 앉혔어요.');await expect(box).toHaveValue('');await expect(page.getByText('자리 4/10',{exact:false})).toBeVisible();
