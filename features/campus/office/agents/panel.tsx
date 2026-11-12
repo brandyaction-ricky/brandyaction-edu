@@ -16,7 +16,10 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  const [statusFirst,setStatusFirst]=useState<boolean|null>(demo?false:null);
  const [epoch,setEpoch]=useState(0),[gone,setGone]=useState(0),[local,setLocal]=useState<BotProfile[]>([]);
  const dir=useDirectory(enrollmentId,!demo,epoch);
- const employees=demo?local:(dir.data?.employees??[]),desks=saved.document.profiles.filter(p=>p.employeeId!=='manager');
+ const desks=saved.document.profiles.filter(p=>p.employeeId!=='manager');
+ // 자리에 앉은 순서대로(총괄 관리자 자리부터), 앉지 않은 직원은 이름순으로 뒤에.
+ const seatOrder=(p:BotProfile)=>desks.find(d=>d.employeeId===p.employeeId)?.seatIndex??99;
+ const employees=[...(demo?local:(dir.data?.employees??[]))].sort((a,b)=>seatOrder(a)-seatOrder(b)||a.name.localeCompare(b.name,'ko'));
  function changed(){setEpoch(v=>v+1);}
  useCampusDraftGuard(!!(name||telegram||duties||bulk),busy,'personal-office');
  async function refresh(signal?:AbortSignal){if(demo)return;const r=await fetch('/api/campus/office/agents?enrollmentId='+enrollmentId,{cache:'no-store',signal});const data=await r.json();if(!r.ok)throw Error(data.error||'내 직원을 불러오지 못했어요.');setPilot(data.pilot===true);setSaved(data);setStatusFirst(v=>v??data.document.profiles.some((p:BotProfile)=>p.employeeId!=='manager'));setLoaded(true);onChangeRef.current?.(data.document);}

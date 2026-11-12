@@ -11,3 +11,7 @@
 .jobsWide{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
 .job h4,.detail h3{word-break:keep-all;overflow-wrap:anywhere}
 .waiting a{font-weight:700}
+/* 실제 캠퍼스에서는 작업함이 먼저 보이도록 머리말을 한 줄로 줄인다 */
+.header[data-live] .icon{display:none}
+.header[data-live] h2{font-size:19px;margin:4px 0}
+.header[data-live] h2 br{display:none}

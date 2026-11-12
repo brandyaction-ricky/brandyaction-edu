@@ -45,7 +45,7 @@ export function StudentConnections({enrollmentId,employees,onJobs}:{enrollmentId
       <button type="submit" disabled={busy||!/^MS1-\d{10}-[\da-f]{64}$/.test(code.trim())}>연결 요청</button>
     </form>}
     {rows&&!rows.length&&!available.length&&<p>텔레그램 봇 주소가 있는 직원을 먼저 추가하세요.</p>}
-    {rows&&rows.length>0&&<div className={styles.links}>{rows.map(r=>{
+    {rows&&rows.length>0&&<div className={styles.links}>{[...rows].sort((a,b)=>{const at=(id:string)=>{const i=employees.findIndex(p=>p.employeeId===id);return i<0?999:i;};return at(a.employeeId)-at(b.employeeId);}).map(r=>{
       const profile=employees.find(p=>p.employeeId===r.employeeId);
       const name=profile?.name||r.employeeId;
       return <div key={r.id} className={styles.link} data-status={r.status}>
