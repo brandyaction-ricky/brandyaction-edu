@@ -18,7 +18,7 @@ export const tourTasks:TourTask[]=[
  task('community:talent','study','동료와 함께하기','재능 교환','서로 필요한 도움을 제안하고 완료하기'),
  task('community:demo_day','study','동료와 함께하기','결과물 발표회','발표 일정, 동료 질문과 발표 기록'),
  task('lounge','study','동료와 함께하기','동료와 대화','공부방에 함께 있는 동료를 보고 인사하기'),
- task('sound','study','나에게 맞추기','공간 소리·참여 방식','조명·빗소리·키보드 소리, 조용히 또는 함께'),
+ task('sound','study','나에게 맞추기','조명·배경음','조명과 빗소리·키보드 소리 고르기'),
  task('legacy-space','study','나에게 맞추기','기존 우주선·기념사진','기존 달·로켓 공간과 사진·발사 연출'),
  task('desk','study','나에게 맞추기','내 자리 설정','개인 책상 메모와 사진 참여 설정'),
  task('support:settings','study','나에게 맞추기','참여 설정·수업 변경','알림 선택과 바뀐 수업 확인'),
