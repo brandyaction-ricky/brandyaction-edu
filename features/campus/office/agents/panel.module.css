@@ -2,3 +2,14 @@
 
 .seats{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.seats li{border:1px solid #dbe3ec;border-radius:10px;padding:10px;display:grid;align-content:start;gap:5px}.seats strong{overflow-wrap:anywhere}.seats small,.office h3 small{color:#55667c}.office .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.office button{width:fit-content}.office button:disabled{opacity:.55}.office form{max-width:40rem;margin-top:1.5rem}.office form button{justify-self:start}.roster article{min-width:0}.office h3{margin-top:1.4rem}
 .office details label{margin:10px 0}.office details textarea{width:100%;box-sizing:border-box}
+/* 좌석: 실제 사무실처럼 5자리씩 두 줄. 이름은 단어 중간에서 끊지 않고, 버튼은 카드 아래에 맞춘다. */
+.seats{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0 0}
+.seats li{grid-template-rows:auto 1fr auto;align-content:stretch;gap:6px;padding:12px;border-radius:12px;background:#fff;min-height:118px}
+.seats strong{word-break:keep-all;line-height:1.35}
+.seats li[data-lead]{border-color:#a9bdf6;background:#f3f6ff}
+.seats li[data-empty]{border-style:dashed;background:transparent}
+.seats li[data-empty] strong{color:#8493a8;font-weight:500}
+.office .seats button,.office .seats select{width:100%;min-height:40px;padding:6px 10px;font-size:13px;color:#42536b;background:#f6f8fc;border-color:#e0e6f0;border-radius:8px}
+@media(max-width:900px){.seats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.seats{grid-template-columns:repeat(2,minmax(0,1fr))}.seats li{min-height:0}.office .seats button,.office .seats select{min-height:44px}}
+.office p{word-break:keep-all;overflow-wrap:anywhere}
