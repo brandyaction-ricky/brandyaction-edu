@@ -45,18 +45,19 @@ export function StudentConnections({enrollmentId,employees,onJobs}:{enrollmentId
       <button type="submit" disabled={busy||!/^MS1-\d{10}-[\da-f]{64}$/.test(code.trim())}>연결 요청</button>
     </form>}
     {rows&&!rows.length&&!available.length&&<p>텔레그램 봇 주소가 있는 직원을 먼저 추가하세요.</p>}
-    {rows?.map(r=>{
+    {rows&&rows.length>0&&<div className={styles.links}>{rows.map(r=>{
       const profile=employees.find(p=>p.employeeId===r.employeeId);
       const name=profile?.name||r.employeeId;
-      return <div key={r.id}><strong>{name}</strong>
-      <p>{r.status==='active'?'업무 보고 연결됨':r.status==='expired'?'확인 기간 만료 · 해제 후 다시 연결하세요.':'직원 확인 대기'}</p>
+      return <div key={r.id} className={styles.link} data-status={r.status}>
+      <div><strong>{name}</strong><span>{r.status==='active'?'업무 보고 연결됨':r.status==='expired'?'확인 기간 만료':'직원 확인 대기'}</span></div>
+      {r.status==='expired'&&<p>해제한 뒤 다시 연결하세요.</p>}
       {r.confirmation&&<p>같은 Telegram 대화에 보내세요. <code>캠퍼스 연결 확인 {r.confirmation}</code></p>}
-      {r.status==='active'&&<div className={styles.controls}>
-        {profile?.telegramUrl&&<a href={profile.telegramUrl} target="_blank" rel="noopener noreferrer">Telegram에서 업무 맡기기 ↗</a>}
-        {onJobs&&<button type="button" onClick={()=>onJobs({id:r.employeeId,name})}>이 직원의 작업함 열기</button>}
-      </div>}
-      <button disabled={busy} onClick={()=>void act('revoke',r.id)}>연결 해제</button></div>;
-    })}
+      <div className={styles.controls}>
+        {r.status==='active'&&profile?.telegramUrl&&<a href={profile.telegramUrl} target="_blank" rel="noopener noreferrer">Telegram에서 업무 맡기기 ↗</a>}
+        {r.status==='active'&&onJobs&&<button type="button" onClick={()=>onJobs({id:r.employeeId,name})}>이 직원의 작업함 열기</button>}
+        <button className={styles.quiet} disabled={busy} onClick={()=>void act('revoke',r.id)}>연결 해제</button>
+      </div></div>;
+    })}</div>}
     <button disabled={busy} onClick={()=>void act('list')}>연결 상태 새로고침</button>
     {message&&<p role="status">{message}</p>}
   </section>;

@@ -77,3 +77,9 @@ test('a stdin draft keeps the original start context and literal Unicode across 
   await assert.rejects(resultFromStart({action:'retry'},[]),/start file/);
   await assert.rejects(resultFromStart(start,[Buffer.alloc(40003)]),/too large/);
 });
+test('report text shows the words of a Telegram-markdown answer without changing links or plain text',async()=>{
+  const {officeReportText}=await import('../features/campus/office/report-text.ts');
+  assert.equal(officeReportText('# 공지 초안\n**이번 주 일정**\n- 목요일 저녁 8시\n* 금요일 마감\n- [ ] 링크 확인\n- [x] 문구 확인\n> 다시 보내드립니다.\n1. 첫째 `코드`\n2 * 3 = 6, a-b, https://example.com/a_b_c'),
+    '공지 초안\n이번 주 일정\n• 목요일 저녁 8시\n• 금요일 마감\n☐ 링크 확인\n☑ 문구 확인\n다시 보내드립니다.\n1. 첫째 코드\n2 * 3 = 6, a-b, https://example.com/a_b_c');
+  assert.equal(officeReportText('<citation refs="a1, b2">근거</citation> 문장'),'근거 문장');
+});

@@ -88,3 +88,5 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 .office-desk-job[data-compact="true"] small{display:none}
 .office-desk-job[data-status="review"]{border-color:#f8ce74;background:#483717;color:#fff2cf}
 .office-desk-job:after{pointer-events:none;left:var(--line-start);top:50%;width:var(--line-length);height:0;border:0;border-top:1px solid currentColor;opacity:.75;transform:rotate(var(--line-angle));transform-origin:left center}
+/* 터치 화면의 세 줄 이동 안내와 겹치지 않게 조명·배경음 버튼을 그 위로 올린다. */
+@media(max-width:650px) and (pointer:coarse){body:not([data-visitor=true]) #environment-open{bottom:calc(258px + env(safe-area-inset-bottom))}}

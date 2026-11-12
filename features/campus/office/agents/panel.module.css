@@ -15,3 +15,17 @@
 .office p{word-break:keep-all;overflow-wrap:anywhere}
 .office .danger{margin-left:auto;min-height:40px;padding:6px 10px;font-size:13px;color:#b42318;background:transparent;border-color:transparent}
 .office .danger:hover{border-color:#f3c5bf;background:#fff5f4}
+/* 직원 보고 연결: 직원마다 카드 한 장 */
+.links{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px;margin:14px 0}
+.link{display:grid;align-content:start;gap:8px;padding:14px;background:#fff;border:1px solid #e0e6f0;border-radius:12px;min-width:0}
+.link>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.link>div:first-child strong{word-break:keep-all;overflow-wrap:anywhere}
+.link>div:first-child span{font-size:12px;font-weight:600;color:#1a7f4b;white-space:nowrap}
+.link[data-status="pending"]>div:first-child span{color:#9a6700}
+.link[data-status="expired"]>div:first-child span{color:#b42318}
+.link p{margin:0;font-size:13px}
+.office .link a{color:#214ed1;font-weight:700;font-size:13px}
+.office .link button{min-height:40px;padding:6px 10px;font-size:13px}
+.office .quiet{margin-left:auto;color:#53657c;background:transparent;border-color:transparent}
+.office select{min-height:44px;border:1px solid #c8d2e2;border-radius:8px;padding:8px 12px;font:inherit;background:#fff;color:inherit;max-width:100%}
+@media(max-width:600px){.office .link button{min-height:44px}}

@@ -7,3 +7,7 @@
 .filters{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}.filters label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.filters select{max-width:100%;min-height:40px}.filters button{padding:7px 12px;border:1px solid var(--line);background:white;border-radius:8px}
 
 .liveLabel{font-size:12px;color:#27574a;font-weight:600}
+/* 실제 캠퍼스 작업함: 카드를 두 줄로, 긴 제목은 단어 단위로 */
+.jobsWide{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.job h4,.detail h3{word-break:keep-all;overflow-wrap:anywhere}
+.waiting a{font-weight:700}
