@@ -130,7 +130,7 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
         <label>안내 링크 주소<input type="url" value={settings.url} disabled={pending} maxLength={1800} placeholder="https://…" onChange={event => setSettings(current => ({ ...current, url: event.target.value }))} /></label>
         <p className="meta">결제가 완료되면 선택한 기수의 구매자에게 안내가 바로 표시됩니다. 링크를 등록하면 복사와 입장 버튼이 생깁니다. 메시지만 표시하려면 제목과 링크 주소를 비워 두세요.</p>
         <CompletionGuidePreview settings={settings} />
-        <button className="btn primary" type="submit" disabled={pending}>설정 저장</button>
+        <p className="meta">저장 대상: {cohorts.find(item => item.id === cohort)?.name || "선택한 기수"} · 결제 완료 화면 안내</p><button className="btn primary" type="submit" disabled={pending}>설정 저장</button>
       </form>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     </section>

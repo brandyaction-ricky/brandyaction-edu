@@ -6,6 +6,7 @@ for (const menu of ['seo', 'automations']) test(`${menu}: grouped shortcuts pres
   const writes: string[] = [];
   page.on('request', r => { if (!['GET', 'HEAD'].includes(r.method())) writes.push(r.url()); });
   await page.goto(`/admin-ux-audit-test?menu=${menu}`);
+  if ((viewport?.width || 1440) <= 720) await page.getByRole('button', {name:'관련 메뉴 펼치기'}).click();
   const nav = page.getByRole('navigation', { name: '마케팅 작업 빠른 이동' });
   await expect(nav.getByRole('link')).toHaveCount(9);
   const current = nav.locator('[aria-current=page]');
