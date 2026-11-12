@@ -55,7 +55,7 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
   const placed=!seated||await save(document);dir.first();changed();setBulk(keep.join('\n'));
   setMessage((placed?fresh.length+'명을 등록하고 '+seated+'명을 자리에 앉혔어요.':fresh.length+'명을 등록했지만 자리 배치는 저장하지 못했어요. 전체 직원 목록에서 "빈자리에 배치"를 눌러 주세요.')+(failed.length?' 확인이 필요한 줄: '+failed.join(' / '):''));
   // 결과 안내는 화면 맨 위에 있어서, 아래쪽 입력칸에서 눌렀을 때도 보이도록 올려 준다.
-  requestAnimationFrame(()=>notice.current?.scrollIntoView({block:'nearest',behavior:'smooth'}));
+  requestAnimationFrame(()=>notice.current?.scrollIntoView({block:'center',behavior:'smooth'}));
  }
  function place(p:BotProfile){
   // The lead desk (0) is offered last so it stays free for the 총괄 employee.
