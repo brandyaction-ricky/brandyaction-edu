@@ -11,8 +11,8 @@ test('opt-in local visitors see each other, chat and leave without entering memb
   for(const [page,name]of [[a,'동료 A'],[b,'동료 B']] as const){
    page.on('pageerror',e=>errors.push(e.message));
    const source=fs.readFileSync('public/campus/world/tour/tour.mjs','utf8');
-   expect(source).toContain('original();meetup?.labels?.();root.dataset.playerX');
-   await page.route('**/campus/world/tour/tour.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('original();meetup?.labels?.();root.dataset.playerX','window.__tourDraws=(window.__tourDraws||0)+1;original();meetup?.labels?.();root.dataset.playerX')}));
+   expect(source).toContain('drawScene();meetup?.labels?.();root.dataset.playerX');
+   await page.route('**/campus/world/tour/tour.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('drawScene();meetup?.labels?.();root.dataset.playerX','window.__tourDraws=(window.__tourDraws||0)+1;drawScene();meetup?.labels?.();root.dataset.playerX')}));
    // Capture the first actual GL draw, before Office.ready (three frames).
    // Applying the pixel/shadow budget after ready stalls a second software-rendered client.
    await page.addInitScript(()=>{
