@@ -101,6 +101,9 @@ test('marketing navigation keeps all destinations, help and active state in a re
   await page.route('**/api/conversion', route => route.fulfill({ json: { cases: [], evidence: [], questions: [], courses: [], cohorts: [], runs: [], reviews: [], capabilities: { can_manage_evidence: false, can_mock: false } } }));
   await page.goto(visit('conversion'));
   const nav = page.getByRole('navigation', { name: '마케팅 작업 빠른 이동' });
+  if (info.project.use.viewport!.width <= 720) {
+    await page.getByRole('button', { name: '관련 메뉴 펼치기' }).click();
+  }
   await expect(nav.getByRole('link')).toHaveCount(9);
   await expect(nav.getByRole('link', { name: '모집·문의 검토' })).toHaveAttribute('aria-current', 'page');
   const groups = page.locator('.marketing-task-group');
