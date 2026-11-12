@@ -63,6 +63,8 @@
 @media(max-width:650px){.miniFocus>aside{width:calc(100vw - 24px)}}
 
 /* Let the study cards reserve their own height while the scene loads. */
+/* The plain loading line never blocks taps on what sits under it (the running-focus card on phones). */
+p.loading{pointer-events:none}
 .miniFocus .loading {
   position:static;
   transform:none;
