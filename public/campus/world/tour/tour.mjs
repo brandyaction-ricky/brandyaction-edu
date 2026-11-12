@@ -4,6 +4,7 @@ import {attachEnvironmentControls} from '../office/environment-controls.mjs';
 import {libraryPortal} from './library-wayfinding.mjs';
 import {paintLibrarySign} from './library-signs.mjs';
 import {BotOfficeModel} from '../office/bot-profile.mjs';
+import {useDeskPreviewMaterials} from './desk-preview-materials.mjs';
 import {makeDeskMarkers,positionDeskMarkers} from './office-desk-markers.mjs';
 import {toBotOfficeSessions} from '../office/office-view-adapter.mjs';
 import {applyRenderProfile} from './render-profile.mjs';
@@ -84,13 +85,19 @@ let firstDeskFrame=null;
 // Render the original desk meshes with the final camera. Character and prop downloads
 // can finish later without replacing the desks, their seat coordinates or the canvas.
 function showFirstDeskFrame(){
+ let labelsVisible=false;
  const projectJobs=()=>{
   layer.replaceChildren();
-  if(room!=='office'||blocked||!pendingOffice)return;
-  const profiles=pendingOffice.document?.profiles;
-  if(!Array.isArray(profiles)||!Array.isArray(pendingOffice.desks))return;
-  const markers=makeDeskMarkers(layer,officeSeats,profiles,pendingOffice.desks,jobId=>send('office-desk-job',{jobId}));
+  const profiles=pendingOffice?.document?.profiles;
+  const jobs=pendingOffice?.desks;
+  const markers=room==='office'&&!blocked&&Array.isArray(profiles)&&Array.isArray(jobs)
+   ? makeDeskMarkers(layer,officeSeats,profiles,jobs,jobId=>send('office-desk-job',{jobId})) : [];
   positionDeskMarkers(office,markers);
+  const visible=markers.length>0&&markers.length===jobs.length&&markers.every(({b})=>!b.hidden);
+  if(visible!==labelsVisible){
+   labelsVisible=visible;
+   send('office-desks-visible',{visible});
+  }
  };
  const paint=()=>{
   if(room!=='office'||blocked)return;
@@ -150,7 +157,7 @@ function setMarkers(){layer.replaceChildren();markers=actions().filter(([id])=>!
 function showRoom(id){if(!names[id]||!allowed(id))return;prepareRoom(id);positions.set(room,{x:office.campusAvatar?.x,y:office.campusAvatar?.y});room=id;document.body.dataset.room=id;if(['study','office'].includes(id)){interiors??=attachInteriorInteractions({office,root,getRoom:()=>room,onMessage:text=>{keys.clear();target=null;budget.wake(performance.now()+4000);status.textContent=text;}});}else{interiors?.destroy();interiors=null;}mixer?.setRoom(id);document.getElementById('environment-open').hidden=!['study','office'].includes(id);office.setEnvironment({lighting:['study','office'].includes(id)?document.getElementById('lighting-select').value:'bright'});keys.clear();target=null;const p=positions.get(id);office.campusAvatar={...(Number.isFinite(p?.x)?p:info[id].spawn),roomId:id==='office'?'office':'study',moving:false,yaw:id==='live'?Math.PI+.12:Math.PI,studyPose:null};office.campusAvatar.jumpHeight=room==='live'?atriumHeightAt(office.campusAvatar.x,office.campusAvatar.y):0;setMarkers();view?.roomChanged();meetup?.roomChanged();if(ready||!officeFirst)budget.wake(performance.now());office.draw();status.textContent=matchMedia('(pointer:coarse)').matches?'바닥 터치 · 이동\n드래그 · 둘러보기\n두 손가락 · 확대':(publicVisitor&&id==='live'?'문샷 오픈 캠퍼스':names[id])+' · WASD 이동 · 클릭 이동 · 드래그 시점 · 스크롤 확대' ;send('room',{id});}
 function free(p){if(room==='study'||room==='office'){const a=office.campusAvatar;return Plan.resolveCampusMovement(a,{x:p.x-a.x,y:p.y-a.y},room).position;}if(room==='live'&&!canWalkAtrium(office.campusAvatar,p))return null;const f=info[room],r=.25;return p.x>f.cx-f.w/2+r&&p.x<f.cx+f.w/2-r&&p.y>f.cy-f.d/2+r&&p.y<f.cy+f.d/2-r&&!obstacles[room].some(o=>p.x>o.x-r&&p.x<o.x+o.w+r&&p.y>o.y-r&&p.y<o.y+o.d+r)?p:null;}
 function move(dt){if(blocked||editing||document.hidden)return;const a=office.campusAvatar;let x=Number(keys.has('right'))-Number(keys.has('left')),y=Number(keys.has('down'))-Number(keys.has('up'));if(x||y){target=null;const length=Math.hypot(x,y);x/=length;y/=length;const v=view.moveVector(x,y);x=v.x;y=v.y;}else if(target){const dx=target.x-a.x,dy=target.y-a.y,d=Math.hypot(dx,dy);if(d<.15)target=null;else{x=dx/d;y=dy/d;}}a.moving=!!(x||y);if(!a.moving)return;a.studyPose=null;const before={x:a.x,y:a.y},step=dt*4;const px=free({x:a.x+x*step,y:a.y});if(px)Object.assign(a,px);const py=free({x:a.x,y:a.y+y*step});if(py)Object.assign(a,py);if(Math.hypot(a.x-before.x,a.y-before.y)<.001)target=null;a.jumpHeight=room==='live'?atriumHeightAt(a.x,a.y):0;a.yaw=Math.atan2(x,y);}
-async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry}=await import('../office/vendor/office3d.js');office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
+async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry,CampusBasicMaterial}=await import('../office/vendor/office3d.js');office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
  let configuringOffice=officeFirst;
  if(officeFirst){
   if(!office.gl)throw Error('renderer');
@@ -165,10 +172,17 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
   const batch=batchAtriumBoxes(office.campusRoomGroups.get('office'));
   const dispose=office.disposeCampusArchitecture;
   office.disposeCampusArchitecture=()=>{batch.dispose();dispose?.();};
-  firstDeskFrame=showFirstDeskFrame();
-  // Let the browser present the desks and process input before starting GLTF decoding.
-  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-  if(!await office.loadModels())throw Error('renderer');
+  const restoreMaterials=useDeskPreviewMaterials(office.campusRoomGroups.get('office'),CampusBasicMaterial);
+  try {
+   // Process queued reports before submitting the first draw, and present the
+   // interactive desks before decoding character models.
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+   firstDeskFrame=showFirstDeskFrame();
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   if(!await office.loadModels())throw Error('renderer');
+  } finally {
+   restoreMaterials();
+  }
   firstDeskFrame.finish();firstDeskFrame=null;
   office.installCampusInterior();
  }else if(!await office.ready)throw Error('renderer');

@@ -9,8 +9,8 @@
     {
       "path": "office3d.js",
       "sourceSha256": "b45dd4c5cba821669a53bdb666b0ea6b21ca8b16a163a7a1c5c6e6bb9b7ab748",
-      "importSha256": "db4714cc1918304e9c963853b458357e5dda6cbcf0a56eccf5649d05b8a4e3f5",
-      "localPatch": "Export existing bundled InstancedMesh and SphereGeometry classes for the campus adapter. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
+      "importSha256": "3033de614326bfa4eff642bb283f14ebff03f261be05f02db124180399adcadd",
+      "localPatch": "Export existing bundled MeshBasicMaterial, InstancedMesh and SphereGeometry classes for the campus adapter. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
     },
     {
       "path": "campus-plan.js",
