@@ -151,6 +151,12 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
     data.curriculum_lessons = checked({ data: publishedLessons.filter(lesson => activeCohorts.some(cohortId => cohortLessonVisible(data, cohortId, lesson)))
       .map(lesson => ({ ...lesson, curriculum_day_number: days.get(lesson.id) })), error: null }, '학습');
   }
+  if (view === 'learn' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED !== 'true' && active.length && data.curriculum_lessons?.length) {
+    const enrollment = active[0];
+    data.preserved_lesson_access = checked(await admin.from('edu_preserved_lesson_access').select('lesson_id')
+      .eq('enrollment_id', enrollment.id).eq('cohort_id', enrollment.cohort_id).eq('legacy', true)
+      .in('lesson_id', data.curriculum_lessons.map(lesson => lesson.id)).limit(limit), '열린 수업');
+  }
   if (sessionContents) data.cohort_session_contents = sessionContents;
   if (activeIds.length && missionViews.has(view)) {
     const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
