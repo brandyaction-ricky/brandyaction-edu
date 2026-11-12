@@ -81,6 +81,15 @@ let deskProfiles=[],deskJobs=[],deskMarkers=[];
 const officeSeats=Plan.createCampusPlan().officeSeats;
 let officeFirst=false, pendingOffice=null, initialRoomSync=false;
 let firstDeskFrame=null;
+let finishDeskCheck;
+function checkFirstDeskData(){
+ return new Promise(resolve=>{
+  const timer=setTimeout(complete,1800);
+  function complete(){clearTimeout(timer);finishDeskCheck=undefined;resolve();}
+  finishDeskCheck=complete;
+  send('office-desk-check');
+ });
+}
 
 // Render the original desk meshes with the final camera. Character and prop downloads
 // can finish later without replacing the desks, their seat coordinates or the canvas.
@@ -172,16 +181,24 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
   const batch=batchAtriumBoxes(office.campusRoomGroups.get('office'));
   const dispose=office.disposeCampusArchitecture;
   office.disposeCampusArchitecture=()=>{batch.dispose();dispose?.();};
-  const restoreMaterials=useDeskPreviewMaterials(office.campusRoomGroups.get('office'),CampusBasicMaterial);
+  const touchDesk=matchMedia('(pointer: coarse), (max-width: 600px)').matches;
+  const restoreMaterials=touchDesk?useDeskPreviewMaterials(office.campusRoomGroups.get('office'),CampusBasicMaterial):null;
   try {
    // Process queued reports before submitting the first draw, and present the
    // interactive desks before decoding character models.
-   await new Promise(resolve=>requestAnimationFrame(resolve));
+   if(touchDesk)await new Promise(resolve=>requestAnimationFrame(resolve));
    firstDeskFrame=showFirstDeskFrame();
+   // Reconcile the initial snapshot through the existing session while loading assets.
+   const checked=touchDesk?checkFirstDeskData():undefined;
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    if(!await office.loadModels())throw Error('renderer');
+   if(checked){
+    await checked;
+    // Present the reconciled marker before entering the full lighting/actor pass.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   }
   } finally {
-   restoreMaterials();
+   restoreMaterials?.();
   }
   firstDeskFrame.finish();firstDeskFrame=null;
   office.installCampusInterior();
@@ -209,6 +226,7 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
 window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.origin||e.source!==parent||m?.source!=='moonshot-tour-host'||m.token!==token||token.length<32)return;const p=m.payload||{};if(m.type==='init'){if(!started){publicVisitor=p.visitor===true;operatorReview=p.operatorReview===true;devPresence=p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=p.studentOffice===true&&!publicVisitor&&!operatorReview;
  if(officeFirst){room='office';currentRole='student';pendingOffice=p.personalOffice;}
  void start();}else if(ready)send('ready');return;}if(m.type==='meetup-start'){meetupWanted=true;void meetup?.join();return;}if(!ready){
+ if(m.type==='office-desk-check-done')finishDeskCheck?.();
  if(officeFirst && m.type==='personal-office')pendingOffice=p;
  if(officeFirst && m.type==='office-desks-clear')pendingOffice=null;
  if(officeFirst && m.type==='room' && names[p.id] && allowed(p.id))room=p.id;
