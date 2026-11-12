@@ -66,3 +66,15 @@ test('legacy orientation stays reachable beside both imported learning tracks',a
  await expect(page.locator('.learning-nav .lesson-nav')).toHaveCount(1);
  await expect(page.getByRole('link',{name:'다음 학습',exact:true})).toHaveCount(0);
 });
+
+test('inserting between completed and open lessons preserves the classroom link and completion count',async({page})=>{
+ const fixture='/lesson-progression-test?middleInserted=1&target=';
+ await page.goto(fixture+'12');
+ await expect(page.getByText('기존 다음 수업 본문',{exact:true})).toBeVisible();
+ await expect(page.getByText(/1개 학습 완료/)).toBeVisible();
+ await page.goto(fixture+'10');
+ await expect(page.getByRole('button',{name:'학습 완료하기',exact:true})).toBeEnabled();
+ await page.goto(fixture+'13');
+ await expect(page.getByText('이후 잠긴 수업 본문',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('공개된 학습이 없습니다.',{exact:true})).toBeVisible();
+});
