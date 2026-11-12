@@ -40,3 +40,20 @@ test('office result remains openable after first desks paint and before the room
  await expect(page.getByRole('button',{name:'공간 전체 보기',exact:true})).toBeDisabled();
  await result.click();await expect(page.getByRole('article',{name:'선택한 AI 직원 작업'})).toContainText(job.draft_text);
 });
+test('a browser without 3D shows the office as a flat seat list with Korean guidance and opens results from it',async({page})=>{
+ await setup(page);
+ await page.route('**/api/campus/library**',r=>r.fulfill({json:{resources:[]}}));
+ const job={id:'80000000-0000-4000-8000-000000000002',employee_id:'writer',objective:'첫 수업 공지 작성',status:'review',revision:4,draft_text:'3D 없이도 열리는 결과 본문',material_urls:[],output_type:'copy',updated_at:'2026-11-12T00:00:00Z'};
+ await page.route('**/campus/world/tour/index.html*',r=>r.fulfill({contentType:'text/html',body:`<script>const token=new URLSearchParams(location.hash.slice(1)).get('bridge');window.addEventListener('message',e=>{if(e.data.type==='init')parent.postMessage({source:'moonshot-tour',token,type:'error',payload:{}},location.origin);});</script>`}));
+ await page.route('**/api/campus/space**',r=>r.fulfill({json:{profile:defaultProfile('동료'),peers:[],messages:[],seats:[]}}));
+ await page.route('**/api/campus/office/agents?**',r=>r.fulfill({json:{document:{profiles:[{employeeId:'lead',name:'총괄 관리자',seatIndex:0},{employeeId:'writer',name:'공지 직원',seatIndex:1}]},desks:[{employeeId:'writer',jobId:job.id,status:'review'}],employees:[],next:null}}));
+ await page.route('**/api/campus/office?**',r=>r.fulfill({json:{jobs:[job],detail:new URL(r.request().url()).searchParams.get('job')===job.id?job:null,history:[],connection:'incoming_adapter_registered'}}));
+ await page.goto('/campus/workspace?tourLive=1&enrollmentId='+eid);await room(page,'내 AI 사무실');
+ const flat=page.getByRole('region',{name:'사무실 간단히 보기'});await expect(flat).toBeVisible();
+ await expect(flat).toContainText('3D 화면을 열 수 없어 간단한 화면으로 보여드려요');await expect(flat).toContainText('그래픽 가속 사용');
+ const seats=flat.getByRole('listitem');await expect(seats).toHaveCount(10);await expect(seats.nth(0)).toContainText('총괄 관리자 자리');await expect(seats.nth(0)).toContainText('대기 중');await expect(seats.nth(2)).toContainText('빈자리');
+ await expect(page.getByRole('button',{name:'공간 전체 보기',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'내 캐릭터',exact:true})).toHaveCount(0);await expect(page.getByRole('region',{name:'직원 업무'})).toHaveCount(0);
+ await page.screenshot({path:test.info().outputPath('flat-office.png')});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await seats.nth(1).getByRole('button',{name:'공지 직원 · 검토할 결과 업무 열기'}).click();
+ await expect(page.getByRole('article',{name:'선택한 AI 직원 작업'})).toContainText('3D 없이도 열리는 결과 본문');
+});

@@ -95,9 +95,13 @@ p.loading{pointer-events:none}
   margin: 4px 0 0;
   padding: 0;
   list-style: none;
-  max-height: min(23dvh, 9rem);
+  max-height: min(34dvh, 15rem);
   overflow: auto;
 }
+/* macOS hides overlay scrollbars; keep a visible thumb so a long list does not look cut off. */
+.loadingDeskList::-webkit-scrollbar { width: 6px; }
+.loadingDeskList::-webkit-scrollbar-thumb { background: #51738f; border-radius: 3px; }
+.deskShortcuts > strong small { font-weight: 500; color: #9db4cc; }
 .loadingDeskList button {
   display: flex;
   align-items: center;
@@ -115,3 +119,15 @@ p.loading{pointer-events:none}
 }
 .loadingDeskList span { overflow-wrap: anywhere; }
 .loadingDeskList strong { white-space: nowrap; color: #b9dbff; }
+/* 3D를 열 수 없을 때의 평면 사무실 */
+.flatOffice{position:absolute;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);width:min(880px,calc(100% - 32px));max-height:calc(100% - 200px);overflow:auto;padding:22px;background:#0c2034f5;border:1px solid #51738f;border-radius:16px;color:#edf6ff;pointer-events:auto}
+.flatOffice h2{margin:0 0 6px;font-size:18px;word-break:keep-all}
+.flatOffice p{margin:0 0 14px;font-size:13px;line-height:1.7;color:#c4d6ea;word-break:keep-all}
+.flatOffice ol{list-style:none;margin:0 0 14px;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.flatOffice li{display:grid;grid-template-rows:auto 1fr auto;gap:5px;padding:10px;border:1px solid #2f4c68;border-radius:10px;background:#102a44;min-height:98px}
+.flatOffice li[data-empty]{border-style:dashed;background:transparent}
+.flatOffice li[data-empty] strong{color:#7f96ad;font-weight:500}
+.flatOffice li small,.flatOffice li span{font-size:12px;color:#9db4cc}
+.flatOffice li strong{font-size:14px;line-height:1.35;word-break:keep-all}
+.flatOffice button{min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid #5284b3;background:#17406a;color:#edf6ff;font-size:12px;font-weight:600}
+@media(max-width:700px){.flatOffice{padding:16px;max-height:calc(100% - 240px)}.flatOffice ol{grid-template-columns:repeat(2,minmax(0,1fr))}.flatOffice li{min-height:0}.flatOffice button{min-height:44px}}

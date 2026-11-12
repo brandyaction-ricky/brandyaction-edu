@@ -222,7 +222,10 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
  if(officeFirst)applyPersonalOffice(pendingOffice);
  pendingOffice=null;
  // showRoom also configures lighting and camera; paint once after both are set.
- showRoom(room);configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
+ showRoom(room);configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
+  // The renderer paints its own English failure text on the canvas; the host shows the Korean guidance instead.
+  if(office?.loadError){office.loadError='';try{office.draw();}catch{}}
+  status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
 window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.origin||e.source!==parent||m?.source!=='moonshot-tour-host'||m.token!==token||token.length<32)return;const p=m.payload||{};if(m.type==='init'){if(!started){publicVisitor=p.visitor===true;operatorReview=p.operatorReview===true;devPresence=p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=p.studentOffice===true&&!publicVisitor&&!operatorReview;
  if(officeFirst){room='office';currentRole='student';pendingOffice=p.personalOffice;}
  void start();}else if(ready)send('ready');return;}if(m.type==='meetup-start'){meetupWanted=true;void meetup?.join();return;}if(!ready){
