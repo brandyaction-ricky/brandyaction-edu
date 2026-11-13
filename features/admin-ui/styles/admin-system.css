@@ -1034,7 +1034,7 @@
  .edu-admin .marketing-workspace:not(.is-expanded) .marketing-task-group:not(.is-current){display:none}
  .edu-admin .admin-permission-save{flex-direction:column;align-items:stretch;position:static}
  .adm.edu-admin .admin-data-table th button{min-width:44px;min-height:44px}
- .edu-admin .admin-table-scroll:has(.admin-mobile-cards){overflow:visible}
+ .adm.edu-admin .admin-table-scroll:has(.admin-mobile-cards){overflow:visible}
  .adm.edu-admin .admin-table-scroll .admin-mobile-cards{display:block;width:100%;min-width:0}
  .adm.edu-admin .admin-mobile-cards thead{display:flex;flex-wrap:wrap}
  .adm.edu-admin .admin-mobile-cards thead tr{display:flex;flex-wrap:wrap;width:100%}
@@ -1049,7 +1049,7 @@
  .adm.edu-admin .admin-mobile-cards tbody td[colspan]::before{content:none}
  .edu-admin .participant-pagination label{white-space:nowrap;display:flex;align-items:center;gap:8px}
  .edu-admin .participant-pagination select{width:auto;flex:1}
- .edu-admin .admin-table-frame:has(.admin-mobile-cards)>.admin-table-hint{display:none}
+ .adm.edu-admin .admin-table-frame:has(.admin-mobile-cards)>.admin-table-hint{display:none}
 }
 
 @media(max-width:720px){

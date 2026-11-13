@@ -3,6 +3,7 @@ import { filterValues, type DashboardReport, type PerformanceCampaign } from './
 import { kstDate } from './landing';
 import { periodActuals } from './landing-operations-phase1';
 import type { LandingInsights } from './landing-insights';
+import { metaCampaignIds } from './meta-campaign-settings';
 
 type Db = ReturnType<typeof createAdminClient>;
 type Session = { session_id: string; visitor_id?: string; created_at: string; last_seen_at: string; clicks?: number; attribution: Record<string, string> | null };
@@ -101,7 +102,39 @@ export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign
       return result.data as LandingInsights;
     } catch { errors.insights = '자동 매출·행동 분석을 불러오지 못했습니다. 다시 조회해 주세요.'; return null; }
   };
-  if (baseUi) { const analysis = await insights(); return { ...baseUi, ...(actorId ? { insights: analysis } : {}), errors: { ...baseUi.errors, ...errors } }; }
-  const [daily_a, last_collected_at, actual, analysis] = await Promise.all([trend(), collection(), actuals(), insights()]);
-  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, ...(actorId ? { insights: analysis } : {}), errors };
+  const currentKakao = async () => {
+    try {
+      // The current headcount is independent of the selected reporting period.
+      const result = await db.from('landing_campaign_actuals').select('day,kakao_members').eq('campaign_id', campaign.id)
+        .not('kakao_members', 'is', null).lte('day', kstDate(new Date())).order('day', { ascending: false }).limit(1).abortSignal(limitedSignal);
+      if (result.error) throw Error();
+      const row = result.data?.[0];
+      return row && typeof row.kakao_members === 'number' && row.kakao_members >= 0 ? { members: row.kakao_members, day: row.day } : null;
+    } catch { errors.current_kakao = '현재 카카오톡방 인원을 불러오지 못했습니다.'; return null; }
+  };
+  const collectionRanges = async (): Promise<NonNullable<DashboardReport['ui']>['collection_ranges']> => {
+    try {
+      const ids = metaCampaignIds(campaign);
+      // Four single-row indexed reads describe campaign-wide availability only.
+      // They never replace period/filter-specific totals or scan session pages.
+      const edge = async (source: 'edu' | 'meta', ascending: boolean) => {
+        if (source === 'meta' && !ids.length) return null;
+        const query = source === 'edu'
+          ? db.from('funnel_sessions').select('created_at').eq('landing_id', campaign.landing_id).lte('created_at', new Date().toISOString()).order('created_at', { ascending })
+          : db.from('landing_campaign_meta_daily').select('day').eq('campaign_id', campaign.id).in('meta_campaign_id', ids).lte('day', kstDate(new Date())).order('day', { ascending });
+        const result = await query.limit(1).abortSignal(limitedSignal);
+        if (result.error) throw Error();
+        const row = result.data?.[0] as { created_at?: string; day?: string } | undefined;
+        return row ? source === 'edu' ? kstDate(row.created_at!) : row.day! : null;
+      };
+      const [eduStart, eduEnd, metaStart, metaEnd] = await Promise.all([edge('edu', true), edge('edu', false), edge('meta', true), edge('meta', false)]);
+      return { edu: eduStart && eduEnd ? { start: eduStart, end: eduEnd } : null, meta: metaStart && metaEnd ? { start: metaStart, end: metaEnd } : null };
+    } catch { errors.collection_ranges = 'EDU·Meta 수집 범위를 확인하지 못했습니다. 두 지표의 기간을 확인해 주세요.'; return null; }
+  };
+  if (baseUi) {
+    const [analysis, current_kakao, collection_ranges] = await Promise.all([insights(), currentKakao(), collectionRanges()]);
+    return { ...baseUi, current_kakao, collection_ranges, ...(actorId ? { insights: analysis } : {}), errors: { ...baseUi.errors, ...errors } };
+  }
+  const [daily_a, last_collected_at, actual, analysis, current_kakao, collection_ranges] = await Promise.all([trend(), collection(), actuals(), insights(), currentKakao(), collectionRanges()]);
+  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, current_kakao, collection_ranges, ...(actorId ? { insights: analysis } : {}), errors };
 }
