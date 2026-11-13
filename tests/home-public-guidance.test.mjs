@@ -40,3 +40,11 @@ test('홈페이지와 상담 API에 적용하는 공개 조건', () => {
   assert.equal(enabled({VERCEL_ENV:'preview', OPENAI_API_KEY:'fixture'}), true);
   assert.equal(enabled({VERCEL_ENV:'production', EDU_HOME_CONSULTATION_ENABLED:'true'}), false);
 });
+
+test('에듀 특약 대상 12개월 문의에는 월별 일반 행사 대신 상세 FAQ를 근거로 답한다',async()=>{
+  const reply = await bundledModule.exports.findReply('현대카드 12개월 무이자 할부 되나요?',[]);
+  assert.match(reply.text,/5만 원 이상/);
+  assert.match(reply.text,/우리카드와 비씨\(BC\)카드를 제외/);
+  assert.match(reply.text,/2~12개월 전액 무이자/);
+  assert.equal(reply.sources.length,1);
+});

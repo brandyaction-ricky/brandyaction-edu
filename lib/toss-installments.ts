@@ -81,14 +81,14 @@ export async function installmentFact(question:string,now=new Date()) {
     if (!memo || memo.day!==today || memo.until<=Date.now()) memo={day:today,until:Date.now()+300_000,terms:retrieve(today)};
     const t=await memo.terms;
     const months=Number(question.match(/(\d{1,2})\s*개월/)?.[1] ?? 12);
-    const card=t.full.find(r=>question.includes(r.card)|| (r.card==='KB국민' && question.includes('국민')) || (r.card==='NH농협' && question.includes('농협')) || (r.card==='비씨' && /BC/i.test(question)))?.card.replace(/^NH/,'');
+    const card=t.full.find(r=>question.includes(r.card)|| (r.card==='KB국민' && question.includes('국민')) || (r.card==='NH농협' && question.includes('농협')) || (r.card==='비씨' && /BC|비시/i.test(question)))?.card.replace(/^NH/,'');
     const eligible=(r:{card:string;lo:number;hi:number})=>(!card||r.card.replace(/^NH/,'')===card)&&r.lo<=months&&months<=r.hi;
     const cards=t.full.filter(eligible).map(r=>r.card);
     const costs=t.partial.filter(eligible).map(r=>r.card+' '+r.pays);
     const full=cards.length ? months+'개월 카드사 부담 무이자: '+cards.join('·')+'.' : months+'개월 전액 무이자는 이 공지에서 확인되지 않아요.';
     const partial=costs.length ? months+'개월 부분 무이자에서 고객이 이자를 내는 회차: '+costs.join(', ')+'. 나머지 회차 이자는 면제됩니다.' : months+'개월 부분 무이자도 이 공지에서 확인되지 않아요.';
-    return {...fact,topic:'이번 달 카드사 '+months+'개월 무이자 할부',text:t.from+' ~ '+t.to+' 토스 공지 기준입니다. '+full+' '+partial+' 온라인 PG 결제 5만 원 이상이 기본 대상이며, 카드 종류·교육 등 제외 업종·상점 계약에 따라 달라요. 내 카드의 최종 조건은 결제창과 카드사에서 확인해 주세요.'};
+    return {...fact,topic:'이번 달 카드사 '+months+'개월 무이자 할부',text:'카드사 일반 행사('+t.from+' ~ '+t.to+') 기준입니다. '+full+' '+partial+' 온라인 PG 결제 5만 원 이상이 기본 대상이며, 카드 종류·교육 등 제외 업종·상점 계약에 따라 달라요. 내 카드의 최종 조건은 결제창과 카드사에서 확인해 주세요.'};
   } catch {
-    return {...fact,text:'현재 토스 공지에서 이번 달 카드별 조건을 확인하지 못했어요. 12개월 할부가 전액 무이자라는 뜻은 아니에요. 토스 공지와 결제창에서 전액·부분 무이자 및 고객 부담 회차를 확인해 주세요.'};
+    return {...fact,text:'현재 토스 공지에서 이번 달 카드별 조건을 확인하지 못했어요. 특약 제외 카드의 행사 조건은 토스 공지와 결제창에서 전액·부분 무이자 및 고객 부담 회차를 확인해 주세요.'};
   }
 }

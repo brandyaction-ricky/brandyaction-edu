@@ -1,4 +1,5 @@
 "use client";
+import { installmentMinimum, installmentHeading, installmentTerms, installmentCheck } from "@/lib/edu-card-installment";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
 import { ArrowLeft, ArrowRight, Check, Copy, CreditCard, Landmark } from "lucide-react";
@@ -85,6 +86,12 @@ export function Checkout({
   const couponLoading = couponRegistration.loading;
   const widgetEnabled = process.env.NEXT_PUBLIC_TOSS_WIDGET_ENABLED === "true" && !!user && !!cohort && !free;
   const widgetAmount = quote?.totalAmount ?? num(cohort, "price");
+  const installmentNotice = widgetAmount >= installmentMinimum && (
+    <div className="notice mt8">
+      <strong>{installmentHeading}</strong>
+      <p>{installmentTerms} {installmentCheck}</p>
+    </div>
+  );
   const latestWidgetAmount = useRef(widgetAmount);
   useEffect(() => { latestWidgetAmount.current = widgetAmount; }, [widgetAmount]);
   const tossWidget = useTossCheckoutWidget(widgetEnabled, user?.id || "", Math.max(1, widgetAmount));
@@ -370,6 +377,7 @@ export function Checkout({
               <div className="panel-head"><h2>결제 수단</h2></div>
               <div className="panel-body">
                 <div id="toss-payment-methods" />
+                {installmentNotice}
                 <p className="meta">실시간 계좌이체에서 개인계좌를 선택하면 퀵계좌이체를 이용할 수 있어요.</p>
                 <div id="toss-payment-agreement" />
                 {tossWidget.error && <p role="alert" className="form-error">{tossWidget.error}</p>}
@@ -405,6 +413,7 @@ export function Checkout({
                     </label>
                   ))}
                 </div>
+                {paymentMethod === "CARD" && installmentNotice}
                 <div className="notice checkout-payment-next" aria-live="polite">
                   <h3>결제 수단은 결제창에서 최종 선택합니다</h3>
                   <p>필수 항목을 선택한 뒤 ‘동의하고 결제창 열기’를 눌러 주세요. {paymentMethod === "CARD" ? "결제창에서 카드나 간편결제를 선택해 주세요." : "이용 가능한 계좌이체 방식과 인증 절차는 결제창에서 확인해 주세요. 현금영수증도 결제창에서 신청할 수 있어요."}</p>
