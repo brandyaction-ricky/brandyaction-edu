@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['unpdf'],
   outputFileTracingIncludes: { '/api/campus/office/skill': ['./skills/packages/*.zip'] },
   images: {
     remotePatterns: [
