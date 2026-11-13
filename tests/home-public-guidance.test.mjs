@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
 
 const {outputFiles} = buildSync({entryPoints:['lib/home-public-guidance.ts'], bundle:true, platform:'node',format:'cjs',write:false});
-const module = {exports:{}};
-new Function('module','exports',outputFiles[0].text)(module,module.exports);
-const {productFacts} = module.exports;
+const bundledModule = {exports:{}};
+new Function('module','exports',outputFiles[0].text)(bundledModule,bundledModule.exports);
+const {productFacts} = bundledModule.exports;
 const course = {id:'course',slug:'moonshot',title:'문샷',status:'published',category:'paid_class',list_price:123000,
   duration_label:'6주',schedule_label:'기수별',metadata:{detail_html:'Q. 윈도우에서 되나요? A. 윈도우도 가능해요. Q. 지인 혜택이 있나요? A. 10% 할인이에요.'}};
 const cohort = {id:'old',course_id:'course',name:'5기',price:120000,status:'recruiting',recruitment_end_at:'2026-11-10T12:00:00Z'};
