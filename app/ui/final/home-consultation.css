@@ -1,0 +1,51 @@
+.home-consultation{position:fixed;right:24px;bottom:max(20px,env(safe-area-inset-bottom));z-index:70;font-family:inherit;color:#20242b;line-height:1.6}
+.home-consultation button,.home-consultation textarea{font:inherit}
+.home-consultation button,.home-consultation a{touch-action:manipulation}
+.home-consultation .home-consultation-launcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 0 21px;
+  border: 0;
+  border-radius: 999px;
+  background: #c92030;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px #171b261a;
+  cursor: pointer;
+}
+.home-consultation-launcher svg { flex: none; }
+.home-consultation-launcher:hover { filter: brightness(.96); }
+.home-consultation-panel{width:380px;max-width:calc(100vw - 32px);height:610px;max-height:calc(100dvh - 48px - env(safe-area-inset-bottom));display:flex;flex-direction:column;border:1px solid #e0e3e8;border-radius:20px;background:#fff;box-shadow:0 12px 48px #171b2626;overflow:hidden}
+.home-consultation-panel header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid #eceef2}
+.home-consultation-panel header strong{font-size:17px}
+.home-consultation-panel p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.home-consultation-panel header p{font-size:13px;color:#626975;margin-top:3px}
+.home-consultation-panel header button{display:grid;place-items:center;border:0;background:none;min-width:44px;min-height:44px;cursor:pointer}
+.home-consultation-messages{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;padding:20px;font-size:14px}
+.home-consultation-welcome{padding:16px;background:#f4f5f7;border-radius:12px}
+.home-consultation-turn+.home-consultation-turn{margin-top:20px}
+.home-consultation-turn span{font-size:12px;color:#68717d;display:block;margin-bottom:5px}
+.home-consultation-question{background:#fff2f3;padding:12px 14px;border-radius:12px;margin-bottom:14px}
+.home-consultation-answer ul{list-style:none;padding:0;margin:12px 0 0}
+.home-consultation-answer a{color:#ad1628;text-decoration:underline;text-underline-offset:3px}
+.home-consultation-handoff{background:#f6f7f9;border:1px solid #e2e5eb;border-radius:12px;padding:14px;margin-top:18px}
+.home-consultation-handoff p{font-size:12px;color:#626975;margin:5px 0 10px}
+.home-consultation-handoff a{display:inline-block;color:#20242b;font-weight:700}
+.home-consultation-panel form{padding:16px 20px;border-top:1px solid #eceef2;background:#fff}
+.home-consultation-panel label{display:block;font-weight:600;font-size:13px;margin-bottom:7px}
+.home-consultation-panel textarea{display:block;resize:vertical;box-sizing:border-box;max-height:160px;min-height:76px;width:100%;border:1px solid #ccd1da;border-radius:10px;padding:10px 12px;font-size:16px;background:#fff;color:#20242b}
+.home-consultation-privacy{font-size:11px;color:#68717d;margin:7px 0 12px!important}
+.home-consultation-panel form>div{display:flex;justify-content:space-between;gap:12px}
+.home-consultation-panel form button{border-radius:8px;min-height:40px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer}
+.home-consultation-staff{background:#fff;border:1px solid #d7dce4;color:#464f5b}
+.home-consultation-send{background:#c92030;color:white;border:1px solid #c92030}
+.home-consultation-send:disabled{opacity:.5;cursor:default}
+.home-consultation :focus-visible{outline:3px solid #315f9a;outline-offset:3px}
+@media(max-width:600px){.home-consultation{right:16px}.home-consultation-panel{width:calc(100vw - 32px);height:650px}.home-consultation-panel header,.home-consultation-panel form,.home-consultation-messages{padding:16px}}

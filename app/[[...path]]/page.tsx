@@ -50,6 +50,10 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  const ld=path.length===0?jsonLd([{'@context':'https://schema.org','@type':'WebSite',name:EDU_SITE_NAME,alternateName:brand.alternateName,url:SITE_URL+'/'},{'@context':'https://schema.org',...brand}])
   :item&&!item.unlisted&&root==='classes'?jsonLd({'@context':'https://schema.org','@type':'Course',name:item.title,description:item.description||item.title,url:`${SITE_URL}/classes/${section}`,provider:brand}):null;
  const platform=item||ld?<>{ld}<Platform path={path} user={null} preview={item?{title:item.title,summary:item.description}:undefined}/></>:<Platform path={path} user={null}/>;
+ if (!path.length && (await import('@/lib/home-consultation-enabled')).homeConsultationEnabled()) {
+  const { PublicHomeConsultation } = await import('@/app/ui/final/home-consultation');
+  return <>{platform}<PublicHomeConsultation /></>;
+ }
  return CampusEntryBar||LessonFocus?<>{CampusEntryBar&&<CampusEntryBar returnTo={typeof returnTo==='string'?returnTo:undefined}/>}{platform}{LessonFocus&&<LessonFocus/>}</>:platform;
 }
 
