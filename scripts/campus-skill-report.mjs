@@ -1,7 +1,7 @@
 // Called by the Aside agent only at explicit workflow steps. No watcher or AI runner.
 import { studentEnvironment } from './student-target.mjs';
 import { createHash } from 'node:crypto';
-import { readFile, writeFile, mkdir, rename, stat, open, unlink, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, stat, open, unlink, readdir, rmdir } from 'node:fs/promises';
 import { resolve, join, dirname, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prepareReport, deliverReport } from './campus-office-report.mjs';
@@ -82,16 +82,29 @@ export async function resultFromStart(start, chunks) {
   return {action:'result', context:start.context, resultText:Buffer.concat(parts).toString('utf8').trim()};
 }
 // The start file lives in the employee's working folder only while its task runs. Once the result is in,
-// remove it, together with start files that earlier tasks left behind for more than a day.
+// remove it, together with report files that earlier tasks left behind for more than an hour.
+// ponytail: one hour assumes a task finishes well within it; lengthen if employees run longer jobs in parallel.
+const reportFile=/^campus-(?:start|connect)-.+\.json$/;
 export async function tidyStartFiles(startPath, now=Date.now()) {
-  if (!/^campus-start-.+\.json$/.test(basename(startPath))) return;
+  if (!reportFile.test(basename(startPath))) return;
   await unlink(startPath).catch(()=>{});
   const dir=dirname(resolve(startPath));
   for (const name of await readdir(dir).catch(()=>[])) {
-    if (!/^campus-start-.+\.json$/.test(name)) continue;
+    if (!reportFile.test(name)) continue;
     const file=join(dir,name), info=await stat(file).catch(()=>null);
-    if (info?.isFile() && now-info.mtimeMs>86400000) await unlink(file).catch(()=>{});
+    if (info?.isFile() && now-info.mtimeMs>3600000) await unlink(file).catch(()=>{});
   }
+  // Earlier versions let the employee keep connection inputs in this folder; it goes once it is empty.
+  await rmdir(join(dir,'.campus-input')).catch(()=>{});
+}
+// What the employee tells the learner when a report did not reach the office. The first line is copied as is.
+export function failureNotice(message) {
+  const why=/Report rejected \(HTTP 40[13]\)|Invalid skill request binding/.test(message)
+    ? '이 직원의 보고 연결이 해제됐거나 만료됐어요. 캠퍼스 ‘내 AI 직원’의 이 직원 카드에 ‘연결 해제’ 버튼이 보이면 먼저 누르고, 이 대화에 ‘캠퍼스 연결 준비’를 보내 다시 연결해 주세요.'
+    : /Delivery unconfirmed/.test(message) ? '캠퍼스에 닿지 못했어요. 인터넷 연결을 확인한 뒤 같은 일을 다시 맡겨 주세요.'
+    : /Local report file unavailable|Missing private report storage/.test(message) ? '이 직원은 아직 캠퍼스에 연결되지 않았어요. 이 대화에 ‘캠퍼스 연결 준비’를 보내 연결해 주세요.'
+    : '잠시 뒤 같은 일을 다시 맡겨 주세요. 계속되면 아래 오류 문장을 운영 담당자에게 알려 주세요.';
+  return '⚠️ 캠퍼스 사무실에는 기록되지 않았어요. '+why+'\n('+message+')';
 }
 async function main(configPath,inputPath,mode) {
   if(!configPath||!inputPath)throw Error('Usage: report.mjs PRIVATE_CONFIG INPUT_JSON');
@@ -126,5 +139,5 @@ async function main(configPath,inputPath,mode) {
   } finally {await handle.close();await unlink(lock);}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main(...process.argv.slice(2)).catch(e=>{
-  console.error(e instanceof SyntaxError?'Invalid JSON':e.code?'Local report file unavailable':e.message);process.exitCode=1;
+  console.error(failureNotice(e instanceof SyntaxError?'Invalid JSON':e.code?'Local report file unavailable':e.message));process.exitCode=1;
 });

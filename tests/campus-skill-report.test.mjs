@@ -88,17 +88,31 @@ test('a paired employee keeps reporting after /new starts another session, but n
   // The legacy single-session pilot stays tied to its session.
   await assert.rejects(reportSkill(config,{...start,context:{...context,sessionId:'s2-after-new'}},null,send,async()=>{}),/Invalid skill request binding/);
 });
-test('the start file is removed after its result, with start files left behind for more than a day',async()=>{
+test('the start file is removed after its result, with report files left behind for more than an hour',async()=>{
   const {tidyStartFiles}=await import('../scripts/campus-skill-report.mjs');
-  const {mkdtemp,writeFile,readdir,utimes,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+  const {mkdtemp,mkdir,writeFile,readdir,utimes,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
   const dir=await mkdtemp(join(tmpdir(),'campus-start-test-'));
   try{
-    for(const name of ['campus-start-s1-1.json','campus-start-old-2.json','campus-start-fresh-3.json','notes.md','campus-start.txt'])await writeFile(join(dir,name),'{}');
-    const old=new Date(Date.now()-2*86400000);await utimes(join(dir,'campus-start-old-2.json'),old,old);await utimes(join(dir,'notes.md'),old,old);
+    for(const name of ['campus-start-s1-1.json','campus-start-old-2.json','campus-connect-old-9.json','campus-start-fresh-3.json','notes.md','campus-start.txt'])await writeFile(join(dir,name),'{}');
+    await mkdir(join(dir,'.campus-input'));
+    const old=new Date(Date.now()-2*3600000);for(const name of ['campus-start-old-2.json','campus-connect-old-9.json','notes.md'])await utimes(join(dir,name),old,old);
     await tidyStartFiles(join(dir,'campus-start-s1-1.json'));
     assert.deepEqual((await readdir(dir)).sort(),['campus-start-fresh-3.json','campus-start.txt','notes.md']);
-    await tidyStartFiles(join(dir,'notes.md'));assert.equal((await readdir(dir)).length,3);
+    // A folder the learner still keeps something in is left alone.
+    await mkdir(join(dir,'.campus-input'));await writeFile(join(dir,'.campus-input','mine.txt'),'x');await writeFile(join(dir,'campus-start-s1-4.json'),'{}');
+    await tidyStartFiles(join(dir,'campus-start-s1-4.json'));assert.ok((await readdir(dir)).includes('.campus-input'));
+    await tidyStartFiles(join(dir,'notes.md'));assert.ok((await readdir(dir)).includes('notes.md'));
   }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('a failed report gives the employee one first line to copy, with the right next step',async()=>{
+  const {failureNotice}=await import('../scripts/campus-skill-report.mjs');
+  const first=m=>failureNotice(m).split('\n')[0];
+  for(const m of ['Report rejected (HTTP 403). Keep the saved report; check mapping/revision before retrying.','Report rejected (HTTP 401). x','Invalid skill request binding'])
+    assert.match(first(m),/^⚠️ 캠퍼스 사무실에는 기록되지 않았어요\. .*해제됐거나 만료됐어요.*캠퍼스 연결 준비/);
+  assert.match(first('Delivery unconfirmed. Keep this saved report and retry it; do not create another event.'),/인터넷 연결/);
+  assert.match(first('Local report file unavailable'),/아직 캠퍼스에 연결되지 않았어요/);
+  assert.match(first('Report rejected (HTTP 409). x'),/^⚠️ 캠퍼스 사무실에는 기록되지 않았어요\. 잠시 뒤/);
+  assert.match(failureNotice('Invalid skill request binding'),/\n\(Invalid skill request binding\)$/);
 });
 test('report text shows the words of a Telegram-markdown answer without changing links or plain text',async()=>{
   const {officeReportText}=await import('../features/campus/office/report-text.ts');
