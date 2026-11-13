@@ -60,3 +60,4 @@
 .done{padding:12px 14px;border-radius:10px;background:#e9f6ee;color:#17693d;font-weight:600}
 .setup>.controls{margin-top:14px}
 @media(max-width:700px){.office form.pair{grid-template-columns:1fr}.roster .cardHead{flex-direction:column}.roster .chips{justify-content:flex-start}.roster .controls button,.roster .controls a{min-height:44px}}
+.eye{display:inline-flex;align-items:center;justify-content:center;gap:6px}

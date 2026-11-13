@@ -46,6 +46,7 @@ test('learner commands cannot run jobs; draft receipt cannot self-approve and CA
  assert.throws(()=>learnerOfficeTransition({...job,status:'review',draft_text:'verified real draft'}, {action:'approve',expectedRevision:0}),{status:409});
  assert.equal(connectorOfficeTransition(job,{event:'accepted',expectedRevision:1}),'queued');
  assert.throws(()=>learnerOfficeTransition({...job,status:'running'}, {action:'archive',expectedRevision:1}),{status:409});
+ assert.equal(learnerOfficeTransition({...job,status:'archived'},{action:'restore',expectedRevision:1}),'awaiting_connection');assert.throws(()=>learnerOfficeTransition({...job,status:'review'},{action:'restore',expectedRevision:1}),{status:409});
 });
 test('office API origin/auth/input boundary',async()=>{
  const deps={enabled:true,authenticate:async()=>({id:uid(1)}),load:async()=>({jobs:[],connection:'not_connected'}),save:async()=>({status:'awaiting_connection'})};
@@ -77,6 +78,11 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  insert into enrollments(id,user_id,course_id,cohort_id,status) values('${uid(31)}','${uid(1)}','${uid(10)}','${uid(20)}','active'),('${uid(32)}','${uid(2)}','${uid(10)}','${uid(20)}','active');`);
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102154425_edu_campus_private_office_jobs.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../supabase/migrations/20261107004756_edu_campus_office_registered_reports.sql',import.meta.url),'utf8'));
+ // The later dispatch migration renames the routine; the restore migration patches it under that name.
+ await db.exec(`alter function private.campus_office_mutate(jsonb) rename to campus_office_mutate_before_dispatch;
+  create function private.campus_office_mutate(p_command jsonb) returns jsonb language sql security definer set search_path='' as $$select private.campus_office_mutate_before_dispatch(p_command)$$;
+  revoke all on function private.campus_office_mutate(jsonb) from public;grant execute on function private.campus_office_mutate(jsonb) to authenticated;`);
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261113150000_campus_office_job_restore.sql',import.meta.url),'utf8'));
  const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
  const mutate=async c=>(await db.query('select public.edu_campus_office_mutate($1::jsonb) result',[JSON.stringify(c)])).rows[0].result;
  const ingest=async(id,ev,owners=[uid(1)],hash='a'.repeat(64),connectorId='office',version='v1')=>(await db.query('select public.edu_campus_office_ingest($1,$2,$3::uuid[],$4,$5,$6::jsonb) result',[connectorId,version,owners,uid(id),hash,JSON.stringify(ev)])).rows[0].result;
@@ -117,7 +123,20 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  assert.equal((await mutate(approve)).status,'approved');await assert.rejects(mutate({...approve,requestId:uid(301)}),/revision conflict/i);
  await mutate({...approve,requestId:uid(302),action:'archive',expectedRevision:5,note:''});
  assert.equal((await db.query('select * from edu_campus_office_history where job_id=$1',[uid(100)])).rows.length,6);
- await db.exec(`reset role;set role service_role;`);await assert.rejects(ingest(203,{...accepted,expectedRevision:6}),/transition/i);
+ // Hiding is undone: the job returns to the state before it was hidden, with the memo of its last review, any number of times.
+ const hidden={...approve,note:''},shown=async()=>(await db.query('select status,review_note,revision from edu_campus_office_jobs where id=$1',[uid(100)])).rows[0];
+ assert.equal((await shown()).review_note,'');
+ assert.equal((await mutate({...hidden,requestId:uid(303),action:'restore',expectedRevision:6})).status,'approved');
+ assert.deepEqual(await shown(),{status:'approved',review_note:approve.note,revision:7});
+ await assert.rejects(mutate({...hidden,requestId:uid(304),action:'restore',expectedRevision:7}),/transition/i);
+ await mutate({...hidden,requestId:uid(305),action:'archive',expectedRevision:7});
+ assert.equal((await mutate({...hidden,requestId:uid(306),action:'restore',expectedRevision:8})).status,'approved');assert.equal((await shown()).review_note,approve.note);
+ await mutate({...hidden,requestId:uid(307),action:'archive',expectedRevision:9});
+ const waiting={...create,requestId:uid(101)};await mutate(waiting);
+ await mutate({requestId:uid(308),enrollmentId:uid(31),action:'archive',jobId:uid(101),expectedRevision:1,note:''});
+ assert.equal((await mutate({requestId:uid(309),enrollmentId:uid(31),action:'restore',jobId:uid(101),expectedRevision:2,note:''})).status,'awaiting_connection');
+ await login(2);await assert.rejects(mutate({requestId:uid(310),enrollmentId:uid(32),action:'restore',jobId:uid(100),expectedRevision:10,note:''}),/scope/i);await login(1);
+ await db.exec(`reset role;set role service_role;`);await assert.rejects(ingest(203,{...accepted,expectedRevision:10}),/transition/i);
  await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}';`);await login(1);
  assert.equal((await db.query('select * from edu_campus_office_jobs')).rows.length,0);await assert.rejects(mutate({...create,requestId:uid(500)}),/scope/i);
  await db.exec('reset role;set role service_role;');await assert.rejects(ingest(500,{...accepted,expectedRevision:6}),/scope/i);

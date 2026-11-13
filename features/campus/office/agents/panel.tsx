@@ -1,6 +1,7 @@
 'use client';
 import {studentReportingAvailable} from '../student-reporting';
 import {useEffect,useRef,useState} from 'react';
+import {Eye,EyeOff} from 'lucide-react';
 import {ConnectionSetup,connectionLabel,useStudentConnections} from '../student-connections';
 import {BotOfficeModel,normalizeTelegramBot,type BotDocument,type BotProfile} from '@/public/campus/world/office/bot-profile.mjs';
 import {parseEmployeeLines,pickSeat} from './bulk';
@@ -95,8 +96,8 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  const links=conn.enabled&&<ConnectionSetup enrollmentId={enrollmentId} employees={employees} conn={conn}/>;
  const seatBoard=<>
  <section aria-label="사무실 좌석"><h3>사무실 좌석 <small>{desks.length} / 10</small></h3>
- <p>총괄 관리자 자리는 29일차에 채용하는 총괄 관리자의 자리예요. 자리를 비워도 직원의 보고 연결과 업무 기록은 그대로 남아요.</p>
- <ol className={styles.seats}>{[0,1,2,3,4,5,6,7,8,9].map(n=>{const p=desks.find(d=>d.seatIndex===n),free=employees.filter(e=>!desks.some(d=>d.employeeId===e.employeeId));return <li key={n} data-empty={p?undefined:''} data-lead={n?undefined:''}><small>{n?n+'번 자리':'총괄 관리자 자리'}</small><strong>{p?.name||'빈자리'}</strong>{p?<button type="button" disabled={busy} onClick={()=>unseat(p)}>자리 비우기</button>:!n&&free.length>0&&<select aria-label="총괄 관리자 자리에 앉힐 직원" value="" disabled={busy} onChange={e=>{const chosen=free.find(f=>f.employeeId===e.target.value);if(chosen)seatAt(chosen,0);}}><option value="">직원 선택</option>{free.map(f=><option key={f.employeeId} value={f.employeeId}>{f.name}</option>)}</select>}</li>;})}</ol></section>
+ <p>총괄 관리자 자리는 29일차에 채용하는 총괄 관리자의 자리예요. 눈 표시 ‘숨기기’를 누르면 그 직원이 사무실 자리에서만 빠져요. 직원 등록, 보고 연결, 업무 기록은 그대로 남고, 직원 목록의 ‘빈자리에 배치’로 다시 보이게 할 수 있어요.</p>
+ <ol className={styles.seats}>{[0,1,2,3,4,5,6,7,8,9].map(n=>{const p=desks.find(d=>d.seatIndex===n),free=employees.filter(e=>!desks.some(d=>d.employeeId===e.employeeId));return <li key={n} data-empty={p?undefined:''} data-lead={n?undefined:''}><small>{n?n+'번 자리':'총괄 관리자 자리'}</small><strong>{p?.name||'빈자리'}</strong>{p?<button type="button" className={styles.eye} disabled={busy} aria-label={p.name+' 사무실에서 숨기기'} onClick={()=>unseat(p)}><EyeOff size={14} aria-hidden/>숨기기</button>:!n&&free.length>0&&<select aria-label="총괄 관리자 자리에 앉힐 직원" value="" disabled={busy} onChange={e=>{const chosen=free.find(f=>f.employeeId===e.target.value);if(chosen)seatAt(chosen,0);}}><option value="">직원 선택</option>{free.map(f=><option key={f.employeeId} value={f.employeeId}>{f.name}</option>)}</select>}</li>;})}</ol></section>
  </>;
  const roster=<>
  <h3>전체 직원 목록 <small>{employees.length}명</small></h3>{dir.error&&<p role="alert">{dir.error}</p>}{!employees.length&&<p className={styles.note}>아직 등록한 직원이 없어요. 아래 ‘직원 추가’에서 수업에서 만든 봇을 등록해 보세요.</p>}
@@ -108,7 +109,7 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  <div className={styles.controls}>
  {onJobs&&!demo&&<button type="button" onClick={()=>onJobs({id:p.employeeId,name:p.name})}>업무·결과 보기</button>}
  {p.telegramUrl&&<a href={p.telegramUrl} target="_blank" rel="noopener noreferrer">{link?.status==='active'?'Telegram에서 업무 맡기기 ↗':'텔레그램 열기 ↗'}</a>}
- {!seat&&<button type="button" disabled={busy||desks.length>=10} onClick={()=>place(p)}>빈자리에 배치</button>}
+ {seat?<button type="button" className={styles.eye} disabled={busy} onClick={()=>unseat(p)}><EyeOff size={14} aria-hidden/>사무실에서 숨기기</button>:<button type="button" className={styles.eye} disabled={busy||desks.length>=10} onClick={()=>place(p)}><Eye size={14} aria-hidden/>빈자리에 배치</button>}
  <span className={styles.spacer}/>
  {link&&<button type="button" className={styles.quiet} disabled={busy||conn.busy} onClick={()=>void release(p,link.id)}>연결 해제</button>}
  <button type="button" className={styles.danger} disabled={busy} onClick={()=>void remove(p)}>직원 삭제</button></div></article>;})}</div>
