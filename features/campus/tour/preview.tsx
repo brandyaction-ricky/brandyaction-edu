@@ -260,7 +260,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const pendingDeskJobs=desksVisible&&role==='student'&&deskList?.enrollment===snapshot.selectedEnrollmentId&&
    visibleTasks('office',role).some(task=>task.id==='office') ? deskList?.jobs : undefined;
  const deskShortcuts=!editing&&pendingDeskJobs?.length ? <section className={styles.deskShortcuts} aria-label="직원 업무">
-   <strong>직원 업무 <small>{pendingDeskJobs.length}건</small></strong><ul className={styles.loadingDeskList}>{pendingDeskJobs.slice().sort((a,b)=>Number(b.status==='review')-Number(a.status==='review')).map(job=>{
+   <strong>직원 업무 <small>{pendingDeskJobs.length}건</small></strong><ul className={styles.loadingDeskList}>{pendingDeskJobs.slice().sort((a,b)=>Number(b.status==='running')-Number(a.status==='running')).map(job=>{
      const label=job.status==='running'?'진행 중':'검토할 결과';
      return <li key={job.jobId}><button type="button" aria-label={job.name+' · '+label+' 업무 열기'} onClick={()=>{
        setOfficeFilter(job);selectTask('office');

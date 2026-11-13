@@ -1,8 +1,8 @@
 // Called by the Aside agent only at explicit workflow steps. No watcher or AI runner.
 import { studentEnvironment } from './student-target.mjs';
 import { createHash } from 'node:crypto';
-import { readFile, writeFile, mkdir, rename, stat, open, unlink } from 'node:fs/promises';
-import { resolve, join, dirname } from 'node:path';
+import { readFile, writeFile, mkdir, rename, stat, open, unlink, readdir } from 'node:fs/promises';
+import { resolve, join, dirname, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prepareReport, deliverReport } from './campus-office-report.mjs';
 import { protectedPreviewFetch } from './campus-office-preview-transport.mjs';
@@ -14,7 +14,9 @@ export function skillBinding(config, input) {
   const c=input?.context;
   if(studentEnvironment==='production' && config.transport!=='student-device') throw Error('Production requires a student device connection');
   if(config.environment!==(config.transport==='student-device'?studentEnvironment:'development') || !Number.isFinite(config.notBefore) || !id(config.connectorId)
-    || !c || c.platform!=='telegram' || c.sessionId!==config.sessionId || c.connectionId!==config.connectionId
+    // A paired employee is the bot connection plus its chat. /new starts another Aside session for the same
+    // employee, so a device connection must keep reporting from it; only the legacy pilot stays tied to one session.
+    || !c || c.platform!=='telegram' || !id(c.sessionId) || (config.transport!=='student-device' && c.sessionId!==config.sessionId) || c.connectionId!==config.connectionId
     || c.channelId!==config.channelId || !id(c.messageId) || !Number.isFinite(c.requestedAt) || c.requestedAt<config.notBefore
     || !['start','result','failed','retry'].includes(input.action)) throw Error('Invalid skill request binding');
   const request=JSON.stringify([config.connectorId,c.connectionId,c.sessionId,c.channelId,c.messageId]);
@@ -79,6 +81,18 @@ export async function resultFromStart(start, chunks) {
   }
   return {action:'result', context:start.context, resultText:Buffer.concat(parts).toString('utf8').trim()};
 }
+// The start file lives in the employee's working folder only while its task runs. Once the result is in,
+// remove it, together with start files that earlier tasks left behind for more than a day.
+export async function tidyStartFiles(startPath, now=Date.now()) {
+  if (!/^campus-start-.+\.json$/.test(basename(startPath))) return;
+  await unlink(startPath).catch(()=>{});
+  const dir=dirname(resolve(startPath));
+  for (const name of await readdir(dir).catch(()=>[])) {
+    if (!/^campus-start-.+\.json$/.test(name)) continue;
+    const file=join(dir,name), info=await stat(file).catch(()=>null);
+    if (info?.isFile() && now-info.mtimeMs>86400000) await unlink(file).catch(()=>{});
+  }
+}
 async function main(configPath,inputPath,mode) {
   if(!configPath||!inputPath)throw Error('Usage: report.mjs PRIVATE_CONFIG INPUT_JSON');
   if((await stat(inputPath)).size>64000)throw Error('Input too large');
@@ -108,6 +122,7 @@ async function main(configPath,inputPath,mode) {
     const persist=async s=>{await writeFile(file+'.tmp',JSON.stringify(s),{mode:0o600});await rename(file+'.tmp',file);};
     const result=await reportSkill(config,input,state,(c,r)=>deliverReport(c,r,secret,c.transport==='vercel-cli'?(url,init)=>protectedPreviewFetch(url,init,c.previewCliPath):fetch),persist);
     console.log(JSON.stringify(result));
+    if (mode && result.reported==='result') await tidyStartFiles(inputPath);
   } finally {await handle.close();await unlink(lock);}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main(...process.argv.slice(2)).catch(e=>{

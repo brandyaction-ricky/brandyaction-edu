@@ -66,7 +66,7 @@ export function ConnectionSetup({enrollmentId,employees,conn}:{enrollmentId:stri
       <div><strong>목록의 다른 쪽에 있는 직원</strong><span>{connectionLabel(r.status)}</span></div>
       {r.confirmation&&<p>같은 Telegram 대화에 보내세요. <code>캠퍼스 연결 확인 {r.confirmation}</code></p>}
       <div className={styles.controls}><button className={styles.quiet} disabled={conn.busy} onClick={()=>void conn.revoke(r.id)}>연결 해제</button></div></div>)}</div>}
-    <div className={styles.controls}><button type="button" disabled={conn.busy} onClick={()=>void conn.refresh()}>연결 상태 새로고침</button><span className={styles.note}>연결한 뒤에는 “공지 초안 써줘”처럼 부탁하세요. 인사와 일반 질문은 대화에만 남아요.</span></div>
+    <div className={styles.controls}><button type="button" disabled={conn.busy} onClick={()=>void conn.refresh()}>연결 상태 새로고침</button><span className={styles.note}>연결한 뒤에는 “공지 초안 써줘”처럼 부탁하세요. 인사와 일반 질문은 대화에만 남아요. 스킬을 새로 받았을 때는 봇마다 /new만 보내면 되고, 연결은 그대로 유지돼요.</span></div>
     {conn.message&&<p role="status" className={styles.notice}>{conn.message}</p>}
   </section>;
 }

@@ -77,6 +77,29 @@ test('a stdin draft keeps the original start context and literal Unicode across 
   await assert.rejects(resultFromStart({action:'retry'},[]),/start file/);
   await assert.rejects(resultFromStart(start,[Buffer.alloc(40003)]),/too large/);
 });
+test('a paired employee keeps reporting after /new starts another session, but not from another bot or chat',async()=>{
+  const paired={...config,transport:'student-device',reportMode:'assigned-tasks'};
+  const sent=[];const send=async(_c,e)=>sent.push(JSON.parse(e.raw));
+  const later={...context,sessionId:'s2-after-new',messageId:'42:77'};
+  const receipt=await reportSkill(paired,{action:'start',context:later,requestText:'공지 써줘',taskObjective:'수강생에게 보낼 공지 초안 작성'},null,send,async()=>{});
+  assert.equal(receipt.reported,'started');assert.equal(sent.length,3);
+  for(const other of [{...later,connectionId:'another-bot'},{...later,channelId:'telegram:99'},{...later,sessionId:'bad id with spaces'}])
+    await assert.rejects(reportSkill(paired,{action:'start',context:other,requestText:'공지 써줘',taskObjective:'수강생에게 보낼 공지 초안 작성'},null,send,async()=>{}),/Invalid skill request binding/);
+  // The legacy single-session pilot stays tied to its session.
+  await assert.rejects(reportSkill(config,{...start,context:{...context,sessionId:'s2-after-new'}},null,send,async()=>{}),/Invalid skill request binding/);
+});
+test('the start file is removed after its result, with start files left behind for more than a day',async()=>{
+  const {tidyStartFiles}=await import('../scripts/campus-skill-report.mjs');
+  const {mkdtemp,writeFile,readdir,utimes,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+  const dir=await mkdtemp(join(tmpdir(),'campus-start-test-'));
+  try{
+    for(const name of ['campus-start-s1-1.json','campus-start-old-2.json','campus-start-fresh-3.json','notes.md','campus-start.txt'])await writeFile(join(dir,name),'{}');
+    const old=new Date(Date.now()-2*86400000);await utimes(join(dir,'campus-start-old-2.json'),old,old);await utimes(join(dir,'notes.md'),old,old);
+    await tidyStartFiles(join(dir,'campus-start-s1-1.json'));
+    assert.deepEqual((await readdir(dir)).sort(),['campus-start-fresh-3.json','campus-start.txt','notes.md']);
+    await tidyStartFiles(join(dir,'notes.md'));assert.equal((await readdir(dir)).length,3);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
 test('report text shows the words of a Telegram-markdown answer without changing links or plain text',async()=>{
   const {officeReportText}=await import('../features/campus/office/report-text.ts');
   assert.equal(officeReportText('# 공지 초안\n**이번 주 일정**\n- 목요일 저녁 8시\n* 금요일 마감\n- [ ] 링크 확인\n- [x] 문구 확인\n> 다시 보내드립니다.\n1. 첫째 `코드`\n2 * 3 = 6, a-b, https://example.com/a_b_c'),

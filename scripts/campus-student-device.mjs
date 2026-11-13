@@ -49,6 +49,7 @@ export async function configureDevice(root,c,command,transport=fetch) {
   } finally {await fd.close();await unlink(lock);}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
-  try {const input=JSON.parse(await readFile(process.argv[3],'utf8'));console.log(JSON.stringify(await configureDevice(process.argv[2],input.context,input.requestText)));}
+  // The command input is a one-time file; do not leave it in the employee's working folder.
+  try {const input=JSON.parse(await readFile(process.argv[3],'utf8'));console.log(JSON.stringify(await configureDevice(process.argv[2],input.context,input.requestText)));await unlink(process.argv[3]).catch(()=>{});}
   catch(e){console.error(e.code==='ENOENT'&&String(e.path||'').endsWith('gateway-public.json')?'Skill folder is incomplete (scripts/gateway-public.json is missing). Download the report skill again from the campus.':e.code?'Local connection file unavailable'+(e.path?' ('+String(e.path).split('/').pop()+')':''):e.message);process.exitCode=1;}
 }
