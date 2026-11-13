@@ -1,4 +1,6 @@
 "use client";
+import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
+import { rememberAccountHint } from '@/lib/recent-account-hint';
 import { readJson } from '@/lib/read-json';
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
@@ -224,6 +226,9 @@ export function Platform({
   const [user, setUser] = useState(() =>
     initialUser || (admin ? cachedAdminUser : null),
   );
+  useEffect(() => {
+    if (!admin && user?.email) rememberAccountHint(user.email);
+  }, [admin, user?.email]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
@@ -719,6 +724,7 @@ export function Platform({
     body = (
       <AuthView
         signup={path[0] === "signup"}
+        supportUrl={safeUrl(support.url) || MOONSHOT_SUPPORT_URL}
         pending={pending}
         social={social}
         next={safeNext(searchParams.get("next"))}

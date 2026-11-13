@@ -65,12 +65,14 @@ export function AuthView({
   social,
   next,
   authError,
+  supportUrl,
 }: {
   signup: boolean;
   pending: boolean;
   social: (provider: "google" | "kakao") => Promise<void>;
   next: string;
   authError?: string | null;
+  supportUrl: string;
 }) {
   const ua=useSyncExternalStore(subscribeBrowser,browserAgent,serverAgent),embedded=isEmbeddedLoginBrowser(ua),browserReady=!!ua;
   const [browserHelp,setBrowserHelp]=useState(0);
@@ -123,7 +125,7 @@ export function AuthView({
           )}
         </div>
         <BrowserLoginHelp key={`${embedded}-${browserHelp}`} next={next} embedded={embedded} requested={browserHelp}/>
-        <EmailAuth key={signup ? 'signup' : 'login'} signup={signup} next={next} disabled={pending} />
+        <EmailAuth key={signup ? 'signup' : 'login'} signup={signup} next={next} disabled={pending} supportUrl={supportUrl} />
         <p className="meta">
           처음 방문하셨다면 가입 후 필수 약관을 확인합니다.
         </p>
