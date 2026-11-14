@@ -146,3 +146,5 @@ p.loading{pointer-events:none}
 @media(max-width:700px){.flatRoom ol{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:650px){.root[data-room=study] .flatRoom{top:auto;bottom:150px;transform:translate(-50%,0);max-height:calc(100% - 420px)}}
 .flatRoom li{border:0;padding:0;background:transparent}
+/* Wider screens: the study room keeps its cards on the left, so the simple screen sits to their right. */
+@media(min-width:651px){.root[data-room=study] .flatRoom{left:auto;right:24px;transform:translateY(-50%);width:min(820px,calc(100% - 372px))}}
