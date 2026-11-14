@@ -82,6 +82,13 @@ test('video previews can be reserved only after the video migration; other types
  await login(1);const f=await prepare(video);assert.equal(f.content_type,'video/mp4');assert.equal(f.removed_at,null);
  assert.equal((await prepare({...video,requestId:uid(301),name:'광고.webm',contentType:'video/webm'})).content_type,'video/webm');
  await assert.rejects(prepare({...video,requestId:uid(302),name:'광고.mov',contentType:'video/quicktime'}));
+ // Conflicts answer as 23505 after the conflict-code migration; as 40001 the API layer retried them until it timed out.
+ const code=async run=>{try{await run();return'ok';}catch(e){return e.code;}};
+ assert.equal(await code(()=>prepare({...video,requestId:uid(303),expectedRevision:9})),'40001');
+ await db.exec('reset role');await db.exec(readFileSync(new URL('../supabase/migrations/20261114220000_campus_community_conflict_code.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
+ await login(1);assert.equal(await code(()=>prepare({...video,requestId:uid(303),expectedRevision:9})),'23505');
+ assert.equal(await code(()=>mutate({...make(304),action:'revise',postId:uid(100),expectedRevision:9,changeNote:'버전이 어긋난 수정'})),'23505');
+ const funcs=(await db.query("select count(*)::int as n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='private' and p.proname in('campus_community_mutate','campus_portfolio_file_prepare','campus_portfolio_file_share','campus_portfolio_file_complete') and pg_get_functiondef(p.oid) like '%40001%'")).rows[0].n;assert.equal(funcs,0);
  }finally{await db.close();}
 });
 test('portfolio attachment metadata stays owner only even on shared posts; completion is server only and revoked access fails',async()=>{
