@@ -140,3 +140,17 @@ test('late workspace response cannot replace the latest selected portfolio view'
  await expect(page.getByRole('button',{name:'내 결과물 모음',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.getByText('작업실을 불러오고 있어요…',{exact:true})).toHaveCount(0);await noOverflow(page);
 });
+
+test('a review that loses the race with a new version keeps its text and says a new version arrived',async({page})=>{
+ const base={...createCommunityDemo(student),demo:false};let revised=false,posts=0;
+ await page.route('**/api/campus/community/files**',route=>route.fulfill({json:{files:[]}}));
+ await page.route(url=>url.pathname==='/api/campus/community',async route=>{
+  if(route.request().method()==='POST'){posts++;revised=true;await route.fulfill({status:409,json:{error:'다른 창에서 바뀌었거나 같은 요청이 있습니다. 새로고침 후 확인해 주세요.'}});return;}
+  await route.fulfill({json:revised?{...base,posts:[{...base.posts[0],revision:2,title:'지역 공방 원데이 클래스 신청 페이지 (가격 추가)'}]}:base});
+ });
+ await page.goto('/community-live');await page.getByRole('button',{name:/지역 공방 원데이 클래스 신청 페이지/}).click();
+ await page.getByRole('radio',{name:'알겠어요'}).check();await page.getByLabel('좋았던 점 하나').fill('대상이 누구인지 첫 문장에서 바로 보여요.');await page.getByLabel('고칠 점 하나').fill('가격을 버튼 위에 넣어 보세요.');
+ await page.getByRole('button',{name:'의견 남기기',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('새 버전이 올라왔어요');await expect(page.getByLabel('고칠 점 하나')).toHaveValue('가격을 버튼 위에 넣어 보세요.');
+ await expect(page.getByRole('heading',{name:'지역 공방 원데이 클래스 신청 페이지 (가격 추가)',exact:true}).first()).toBeVisible();await expect(page.getByRole('button',{name:'같은 요청 다시 확인'})).toHaveCount(0);expect(posts).toBe(1);
+});

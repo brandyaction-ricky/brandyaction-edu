@@ -48,7 +48,7 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
   const alive = useRef(true), readSequence=useRef(0);
   const invalidateReads=useCallback(()=>{readSequence.current+=1;},[]);
   const refresh = useCallback(async (page = 0, quiet = false) => {
-    if (demo || !enrollmentId) return;
+    if (demo || !enrollmentId) return null;
     const sequence=++readSequence.current;
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -61,8 +61,10 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
         return { ...next, posts: merge(previous.posts, next.posts, p => p.id), revisions: merge(previous.revisions, next.revisions, r => r.id), comments: merge(previous.comments, next.comments, c => c.id), acknowledgments: merge(previous.acknowledgments, next.acknowledgments, a => a.comment_id), reports: merge(previous.reports, next.reports, r => r.id) };
       });
       if (quiet && alive.current && sequence===readSequence.current) setFilesVersion(v => v + 1);
+      return data as CommunityState;
     } catch (e) { if (!quiet&&alive.current&&sequence===readSequence.current) setError(e instanceof Error ? e.message : '작업실을 불러오지 못했습니다.'); }
     finally { if (alive.current&&sequence===readSequence.current) setLoading(false); }
+    return null;
   }, [demo, enrollmentId, tab,focusPost]);
   useEffect(() => { alive.current = true; const timer = setTimeout(() => void refresh(), 0); return () => { clearTimeout(timer); invalidateReads();alive.current = false; }; }, [refresh,invalidateReads]);
   // Others keep uploading and reviewing while this window is open: pull quietly once a minute and when the window comes
@@ -85,7 +87,8 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
       } else {
         const response = await fetch('/api/campus/community', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(valid) });
         const data = await response.json();
-        if (response.status === 409 && valid.action === 'comment') { await refresh(0, true); setPending(null); setError('그 사이 이 결과물에 새 버전이 올라왔어요. 바뀐 내용을 보고 「의견 남기기」를 다시 눌러 주세요. 적어 둔 의견은 그대로 있어요.'); return false; }
+        // A review can lose a race with the owner's new version. Pull the new version in and say so; the typed review stays.
+        if (response.status === 409 && valid.action === 'comment') { const fresh = await refresh(0, true), current = fresh?.posts.find(p => p.id === valid.postId)?.revision; if (current && current !== valid.expectedRevision) { setPending(null); setError('그 사이 이 결과물에 새 버전이 올라왔어요. 바뀐 내용을 보고 「의견 남기기」를 다시 눌러 주세요. 적어 둔 의견은 그대로 있어요.'); return false; } }
         if (!response.ok) throw new Error(data.error ?? '저장하지 못했습니다.');
         if (data.postId) setSelected(data.postId);
         lastSaved.current = data;
