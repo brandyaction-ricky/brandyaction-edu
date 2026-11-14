@@ -7,6 +7,7 @@ import {DemoAi} from '../ui/demo-ai';
 import {BusinessPanel,type BusinessView} from '../business/panel';
 import {CommunityPanel} from '../community/panel';
 import {SupportPanel} from '../support/panel';
+import {LessonFinder} from '../support/lesson-finder';
 import {SupportAdminPanel} from '../support/admin-panel';
 import {SpaceAdminPanel} from '../space/admin-panel';
 import {SpaceHttpMetrics} from '../space/http-metrics-panel';
@@ -29,6 +30,7 @@ export default function FeaturePanel({archive=true,officeFilter,id,snapshot,admi
  if(id==='journal')return <JournalPanel snapshot={snapshot} demo={demo} active onOpen={id=>onOpen(id)}/>;
  if(id==='feedback'||id.startsWith('community:'))return <CommunityPanel snapshot={snapshot} demo={demo} onOpen={onOpen} initialTab={id==='feedback'?'feedback':id.split(':')[1] as 'mine'|'talent'|'demo_day'}/>;
  if(id.startsWith('business:'))return <BusinessPanel snapshot={snapshot} demo={demo} view={id.slice(9) as BusinessView} onOpenLesson={onOpen} onAsk={onAsk}/>;
+ if(id==='support:library')return <LessonFinder snapshot={snapshot} demo={demo} onOpen={id=>onOpen(id)} onAsk={onAsk}/>;
  if(id.startsWith('support:'))return <SupportPanel snapshot={snapshot} demo={demo} initialTab={id.slice(8)} focused archive={archive} onOpen={onOpen} onAsk={onAsk}/>;
  if(id==='archive')return <PersonalArchive demo={demo}/>;
  if(id==='legacy-space')return <SpacePanel snapshot={snapshot} demo={demo} initialRenderer="classic" onNavigate={onNavigate} onOpenLesson={onOpen}/>;

@@ -2,11 +2,10 @@
 import theme from './theme.module.css';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Orbit, RefreshCw, Check, Flag, MessageCircle, Download, X, Clock3, CircleHelp } from 'lucide-react';
+import { ArrowUpRight, Orbit, RefreshCw, Check, Flag, MessageCircle, Clock3, CircleHelp } from 'lucide-react';
 import type { CampusSnapshot } from '../contracts';
 import type { CampusAdminSnapshot } from '../admin-metrics';
 import { learnerMetrics } from '../learner-metrics';
-import { downloadProgressCard } from './progress-card';
 import styles from './dashboard.module.css';
 
 export function CampusFrame({ children, demo = false, admin = false, immersive = false, enrollmentId }: { children: React.ReactNode; demo?: boolean; admin?: boolean; immersive?: boolean; enrollmentId?: string | null }) {
@@ -21,22 +20,11 @@ export function LearnerDashboard({ snapshot, onOpen, onRefresh, onSelect, demo =
 }) {
   const metrics = learnerMetrics(snapshot);
   const [filter, setFilter] = useState('all');
-  const [report, setReport] = useState(false);
-  useEffect(() => {
-    if(!report)return;
-    const dialog=document.querySelector<HTMLElement>('[aria-labelledby="progress-card-title"]');
-    const close=(event:KeyboardEvent)=>{
-      if(event.key==='Escape'){setReport(false);return;}
-      if(event.key==='Tab'&&dialog){const nodes=Array.from(dialog.querySelectorAll<HTMLElement>('button,a[href],input'));const first=nodes[0],last=nodes.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
-    };
-    document.addEventListener('keydown',close);
-    return()=>{document.removeEventListener('keydown',close);document.querySelector<HTMLElement>('[data-progress-trigger]')?.focus();};
-  },[report]);
   const steps = metrics.steps.filter(s => filter === 'all' || (filter === 'revision' ? s.status === 'revision' : s.status === 'complete'));
   return <>
     <div className={styles.heading}><div><span className={styles.eyebrow}>나의 문샷</span><h1>{snapshot.viewer.displayName}님의 다음 도약</h1><p>어디까지 왔는지 확인하고, 다음 수업을 이어가세요.</p></div><div className={styles.tools}>
       <label className={styles.srOnly} htmlFor="campus-scope">내 수강 기수</label><select id="campus-scope" value={snapshot.selectedEnrollmentId || ''} onChange={e => onSelect(e.target.value)}><option value="" disabled>기수 선택</option>{snapshot.scopes.map(s => <option key={s.enrollmentId} value={s.enrollmentId}>{s.courseTitle} · {s.cohortName}</option>)}</select>
-      <button onClick={onRefresh} aria-label="학습 기록 새로고침"><RefreshCw size={17}/></button>{snapshot.scopes.length>0&&<button data-progress-trigger onClick={() => setReport(true)}>내 성장 카드 보기 <ArrowUpRight size={16}/></button>}</div></div>
+      <button onClick={onRefresh} aria-label="학습 기록 새로고침"><RefreshCw size={17}/></button></div></div>
     {!snapshot.scopes.length ? <div className={styles.empty}><h2>이용 가능한 수업을 확인해 주세요</h2><p>수강권이 연결되면 이곳에서 나의 미션과 실행 기록을 확인할 수 있어요.</p><Link href="/my/classes">내 클래스 보기</Link></div> : <>
         <div className={styles.stats} style={{gridTemplateColumns:'1fr'}}><Stat label="완료한 수업" value={`${metrics.completedLessons} / ${metrics.totalLessons}`} note="수업 완료 표시 기준" icon={<Check/>}/></div>
 
@@ -44,7 +32,6 @@ export function LearnerDashboard({ snapshot, onOpen, onRefresh, onSelect, demo =
       <div className={styles.lessonGrid}>{steps.map(step => <button className={styles.lesson} key={step.lessonId} onClick={() => onOpen(step.lessonId)}><div className={styles.lessonTop}><b>{(step.week ?? 1) <= 0 ? '준비' : 'DAY'} {String(step.day).padStart(2,'0')}</b><span className={styles[step.status] || styles.pill}>{({revision:'수정 필요',waiting:'검토 대기',ready:'실행 준비',complete:'완료',not_started:'시작 전',in_progress:'진행 중',unknown:'확인 필요'})[step.status]}</span></div><h3>{step.title}</h3><span className={styles.lessonLink}>수업 열기 <ArrowUpRight size={15}/></span></button>)}</div>{!steps.length && <p className={styles.empty}>이 상태의 수업이 없습니다.</p>}</section>
     <details className={styles.definitions}><summary><CircleHelp size={16}/> 지표는 어떻게 계산하나요?</summary><p>수업 완료는 학습 화면의 완료 표시 기준입니다. 공개된 수업이 바뀌면 전체 개수도 달라집니다.</p><p>집계 시점: {new Date(snapshot.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</p></details>
     </>}
-    {report && <div className={styles.scrim} onClick={() => setReport(false)}><section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="progress-card-title" onClick={e => e.stopPropagation()}><button className={styles.close} autoFocus aria-label="성장 카드 닫기" onClick={() => setReport(false)}><X/></button><span className={styles.eyebrow}>MY PROGRESS, MY PROOF</span><h2 id="progress-card-title">나의 실행 기록</h2><p>개인 보관용 성장 카드예요. 공개 게시 없이 파일로 저장합니다.</p><pre>{demo ? '[가상 예시 · 검수용]\n' : ''}{metrics.reportText}</pre><button className={styles.primary} onClick={() => downloadProgressCard(snapshot, demo)}><Download size={17}/> 성장 카드 이미지 저장</button><p className={styles.small}>수료증이나 사업 성과 인증서가 아닙니다.</p></section></div>}
   </>;
 }
 function Stat({label,value,note,icon}:{label:string;value:string;note:string;icon:React.ReactNode}) {return <div className={styles.stat}><div className={styles.statLabel}>{label}{icon}</div><strong>{value}</strong><p>{note}</p></div>;}
