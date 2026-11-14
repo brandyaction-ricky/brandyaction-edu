@@ -46,7 +46,8 @@ test('disconnected office stores private request; only explicit synthetic receip
  await page.getByRole('button',{name:'예시 실행 시작',exact:true}).click();await expect(detail.getByText('실행 중',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'이 작업 숨기기',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'예시 초안 도착',exact:true}).click();await expect(detail.getByText('내 검토 필요',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'검토 후 승인',exact:true})).toBeDisabled();
+ // Approving needs no memo; a revision request does.
+ await expect(page.getByRole('button',{name:'검토 후 승인',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'수정 요청',exact:true})).toBeDisabled();
  await page.getByRole('textbox',{name:'검토 메모',exact:true}).fill('고객 대상과 실행 순서를 확인했고 이 초안으로 진행하겠습니다.');await page.getByRole('button',{name:'검토 후 승인',exact:true}).click();
  await expect(detail.getByText('승인 완료',{exact:true})).toBeVisible();await detail.getByText('요청·검토 이력 · 최근 20개',{exact:true}).click();await expect(detail.getByText('v1 · 연결 대기',{exact:true})).toBeVisible();await noOverflow(page);
  await page.screenshot({path:test.info().outputPath('office-approved.png'),fullPage:true});

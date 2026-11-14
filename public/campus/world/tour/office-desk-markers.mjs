@@ -1,22 +1,24 @@
-// Project only jobs belonging to occupied seats in this office.
-export function makeDeskMarkers(layer, seats, profiles, jobs, openJob) {
+// One marker per occupied seat. A desk with work in progress or a result to review opens that job;
+// with openEmployee, an idle desk also gets a quiet name tag that opens the employee's status card.
+export function makeDeskMarkers(layer, seats, profiles, jobs, openJob, openEmployee) {
   const markers = [];
-  for (const job of jobs) {
-    const profile = profiles.find(person => person.employeeId === job.employeeId);
+  for (const profile of profiles) {
     const desk = seats[profile?.seatIndex];
-    if (!desk || !['running', 'review'].includes(job.status)) continue;
+    if (!desk) continue;
+    const job = jobs.find(item => item.employeeId === profile.employeeId && ['running', 'review'].includes(item.status));
+    if (!job && !openEmployee) continue;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'tour-hotspot office-desk-job';
-    button.dataset.status = job.status;
-    const label = job.status === 'review' ? '검토할 결과' : '진행 중';
-    button.setAttribute('aria-label', profile.name + ' · ' + label + ' 업무 열기');
+    button.dataset.status = job ? job.status : 'idle';
+    const label = !job ? '대기 중' : job.status === 'review' ? '검토할 결과' : '진행 중';
+    button.setAttribute('aria-label', profile.name + (job ? ' · ' + label + ' 업무 열기' : ' 상태 보기'));
     // Show who it is, not the seat number: the name on top, the status under it.
     const who = document.createElement('strong'), what = document.createElement('small');
     who.textContent = profile.name; what.textContent = label;
     button.append(who, what);
     button.title = profile.name + ' · ' + label;
-    button.onclick = () => openJob(job.jobId);
+    button.onclick = () => job ? openJob(job.jobId) : openEmployee(profile.employeeId);
     layer.append(button);
     markers.push({b:button,wing:desk.wing,item:{x:desk.x,y:desk.y,w:0,d:0,height:1.6}});
   }
