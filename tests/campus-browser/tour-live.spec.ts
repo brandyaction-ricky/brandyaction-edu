@@ -70,6 +70,6 @@ test('live job inbox names the employee, titles the result by the task and point
  const card=page.getByRole('button',{name:/첫 수업 공지 작성/});await expect(card).toContainText('공지 직원 · 문구 초안');await card.click();
  const detail=page.getByRole('article',{name:'선택한 AI 직원 작업'});await expect(detail.getByRole('heading',{name:'첫 수업 공지 작성'})).toBeVisible();await expect(detail).toBeInViewport();
  await expect(detail).toContainText('수정을 요청한 초안');await expect(detail).toContainText('공지\n목요일 저녁 8시\n• 링크는 당일 발송');await expect(detail).not.toContainText('**');
- await expect(detail.getByRole('link',{name:'Telegram에서 다시 맡기기 ↗'})).toHaveAttribute('href','https://t.me/moonshot_notice_bot');
+ await expect(detail.getByRole('link',{name:'텔레그램에서 이어서 맡기기 ↗'})).toHaveAttribute('href','https://t.me/moonshot_notice_bot');
  await expect(page.getByRole('navigation',{name:'업무 페이지'})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });

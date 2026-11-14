@@ -4,8 +4,16 @@ test('personal bot roster registers independently of seats and preserves the emp
  await page.getByLabel('직원 이름').fill('콘텐츠 기획 담당');await page.getByLabel('텔레그램 봇 주소').fill('https://t.me/moonshot_qa_bot');await page.getByLabel('담당 업무').fill('내 사업의 콘텐츠 아이디어 정리');await page.getByRole('button',{name:'직원 등록하기',exact:true}).click();
  const employee=page.getByRole('article').filter({hasText:'콘텐츠 기획 담당'}),seats=page.getByRole('region',{name:'사무실 좌석',exact:true});
  await expect(employee.getByRole('link',{name:'텔레그램 열기 ↗',exact:true})).toHaveAttribute('href','https://t.me/moonshot_qa_bot');await expect(employee).toContainText('미배치');await expect(seats.getByRole('button',{name:/사무실에서 숨기기$/})).toHaveCount(0);
- await employee.getByRole('button',{name:'빈자리에 배치',exact:true}).click();await expect(seats).toContainText('콘텐츠 기획 담당');await expect(page.getByText('자리 1/10',{exact:false})).toBeVisible();await page.screenshot({path:test.info().outputPath('personal-office.png')});
- await seats.getByRole('button',{name:/사무실에서 숨기기$/}).click();await expect(page.getByText('자리 0/10',{exact:false})).toBeVisible();await expect(employee).toContainText('미배치');await expect(employee.getByRole('link',{name:'텔레그램 열기 ↗',exact:true})).toBeVisible();await expect(seats.getByRole('button',{name:/사무실에서 숨기기$/})).toHaveCount(0);expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ const seat=(name:string)=>seats.getByRole('listitem').filter({has:page.getByText(name,{exact:true})}).locator('strong');
+ await employee.getByRole('button',{name:'빈자리에 배치',exact:true}).click();await expect(seat('1번 자리')).toHaveText('콘텐츠 기획 담당');await expect(page.getByText('자리 1/10',{exact:false})).toBeVisible();await page.screenshot({path:test.info().outputPath('personal-office.png')});
+ // Any free seat can take the employee: its own select moves a seated employee there.
+ await seats.getByLabel('3번 자리에 앉힐 직원',{exact:true}).selectOption({label:'콘텐츠 기획 담당 (1번 자리에서 옮기기)'});await expect(seat('3번 자리')).toHaveText('콘텐츠 기획 담당');await expect(seat('1번 자리')).toHaveText('빈자리');
+ // Hiding folds the employee under 숨긴 직원 with the seat to return to; showing again returns to that seat.
+ await seats.getByRole('button',{name:/사무실에서 숨기기$/}).click();await expect(page.getByText('자리 0/10',{exact:false})).toBeVisible();await expect(seats.getByRole('button',{name:/사무실에서 숨기기$/})).toHaveCount(0);
+ await page.locator('details').filter({hasText:'숨긴 직원 1명'}).locator('summary').click();await expect(employee).toContainText('숨김 · 3번 자리');await expect(employee.getByRole('link',{name:'텔레그램 열기 ↗',exact:true})).toBeVisible();
+ await employee.getByRole('button',{name:'다시 보이기',exact:true}).click();await expect(seat('3번 자리')).toHaveText('콘텐츠 기획 담당');await expect(page.locator('details').filter({hasText:/숨긴 직원 \d+명/})).toHaveCount(0);
+ await seats.getByRole('button',{name:'모두 숨기기',exact:true}).click();await expect(page.getByText('자리 0/10',{exact:false})).toBeVisible();await seats.getByRole('button',{name:'모두 보이기',exact:true}).click();await expect(seat('3번 자리')).toHaveText('콘텐츠 기획 담당');
+ expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
 test('several employees register at once, take free desks, and lines that fail stay in the box',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/personal-office');

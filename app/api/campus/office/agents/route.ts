@@ -56,6 +56,17 @@ export async function POST(request:Request){try{
   const r=await db.from('edu_campus_office_employees').delete().eq('owner_id',user.id).eq('employee_id',id).select('employee_id');
   if(r.error)throw r.error;if(!r.data.length)fail('이미 삭제된 직원입니다.',404);return privateReply({removed:id});
  }
+ if(body.action==='hidden'){
+  // Hidden is a mark on the employee's own directory row. Seating the employee again rewrites the row from the office document, which clears it.
+  const {db,user}=await access(body.enrollmentId);const ids=body.employeeIds;
+  if(!Array.isArray(ids)||!ids.length||ids.length>24||ids.some(id=>typeof id!=='string'||!id||id.length>128)||typeof body.hidden!=='boolean')fail('숨길 직원을 확인해 주세요.');
+  const rows=await db.from('edu_campus_office_employees').select('employee_id,profile').eq('owner_id',user.id).in('employee_id',ids);if(rows.error)throw rows.error;
+  for(const row of rows.data){
+   const profile={...(row.profile as Record<string,unknown>)};if(body.hidden)profile.hidden=true;else delete profile.hidden;
+   const r=await db.from('edu_campus_office_employees').update({profile}).eq('owner_id',user.id).eq('employee_id',row.employee_id);if(r.error)throw r.error;
+  }
+  return privateReply({hidden:body.hidden,employeeIds:rows.data.map(r=>r.employee_id)});
+ }
  if(Object.keys(body).some(k=>!['enrollmentId','document','revision','expectedRevision'].includes(k))||!uuid(body.revision)||body.expectedRevision!==null&&!uuid(body.expectedRevision))fail('저장 요청을 확인해 주세요.');
  const{db,user}=await access(body.enrollmentId);let document;try{document=new BotOfficeModel().restore(body.document);}catch{fail('직원 이름·텔레그램 주소·좌석을 확인해 주세요.');}
  const row={owner_id:user.id,document,revision:body.revision,updated_at:new Date().toISOString()};

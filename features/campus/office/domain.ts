@@ -29,7 +29,7 @@ export function validateOfficeCommand(input: unknown): OfficeCommand {
     out.materialUrls = [...new Set(c.materialUrls.map(v => safeCommunityUrl(v, false)))]; out.outputType = c.outputType;
   } else {
     if (!isCampusId(c.jobId!) || !Number.isSafeInteger(c.expectedRevision) || c.expectedRevision! < 1) campusError(400, '최신 작업을 선택해 주세요.');
-    out.jobId = c.jobId; out.expectedRevision = c.expectedRevision; out.note = text(c.note ?? '', ['approve', 'request_revision'].includes(c.action) ? 5 : 0, 2000);
+    out.jobId = c.jobId; out.expectedRevision = c.expectedRevision; out.note = text(c.note ?? '', c.action === 'request_revision' ? 5 : 0, 2000);
   }
   return out;
 }

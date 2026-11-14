@@ -77,7 +77,7 @@ function actions(){if(room==='library')return [['library:files','무료 자료 �
  office:[['office','업무 관리','요청 · 초안 · 검토',{x:25,y:16,w:4,d:2,height:1.2}],['bots','내 AI 직원','연결 상태 확인',{x:21.8,y:12.3,w:1.6,d:1.4,height:1.5}]],
  }[room].filter(([id])=>!publicVisitor||id!=='live-video');}
 let contentTasks=null;
-let deskProfiles=[],deskJobs=[],deskMarkers=[];
+let deskProfiles=[],deskJobs=[],deskMarkers=[],deskLive=false;
 const officeSeats=Plan.createCampusPlan().officeSeats;
 let officeFirst=false, pendingOffice=null, initialRoomSync=false;
 let firstDeskFrame=null;
@@ -149,13 +149,13 @@ function applyPersonalOffice(payload){
    deskProfiles=document.profiles;
    lastDocument=key;
   }
-  deskJobs=Array.isArray(payload.desks)?payload.desks:[];
+  deskJobs=Array.isArray(payload.desks)?payload.desks:[];deskLive=true;
   return changed;
  }catch{return;}
 }
 function renderDeskMarkers(){
  deskMarkers=room==='office'&&currentRole==='student'
-   ? makeDeskMarkers(layer,officeSeats,deskProfiles,deskJobs,jobId=>send('office-desk-job',{jobId})) : [];
+   ? makeDeskMarkers(layer,officeSeats,deskProfiles,deskJobs,jobId=>send('office-desk-job',{jobId}),deskLive?employeeId=>send('office-desk-employee',{employeeId}):undefined) : [];
 }
 function refreshDeskLabels(){
  for(const {b} of deskMarkers)b.remove();
@@ -238,7 +238,7 @@ window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.orig
  return;
 }if(m.type==='dev-visitor-state')meetup?.receive?.(p);if(m.type==='personal-office'){
  const seatsChanged=applyPersonalOffice(p);refreshDeskLabels();if(seatsChanged)office.draw();
-}if(m.type==='office-desks-clear'){deskJobs=[];refreshDeskLabels();}if(m.type==='content-config'&&Array.isArray(p.tasks)){contentTasks=p.tasks.filter(t=>typeof t.id==='string'&&typeof t.title==='string'&&typeof t.description==='string');setMarkers();}if(m.type==='room'){if(!initialRoomSync||p.id!==room)showRoom(p.id);initialRoomSync=false;}if(m.type==='role'){currentRole=['guest','waiting','student','admin','expired'].includes(p.role)?p.role:'guest';if(!allowed(room))showRoom('live');meetup?.roleChanged();}if(m.type==='environment-open'&&['study','office'].includes(room))environment?.open();if(m.type==='blocked'){blocked=!!p.value;root.inert=blocked||environment?.isOpen()===true;layer.hidden=blocked;view.refresh();keys.clear();target=null;if(!blocked){budget.wake(performance.now());office.draw();if(!editing)root.focus({preventScroll:true});}}if(m.type==='sit'&&room==='study'){const p=Plan.getStudySeats()[0];Object.assign(office.campusAvatar,p,{studyPose:'sit',moving:false});target=null;keys.clear();office.draw();}if(m.type==='appearance'){office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.nickname||'나 · 미리보기').slice(0,24)};office.draw();if(meetupWanted)void meetup?.join();}if(m.type==='progress'){office.campusIdentity={...office.campusIdentity,level:Number.isSafeInteger(p.level)?Math.max(0,Math.min(30,p.level)):0};root.dataset.level=String(office.campusIdentity.level);office.draw();}if(m.type==='camera'){view.set(p.mode);root.focus({preventScroll:true});}if(m.type==='appearance-open'&&!blocked){editor.open();send('editor',{open:true});}if(m.type==='appearance-result'){editor.result(p);if(p.ok){send('editor',{open:false});view.refresh();budget.wake(performance.now());office.draw();}}});
+}if(m.type==='office-desks-clear'){deskJobs=[];deskLive=false;refreshDeskLabels();}if(m.type==='content-config'&&Array.isArray(p.tasks)){contentTasks=p.tasks.filter(t=>typeof t.id==='string'&&typeof t.title==='string'&&typeof t.description==='string');setMarkers();}if(m.type==='room'){if(!initialRoomSync||p.id!==room)showRoom(p.id);initialRoomSync=false;}if(m.type==='role'){currentRole=['guest','waiting','student','admin','expired'].includes(p.role)?p.role:'guest';if(!allowed(room))showRoom('live');meetup?.roleChanged();}if(m.type==='environment-open'&&['study','office'].includes(room))environment?.open();if(m.type==='blocked'){blocked=!!p.value;root.inert=blocked||environment?.isOpen()===true;layer.hidden=blocked;view.refresh();keys.clear();target=null;if(!blocked){budget.wake(performance.now());office.draw();if(!editing)root.focus({preventScroll:true});}}if(m.type==='sit'&&room==='study'){const p=Plan.getStudySeats()[0];Object.assign(office.campusAvatar,p,{studyPose:'sit',moving:false});target=null;keys.clear();office.draw();}if(m.type==='appearance'){office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.nickname||'나 · 미리보기').slice(0,24)};office.draw();if(meetupWanted)void meetup?.join();}if(m.type==='progress'){office.campusIdentity={...office.campusIdentity,level:Number.isSafeInteger(p.level)?Math.max(0,Math.min(30,p.level)):0};root.dataset.level=String(office.campusIdentity.level);office.draw();}if(m.type==='camera'){view.set(p.mode);root.focus({preventScroll:true});}if(m.type==='appearance-open'&&!blocked){editor.open();send('editor',{open:true});}if(m.type==='appearance-result'){editor.result(p);if(p.ok){send('editor',{open:false});view.refresh();budget.wake(performance.now());office.draw();}}});
 const direction=e=>({KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[e.code]);
 document.addEventListener('keydown',e=>{const d=direction(e);if(!d||blocked||editing||!ready||e.target.closest('button,input,textarea,select'))return;e.preventDefault();keys.add(d);budget.wake(performance.now());});document.addEventListener('keyup',e=>{keys.delete(direction(e));});window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{keys.clear();target=null;});
 root.addEventListener('pointerup',e=>{if(!ready||blocked||editing||!view.isClick()||e.button!==0)return;const rect=root.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top,near=office.camera.position.clone().set(mx/office.cw*2-1,1-my/office.ch*2,-1).unproject(office.camera),far=office.camera.position.clone().set(mx/office.cw*2-1,1-my/office.ch*2,1).unproject(office.camera);const p=room==='live'?intersectAtriumRay(near,far):office.campusFloorAt(mx,my);if(p){target=p;root.focus();budget.wake(performance.now());}});

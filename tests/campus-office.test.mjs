@@ -46,6 +46,8 @@ test('learner commands cannot run jobs; draft receipt cannot self-approve and CA
  assert.throws(()=>learnerOfficeTransition({...job,status:'review',draft_text:'verified real draft'}, {action:'approve',expectedRevision:0}),{status:409});
  assert.equal(connectorOfficeTransition(job,{event:'accepted',expectedRevision:1}),'queued');
  assert.throws(()=>learnerOfficeTransition({...job,status:'running'}, {action:'archive',expectedRevision:1}),{status:409});
+ const reviewed={requestId:uid(1),enrollmentId:uid(2),jobId:uid(3),expectedRevision:1};
+ assert.equal(validateOfficeCommand({...reviewed,action:'approve'}).note,'');assert.throws(()=>validateOfficeCommand({...reviewed,action:'request_revision',note:'짧음'}),{status:400});
  assert.equal(learnerOfficeTransition({...job,status:'archived'},{action:'restore',expectedRevision:1}),'awaiting_connection');assert.throws(()=>learnerOfficeTransition({...job,status:'review'},{action:'restore',expectedRevision:1}),{status:409});
 });
 test('office API origin/auth/input boundary',async()=>{
@@ -83,6 +85,7 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
   create function private.campus_office_mutate(p_command jsonb) returns jsonb language sql security definer set search_path='' as $$select private.campus_office_mutate_before_dispatch(p_command)$$;
   revoke all on function private.campus_office_mutate(jsonb) from public;grant execute on function private.campus_office_mutate(jsonb) to authenticated;`);
  await db.exec(readFileSync(new URL('../supabase/migrations/20261113150000_campus_office_job_restore.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261114100100_campus_office_approve_without_memo.sql',import.meta.url),'utf8'));
  const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
  const mutate=async c=>(await db.query('select public.edu_campus_office_mutate($1::jsonb) result',[JSON.stringify(c)])).rows[0].result;
  const ingest=async(id,ev,owners=[uid(1)],hash='a'.repeat(64),connectorId='office',version='v1')=>(await db.query('select public.edu_campus_office_ingest($1,$2,$3::uuid[],$4,$5,$6::jsonb) result',[connectorId,version,owners,uid(id),hash,JSON.stringify(ev)])).rows[0].result;
@@ -120,6 +123,8 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  await ingest(201,{...accepted,event:'started',expectedRevision:2});
  await ingest(202,{...accepted,event:'draft',expectedRevision:3,draftText:'첫 제안의 대상을 좁히고 고객이 얻을 변화를 구체적으로 적으세요.',draftUrl:''});
  await login(1);const approve={requestId:uid(300),enrollmentId:uid(31),action:'approve',jobId:uid(100),expectedRevision:4,note:'목표와 자료를 확인했고 사용 가능한 초안입니다.'};
+ // A revision request needs a memo; an approval does not (the second job below is approved with none).
+ await assert.rejects(mutate({...approve,requestId:uid(297),action:'request_revision',note:''}),/note/i);
  assert.equal((await mutate(approve)).status,'approved');await assert.rejects(mutate({...approve,requestId:uid(301)}),/revision conflict/i);
  await mutate({...approve,requestId:uid(302),action:'archive',expectedRevision:5,note:''});
  assert.equal((await db.query('select * from edu_campus_office_history where job_id=$1',[uid(100)])).rows.length,6);
@@ -136,6 +141,8 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  await mutate({requestId:uid(308),enrollmentId:uid(31),action:'archive',jobId:uid(101),expectedRevision:1,note:''});
  assert.equal((await mutate({requestId:uid(309),enrollmentId:uid(31),action:'restore',jobId:uid(101),expectedRevision:2,note:''})).status,'awaiting_connection');
  await login(2);await assert.rejects(mutate({requestId:uid(310),enrollmentId:uid(32),action:'restore',jobId:uid(100),expectedRevision:10,note:''}),/scope/i);await login(1);
+ await db.exec('reset role;set role service_role;');await ingest(804,{jobId:uid(700),event:'draft',expectedRevision:3,draftText:'메모 없이 승인할 수 있는지 확인하는 두 번째 초안입니다.',draftUrl:''});await login(1);
+ assert.equal((await mutate({requestId:uid(311),enrollmentId:uid(31),action:'approve',jobId:uid(700),expectedRevision:4})).status,'approved');
  await db.exec(`reset role;set role service_role;`);await assert.rejects(ingest(203,{...accepted,expectedRevision:10}),/transition/i);
  await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}';`);await login(1);
  assert.equal((await db.query('select * from edu_campus_office_jobs')).rows.length,0);await assert.rejects(mutate({...create,requestId:uid(500)}),/scope/i);

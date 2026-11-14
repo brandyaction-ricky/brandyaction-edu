@@ -24,3 +24,10 @@
 .root>details button{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .history summary{font-size:13px}
 .history li>details>summary{min-height:36px;font-size:12px;font-weight:600}
+.steps{list-style:none;counter-reset:step;margin:16px 0 4px;padding:14px 16px;display:grid;gap:10px;border:1px solid var(--line);border-radius:11px;background:var(--surface-subtle, #f7f8f9)}
+.steps li{counter-increment:step;display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:10px;font-size:13px;line-height:1.6}
+.steps li::before{content:counter(step);grid-row:1/3;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fff;border:1px solid var(--border-strong, #cfd3d8);font-weight:700;font-size:12px}
+.steps li span{color:var(--muted)}
+.root a.secondary{font:inherit;text-decoration:none;color:var(--ink)}
+.draft .actions{margin-top:4px}
+.actions .notice{margin:0}

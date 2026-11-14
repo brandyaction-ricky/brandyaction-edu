@@ -10,18 +10,23 @@ import {campusActivity} from '../../analytics/client';
 import {useDirectory} from './directory';
 import styles from './panel.module.css';
 type Saved={document:BotDocument;revision:string|null;updated_at:string|null};
+// A hidden employee is out of the office but keeps the seat it returns to (the directory row's last seat).
+type Employee=BotProfile&{hidden?:boolean};
+const seatName=(n:number)=>n?n+'번 자리':'총괄 관리자 자리';
 export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enrollmentId:string;demo?:boolean;onChange?:(document:BotDocument)=>void;onJobs?:(employee:{id:string;name:string})=>void}){
  const [pilot,setPilot]=useState(false);
  const [loaded,setLoaded]=useState(demo);
  const [saved,setSaved]=useState<Saved>({document:new BotOfficeModel().getDocument(),revision:null,updated_at:null}),[loading,setLoading]=useState(!demo),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[name,setName]=useState(''),[telegram,setTelegram]=useState(''),[duties,setDuties]=useState(''),[bulk,setBulk]=useState('');const locked=useRef(false),notice=useRef<HTMLParagraphElement>(null),onChangeRef=useRef(onChange);useEffect(()=>{onChangeRef.current=onChange;},[onChange]);
  const [statusFirst,setStatusFirst]=useState<boolean|null>(demo?false:null);
- const [epoch,setEpoch]=useState(0),[local,setLocal]=useState<BotProfile[]>([]);
+ const [epoch,setEpoch]=useState(0),[local,setLocal]=useState<Employee[]>([]);
  const conn=useStudentConnections(enrollmentId,!demo&&(pilot||studentReportingAvailable()));
  const dir=useDirectory(enrollmentId,!demo,epoch);
  const desks=saved.document.profiles.filter(p=>p.employeeId!=='manager');
  // 자리에 앉은 순서대로(총괄 관리자 자리부터), 앉지 않은 직원은 이름순으로 뒤에.
  const seatOrder=(p:BotProfile)=>desks.find(d=>d.employeeId===p.employeeId)?.seatIndex??99;
- const employees=[...(demo?local:(dir.data?.employees??[]))].sort((a,b)=>seatOrder(a)-seatOrder(b)||a.name.localeCompare(b.name,'ko'));
+ const employees=([...(demo?local:(dir.data?.employees??[]))] as Employee[]).sort((a,b)=>seatOrder(a)-seatOrder(b)||a.name.localeCompare(b.name,'ko'));
+ const isSeated=(p:BotProfile)=>desks.some(d=>d.employeeId===p.employeeId);
+ const hiddenStaff=employees.filter(p=>p.hidden&&!isSeated(p)),shownStaff=employees.filter(p=>!p.hidden||isSeated(p));
  function changed(){setEpoch(v=>v+1);}
  useCampusDraftGuard(!!(name||telegram||duties||bulk),busy,'personal-office');
  async function refresh(signal?:AbortSignal){if(demo)return;const r=await fetch('/api/campus/office/agents?enrollmentId='+enrollmentId,{cache:'no-store',signal});const data=await r.json();if(!r.ok)throw Error(data.error||'내 직원을 불러오지 못했어요.');setPilot(data.pilot===true);setSaved(data);setStatusFirst(v=>v??data.document.profiles.some((p:BotProfile)=>p.employeeId!=='manager'));setLoaded(true);onChangeRef.current?.(data.document);}
@@ -77,15 +82,37 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
   if(!window.confirm('‘'+p.name+'’의 보고 연결을 해제할까요?\n다시 연결하려면 연결 코드를 새로 받아야 해요. 받은 업무 기록은 작업함에 남아요.'))return;
   setMessage(await conn.revoke(id)?'‘'+p.name+'’의 보고 연결을 해제했어요.':'연결을 해제하지 못했어요. 아래 ‘연결 상태 새로고침’을 눌러 확인해 주세요.');
  }
- function place(p:BotProfile){
-  // The lead desk (0) is offered last so it stays free for the 총괄 employee.
-  const seat=[1,2,3,4,5,6,7,8,9,0].find(n=>!desks.some(d=>d.seatIndex===n));
-  if(seat!==undefined)seatAt(p,seat);
+ async function mark(ids:string[],hidden:boolean){
+  if(demo){setLocal(old=>old.map(p=>ids.includes(p.employeeId)?{...p,hidden}:p));return true;}
+  const r=await fetch('/api/campus/office/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'hidden',enrollmentId,employeeIds:ids,hidden})});return r.ok;
  }
- function seatAt(p:BotProfile,seat:number){
-  const document=structuredClone(saved.document);document.profiles.push({...p,seatIndex:seat});void save(document);
+ // 숨기기: 사무실 자리에서만 빠지고, 돌아올 자리를 기억한 채 '숨긴 직원'으로 접힌다.
+ async function hide(list:BotProfile[]){
+  const ids=list.map(p=>p.employeeId);if(!ids.length)return;
+  if(!await save({...saved.document,profiles:saved.document.profiles.filter(d=>!ids.includes(d.employeeId))}))return;
+  const ok=await mark(ids,true);changed();
+  setMessage(!ok?'사무실에서는 뺐지만 숨김 표시를 저장하지 못했어요. 직원 목록에서 ‘빈자리에 배치’로 다시 앉힐 수 있어요.':(list.length===1?'‘'+list[0].name+'’을(를)':list.length+'명을')+' 사무실에서 숨겼어요. 보고 연결과 업무 기록은 그대로예요. ‘숨긴 직원’에서 다시 보이게 할 수 있어요.');
  }
- function unseat(p:BotProfile){void save({...saved.document,profiles:saved.document.profiles.filter(d=>d.employeeId!==p.employeeId)});}
+ // 보이기: 숨기기 전 자리가 비어 있으면 그 자리로, 아니면 빈자리로. at을 주면 그 자리에 앉힌다.
+ async function show(list:Employee[],at?:number){
+  const document=structuredClone(saved.document);let placed=0;
+  for(const p of [...list].sort((a,b)=>a.seatIndex-b.seatIndex)){
+   const taken=new Set(document.profiles.map(d=>d.seatIndex));
+   // The lead desk (0) is offered last so it stays free for the 총괄 employee.
+   const seat=at!==undefined&&!taken.has(at)?at:p.hidden&&!taken.has(p.seatIndex)?p.seatIndex:[1,2,3,4,5,6,7,8,9,0].find(n=>!taken.has(n));
+   if(seat===undefined)break;
+   document.profiles.push({employeeId:p.employeeId,name:p.name,telegramUrl:p.telegramUrl,duties:p.duties,appearanceSeed:p.appearanceSeed,seatIndex:seat});placed++;
+  }
+  if(!placed){setMessage('빈자리가 없어요. 다른 직원을 먼저 숨겨 주세요.');return;}
+  if(await save(document))setMessage(placed<list.length?placed+'명만 자리에 앉혔어요. 남은 직원은 빈자리가 생기면 앉힐 수 있어요.':list.length===1?'‘'+list[0].name+'’을(를) 사무실 자리에 앉혔어요.':placed+'명을 원래 자리에 다시 앉혔어요.');
+ }
+ // 자리의 선택칸: 빈자리면 고른 직원을 앉히고(다른 자리에 있으면 옮기고), 앉은 자리면 고른 직원과 서로 바꾼다.
+ async function moveTo(seat:number,id:string){
+  const document=structuredClone(saved.document),here=document.profiles.find(d=>d.seatIndex===seat),other=document.profiles.find(d=>d.employeeId===id);
+  if(!other){const p=employees.find(e=>e.employeeId===id);if(p&&!here)await show([p],seat);return;}
+  const from=other.seatIndex;other.seatIndex=seat;if(here)here.seatIndex=from;
+  if(await save(document))setMessage(here?'‘'+here.name+'’와(과) ‘'+other.name+'’의 자리를 서로 바꿨어요.':'‘'+other.name+'’을(를) '+seatName(seat)+'로 옮겼어요.');
+ }
  async function importFile(file:File){try{if(file.size>18000)throw Error('직원 목록 JSON 파일은 18KB 이내로 넣어 주세요.');const raw=JSON.parse(await file.text()),model=new BotOfficeModel();await save(model.restore(raw.botOffice||raw));}catch{setMessage('윤익님 사무실에서 내보낸 직원 목록 JSON 파일을 확인해 주세요. 봇 토큰은 넣지 마세요.');}}
  // 들어왔을 때 이미 자리에 앉은 직원이 있으면 현황(자리·목록·연결)을 먼저, 처음이면 등록 칸을 먼저 보여 준다.
  // 화면을 쓰는 도중에는 순서를 바꾸지 않는다(방금 쓰던 등록 칸이 다른 곳으로 옮겨 가지 않게).
@@ -95,24 +122,38 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  </>;
  const links=conn.enabled&&<ConnectionSetup enrollmentId={enrollmentId} employees={employees} conn={conn}/>;
  const seatBoard=<>
- <section aria-label="사무실 좌석"><h3>사무실 좌석 <small>{desks.length} / 10</small></h3>
- <p>총괄 관리자 자리는 29일차에 채용하는 총괄 관리자의 자리예요. 눈 표시 ‘숨기기’를 누르면 그 직원이 사무실 자리에서만 빠져요. 직원 등록, 보고 연결, 업무 기록은 그대로 남고, 직원 목록의 ‘빈자리에 배치’로 다시 보이게 할 수 있어요.</p>
- <ol className={styles.seats}>{[0,1,2,3,4,5,6,7,8,9].map(n=>{const p=desks.find(d=>d.seatIndex===n),free=employees.filter(e=>!desks.some(d=>d.employeeId===e.employeeId));return <li key={n} data-empty={p?undefined:''} data-lead={n?undefined:''}><small>{n?n+'번 자리':'총괄 관리자 자리'}</small><strong>{p?.name||'빈자리'}</strong>{p?<button type="button" className={styles.eye} disabled={busy} aria-label={p.name+' 사무실에서 숨기기'} onClick={()=>unseat(p)}><EyeOff size={14} aria-hidden/>숨기기</button>:!n&&free.length>0&&<select aria-label="총괄 관리자 자리에 앉힐 직원" value="" disabled={busy} onChange={e=>{const chosen=free.find(f=>f.employeeId===e.target.value);if(chosen)seatAt(chosen,0);}}><option value="">직원 선택</option>{free.map(f=><option key={f.employeeId} value={f.employeeId}>{f.name}</option>)}</select>}</li>;})}</ol></section>
+ <section aria-label="사무실 좌석"><div className={styles.seatHead}><h3>사무실 좌석 <small>{desks.length} / 10</small></h3><div className={styles.controls}>
+  {desks.length>0&&<button type="button" className={styles.eye} disabled={busy} onClick={()=>void hide(desks)}><EyeOff size={14} aria-hidden/>모두 숨기기</button>}
+  {hiddenStaff.length>0&&<button type="button" className={styles.eye} disabled={busy} onClick={()=>void show(hiddenStaff)}><Eye size={14} aria-hidden/>모두 보이기</button>}</div></div>
+ <p>총괄 관리자 자리는 29일차에 채용하는 총괄의 자리예요. 자리의 선택칸으로 직원을 앉히거나 서로 자리를 바꿀 수 있어요.</p>
+ <p className={styles.note}>눈 표시 ‘숨기기’를 누르면 직원이 사무실에서만 빠져요. 보고 연결과 업무 기록은 그대로이고, ‘다시 보이기’를 누르면 원래 자리로 돌아와요.</p>
+ <ol className={styles.seats}>{[0,1,2,3,4,5,6,7,8,9].map(n=>{const p=desks.find(d=>d.seatIndex===n),others=desks.filter(d=>d.seatIndex!==n),free=employees.filter(e=>!isSeated(e));
+  return <li key={n} data-empty={p?undefined:''} data-lead={n?undefined:''}><small>{seatName(n)}</small><strong>{p?.name||'빈자리'}</strong>
+   {p&&<button type="button" className={styles.eye} disabled={busy} aria-label={p.name+' 사무실에서 숨기기'} onClick={()=>void hide([p])}><EyeOff size={14} aria-hidden/>숨기기</button>}
+   {(p?others.length>0:free.length+others.length>0)&&<select aria-label={p?seatName(n)+' 직원과 자리 바꾸기':seatName(n)+'에 앉힐 직원'} value="" disabled={busy} onChange={e=>{if(e.target.value)void moveTo(n,e.target.value);}}>
+    <option value="">{p?'자리 바꾸기':'직원 선택'}</option>
+    {!p&&free.map(f=><option key={f.employeeId} value={f.employeeId}>{f.name}{f.hidden?' · 숨김':''}</option>)}
+    {others.map(o=><option key={o.employeeId} value={o.employeeId}>{o.name} ({seatName(o.seatIndex)}{p?'':'에서 옮기기'})</option>)}
+   </select>}</li>;})}</ol></section>
  </>;
- const roster=<>
- <h3>전체 직원 목록 <small>{employees.length}명</small></h3>{dir.error&&<p role="alert">{dir.error}</p>}{!employees.length&&<p className={styles.note}>아직 등록한 직원이 없어요. 아래 ‘직원 추가’에서 수업에서 만든 봇을 등록해 보세요.</p>}
- <div className={styles.roster}>{employees.map(p=>{const seat=desks.find(d=>d.employeeId===p.employeeId),link=conn.rows?.find(r=>r.employeeId===p.employeeId);return <article key={p.employeeId}>
- <div className={styles.cardHead}><strong>{p.name}</strong><div className={styles.chips}><span>{seat?(seat.seatIndex?seat.seatIndex+'번 자리':'총괄 관리자 자리'):'미배치'}</span>{conn.rows&&<span data-status={link?.status||'none'}>{link?connectionLabel(link.status):'보고 미연결'}</span>}</div></div>
+ const card=(p:Employee)=>{const seat=desks.find(d=>d.employeeId===p.employeeId),link=conn.rows?.find(r=>r.employeeId===p.employeeId);return <article key={p.employeeId}>
+ <div className={styles.cardHead}><strong>{p.name}</strong><div className={styles.chips}><span data-hidden={!seat&&p.hidden?'':undefined}>{seat?seatName(seat.seatIndex):p.hidden?'숨김 · '+seatName(p.seatIndex):'미배치'}</span>{conn.rows&&<span data-status={link?.status||'none'}>{link?connectionLabel(link.status):'보고 미연결'}</span>}</div></div>
  {p.duties&&<p>{p.duties}</p>}
  {link?.confirmation&&<p className={styles.confirm}>같은 Telegram 대화에 보내세요. <code>캠퍼스 연결 확인 {link.confirmation}</code></p>}
  {link?.status==='expired'&&<p className={styles.confirm}>확인 기간이 지났어요. 연결을 해제한 뒤 다시 연결하세요.</p>}
  <div className={styles.controls}>
  {onJobs&&!demo&&<button type="button" onClick={()=>onJobs({id:p.employeeId,name:p.name})}>업무·결과 보기</button>}
  {p.telegramUrl&&<a href={p.telegramUrl} target="_blank" rel="noopener noreferrer">{link?.status==='active'?'Telegram에서 업무 맡기기 ↗':'텔레그램 열기 ↗'}</a>}
- {seat?<button type="button" className={styles.eye} disabled={busy} onClick={()=>unseat(p)}><EyeOff size={14} aria-hidden/>사무실에서 숨기기</button>:<button type="button" className={styles.eye} disabled={busy||desks.length>=10} onClick={()=>place(p)}><Eye size={14} aria-hidden/>빈자리에 배치</button>}
+ {seat?<button type="button" className={styles.eye} disabled={busy} onClick={()=>void hide([seat])}><EyeOff size={14} aria-hidden/>사무실에서 숨기기</button>
+  :p.hidden?<button type="button" className={styles.eye} disabled={busy||desks.length>=10} onClick={()=>void show([p])}><Eye size={14} aria-hidden/>다시 보이기</button>
+  :<button type="button" className={styles.eye} disabled={busy||desks.length>=10} onClick={()=>void show([p])}><Eye size={14} aria-hidden/>빈자리에 배치</button>}
  <span className={styles.spacer}/>
  {link&&<button type="button" className={styles.quiet} disabled={busy||conn.busy} onClick={()=>void release(p,link.id)}>연결 해제</button>}
- <button type="button" className={styles.danger} disabled={busy} onClick={()=>void remove(p)}>직원 삭제</button></div></article>;})}</div>
+ <button type="button" className={styles.danger} disabled={busy} onClick={()=>void remove(p)}>직원 삭제</button></div></article>;};
+ const roster=<>
+ <h3>전체 직원 목록 <small>{employees.length}명{hiddenStaff.length>0&&' · 숨김 '+hiddenStaff.length+'명'}</small></h3>{dir.error&&<p role="alert">{dir.error}</p>}{!employees.length&&<p className={styles.note}>아직 등록한 직원이 없어요. 아래 ‘직원 추가’에서 수업에서 만든 봇을 등록해 보세요.</p>}
+ <div className={styles.roster}>{shownStaff.map(card)}</div>
+ {hiddenStaff.length>0&&<details className={styles.hiddenGroup}><summary>숨긴 직원 {hiddenStaff.length}명</summary><p className={styles.note}>사무실에는 안 보이지만 텔레그램으로 맡긴 일은 그대로 작업함에 기록돼요.</p><div className={styles.roster}>{hiddenStaff.map(card)}</div></details>}
  {!demo&&(dir.page>1||!!dir.data?.next)&&<><div className={styles.controls}><button disabled={dir.page===1} onClick={dir.prev}>이전 직원 목록</button><span>{dir.page}페이지</span><button disabled={!dir.data?.next} onClick={dir.next}>다음 직원 목록</button></div>
 </>}
  </>;
