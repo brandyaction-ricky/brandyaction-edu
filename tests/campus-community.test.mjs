@@ -89,3 +89,19 @@ test('space exhibition navigation survives delayed panel mount and consumes only
  rememberCommunityDemoState(uid(2),uid(1),state);assert.equal(getCommunityDemoState(uid(2),uid(9)),null);assert.equal(getCommunityDemoState(uid(2),uid(1)),state);assert.deepEqual(getCommunityDemoExhibition(uid(2)).map(p=>p.id),[uid(100)]);
  state.reports=[{post_id:uid(100),status:'open'}];rememberCommunityDemoState(uid(2),uid(1),state);assert.deepEqual(getCommunityDemoExhibition(uid(2)),[]);
 });
+
+test('work brief and three-part review survive the round trip through body text; plain text stays plain; unreviewed work comes first',async()=>{
+ const {composeWork,parseWork,composeReview,parseReview,unreviewedFirst,openKinds}=await load('../features/campus/community/domain.ts');
+ assert.deepEqual(openKinds,['landing','ad']);
+ const work={offer:'점심을 거르는 직장인에게  도시락 구독',focus:'문구가 끌리는지',note:'첫 줄\n둘째 줄'};
+ assert.deepEqual(parseWork(composeWork(work)),{...work,offer:'점심을 거르는 직장인에게 도시락 구독'});
+ assert.deepEqual(parseWork(composeWork({...work,note:''})),{offer:'점심을 거르는 직장인에게 도시락 구독',focus:'문구가 끌리는지',note:''});
+ assert.equal(parseWork('그냥 적은 예전 글입니다.'),null);
+ assert.ok(composeWork({...work,note:''}).length>=10);
+ const review={clear:'애매해요',good:'대상이 바로 보여요.',fix:'가격을 버튼 위로 올려 보세요.'};
+ assert.deepEqual(parseReview(composeReview(review)),review);
+ assert.equal(parseReview('자유롭게 남긴 예전 의견입니다.'),null);
+ const posts=[{id:'a',owner_id:'u1'},{id:'b',owner_id:'u2'},{id:'c',owner_id:'u3'}];
+ const comments=[{post_id:'a',author_id:'u2',hidden:false},{post_id:'b',author_id:'u2',hidden:false},{post_id:'c',author_id:'u1',hidden:true}];
+ assert.deepEqual(unreviewedFirst(posts,comments).map(p=>p.id),['b','c','a']);
+});

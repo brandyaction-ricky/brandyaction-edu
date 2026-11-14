@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { campusError } from '../snapshot';
-import { loadCommunityExhibition, type ExhibitionCandidate, type ExhibitionPorts } from './exhibition';
+import { exhibitKinds, loadCommunityExhibition, type ExhibitionCandidate, type ExhibitionPorts } from './exhibition';
 export async function readCommunityExhibition(viewerId: string, enrollmentId: string) {
   const db = await createClient();
   const ports: ExhibitionPorts = {
@@ -20,7 +20,7 @@ export async function readCommunityExhibition(viewerId: string, enrollmentId: st
       return String(e.cohort_id);
     },
     authorizedPosts: async (cohortId, ids) => {
-      let query = db.from('edu_campus_posts').select('id,cohort_id,kind,visibility,hidden,title,alias,revision,updated_at').eq('cohort_id', cohortId).eq('kind', 'portfolio').eq('visibility', 'cohort').eq('hidden', false);
+      let query = db.from('edu_campus_posts').select('id,cohort_id,kind,visibility,hidden,title,alias,revision,updated_at').eq('cohort_id', cohortId).in('kind', exhibitKinds).eq('visibility', 'cohort').eq('hidden', false);
       if (ids) { if (!ids.length) return []; query = query.in('id', ids); }
       const result = await query.order('updated_at', { ascending: false }).order('id', { ascending: false }).limit(24);
       if (result.error || !Array.isArray(result.data)) campusError(503, '전시 조회 실패');

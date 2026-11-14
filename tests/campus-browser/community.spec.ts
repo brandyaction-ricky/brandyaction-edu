@@ -5,9 +5,9 @@ const title='동료에게 보여줄 첫 제안';
 async function compose(page:Page, sharing=false) {
  await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();
  await page.getByLabel('제목',{exact:true}).fill(title);
- await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('지역 공방을 위한 첫 제안과 신청 흐름을 만들었습니다. 대상과 결과가 잘 전달되는지 확인해 주세요.');
+ await page.getByLabel('누구에게 무엇을 파나요?').fill('지역 공방을 위한 첫 제안과 신청 흐름을 만들었습니다. 대상과 결과가 잘 전달되는지 확인해 주세요.');
  await page.getByLabel('작업물 링크').fill('https://example.com/work');
- if(sharing)await page.getByRole('radio',{name:'같은 기수와 공유'}).check();
+ await page.getByRole('radio',{name:sharing?'같은 기수와 공유':'나만 보기'}).check();
  await page.getByRole('button',{name:sharing?'기수에 공유하며 저장':'나만 보도록 저장',exact:true}).click();
  await expect(page.getByRole('article',{name:'선택한 작업물'})).toBeVisible();
 }
@@ -38,7 +38,7 @@ test('recipient verifies useful feedback and applies it only to a new portfolio 
  await page.getByRole('button',{name:'확인 기록 저장'}).click();
  await expect(page.getByText('도움됨',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'개선한 새 버전 저장'}).click();
- await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('동료의 의견에 따라 지역 공방 운영자의 첫 고객 문의를 만드는 페이지로 바꿨습니다.');
+ await page.getByLabel('누구에게 무엇을 파나요?').fill('동료의 의견에 따라 지역 공방 운영자의 첫 고객 문의를 만드는 페이지로 바꿨습니다.');
  await page.getByLabel('이번에 바꾼 점').fill('첫 문장에 고객의 구체적인 상황을 넣었습니다.');
  await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();
  await page.getByRole('button',{name:'확인 기록 수정'}).click();
@@ -51,9 +51,9 @@ test('recipient verifies useful feedback and applies it only to a new portfolio 
 
 test('peer feedback receipt grants no self XP, reporting is scoped and blocking is reversible',async({page})=>{
  await page.goto('/community');
- await page.getByRole('button',{name:/첫 화면만 보고 누구를 위한 서비스인지/}).click();
+ await page.getByRole('button',{name:/지역 공방 원데이 클래스 신청 페이지/}).click();
  await expect(page.getByRole('button',{name:'도움됨 · 반영 기록 남기기'})).toHaveCount(0);
- await page.getByLabel('동료에게 남길 의견').fill('첫 번째 버튼에서 고객이 받을 수 있는 결과를 더 구체적으로 알려주면 좋겠습니다.');
+ await page.getByRole('radio',{name:'애매해요'}).check();await page.getByLabel('좋았던 점 하나').fill('대상이 누구인지 첫 문장에서 바로 보여요.');await page.getByLabel('고칠 점 하나').fill('첫 번째 버튼에서 고객이 받을 수 있는 결과를 더 구체적으로 알려주면 좋겠습니다.');
  await page.getByRole('button',{name:'의견 남기기',exact:true}).click();
  await page.getByRole('button',{name:'체험: 예시 동료가 도움됨 확인'}).click();
  await expect(page.getByText('도움됨',{exact:true})).toBeVisible();
@@ -61,15 +61,15 @@ test('peer feedback receipt grants no self XP, reporting is scoped and blocking 
  await page.getByLabel('확인이 필요한 이유').fill('예시 신고입니다. 연결된 자료의 공개 범위를 확인해 주세요.');
  await page.getByRole('button',{name:'신고 접수',exact:true}).click();
  await page.getByRole('button',{name:'이 동료 차단',exact:true}).click();
- await expect(page.getByRole('button',{name:/첫 화면만 보고 누구를 위한 서비스인지/})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:/지역 공방 원데이 클래스 신청 페이지/})).toHaveCount(0);
  await page.getByText('차단 관리 · 1명',{exact:true}).click();await page.getByRole('button',{name:'차단한 동료 1 해제',exact:true}).click();
- await expect(page.getByRole('button',{name:/첫 화면만 보고 누구를 위한 서비스인지/})).toBeVisible();
+ await expect(page.getByRole('button',{name:/지역 공방 원데이 클래스 신청 페이지/})).toBeVisible();
  await noOverflow(page);
 });
 
 test('unsafe links never enter portfolio and retained forms allow correction',async({page})=>{
  await page.goto('/community');await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();
- await page.getByLabel('제목',{exact:true}).fill(title);await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('공개 가능한 링크만 안전하게 공유하는지 확인합니다.');await page.getByLabel('작업물 링크').fill('http://example.com');
+ await page.getByLabel('제목',{exact:true}).fill(title);await page.getByLabel('누구에게 무엇을 파나요?').fill('공개 가능한 링크만 안전하게 공유하는지 확인합니다.');await page.getByLabel('작업물 링크').fill('http://example.com');await page.getByRole('radio',{name:'나만 보기'}).check();
  await page.getByRole('button',{name:'나만 보도록 저장'}).click();await expect(page.getByRole('alert')).toContainText('HTTPS');
  await page.getByLabel('작업물 링크').fill('https://example.com');await page.getByRole('button',{name:'나만 보도록 저장'}).click();
  await expect(page.getByRole('link',{name:'작업물 열기'})).toHaveAttribute('rel','noopener noreferrer');await noOverflow(page);
@@ -77,7 +77,7 @@ test('unsafe links never enter portfolio and retained forms allow correction',as
 
 async function composeTyped(page:Page,kind:string,name:string){
  await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();await page.getByRole('combobox',{name:'종류',exact:true}).selectOption(kind);
- await page.getByLabel('제목',{exact:true}).fill(name);await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('첫 화면의 제안과 고객 흐름을 함께 점검할 작업입니다. 구체적인 범위와 결과를 남겨요.');await page.getByRole('radio',{name:'같은 기수와 공유'}).check();await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();
+ await page.getByLabel('제목',{exact:true}).fill(name);await page.getByLabel('누구에게 무엇을 파나요?').fill('첫 화면의 제안과 고객 흐름을 함께 점검할 작업입니다. 구체적인 범위와 결과를 남겨요.');await page.getByRole('radio',{name:'같은 기수와 공유'}).check();await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();
 }
 // Retired from the study menu on 2026-11-11 (CEO utility review); code and data are kept.
 test.fixme('talent proposal needs recipient acceptance and recipient final confirmation with retained history',async({page})=>{
@@ -102,10 +102,21 @@ test('file sharing is a separate unchecked choice and private post changes revok
  const check=files.getByRole('checkbox',{name:'이 파일을 같은 기수에 공개합니다'});await expect(check).not.toBeChecked();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();await check.check();await files.getByRole('button',{name:'확인한 파일 기수에 공유'}).click();await expect(files.getByText(/공개할 캡처.pdf.*기수 공개/)).toBeVisible();
  await page.getByRole('button',{name:'개선한 새 버전 저장'}).click();await page.getByLabel('이번에 바꾼 점').fill('내 작업을 비공개로 바꾸면서 첨부 공개를 회수합니다.');await page.getByRole('radio',{name:'나만 보기'}).check();await page.getByRole('button',{name:'나만 보도록 저장'}).click();await expect(files.getByText(/공개할 캡처.pdf.*나만 보기/)).toBeVisible();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();
 });
+test('a landing page needs an address or a capture; the capture is shared with the post and reviews use three parts',async({page})=>{
+ const requests:string[]=[];page.on('request',r=>{if(r.url().includes('/api/campus/'))requests.push(r.url());});await page.goto('/community');
+ await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();await expect(page.getByRole('combobox',{name:'종류',exact:true}).getByRole('option')).toHaveText(['랜딩 페이지','광고 소재']);
+ await page.getByLabel('제목',{exact:true}).fill('도시락 구독 랜딩 첫 화면');await page.getByLabel('누구에게 무엇을 파나요?').fill('점심을 거르는 30대 직장인에게 주 5일 도시락 구독');await page.getByLabel('의견받고 싶은 점').selectOption('문구가 끌리는지');
+ await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();await expect(page.getByRole('alert')).toContainText('주소나 이미지 중 하나');
+ await page.getByLabel('화면 캡처 올리기').setInputFiles({name:'첫 화면.png',mimeType:'image/png',buffer:Buffer.from([137,80,78,71,13,10,26,10])});await expect(page.getByRole('list',{name:'올릴 이미지'}).getByRole('img')).toHaveCount(1);
+ await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();const work=page.getByRole('article',{name:'선택한 작업물'});await expect(work).toContainText('점심을 거르는 30대 직장인에게 주 5일 도시락 구독');await expect(work).toContainText('문구가 끌리는지');
+ const files=work.getByRole('region',{name:'작업물 첨부'});await expect(files.getByText(/첫 화면.png.*기수 공개/)).toBeVisible();await expect(files.getByRole('img',{name:'첫 화면.png'})).toHaveCount(1);
+ await work.getByRole('button',{name:'체험: 예시 동료 의견 추가'}).click();await expect(work).toContainText('3초 안에 무엇을 파는지');await expect(work).toContainText('애매해요');
+ expect(requests).toEqual([]);await noOverflow(page);
+});
 test('empty and saved community forms do not lock navigation, while an actual draft does',async({page})=>{
  await page.goto('/community');const guarded=()=>page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;});
  await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();await expect.poll(guarded).toBe(false);await page.getByLabel('제목',{exact:true}).fill('작성 보호 검수');await expect.poll(guarded).toBe(true);
- await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('새 결과물을 작성한 뒤 저장하면 작성 보호를 해제하는지 확인합니다.');await page.getByRole('button',{name:'나만 보도록 저장'}).click();await expect.poll(guarded).toBe(false);await page.getByRole('button',{name:'개선한 새 버전 저장'}).click();await expect.poll(guarded).toBe(false);
+ await page.getByLabel('누구에게 무엇을 파나요?').fill('새 결과물을 작성한 뒤 저장하면 작성 보호를 해제하는지 확인합니다.');await page.getByLabel('작업물 링크').fill('https://example.com/guard');await page.getByRole('radio',{name:'나만 보기'}).check();await page.getByRole('button',{name:'나만 보도록 저장'}).click();await expect.poll(guarded).toBe(false);await page.getByRole('button',{name:'개선한 새 버전 저장'}).click();await expect.poll(guarded).toBe(false);
 });
 
 test('late workspace response cannot replace the latest selected portfolio view',async({page})=>{

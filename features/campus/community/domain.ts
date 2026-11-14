@@ -1,10 +1,10 @@
 import { campusError, isCampusId } from '../snapshot';
 
-export const communityKinds = ['portfolio', 'feedback', 'process', 'failure', 'talent_offer', 'talent_request', 'demo_day'] as const;
+export const communityKinds = ['landing', 'ad', 'portfolio', 'feedback', 'process', 'failure', 'talent_offer', 'talent_request', 'demo_day'] as const;
 export type CommunityKind = typeof communityKinds[number];
-/** Kinds a student can start now. Talent exchange and demo day left the study room with their menu tasks (tour/tasks.ts retiredTasks); stored posts of those kinds still read. */
-export const openKinds = communityKinds.filter(k => !k.startsWith('talent_') && k !== 'demo_day');
-export const kindLabels: Record<CommunityKind, string> = { portfolio: '내 결과물 모음', feedback: '의견 요청', process: '작업 과정', failure: '실패에서 배운 점', talent_offer: '도움 드려요', talent_request: '도움 구해요', demo_day: '문샷 결과물 발표회' };
+/** Kinds a student can start now: a landing page or an ad creative, each asking for one specific opinion. Older kinds (and talent exchange, demo day) only read. */
+export const openKinds: CommunityKind[] = ['landing', 'ad'];
+export const kindLabels: Record<CommunityKind, string> = { landing: '랜딩 페이지', ad: '광고 소재', portfolio: '내 결과물 모음', feedback: '의견 요청', process: '작업 과정', failure: '실패에서 배운 점', talent_offer: '도움 드려요', talent_request: '도움 구해요', demo_day: '문샷 결과물 발표회' };
 export type CommunityPost = { id: string; owner_id: string; enrollment_id: string; cohort_id: string; alias: string; kind: CommunityKind; title: string; body: string; url: string; image_urls: string[]; lesson_id: string | null; visibility: 'private' | 'cohort'; revision: number; hidden: boolean; created_at: string; updated_at: string };
 export type CommunityRevision = Pick<CommunityPost, 'id' | 'title' | 'body' | 'url' | 'image_urls' | 'visibility' | 'revision' | 'created_at'> & { post_id: string; change_note: string };
 export type CommunityComment = { id: string; post_id: string; author_id: string; alias: string; body: string; post_revision: number; hidden: boolean; created_at: string };
@@ -66,4 +66,27 @@ export function calculateCommunityRewards(approved: number, required: number, us
   const xp = approved * rewardRule.missionXp + useful * rewardRule.usefulXp;
   const reasons = [required === 0 ? '현재 공개된 필수 과제가 필요해요.' : approved < required ? `필수 과제 승인 ${approved}/${required}` : '', useful < 1 ? '다른 동료에게 받은 도움됨 1개가 필요해요.' : '', applied < 1 ? '받은 의견을 새 버전에 반영한 기록 1개가 필요해요.' : ''].filter(Boolean);
   return { ruleVersion: rewardRule.version, approvedMissions: approved, requiredMissions: required, usefulFeedback: useful, appliedRevisions: applied, xp, level: 1 + Math.floor(xp / 200), badges: [approved > 0 ? '첫 과제 승인' : '', useful > 0 ? '도움이 된 동료' : '', applied > 0 ? '한 번 더 개선' : '', !reasons.length ? '문샷 발사 준비' : ''].filter(Boolean), eligible: !reasons.length, claimedAt, cohortLaunches, cohortGoal: rewardRule.cohortGoal, reasons };
+}
+
+// ponytail: the work brief and the three-part review live as labelled lines inside `body`, so no new columns or
+// migration. Move them to columns if we ever need to filter or count by them.
+export const feedbackFocuses = ['첫 화면에서 무엇을 파는지 알겠는지', '문구가 끌리는지', '믿음이 가는지', '신청·구매까지 가고 싶은지', '전체 인상'] as const;
+export const clarityAnswers = ['알겠어요', '애매해요', '모르겠어요'] as const;
+const labelled = (body: string, labels: string[]) => {
+  const lines = body.split('\n');
+  if (!labels.every((label, i) => lines[i]?.startsWith(label + ': '))) return null;
+  return [...labels.map((label, i) => lines[i].slice(label.length + 2).trim()), lines.slice(labels.length).join('\n').trim()];
+};
+const oneLine = (value: string) => value.replace(/\s+/g, ' ').trim();
+const workLabels = ['누구에게 무엇을', '의견받고 싶은 점'], reviewLabels = ['3초 안에 무엇을 파는지', '좋았던 점', '고칠 점'];
+export type WorkBrief = { offer: string; focus: string; note: string };
+export const composeWork = (w: WorkBrief) => `${workLabels[0]}: ${oneLine(w.offer)}\n${workLabels[1]}: ${oneLine(w.focus)}` + (w.note.trim() ? '\n\n' + w.note.trim() : '');
+export function parseWork(body: string): WorkBrief | null { const v = labelled(body, workLabels); return v ? { offer: v[0], focus: v[1], note: v[2] } : null; }
+export type Review = { clear: string; good: string; fix: string };
+export const composeReview = (r: Review) => `${reviewLabels[0]}: ${oneLine(r.clear)}\n${reviewLabels[1]}: ${oneLine(r.good)}\n${reviewLabels[2]}: ${oneLine(r.fix)}`;
+export function parseReview(body: string): Review | null { const v = labelled(body, reviewLabels); return v && !v[3] ? { clear: v[0], good: v[1], fix: v[2] } : null; }
+/** Work nobody else has reviewed yet comes first, so no one is left without an opinion; the rest keep their order. */
+export function unreviewedFirst<T extends { id: string; owner_id: string }>(posts: T[], comments: { post_id: string; author_id: string; hidden: boolean }[]): T[] {
+  const reviewed = (p: T) => comments.some(c => c.post_id === p.id && !c.hidden && c.author_id !== p.owner_id);
+  return [...posts.filter(p => !reviewed(p)), ...posts.filter(reviewed)];
 }

@@ -1,12 +1,12 @@
 import type { CampusSnapshot } from '../contracts';
 import { campusError } from '../snapshot';
-import { calculateCommunityRewards, validateCommunityCommand, type CommunityState, type CommunityCommand, type CommunityPost } from './domain';
+import { calculateCommunityRewards, composeWork, validateCommunityCommand, type CommunityState, type CommunityCommand, type CommunityPost } from './domain';
 export const demoPeerId = '10000000-0000-4000-8000-000000000002';
 const demoPostId = '10000000-0000-4000-8000-000000000003';
 export function createCommunityDemo(snapshot: CampusSnapshot): CommunityState {
   const scope = snapshot.scopes.find(s => s.enrollmentId === snapshot.selectedEnrollmentId);
   const now = new Date().toISOString();
-  const peer: CommunityPost = { id: demoPostId, owner_id: demoPeerId, enrollment_id: '10000000-0000-4000-8000-000000000004', cohort_id: scope?.cohortId ?? '', alias: '예시 동료 지우', kind: 'feedback', title: '첫 화면만 보고 누구를 위한 서비스인지 알 수 있나요?', body: '지역 공방을 위한 신청 페이지를 만들었어요.\n\n시도한 것: 대상과 받을 수 있는 결과를 첫 화면에 넣었습니다.\n궁금한 점: 신청 버튼을 누르기 전에 더 필요한 정보가 있을까요?', url: 'https://example.com/workshop', image_urls: [], lesson_id: snapshot.lessons[0]?.id ?? null, visibility: 'cohort', revision: 1, hidden: false, created_at: now, updated_at: now };
+  const peer: CommunityPost = { id: demoPostId, owner_id: demoPeerId, enrollment_id: '10000000-0000-4000-8000-000000000004', cohort_id: scope?.cohortId ?? '', alias: '예시 동료 지우', kind: 'landing', title: '지역 공방 원데이 클래스 신청 페이지', body: composeWork({ offer: '주말에 취미를 찾는 직장인에게 지역 공방 원데이 클래스', focus: '첫 화면에서 무엇을 파는지 알겠는지', note: '대상과 받을 수 있는 결과를 첫 화면에 넣었습니다. 신청 버튼을 누르기 전에 더 필요한 정보가 있을까요?' }), url: 'https://example.com/workshop', image_urls: [], lesson_id: snapshot.lessons[0]?.id ?? null, visibility: 'cohort', revision: 1, hidden: false, created_at: now, updated_at: now };
   const missions = snapshot.lessons.flatMap(l => l.missions).filter(m => m.required);
   return { posts: [peer], revisions: [{ ...peer, post_id: peer.id, change_note: '첫 결과물 저장' }], comments: [], acknowledgments: [], reports: [], blockedIds: [], operator: false, demo: true, rewards: calculateCommunityRewards(missions.filter(m => m.status === 'approved').length, missions.length, 0, 0) };
 }

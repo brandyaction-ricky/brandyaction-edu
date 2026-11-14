@@ -1,4 +1,6 @@
 import { campusError, isCampusId } from '../snapshot';
+/** Shared work shown in the space: the two kinds students make now, and the earlier portfolio kind. */
+export const exhibitKinds = ['landing', 'ad', 'portfolio'];
 export type ExhibitionItem = { id: string; title: string; alias: string; revision: number; updatedAt: string };
 export type ExhibitionCandidate = { id: string; cohort_id: string; kind: string; visibility: string; hidden: boolean; title: string; alias: string; revision: number; updated_at: string };
 export type ExhibitionPorts = {
@@ -8,7 +10,7 @@ export type ExhibitionPorts = {
 };
 export async function loadCommunityExhibition(ports: ExhibitionPorts, viewerId: string, enrollmentId: string): Promise<{ items: ExhibitionItem[] }> {
   const cohortId = await ports.scope(viewerId, enrollmentId);
-  const eligible = (rows: ExhibitionCandidate[]) => rows.filter(p => p.cohort_id === cohortId && p.kind === 'portfolio' && p.visibility === 'cohort' && p.hidden === false);
+  const eligible = (rows: ExhibitionCandidate[]) => rows.filter(p => p.cohort_id === cohortId && exhibitKinds.includes(p.kind) && p.visibility === 'cohort' && p.hidden === false);
   const candidates = eligible(await ports.authorizedPosts(cohortId));
   if (candidates.length > 24) campusError(503, '전시 범위를 확인하지 못했습니다.');
   if (!candidates.length) return { items: [] };

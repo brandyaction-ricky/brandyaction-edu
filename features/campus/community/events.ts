@@ -1,4 +1,5 @@
 import type { CommunityRewards,CommunityState } from './domain';
+import { exhibitKinds } from './exhibition';
 // Synthetic cross-panel cache only. A page reload resets it; no member data is persisted.
 const demoRewards = new Map<string, CommunityRewards>();
 export function getCommunityDemoRewards(enrollmentId: string): CommunityRewards | null { return demoRewards.get(enrollmentId) ?? null; }
@@ -16,5 +17,5 @@ export function getCommunityDemoExhibition(enrollmentId:string){return demoExhib
 export function rememberCommunityDemoState(enrollmentId:string,viewerId:string,state:CommunityState){
  demoStates.set(`${viewerId}:${enrollmentId}`,state);
  const held=new Set(state.reports.filter(r=>r.status==='open').map(r=>r.post_id));
- demoExhibitions.set(enrollmentId,state.posts.filter(p=>p.kind==='portfolio'&&p.visibility==='cohort'&&!p.hidden&&!held.has(p.id)&&!state.blockedIds.includes(p.owner_id)).slice(0,6).map(p=>({id:p.id,title:p.title,alias:p.alias,revision:p.revision,updatedAt:p.updated_at})));
+ demoExhibitions.set(enrollmentId,state.posts.filter(p=>exhibitKinds.includes(p.kind)&&p.visibility==='cohort'&&!p.hidden&&!held.has(p.id)&&!state.blockedIds.includes(p.owner_id)).slice(0,6).map(p=>({id:p.id,title:p.title,alias:p.alias,revision:p.revision,updatedAt:p.updated_at})));
 }

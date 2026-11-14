@@ -83,6 +83,19 @@ test('recipient feedback CAS, applied revision evidence, reward dedup, verified 
  }finally{await db.close();}
 });
 
+test('landing page and ad creative kinds are accepted after the kinds migration; unknown kinds are not',async()=>{
+ const {db,login,mutate,make}=await setup();
+ try{
+  await login(1);
+  await assert.rejects(mutate(make(300,{kind:'landing'})));
+  await db.exec('reset role');await db.exec(readFileSync(new URL('../supabase/migrations/20261114200000_campus_community_landing_ad_kinds.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
+  await login(1);
+  assert.equal((await mutate(make(301,{kind:'landing'}))).postId,uid(301));
+  assert.equal((await mutate(make(302,{kind:'ad'}))).postId,uid(302));
+  assert.equal((await mutate(make(303))).postId,uid(303));
+  await assert.rejects(mutate(make(304,{kind:'video'})));
+ }finally{await db.close();}
+});
 test('blocks are bidirectional, reports private, moderation permission and log enforced',async()=>{
  const {db,login,mutate,make}=await setup();
  try{
