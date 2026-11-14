@@ -19,4 +19,4 @@
 .actions button,.actions a{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 12px;border-radius:9px;border:1px solid #cfd8e3;background:#fff;color:#161719;font:inherit;font-weight:700;font-size:13px;text-decoration:none;cursor:pointer;white-space:nowrap}
 .actions button{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
 .card :is(button,a):focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
-@media(max-width:560px){.card{right:12px;left:12px;bottom:76px;width:auto}}
+@media(max-width:560px){.card{right:12px;left:12px;bottom:12px;width:auto}}

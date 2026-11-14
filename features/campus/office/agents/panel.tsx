@@ -125,7 +125,8 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  <section aria-label="사무실 좌석"><div className={styles.seatHead}><h3>사무실 좌석 <small>{desks.length} / 10</small></h3><div className={styles.controls}>
   {desks.length>0&&<button type="button" className={styles.eye} disabled={busy} onClick={()=>void hide(desks)}><EyeOff size={14} aria-hidden/>모두 숨기기</button>}
   {hiddenStaff.length>0&&<button type="button" className={styles.eye} disabled={busy} onClick={()=>void show(hiddenStaff)}><Eye size={14} aria-hidden/>모두 보이기</button>}</div></div>
- <p>총괄 관리자 자리는 29일차에 채용하는 총괄의 자리예요. 눈 표시 ‘숨기기’를 누르면 그 직원이 사무실에서만 빠지고 아래 ‘숨긴 직원’에 접혀요. 직원 등록, 보고 연결, 업무 기록은 그대로이고, ‘다시 보이기’를 누르면 원래 자리로 돌아와요. 자리마다 있는 선택칸에서 직원을 고르면 그 자리에 앉히거나 서로 자리를 바꿀 수 있어요.</p>
+ <p>총괄 관리자 자리는 29일차에 채용하는 총괄의 자리예요. 자리의 선택칸으로 직원을 앉히거나 서로 자리를 바꿀 수 있어요.</p>
+ <p className={styles.note}>눈 표시 ‘숨기기’를 누르면 직원이 사무실에서만 빠져요. 보고 연결과 업무 기록은 그대로이고, ‘다시 보이기’를 누르면 원래 자리로 돌아와요.</p>
  <ol className={styles.seats}>{[0,1,2,3,4,5,6,7,8,9].map(n=>{const p=desks.find(d=>d.seatIndex===n),others=desks.filter(d=>d.seatIndex!==n),free=employees.filter(e=>!isSeated(e));
   return <li key={n} data-empty={p?undefined:''} data-lead={n?undefined:''}><small>{seatName(n)}</small><strong>{p?.name||'빈자리'}</strong>
    {p&&<button type="button" className={styles.eye} disabled={busy} aria-label={p.name+' 사무실에서 숨기기'} onClick={()=>void hide([p])}><EyeOff size={14} aria-hidden/>숨기기</button>}

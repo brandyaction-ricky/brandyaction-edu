@@ -28,6 +28,6 @@
 .steps li{counter-increment:step;display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:10px;font-size:13px;line-height:1.6}
 .steps li::before{content:counter(step);grid-row:1/3;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fff;border:1px solid var(--border-strong, #cfd3d8);font-weight:700;font-size:12px}
 .steps li span{color:var(--muted)}
-a.secondary{text-decoration:none}
+.root a.secondary{font:inherit;text-decoration:none;color:var(--ink)}
 .draft .actions{margin-top:4px}
 .actions .notice{margin:0}
