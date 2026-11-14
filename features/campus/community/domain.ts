@@ -85,8 +85,13 @@ export function parseWork(body: string): WorkBrief | null { const v = labelled(b
 export type Review = { clear: string; good: string; fix: string };
 export const composeReview = (r: Review) => `${reviewLabels[0]}: ${oneLine(r.clear)}\n${reviewLabels[1]}: ${oneLine(r.good)}\n${reviewLabels[2]}: ${oneLine(r.fix)}`;
 export function parseReview(body: string): Review | null { const v = labelled(body, reviewLabels); return v && !v[3] ? { clear: v[0], good: v[1], fix: v[2] } : null; }
-/** Work nobody else has reviewed yet comes first, so no one is left without an opinion; the rest keep their order. */
-export function unreviewedFirst<T extends { id: string; owner_id: string }>(posts: T[], comments: { post_id: string; author_id: string; hidden: boolean }[]): T[] {
-  const reviewed = (p: T) => comments.some(c => c.post_id === p.id && !c.hidden && c.author_id !== p.owner_id);
-  return [...posts.filter(p => !reviewed(p)), ...posts.filter(reviewed)];
+export const reviewedByOthers = (post: { id: string; owner_id: string }, comments: { post_id: string; author_id: string; hidden: boolean }[]) => comments.some(c => c.post_id === post.id && !c.hidden && c.author_id !== post.owner_id);
+/**
+ * Work nobody else has reviewed yet comes first, longest-waiting on top, so a later upload never pushes an earlier one
+ * out of sight; reviewed work follows in the order it came (latest change first).
+ * ponytail: sorts what the page has loaded (30 at a time); order on the server if a cohort routinely has more waiting.
+ */
+export function unreviewedFirst<T extends { id: string; owner_id: string; created_at: string }>(posts: T[], comments: { post_id: string; author_id: string; hidden: boolean }[]): T[] {
+  const waiting = posts.filter(p => !reviewedByOthers(p, comments)).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return [...waiting, ...posts.filter(p => reviewedByOthers(p, comments))];
 }

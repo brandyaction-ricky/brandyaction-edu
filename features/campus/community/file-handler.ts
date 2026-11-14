@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { campusError,isCampusId } from '../snapshot';
 import { readLimitedUtf8Body } from './request-body';
-import { portfolioFileSpec,matchesPortfolioFile,portfolioFileLimit,type PortfolioFile } from './files';
-export type FilePorts={list:(postId:string)=>Promise<PortfolioFile[]>;owned:(id:string)=>Promise<PortfolioFile>;readable:(id:string)=>Promise<PortfolioFile>;prepare:(c:Record<string,unknown>)=>Promise<PortfolioFile>;share:(c:Record<string,unknown>)=>Promise<unknown>;signedUpload:(file:PortfolioFile)=>Promise<string>;signedDownload:(file:PortfolioFile)=>Promise<string>;read:(file:PortfolioFile)=>Promise<{bytes:Uint8Array;contentType:string}>;complete:(id:string,hash:string)=>Promise<unknown>};
+import { portfolioFileSpec,matchesPortfolioFile,portfolioFileLimit,videoExpiry,type PortfolioFile } from './files';
+export type FilePorts={list:(postId:string)=>Promise<PortfolioFile[]>;owned:(id:string)=>Promise<PortfolioFile>;readable:(id:string)=>Promise<PortfolioFile>;prepare:(c:Record<string,unknown>)=>Promise<PortfolioFile>;share:(c:Record<string,unknown>)=>Promise<unknown>;signedUpload:(file:PortfolioFile)=>Promise<string>;signedDownload:(file:PortfolioFile)=>Promise<string>;read:(file:PortfolioFile)=>Promise<{bytes:Uint8Array;contentType:string}>;complete:(id:string,hash:string)=>Promise<unknown>;sweep?:()=>Promise<unknown>};
 const headers={'Cache-Control':'private, no-store',Vary:'Cookie'};
-const meta=(f:PortfolioFile)=>({id:f.id,name:f.name,size:f.size,contentType:f.content_type,revision:f.post_revision,ready:f.state==='ready',visibility:f.visibility,accessRevision:f.revision});
+const meta=(f:PortfolioFile)=>({id:f.id,name:f.name,size:f.size,contentType:f.content_type,revision:f.post_revision,ready:f.state==='ready',visibility:f.visibility,accessRevision:f.revision,...videoExpiry(f)});
 export async function handlePortfolioFiles(req:Request,d:{enabled:boolean;authenticate:()=>Promise<{id:string}|null>;ports:(actor:string)=>Promise<FilePorts>}){
  const reply=(value:unknown,status=200)=>Response.json(value,{status,headers});
  if(!d.enabled)return reply({error:'준비 중입니다.'},404);
@@ -12,13 +12,14 @@ export async function handlePortfolioFiles(req:Request,d:{enabled:boolean;authen
  if(req.method==='POST'&&(req.headers.get('origin')!==url.origin||req.headers.get('sec-fetch-site')==='cross-site'))return reply({error:'Origin'},403);
  const viewer=await d.authenticate();if(!viewer)return reply({error:'로그인이 필요합니다.'},401);const ports=await d.ports(viewer.id);
  if(req.method==='GET'){
-  const postId=url.searchParams.get('postId');if(postId){if(!isCampusId(postId))campusError(400,'작업물을 선택해 주세요.');return reply({files:(await ports.list(postId)).map(meta)});}
-  const id=url.searchParams.get('fileId');if(!isCampusId(id??''))campusError(400,'파일을 선택해 주세요.');const f=await ports.readable(id!);if(f.state!=='ready'||!f.sha256||f.size>portfolioFileLimit)campusError(409,'파일 검증이 끝나지 않았어요.');
+  const postId=url.searchParams.get('postId');if(postId){if(!isCampusId(postId))campusError(400,'작업물을 선택해 주세요.');return reply({files:(await ports.list(postId)).filter(f=>f.state==='ready'||!f.removed_at).map(meta)});}
+  const id=url.searchParams.get('fileId');if(!isCampusId(id??''))campusError(400,'파일을 선택해 주세요.');const f=await ports.readable(id!);if(f.state!=='ready'||!f.sha256||f.size>portfolioFileLimit)campusError(409,'파일 검증이 끝나지 않았어요.');if(videoExpiry(f).expired)return reply({error:'영상 보관 기간이 끝났어요.'},410);
   const signed=await ports.signedDownload(f);return new Response(null,{status:302,headers:{...headers,Location:signed,'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}});
  }
  if(!req.headers.get('content-type')?.startsWith('application/json'))campusError(400,'요청 형식을 확인해 주세요.');let b:Record<string,unknown>;try{b=JSON.parse(await readLimitedUtf8Body(req,5000));}catch{campusError(400,'요청 형식을 확인해 주세요.');}if(!b||typeof b!=='object'||Array.isArray(b))campusError(400,'요청 형식을 확인해 주세요.');
  if(b.action==='prepare'){
   if(!isCampusId(String(b.postId??''))||!isCampusId(String(b.requestId??''))||!Number.isSafeInteger(b.expectedRevision)||Number(b.expectedRevision)<1)campusError(400,'작업물 버전을 확인해 주세요.');
+  await ports.sweep?.().catch(()=>{});
   const spec=portfolioFileSpec(b.name,b.size),f=await ports.prepare({requestId:b.requestId,postId:b.postId,expectedRevision:b.expectedRevision,...spec});if(f.owner_id!==viewer.id)campusError(403,'내 파일만 올릴 수 있어요.');
   return reply({...meta(f),...(f.state==='pending'?{signedUrl:await ports.signedUpload(f)}:{})});
  }

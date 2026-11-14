@@ -101,7 +101,8 @@ test('work brief and three-part review survive the round trip through body text;
  const review={clear:'애매해요',good:'대상이 바로 보여요.',fix:'가격을 버튼 위로 올려 보세요.'};
  assert.deepEqual(parseReview(composeReview(review)),review);
  assert.equal(parseReview('자유롭게 남긴 예전 의견입니다.'),null);
- const posts=[{id:'a',owner_id:'u1'},{id:'b',owner_id:'u2'},{id:'c',owner_id:'u3'}];
- const comments=[{post_id:'a',author_id:'u2',hidden:false},{post_id:'b',author_id:'u2',hidden:false},{post_id:'c',author_id:'u1',hidden:true}];
- assert.deepEqual(unreviewedFirst(posts,comments).map(p=>p.id),['b','c','a']);
+ // Server order is latest first. d was uploaded before b and c and is still waiting, so it leads; a and e already have a review.
+ const posts=[{id:'a',owner_id:'u1',created_at:'2026-11-14T05:00:00Z'},{id:'b',owner_id:'u2',created_at:'2026-11-14T04:00:00Z'},{id:'c',owner_id:'u3',created_at:'2026-11-14T03:00:00Z'},{id:'d',owner_id:'u4',created_at:'2026-11-14T01:00:00Z'},{id:'e',owner_id:'u5',created_at:'2026-11-14T00:00:00Z'}];
+ const comments=[{post_id:'a',author_id:'u2',hidden:false},{post_id:'b',author_id:'u2',hidden:false},{post_id:'c',author_id:'u1',hidden:true},{post_id:'e',author_id:'u1',hidden:false}];
+ assert.deepEqual(unreviewedFirst(posts,comments).map(p=>p.id),['d','c','b','a','e']);
 });

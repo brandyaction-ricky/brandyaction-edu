@@ -2,19 +2,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Check, ChevronRight, FilePlus2, Flag, History, LockKeyhole, MessageSquare, Sparkles, ThumbsUp, Users, X } from 'lucide-react';
 import type { CampusSnapshot } from '../contracts';
-import { openKinds, kindLabels, validateCommunityCommand, feedbackFocuses, clarityAnswers, composeWork, parseWork, composeReview, parseReview, unreviewedFirst, type WorkBrief, type CommunityState, type CommunityPost, type CommunityCommand, type CommunityComment, type CommunityRewards } from './domain';
+import { openKinds, kindLabels, validateCommunityCommand, feedbackFocuses, clarityAnswers, composeWork, parseWork, composeReview, parseReview, unreviewedFirst, reviewedByOthers, type WorkBrief, type CommunityState, type CommunityPost, type CommunityCommand, type CommunityComment, type CommunityRewards } from './domain';
 import { createCommunityDemo, demoPeerId, mutateCommunityDemo } from './demo';
 import styles from './panel.module.css';
 import { rememberCommunityDemoRewards,consumeCommunityOpen,getCommunityDemoState,rememberCommunityDemoState } from './events';
 import { CommunityWorkflowPanel } from './workflow-panel';
 import { PortfolioFiles } from './file-panel';
 import { checkPortfolioFile, uploadPortfolioFile, sharePortfolioFile, demoUploads } from './upload';
+import { needsShrink, shrinkVideo, previewSeconds } from './video-preview';
+import { videoRetentionDays } from './files';
 import { useCampusDraftGuard } from '../ui/draft-guard';
 
 type Props = { initialTab?:Tab; snapshot: CampusSnapshot; demo: boolean; onOpen?: (lessonId: string) => void; onRewards?: (rewards: CommunityRewards) => void };
 type Tab = 'all' | 'mine' | 'feedback' | 'talent' | 'demo_day';
 const tabs: [Tab, string][] = [['all', '동료 결과물'], ['mine', '내 결과물 모음']];
 const structured = (kind?: string) => kind === 'landing' || kind === 'ad';
+const isVideo = (file: File) => file.type.startsWith('video/');
 const emptyBrief = (): WorkBrief => ({ offer: '', focus: feedbackFocuses[0], note: '' });
 function date(value: string) { return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(value)); }
 function postDraft(post?: CommunityPost, lessonId?: string): Partial<CommunityCommand> { return { kind: post?.kind ?? 'landing', title: post?.title ?? '', body: post?.body ?? '', url: post?.url ?? '', imageUrls: post?.image_urls ?? [], lessonId: post?.lesson_id ?? lessonId ?? null, alias: post?.alias ?? '문샷 동료', visibility: post?.visibility ?? 'cohort', changeNote: '' }; }
@@ -28,8 +31,8 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
   const [focusPost,setFocusPost]=useState<string|null>(null);
   const [editing, setEditing] = useState<'new' | string | null>(null), [draft, setDraft] = useState<Partial<CommunityCommand>>(postDraft(undefined, snapshot.lessons[0]?.id));
   const [draftBaseline,setDraftBaseline]=useState('');
-  const [brief, setBrief] = useState<WorkBrief>(emptyBrief), [picked, setPicked] = useState<File[]>([]), [uploading, setUploading] = useState(false), [filesVersion, setFilesVersion] = useState(0);
-  const previews = useMemo(() => picked.map(file => ({ file, url: file.type.startsWith('image/') ? URL.createObjectURL(file) : '' })), [picked]);
+  const [brief, setBrief] = useState<WorkBrief>(emptyBrief), [picked, setPicked] = useState<File[]>([]), [uploading, setUploading] = useState(false), [filesVersion, setFilesVersion] = useState(0), [shrinking, setShrinking] = useState<{ done: number; total: number } | null>(null);
+  const previews = useMemo(() => picked.map(file => ({ file, url: /^(image|video)\//.test(file.type) ? URL.createObjectURL(file) : '' })), [picked]);
   useEffect(() => () => previews.forEach(p => p.url && URL.revokeObjectURL(p.url)), [previews]);
   const lastSaved = useRef<{ postId?: string; revision?: number } | null>(null);
   const [loading, setLoading] = useState(!demo), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
@@ -44,10 +47,10 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
   const [pending, setPending] = useState<CommunityCommand | null>(null);
   const alive = useRef(true), readSequence=useRef(0);
   const invalidateReads=useCallback(()=>{readSequence.current+=1;},[]);
-  const refresh = useCallback(async (page = 0) => {
+  const refresh = useCallback(async (page = 0, quiet = false) => {
     if (demo || !enrollmentId) return;
     const sequence=++readSequence.current;
-    setLoading(true); setError('');
+    if (!quiet) { setLoading(true); setError(''); }
     try {
       const response = await fetch(`/api/campus/community?enrollmentId=${encodeURIComponent(enrollmentId)}&page=${page}&view=${tab==='mine'?'mine':'all'}${focusPost?'&postId='+encodeURIComponent(focusPost):''}`, { cache: 'no-store' });
       const data = await response.json(); if (!response.ok) throw new Error(data.error ?? '작업실을 불러오지 못했습니다.');
@@ -57,10 +60,16 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
         const next = data as CommunityState;
         return { ...next, posts: merge(previous.posts, next.posts, p => p.id), revisions: merge(previous.revisions, next.revisions, r => r.id), comments: merge(previous.comments, next.comments, c => c.id), acknowledgments: merge(previous.acknowledgments, next.acknowledgments, a => a.comment_id), reports: merge(previous.reports, next.reports, r => r.id) };
       });
-    } catch (e) { if (alive.current&&sequence===readSequence.current) setError(e instanceof Error ? e.message : '작업실을 불러오지 못했습니다.'); }
+      if (quiet && alive.current && sequence===readSequence.current) setFilesVersion(v => v + 1);
+    } catch (e) { if (!quiet&&alive.current&&sequence===readSequence.current) setError(e instanceof Error ? e.message : '작업실을 불러오지 못했습니다.'); }
     finally { if (alive.current&&sequence===readSequence.current) setLoading(false); }
   }, [demo, enrollmentId, tab,focusPost]);
   useEffect(() => { alive.current = true; const timer = setTimeout(() => void refresh(), 0); return () => { clearTimeout(timer); invalidateReads();alive.current = false; }; }, [refresh,invalidateReads]);
+  // Others keep uploading and reviewing while this window is open: pull quietly once a minute and when the window comes
+  // back, without touching what is being typed. Only the first page is replaced, so it waits while more pages are open.
+  const idle = useRef(true);
+  useEffect(() => { idle.current = !busy && !uploading && !shrinking && !editing && (state?.pageInfo?.page ?? 0) === 0; }, [busy, uploading, shrinking, editing, state?.pageInfo?.page]);
+  useEffect(() => { if (demo) return; const pull = () => { if (idle.current && document.visibilityState === 'visible') void refresh(0, true); }; const timer = setInterval(pull, 60000); window.addEventListener('focus', pull); return () => { clearInterval(timer); window.removeEventListener('focus', pull); }; }, [demo, refresh]);
   useEffect(()=>{const open=()=>{if(!enrollmentId)return;const intent=consumeCommunityOpen(enrollmentId);if(intent){setTab(intent.tab);setSelected(intent.postId??null);setFocusPost(intent.postId??null);setNotice(intent.tab==='demo_day'?'문샷 결과물 발표회에서 발표 시간과 동료 질문을 확인하세요.':'문샷 공간에서 선택한 동료의 결과물이에요.');}};window.addEventListener('campus:open-community',open);const timer=setTimeout(open,0);return()=>{clearTimeout(timer);window.removeEventListener('campus:open-community',open);};},[enrollmentId]);
   const command = (values: Partial<CommunityCommand>): CommunityCommand => ({ requestId: crypto.randomUUID(), enrollmentId: enrollmentId!, ...values } as CommunityCommand);
   async function send(input: CommunityCommand, actor?: string) {
@@ -75,7 +84,9 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
         lastSaved.current = { postId: valid.action === 'create' ? valid.requestId : valid.postId, revision: (valid.expectedRevision ?? 0) + 1 };
       } else {
         const response = await fetch('/api/campus/community', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(valid) });
-        const data = await response.json(); if (!response.ok) throw new Error(data.error ?? '저장하지 못했습니다.');
+        const data = await response.json();
+        if (response.status === 409 && valid.action === 'comment') { await refresh(0, true); setPending(null); setError('그 사이 이 결과물에 새 버전이 올라왔어요. 바뀐 내용을 보고 「의견 남기기」를 다시 눌러 주세요. 적어 둔 의견은 그대로 있어요.'); return false; }
+        if (!response.ok) throw new Error(data.error ?? '저장하지 못했습니다.');
         if (data.postId) setSelected(data.postId);
         lastSaved.current = data;
         await refresh();
@@ -86,15 +97,27 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
   }
   async function pick(input: FileList | File[]) {
     const incoming = Array.from(input);
-    try { if (picked.length + incoming.length > 4) throw Error('이미지는 네 장까지 올릴 수 있어요.'); for (const file of incoming) await checkPortfolioFile(file); setPicked(old => [...old, ...incoming]); setError(''); }
-    catch (e) { setError(e instanceof Error && e.message.includes('네 장') ? e.message : 'PNG·JPG·WEBP 이미지나 PDF, 파일당 10MB까지 올릴 수 있어요.'); }
+    try { if (picked.filter(f => !isVideo(f)).length + incoming.length > 4) throw Error('이미지는 네 장까지 올릴 수 있어요.'); if (incoming.some(isVideo)) throw Error('영상은 아래 「영상 올리기」 칸에 넣어 주세요.'); for (const file of incoming) await checkPortfolioFile(file); setPicked(old => [...old, ...incoming]); setError(''); }
+    catch (e) { setError(e instanceof Error && /네 장|영상은/.test(e.message) ? e.message : 'PNG·JPG·WEBP 이미지나 PDF, 파일당 10MB까지 올릴 수 있어요.'); }
+  }
+  /** One video per post. A big or non-MP4 original is re-recorded small in this browser; only that preview is uploaded. */
+  async function pickVideo(file: File) {
+    if (shrinking) return;
+    setError('');
+    try {
+      let ready = file;
+      if (needsShrink(file)) { setShrinking({ done: 0, total: 0 }); ready = await shrinkVideo(file, (done, total) => { if (alive.current) setShrinking({ done, total }); }); }
+      await checkPortfolioFile(ready);
+      if (alive.current) setPicked(old => [...old.filter(f => !isVideo(f)), ready]);
+    } catch (e) { if (alive.current) setError(e instanceof Error ? e.message : '영상을 올리지 못했어요.'); }
+    finally { if (alive.current) setShrinking(null); }
   }
   /** The post is saved first; its pictures follow, shared with the cohort when the post is. */
   async function attach(postId: string, revision: number, files: File[], shared: boolean) {
     if (!files.length || demo) return;
     setUploading(true);
     try { for (const file of files) { const saved = await uploadPortfolioFile(postId, revision, file); if (shared) await sharePortfolioFile(saved, 'cohort'); } }
-    catch (e) { setError('글은 저장했지만 이미지를 다 올리지 못했어요. 아래 첨부 칸에서 다시 올려 주세요. (' + (e instanceof Error ? e.message : '전송 실패') + ')'); }
+    catch (e) { setError('글은 저장했지만 파일을 다 올리지 못했어요. 아래 첨부 칸에서 다시 올려 주세요. (' + (e instanceof Error ? e.message : '전송 실패') + ')'); }
     finally { if (alive.current) { setUploading(false); setFilesVersion(v => v + 1); } }
   }
   function compose(post?: CommunityPost) { const initial=postDraft(post, snapshot.lessons[0]?.id),initialBrief=post?parseWork(post.body)??{...emptyBrief(),note:post.body}:emptyBrief();setDraft(initial);setBrief(initialBrief);setPicked([]);setDraftBaseline(JSON.stringify([initial,initialBrief])); setEditing(post?.id ?? 'new'); setError(''); setTimeout(() => { formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); formRef.current?.querySelector<HTMLInputElement>('input')?.focus(); }, 0); }
@@ -112,14 +135,15 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
     {demo && <div className={styles.demo}><Sparkles size={17} /> 예시 체험 · 아래 동료와 기록은 가상입니다. 새로고침하면 초기화됩니다.</div>}
     {!!rewards?.usefulFeedback && <p className={styles.hint}>내 의견이 도움이 됐다고 확인한 동료 {rewards.usefulFeedback}명</p>}
     <div className={styles.toolbar}><nav className={styles.tabs} aria-label="작업실 보기">{tabs.map(([id, label]) => <button type="button" key={id} aria-pressed={tab === id} className={tab === id ? styles.activeTab : ''} onClick={() => { setTab(id); setSelected(null); setFocusPost(null); }}>{label}</button>)}</nav><label className={styles.kindFilter}>종류 <select aria-label="종류로 보기" value={kindFilter} onChange={e => setKindFilter(e.target.value)}><option value="">전체</option>{openKinds.map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}</select></label><button type="button" className={styles.textButton} onClick={() => void refresh()} disabled={demo || busy || loading}>새로고침</button></div>
+    {tab === 'all' && <p className={styles.hint}>아직 의견을 못 받은 결과물이 올린 순서대로 위에 보여요. 새로 올라온 결과물과 의견은 1분마다 자동으로 반영돼요.</p>}
     {error && <div role="alert" className={styles.error}>{error}{pending && !busy && <button type="button" onClick={() => pending && void send(pending)}>같은 요청 다시 확인</button>}</div>}
     {notice && <p role="status" className={styles.notice}><Check size={16} />{notice}</p>}
     {loading && <p role="status">작업실을 불러오고 있어요…</p>}
-    {uploading && <p role="status">이미지를 올리고 있어요…</p>}
+    {uploading && <p role="status">올린 파일을 보내고 있어요. 끝날 때까지 이 창을 닫지 마세요…</p>}
     {editing && <div className={styles.composer} ref={formRef}>
       <div className={styles.sectionHeader}><div><span className={styles.eyebrow}>{editing === 'new' ? '작은 초안도 괜찮아요' : '이전 버전은 그대로 보관해요'}</span><h3>{editing === 'new' ? '결과물 남기기' : '개선한 새 버전'}</h3></div><button className={styles.iconButton} aria-label="작성 닫기" onClick={() => setEditing(null)} type="button"><X size={20} /></button></div>
       <form onPaste={e => { const input = Array.from(e.clipboardData.items).filter(x => x.kind === 'file').map(x => x.getAsFile()).filter((x): x is File => !!x); if (isStructured && input.length) { e.preventDefault(); void pick(input); } }} onSubmit={async event => { event.preventDefault(); const original = posts.find(p => p.id === editing);
-        if (isStructured && !original && !draft.url && !picked.length) { setError('페이지 주소나 이미지 중 하나는 넣어 주세요.'); return; }
+        if (isStructured && !original && !draft.url && !picked.length) { setError('페이지 주소나 이미지, 영상 중 하나는 넣어 주세요.'); return; }
         const next = command({ ...draft, ...(isStructured ? { body: composeWork(brief), imageUrls: [], lessonId: null } : {}), action: original ? 'revise' : 'create', postId: original?.id, expectedRevision: original?.revision }), files = isStructured ? picked : [], shared = draft.visibility === 'cohort';
         if (demo && files.length) demoUploads.set(original?.id ?? next.requestId, { files, shared });
         if (await send(next)) { const saved = lastSaved.current; setPicked([]); setEditing(null); setTab('mine'); if (demo) setFilesVersion(v => v + 1); else if (saved?.postId) await attach(saved.postId, saved.revision ?? 1, files, shared); } else if (demo) demoUploads.delete(original?.id ?? next.requestId); }}>
@@ -132,7 +156,10 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
           <div className={styles.pick} onDragOver={e => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); }} onDrop={e => { if (e.dataTransfer.files.length) { e.preventDefault(); void pick(e.dataTransfer.files); } }}>
             <label>{draft.kind === 'ad' ? '광고 이미지 올리기' : '화면 캡처 올리기'} <span>네 장까지 · 파일당 10MB</span><input type="file" multiple accept=".png,.jpg,.jpeg,.webp,.pdf" disabled={busy || uploading || picked.length >= 4} onChange={e => { if (e.target.files) void pick(e.target.files); e.target.value = ''; }} /></label>
             <small>파일을 여기에 끌어 놓거나, 캡처한 뒤 이 화면에서 붙여넣기(Ctrl+V)해도 돼요. 고객 이름·연락처 같은 개인정보는 지우고 올려 주세요.</small>
-            {!!previews.length && <ul className={styles.picked} aria-label="올릴 이미지">{previews.map(({ file, url }, i) => <li key={file.name + i}>{url ? <img src={url} alt={file.name} /> : <span>{file.name}</span>}<button type="button" className={styles.textButton} aria-label={file.name + ' 빼기'} onClick={() => setPicked(old => old.filter((_, n) => n !== i))}>빼기</button></li>)}</ul>}
+            <label>영상 올리기 <span>선택 · 한 개 · 앞 {previewSeconds}초까지</span><input type="file" accept="video/*" disabled={busy || uploading || !!shrinking} onChange={e => { const file = e.target.files?.[0]; if (file) void pickVideo(file); e.target.value = ''; }} /></label>
+            <small>원본은 저장하지 않아요. 이 브라우저에서 작게 줄인 미리보기만 올라가고, 올린 날부터 {videoRetentionDays}일 동안 같은 기수가 볼 수 있어요. 그 뒤에는 영상만 자동으로 지워져요.</small>
+            {shrinking && <p role="status" className={styles.shrinking}>영상을 작게 줄이는 중이에요{shrinking.total ? ` · ${Math.round(shrinking.done)}초 / ${Math.round(shrinking.total)}초` : ''}. 영상 길이만큼 걸려요. 이 화면을 그대로 두세요.<progress max={shrinking.total || 1} value={shrinking.done} /></p>}
+            {!!previews.length && <ul className={styles.picked} aria-label="올릴 파일">{previews.map(({ file, url }, i) => <li key={file.name + i}>{url && isVideo(file) ? <video src={url} muted playsInline controls preload="metadata" aria-label={file.name} /> : url ? <img src={url} alt={file.name} /> : <span>{file.name}</span>}{isVideo(file) && <small>영상 · {(file.size / 1048576).toFixed(1)}MB</small>}<button type="button" className={styles.textButton} aria-label={file.name + ' 빼기'} onClick={() => setPicked(old => old.filter((_, n) => n !== i))}>빼기</button></li>)}</ul>}
           </div>
           <label>덧붙일 설명 <span>선택</span><textarea maxLength={5000} rows={3} value={brief.note} onChange={e => setBrief({ ...brief, note: e.target.value })} placeholder="만든 의도나 고민한 점이 있으면 적어 주세요." /></label>
         </> : <>
@@ -143,12 +170,12 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
         </>}
         {editing !== 'new' && <label>이번에 바꾼 점<input required minLength={5} maxLength={500} value={draft.changeNote} onChange={e => setDraft({ ...draft, changeNote: e.target.value })} placeholder="어떤 의견을 어떻게 반영했는지 적어 주세요." /></label>}
         <fieldset className={styles.sharing}><legend>누가 볼 수 있나요?</legend><label><input type="radio" name="community-visibility" checked={draft.visibility === 'private'} onChange={() => setDraft({ ...draft, visibility: 'private' })} /><LockKeyhole size={16} /> 나만 보기</label><label><input type="radio" name="community-visibility" checked={draft.visibility === 'cohort'} onChange={() => setDraft({ ...draft, visibility: 'cohort' })} /><Users size={16} /> 같은 기수와 공유</label><p>공유하면 올린 이미지도 같은 기수에 함께 보여요. 외부에 공개되거나 홍보에 자동 사용되지 않아요.</p></fieldset>
-        <div className={styles.formActions}><button type="button" className={styles.secondary} onClick={() => setEditing(null)}>닫기</button><button className={styles.primary} disabled={busy || uploading}>{busy ? '저장 중…' : draft.visibility === 'cohort' ? '기수에 공유하며 저장' : '나만 보도록 저장'}</button></div>
+        <div className={styles.formActions}><button type="button" className={styles.secondary} onClick={() => setEditing(null)}>닫기</button><button className={styles.primary} disabled={busy || uploading || !!shrinking}>{busy ? '저장 중…' : draft.visibility === 'cohort' ? '기수에 공유하며 저장' : '나만 보도록 저장'}</button></div>
       </form>
     </div>}
     {!loading && state && <div className={`${styles.workspace} ${post ? styles.withDetail : ''}`}>
       <div className={styles.cards}>{filtered.length ? filtered.map(item => <button type="button" key={item.id} className={`${styles.postCard} ${selected === item.id ? styles.selected : ''}`} onClick={() => { setSelected(item.id); setCompare(false); setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0); }}>
-        <div className={styles.cardMeta}><span>{kindLabels[item.kind]}</span>{item.visibility === 'private' ? <LockKeyhole size={14} aria-label="나만 보기" /> : <Users size={14} aria-label="기수 공유" />}</div><h3>{item.title}</h3><p>{parseWork(item.body)?.offer ?? item.body}</p><div className={styles.cardBottom}><span>{item.alias} · v{item.revision}</span><span><MessageSquare size={13} />{state.comments.filter(c => c.post_id === item.id && !c.hidden).length}<ChevronRight size={15} /></span></div>
+        <div className={styles.cardMeta}><span>{kindLabels[item.kind]}</span>{item.visibility === 'private' ? <LockKeyhole size={14} aria-label="나만 보기" /> : <Users size={14} aria-label="기수 공유" />}</div><h3>{item.title}</h3><p>{parseWork(item.body)?.offer ?? item.body}</p><div className={styles.cardBottom}><span>{item.owner_id === snapshot.viewer.id ? '내 결과물' : item.alias} · v{item.revision}</span><span>{item.visibility === 'cohort' && (state.comments.some(c => c.post_id === item.id && !c.hidden && c.author_id === snapshot.viewer.id && item.owner_id !== snapshot.viewer.id) ? <em className={styles.badge}>내가 의견 남김</em> : !reviewedByOthers(item, state.comments) && <em className={`${styles.badge} ${styles.waiting}`}>의견 기다리는 중</em>)}<MessageSquare size={13} />{state.comments.filter(c => c.post_id === item.id && !c.hidden).length}<ChevronRight size={15} /></span></div>
       </button>) : <div className={styles.empty}><FilePlus2 size={30} /><h3>{tab === 'mine' ? '첫 결과물을 남겨볼까요?' : tab === 'talent' ? '서로의 잘하는 일을 연결해요.' : tab === 'demo_day' ? '완벽한 완성보다, 공개할 수 있는 한 단계.' : '아직 공유된 작업물이 없어요.'}</h3><p>만들던 랜딩 페이지나 광고 소재 한 장이면 충분해요.</p><button type="button" className={styles.secondary} onClick={() => compose()}>결과물 남기기</button></div>}</div>
       {post && <article className={styles.detail} ref={detailRef} aria-label="선택한 작업물">
         <div className={styles.sectionHeader}><span className={styles.pill}>{kindLabels[post.kind]} · v{post.revision}</span><button type="button" className={styles.iconButton} aria-label="작업물 닫기" onClick={() => setSelected(null)}><X size={20} /></button></div>

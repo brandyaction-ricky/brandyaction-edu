@@ -72,6 +72,18 @@ test('demo slots prevent overlap, only operators start/finish, questions retain 
  await login(3);assert.equal((await db.query('select * from edu_campus_demo_slots')).rows.length,0);
  }finally{await db.close();}
 });
+test('video previews can be reserved only after the video migration; other types stay refused',async()=>{
+ const {db,login,mutate,make}=await setup();try{
+ await login(1);await mutate(make(100,{visibility:'cohort'}));
+ const prepare=async c=>(await db.query('select (public.edu_campus_portfolio_file_prepare($1::jsonb)).*',[JSON.stringify(c)])).rows[0];
+ const video={requestId:uid(300),postId:uid(100),expectedRevision:1,name:'광고-미리보기.mp4',size:1200,contentType:'video/mp4'};
+ await assert.rejects(prepare(video));
+ await db.exec('reset role');await db.exec(readFileSync(new URL('../supabase/migrations/20261114210000_campus_portfolio_video_preview.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
+ await login(1);const f=await prepare(video);assert.equal(f.content_type,'video/mp4');assert.equal(f.removed_at,null);
+ assert.equal((await prepare({...video,requestId:uid(301),name:'광고.webm',contentType:'video/webm'})).content_type,'video/webm');
+ await assert.rejects(prepare({...video,requestId:uid(302),name:'광고.mov',contentType:'video/quicktime'}));
+ }finally{await db.close();}
+});
 test('portfolio attachment metadata stays owner only even on shared posts; completion is server only and revoked access fails',async()=>{
  const {db,login,mutate,make}=await setup();try{
  await login(1);await mutate(make(100,{visibility:'cohort'}));

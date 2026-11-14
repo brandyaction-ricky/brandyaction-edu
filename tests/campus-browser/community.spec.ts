@@ -106,10 +106,11 @@ test('a landing page needs an address or a capture; the capture is shared with t
  const requests:string[]=[];page.on('request',r=>{if(r.url().includes('/api/campus/'))requests.push(r.url());});await page.goto('/community');
  await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();await expect(page.getByRole('combobox',{name:'종류',exact:true}).getByRole('option')).toHaveText(['랜딩 페이지','광고 소재']);
  await page.getByLabel('제목',{exact:true}).fill('도시락 구독 랜딩 첫 화면');await page.getByLabel('누구에게 무엇을 파나요?').fill('점심을 거르는 30대 직장인에게 주 5일 도시락 구독');await page.getByLabel('의견받고 싶은 점').selectOption('문구가 끌리는지');
- await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();await expect(page.getByRole('alert')).toContainText('주소나 이미지 중 하나');
- await page.getByLabel('화면 캡처 올리기').setInputFiles({name:'첫 화면.png',mimeType:'image/png',buffer:Buffer.from([137,80,78,71,13,10,26,10])});await expect(page.getByRole('list',{name:'올릴 이미지'}).getByRole('img')).toHaveCount(1);
+ await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();await expect(page.getByRole('alert')).toContainText('주소나 이미지, 영상 중 하나');
+ await page.getByLabel('화면 캡처 올리기').setInputFiles({name:'첫 화면.png',mimeType:'image/png',buffer:Buffer.from([137,80,78,71,13,10,26,10])});await expect(page.getByRole('list',{name:'올릴 파일'}).getByRole('img')).toHaveCount(1);
+ await page.getByLabel('영상 올리기').setInputFiles({name:'광고 영상.webm',mimeType:'video/webm',buffer:Buffer.from([26,69,223,163,1,2,3,4])});await expect(page.getByRole('list',{name:'올릴 파일'}).locator('video')).toHaveCount(1);
  await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();const work=page.getByRole('article',{name:'선택한 작업물'});await expect(work).toContainText('점심을 거르는 30대 직장인에게 주 5일 도시락 구독');await expect(work).toContainText('문구가 끌리는지');
- const files=work.getByRole('region',{name:'작업물 첨부'});await expect(files.getByText(/첫 화면.png.*기수 공개/)).toBeVisible();await expect(files.getByRole('img',{name:'첫 화면.png'})).toHaveCount(1);
+ const files=work.getByRole('region',{name:'작업물 첨부'});await expect(files.getByText(/첫 화면.png.*기수 공개/)).toBeVisible();await expect(files.getByRole('img',{name:'첫 화면.png'})).toHaveCount(1);await expect(files.locator('video')).toHaveCount(1);await expect(files.getByText(/까지 볼 수 있어요/)).toBeVisible();
  await work.getByRole('button',{name:'체험: 예시 동료 의견 추가'}).click();await expect(work).toContainText('3초 안에 무엇을 파는지');await expect(work).toContainText('애매해요');
  expect(requests).toEqual([]);await noOverflow(page);
 });

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { campusError } from '../snapshot';
 import type { FilePorts } from './file-handler';
-import type { PortfolioFile } from './files';
+import { isVideoType, videoRetentionDays, type PortfolioFile } from './files';
 const bucket='campus-portfolio-private';
 export async function portfolioFilePorts(actor:string):Promise<FilePorts>{
  const db=await createClient(),admin=createAdminClient(),storage=admin.storage.from(bucket);
@@ -14,8 +14,16 @@ export async function portfolioFilePorts(actor:string):Promise<FilePorts>{
   share:async c=>{const r=await db.rpc('edu_campus_portfolio_file_share',{p_command:c});error(r.error);return r.data;},
   prepare:async c=>{const r=await db.rpc('edu_campus_portfolio_file_prepare',{p_command:c});error(r.error);if(!r.data)campusError(503,'업로드를 준비하지 못했습니다.');return r.data as PortfolioFile;},
   signedUpload:async file=>{const r=await storage.createSignedUploadUrl(file.path,{upsert:false});if(r.error)campusError(503,'업로드를 준비하지 못했습니다.');return r.data.signedUrl;},
-  signedDownload:async file=>{const check=await db.from('edu_campus_portfolio_files').select('id').eq('id',file.id).eq('state','ready').maybeSingle();if(check.error||!check.data)campusError(403,'파일 공개 범위가 바뀌었습니다.');const r=await storage.createSignedUrl(file.path,30,{download:file.name});if(r.error)campusError(503,'다운로드를 준비하지 못했습니다.');return r.data.signedUrl;},
+  signedDownload:async file=>{const check=await db.from('edu_campus_portfolio_files').select('id').eq('id',file.id).eq('state','ready').maybeSingle();if(check.error||!check.data)campusError(403,'파일 공개 범위가 바뀌었습니다.');// A preview plays for a while and asks for byte ranges as it goes, so its link lives longer than a picture's.
+   const r=await storage.createSignedUrl(file.path,isVideoType(file.content_type)?3600:30,{download:file.name});if(r.error)campusError(503,'다운로드를 준비하지 못했습니다.');return r.data.signedUrl;},
   read:async file=>{const info=await storage.info(file.path);if(info.error||info.data.size!==file.size||info.data.contentType!==file.content_type)campusError(400,'파일 정보가 다릅니다.');const r=await storage.download(file.path);if(r.error||r.data.size!==file.size)campusError(503,'파일을 확인하지 못했습니다.');return{bytes:new Uint8Array(await r.data.arrayBuffer()),contentType:info.data.contentType};},
+  // ponytail: swept a few at a time whenever someone uploads, no scheduled job. Add a cron if storage must be exact.
+  sweep:async()=>{const day=86400000,now=Date.now(),old=new Date(now-videoRetentionDays*day).toISOString(),stale=new Date(now-day).toISOString();
+   const open=()=>admin.from('edu_campus_portfolio_files').select('id,path').is('removed_at',null).limit(10);
+   const [videos,unfinished]=await Promise.all([open().like('content_type','video/%').lt('created_at',old),open().eq('state','pending').lt('created_at',stale)]);
+   const gone=[...(videos.data??[]),...(unfinished.data??[])];if(!gone.length)return;
+   const removed=await storage.remove(gone.map(f=>f.path));if(removed.error)return;
+   await admin.from('edu_campus_portfolio_files').update({removed_at:new Date().toISOString()}).in('id',gone.map(f=>f.id));},
   complete:async(id,hash)=>{const r=await admin.rpc('edu_campus_portfolio_file_complete',{p_actor:actor,p_file:id,p_hash:hash});error(r.error);return r.data;},
  };
 }

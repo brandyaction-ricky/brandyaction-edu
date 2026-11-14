@@ -7,6 +7,22 @@ test('portfolio file contract validates extensions, size and binary signatures, 
  const spec=portfolioFileSpec('캡처.png',8);assert.equal(spec.contentType,'image/png');assert.equal(matchesPortfolioFile(Uint8Array.from([137,80,78,71,13,10,26,10]),spec),true);
  assert.equal(matchesPortfolioFile(new TextEncoder().encode('<script>'),spec),false);
 });
+test('a video preview is accepted by signature, carries a 30-day date, and is refused once the date passes or it was swept',async()=>{
+ const {videoExpiry}=await load('../features/campus/community/files.ts');
+ const mp4=portfolioFileSpec('광고-미리보기.mp4',12),webm=portfolioFileSpec('광고.webm',8);assert.equal(mp4.contentType,'video/mp4');assert.equal(webm.contentType,'video/webm');
+ assert.equal(matchesPortfolioFile(Uint8Array.from([0,0,0,24,102,116,121,112,105,115,111,109]),mp4),true);assert.equal(matchesPortfolioFile(new TextEncoder().encode('<html>12345a'),mp4),false);
+ assert.equal(matchesPortfolioFile(Uint8Array.from([26,69,223,163,1,2,3,4]),webm),true);assert.throws(()=>portfolioFileSpec('영상.mov',10));assert.throws(()=>portfolioFileSpec('큰영상.mp4',10485761));
+ const now=Date.parse('2026-12-01T00:00:00Z'),at=d=>new Date(now-d*86400000).toISOString();
+ assert.deepEqual(videoExpiry({content_type:'image/png',created_at:at(400)},now),{expiresAt:null,expired:false});
+ assert.equal(videoExpiry({content_type:'video/mp4',created_at:at(29)},now).expired,false);assert.equal(videoExpiry({content_type:'video/mp4',created_at:at(30)},now).expired,true);assert.equal(videoExpiry({content_type:'video/mp4',created_at:at(1),removed_at:at(0)},now).expired,true);
+ const file=days=>({id:uid(10),owner_id:uid(1),post_id:uid(2),post_revision:1,name:'광고-미리보기.mp4',size:12,content_type:'video/mp4',path:'p',state:'ready',sha256:'a'.repeat(64),visibility:'cohort',revision:2,created_at:new Date(Date.now()-days*86400000).toISOString()});
+ let swept=0;const ports=days=>async()=>({readable:async()=>file(days),list:async()=>[file(days),{...file(2),id:uid(11),state:'pending',removed_at:new Date().toISOString()}],signedDownload:async()=>'https://storage.example.com/signed/v',sweep:async()=>{swept++;throw Error('storage down');},prepare:async c=>({...file(0),state:'pending',...c}),signedUpload:async()=>'https://storage.example.com/up'});
+ const call=(days,path,init)=>handlePortfolioFiles(new Request('https://edu.example.com/api/campus/community/files'+path,init),{enabled:true,authenticate:async()=>({id:uid(1)}),ports:ports(days)});
+ assert.equal((await call(3,'?fileId='+uid(10))).status,302);assert.equal((await call(31,'?fileId='+uid(10))).status,410);
+ const listed=(await (await call(3,'?postId='+uid(2))).json()).files;assert.equal(listed.length,1);assert.equal(listed[0].expired,false);assert.ok(listed[0].expiresAt);
+ // An upload still goes through when the sweep of old previews fails.
+ const prepared=await call(0,'',{method:'POST',headers:{'content-type':'application/json',origin:'https://edu.example.com'},body:JSON.stringify({action:'prepare',postId:uid(2),requestId:uid(12),expectedRevision:1,name:'새 영상.mp4',size:12})});assert.equal(prepared.status,200);assert.equal(swept,1);
+});
 test('file API authenticates, validates upload completion, issues short private redirect only after authorization and requires explicit sharing',async()=>{
  let completes=0,prepared=null;const bytes=new TextEncoder().encode('%PDF-1.7\nlocal fake fixture');
  const file={id:uid(10),owner_id:uid(1),post_id:uid(2),post_revision:1,name:'문샷 기획.pdf',size:bytes.length,content_type:'application/pdf',path:'private/server/path',state:'pending',sha256:null,visibility:'private',revision:1};
