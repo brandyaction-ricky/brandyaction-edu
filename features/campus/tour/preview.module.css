@@ -145,3 +145,4 @@ p.loading{pointer-events:none}
 .flatRoom li button small{font-size:12px;font-weight:400;color:#b8cde2}
 @media(max-width:700px){.flatRoom ol{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:650px){.root[data-room=study] .flatRoom{top:auto;bottom:150px;transform:translate(-50%,0);max-height:calc(100% - 420px)}}
+.flatRoom li{border:0;padding:0;background:transparent}
