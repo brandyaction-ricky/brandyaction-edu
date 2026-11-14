@@ -43,8 +43,11 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  // Platform loads the authenticated user and page data together from /api/platform.
  // Keeping it mounted across route changes preserves its in-memory state.
  const LessonFocus = root==='learn'&&process.env.EDU_CAMPUS_ENABLED==='true'&&!campusPrivateRelease()&&process.env.EDU_CAMPUS_SPACE_ENABLED==='true' ? (await import('@/features/campus/space/lesson-focus')).LessonFocus : null;
- const CampusEntryBar=process.env.EDU_CAMPUS_ENABLED==='true'&&!campusPrivateRelease()&&['my','learn'].includes(root)?(await import('@/features/campus/ui/entry-bar')).CampusEntryBar:null;
- const returnTo=CampusEntryBar?(await searchParams)?.campusReturn:undefined;
+ // While the campus is private, only someone who came from inside it (a valid return address) is shown the way back.
+ const campusPage=process.env.EDU_CAMPUS_ENABLED==='true'&&['my','learn'].includes(root),campusBack=campusPage?(await searchParams)?.campusReturn:undefined;
+ const campusPrivate=campusPage&&campusPrivateRelease();
+ const CampusEntryBar=campusPage&&(!campusPrivate||(typeof campusBack==='string'&&campusBack.startsWith('/campus/workspace?')))?(await import('@/features/campus/ui/entry-bar')).CampusEntryBar:null;
+ const returnTo=CampusEntryBar?campusBack:undefined;
  // Crawlers read the server HTML: give public pages their name and summary before the client loads the rest.
  const item=['classes','articles'].includes(root)&&section?await publicItem(root,section):null;
  const ld=path.length===0?jsonLd([{'@context':'https://schema.org','@type':'WebSite',name:EDU_SITE_NAME,alternateName:brand.alternateName,url:SITE_URL+'/'},{'@context':'https://schema.org',...brand}])
@@ -54,7 +57,7 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
   const { PublicHomeConsultation } = await import('@/app/ui/final/home-consultation');
   return <>{platform}<PublicHomeConsultation /></>;
  }
- return CampusEntryBar||LessonFocus?<>{CampusEntryBar&&<CampusEntryBar returnTo={typeof returnTo==='string'?returnTo:undefined}/>}{platform}{LessonFocus&&<LessonFocus/>}</>:platform;
+ return CampusEntryBar||LessonFocus?<>{CampusEntryBar&&<CampusEntryBar returnTo={typeof returnTo==='string'?returnTo:undefined} backOnly={campusPrivate}/>}{platform}{LessonFocus&&<LessonFocus/>}</>:platform;
 }
 
 // Search titles per public section (CEO 11-09: 브랜디에듀 · AI 마케팅 · AI 자동화).

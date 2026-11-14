@@ -134,3 +134,14 @@ p.loading{pointer-events:none}
 /* 넓은 화면에서는 직원 업무 목록을 더 길게, 좁은 화면에서는 사무실을 가리지 않게 짧게 */
 @media(min-width:701px){.loadingDeskList{max-height:min(34dvh,15rem)}}
 .toolLink{margin-top:14px;min-height:44px;padding:10px 16px;border:1px solid #c8d2e2;border-radius:8px;background:#fff;color:#17243a;font-weight:600}
+
+/* Phone: the running-focus bar is one row (state and time left, buttons right). */
+@media(max-width:650px){.miniFocus>aside{flex-wrap:nowrap;align-items:center;gap:8px;padding:8px 12px}.miniFocus>aside>div{width:auto;flex:1;min-width:0;flex-direction:column;align-items:flex-start;gap:0}.miniFocus>aside>div>span{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.miniFocus>aside>div>strong{font-size:20px;line-height:1.1}.miniFocus>aside>span{display:none}.miniFocus>aside button{flex:none;min-height:40px;padding:6px 10px}}
+/* A browser that cannot draw 3D: the simple screen replaces the scene, so its leftover controls are put away. */
+.root[data-flat] .scene{visibility:hidden}
+.flatRoom ol{grid-template-columns:repeat(2,minmax(0,1fr))}
+.flatRoom li{min-height:0;grid-template-rows:auto}
+.flatRoom li button{display:grid;gap:3px;width:100%;min-height:56px;text-align:left;padding:10px 12px}
+.flatRoom li button small{font-size:12px;font-weight:400;color:#b8cde2}
+@media(max-width:700px){.flatRoom ol{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:650px){.root[data-room=study] .flatRoom{top:auto;bottom:150px;transform:translate(-50%,0);max-height:calc(100% - 420px)}}

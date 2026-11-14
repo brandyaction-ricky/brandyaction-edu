@@ -35,6 +35,7 @@ const SpaceTools=lazy(()=>import('../space/panel').then(m=>({default:m.SpacePane
 import {LessonTaskPanel} from '../ui/lesson-task-panel';
 import {TOUR_AVATAR_KEY,readTourAvatar,tourAvatar} from './appearance';
 import {CampusWindow} from '../ui/campus-window';
+import {requestedRoom} from '../ui/navigation';
 import {canEnter,rooms,roleNames,type TourRole,type TourRoom} from './model';
 import styles from './preview.module.css';
 type Progress={video:boolean;quiz:(boolean|null)[];level:number[]};
@@ -119,6 +120,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const [officeFilter,setOfficeFilter]=useState<{id:string;name:string;jobId?:string}|null>(null);
  // 사무실에서 직원(이름표·자리)을 눌렀을 때 뜨는 상태 카드의 직원.
  const [staffCard,setStaffCard]=useState<string|null>(null);
+ const restoredRoom=useRef(false);
  const [toolsVisited,setToolsVisited]=useState(false),[toolsPane,setToolsPane]=useState<'focus'|'lounge'|'settings'|'profile'>('focus'),[taskQuery,setTaskQuery]=useState(''),[previous,setPrevious]=useState(''),[handoff,setHandoff]=useState<{lessonId:string;context:string}|null>(null),[aiVisited,setAiVisited]=useState(false),[officeVisited,setOfficeVisited]=useState(false),[fullscreen,setFullscreen]=useState(false);
  useEffect(()=>{const change=()=>setFullscreen(document.fullscreenElement===shell.current);document.addEventListener('fullscreenchange',change);return()=>document.removeEventListener('fullscreenchange',change);},[]);
  const [selectedLesson,setSelectedLesson]=useState('');
@@ -171,7 +173,9 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  // A document navigation releases the WebGL scene/presence and rechecks operator auth.
  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
  function enter(id:TourRoom){post('meetup-start');if(!mayLeave())return;if(visitorRef.current?.operatorReview&&!['live','library'].includes(id)){const q=new URLSearchParams({room:id});if(visitorRef.current.operatorEvent)q.set('event',visitorRef.current.operatorEvent);window.location.assign('/campus/operator?'+q);return;}if(!canEnter(role,id)){setMapOpen(false);setActivityMenu(false);setGate(id);return;}let first=false;if(id==='office'&&live&&role==='student'){try{const key='campus:office-guide:v1:'+snapshot.viewer.id;first=!localStorage.getItem(key);if(first)localStorage.setItem(key,'seen');}catch{}}
- setRoom(id);setMapOpen(false);setGate(null);setTool(first?'office-guide':'');setPrevious('');setActivityMenu(false);setNotice('');post('room',{id});}
+ setRoom(id);setMapOpen(false);setGate(null);setTool(first?'office-guide':'');setPrevious('');setActivityMenu(false);setNotice('');post('room',{id});
+ // 들어온 공간을 주소에 적어 둔다. 새로고침하거나 수업에서 돌아올 때 지도 대신 이 공간이 열린다.
+ if(live&&role==='student'){try{const u=new URL(location.href);u.searchParams.set('room',id);history.replaceState(history.state,'',u);}catch{}}}
  function selectTask(id:string){const t=managedTask(id);if(!t||!taskOpen(id,live?.modules)||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;
   // 조명·배경음은 버튼 하나뿐인 중간 화면을 거치지 않고 3D 화면의 설정 창을 바로 연다.
   if(id==='sound'&&ready&&!failed&&room===t.room){setTool('');setPrevious('');setMapOpen(false);setActivityMenu(false);setNotice('');post('environment-open');return;}
@@ -184,6 +188,9 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
    live.onOpen(id,missionId);return;
  }setPrevious(tool);setSelectedLesson(snapshot.lessons.find(l=>l.id===id)?.title||'오늘 수업');setTool('lesson');}
  function ask(value:{lessonId:string;context:string}){if(!mayLeave(true))return;setPrevious(tool);setHandoff(value);setAiVisited(true);setTool('ai');}
+ // 주소에 공간이 적혀 있으면(새로고침, 수업에서 돌아옴) 지도 대신 그 공간으로 바로 들어간다.
+ // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- a one-time restore once the live view is there
+ useEffect(()=>{if(restoredRoom.current||!live||role!=='student')return;restoredRoom.current=true;const want=requestedRoom(location.search) as TourRoom|null;if(want&&canEnter(role,want))enter(want);},[live]);
  function navigate(id:string){selectTask(({community:'feedback',business:'business:brief',support:'support:request',learning:'learning'} as Record<string,string>)[id]||id);}
  useEffect(()=>{state.current={role,room,tool,mapOpen,gate,camera};},[role,room,tool,mapOpen,gate,camera]);
  useEffect(()=>{const receive=(event:MessageEvent)=>{const m=event.data;if(event.source!==frame.current?.contentWindow||event.origin!==location.origin||m?.source!=='moonshot-tour'||m.token!==token.current||!token.current)return;const s=state.current;
@@ -287,12 +294,21 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
    <p>3D로 보려면 ① 브라우저를 완전히 종료한 뒤 다시 열기 ② 설정 › 시스템 › &lsquo;가능한 경우 그래픽 가속 사용&rsquo; 켜기 ③ 그래도 안 되면 Chrome이나 Edge 최신 버전으로 열기. 공간 전체 보기·3인칭 보기·내 캐릭터는 3D 화면에서만 쓸 수 있어요.</p>
    <button type="button" onClick={()=>{setFailed(false);setReady(false);frame.current?.contentWindow?.location.reload();}}>3D 다시 시도</button>
  </section> : null;
+ // 사무실 밖의 공간(공부방 등)도 3D를 못 여는 브라우저에서는 그 공간의 할 일을 바로 열 수 있는 간단한 화면을 보여 준다.
+ const flatRoom=failed&&!!live&&role==='student'&&!studentOffice&&!mapOpen&&!tool&&!gate&&!editing&&!activityMenu ? <section className={styles.flatOffice+' '+styles.flatRoom} aria-label="간단히 보기">
+   <h2>3D 화면을 열 수 없어 간단한 화면으로 보여드려요</h2>
+   <p>이 브라우저에서는 3D 공간을 그릴 수 없어요. 이 공간에서 할 일은 아래에서 그대로 열 수 있어요.</p>
+   <ol>{visibleTasks(room,role).map(t=><li key={t.id}><button type="button" onClick={()=>selectTask(t.id)}><strong>{t.title}</strong><small>{t.description}</small></button></li>)}</ol>
+   <p>3D로 보려면 ① 브라우저를 완전히 종료한 뒤 다시 열기 ② 설정 › 시스템 › &lsquo;가능한 경우 그래픽 가속 사용&rsquo; 켜기 ③ 그래도 안 되면 Chrome이나 Edge 최신 버전으로 열기.</p>
+   <button type="button" onClick={()=>{setFailed(false);setReady(false);frame.current?.contentWindow?.location.reload();}}>3D 다시 시도</button>
+ </section> : null;
  const sceneLoading=!ready&&!deskShortcuts&&!(studentOffice&&deskFrameVisible)&&!mapOpen&&tool!=='legacy-space'
   ? !failed&&<p className={styles.loading} role="status">공간과 캐릭터를 준비하고 있어요…</p> : null;
- return <div ref={shell} className={styles.root} data-room={room} data-editing={editing}>
+ return <div ref={shell} className={styles.root} data-room={room} data-editing={editing} data-flat={flatOffice||flatRoom?'':undefined}>
  {room==='welcome'&&accountWelcome&&(welcomeSaving>0||welcomeError)&&<div className={styles.accountSave} role={welcomeError?'alert':'status'}>{welcomeError||'준비 기록을 저장하고 있어요…'}{welcomeError&&<button onClick={()=>{if(welcomeLoaded.current){for(const command of welcomeFailed.current.values())void saveWelcome(command).catch(()=>{});}else window.location.reload();}}>다시 시도</button>}</div>}<LibraryScreen roomLabel={room==='welcome'?'웰컴 존':'자료실'} video={screenVideo} onClose={()=>{setScreenVideo(null);setTool(room==='welcome'?'video':'library:replay');}}/><header className={styles.top} data-campus-chrome><div className={styles.brand}><Orbit size={23}/><div><strong>{roomName(room)}</strong>{room==='office'&&live&&role==='student'?<button type="button" className={styles.officeHelp} aria-label="개인 사무실 이용 안내" onClick={()=>{if(mayLeave()){setTool('office-guide');setActivityMenu(false);}}}>사무실 이용 안내 →</button>:<small>{room==='library'?'누구나 꺼내 보는 무료 자료':room==='office'?'나만의 개인 공간':room==='live'?(visitor?'AI 마케팅을 배우고 실행하는 곳':'모두에게 열린 공간'):room==='welcome'?welcomeSettings.title:'함께 실행하는 수강생 공간'}</small>}</div></div><div className={styles.topButtons}><button disabled={editing} className={styles.primary} onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setActivityMenu(false);setMapOpen(true);}}><Map size={17}/>공간 이동</button><button disabled={editing} aria-label={fullscreen?'전체화면 종료':'전체화면'} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else if(shell.current?.requestFullscreen)void shell.current.requestFullscreen().catch(()=>setNotice('이 브라우저에서는 현재 화면 크기로 이용해 주세요.'));else setNotice('이 브라우저에서는 전체화면을 지원하지 않아요. 현재 화면에서 모든 기능을 이용할 수 있어요.');}}>{fullscreen?<Minimize size={18}/>:<Maximize size={18}/>}</button><button disabled={editing} className={styles.exitButton} aria-label="캠퍼스 나가기" onClick={()=>void exitCampus()}><DoorOpen size={18}/><span>나가기</span></button></div></header>
  <div className={styles.scene}>{bridge&&(sceneStarted||studentOffice&&!mapOpen&&!tool)&&!deferSceneForChat&&tool!=='legacy-space'&&<iframe title="문샷 캠퍼스 3D 미리보기" ref={frame} src={'/campus/world/tour/index.html'+(process.env.NEXT_PUBLIC_CAMPUS_LOCAL_MEETUP==='true'&&typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('meet')==='1'?'?previewMeetup=1'+(new URLSearchParams(window.location.search).get('qaChat')==='1'?'&qaChat=1':''):'')+'#bridge='+bridge} sandbox="allow-scripts allow-same-origin" onLoad={()=>{if(sceneStarted)startTourFrame();else waitingForOffice.current=true;}}/>}</div>
  {flatOffice}
+ {flatRoom}
  {staffPerson&&snapshot.selectedEnrollmentId&&<EmployeeCard key={staffPerson.employeeId} enrollmentId={snapshot.selectedEnrollmentId} person={staffPerson} onClose={()=>setStaffCard(null)}
    onInbox={()=>{setStaffCard(null);setOfficeFilter({id:staffPerson.employeeId,name:staffPerson.name});selectTask('office');}}
    onJob={jobId=>{setStaffCard(null);setOfficeFilter({id:staffPerson.employeeId,name:staffPerson.name,jobId});selectTask('office');}}/>}

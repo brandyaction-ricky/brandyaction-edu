@@ -86,3 +86,12 @@
 .toolStatus .caption,.toolStatus .demo{margin:0;font-size:13px}
 .toolStatus .controls{display:flex;margin:0;gap:10px;justify-content:flex-end;font-size:13px}
 .toolStatus .controls>button{flex:none}
+
+/* Phone: the entry card takes one row so the room and its signs stay visible; the names are in 동료와 대화. */
+@media(max-width:650px){
+.studyEntry{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:10px 12px}
+.studyEntry header{grid-column:1;justify-content:flex-start}
+.studyEntry ul{display:none}
+.studyEntry p{grid-column:1;margin:2px 0 0}
+.studyEntry>button{grid-column:2;grid-row:1 / span 2}
+}

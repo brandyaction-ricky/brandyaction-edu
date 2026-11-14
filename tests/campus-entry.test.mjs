@@ -29,7 +29,11 @@ test('campus entry loads only for enabled member pages and preserves existing pu
   process.env.EDU_CAMPUS_ENABLED='false';assert.equal((await render(['my','classes'])).type,'platform');assert.ok(!imports.includes('@/features/campus/ui/entry-bar'));
   process.env.EDU_CAMPUS_ENABLED='true';process.env.EDU_CAMPUS_SPACE_ENABLED='true';assert.equal((await render(['classes','moonshot'])).type,'platform');assert.ok(!imports.includes('@/features/campus/ui/entry-bar'));
   const my=await render(['my','classes']);assert.deepEqual(my.props.children.filter(Boolean).map(c=>c.type),['campus-entry','platform']);
-  privateRelease=true;assert.equal((await render(['my','classes'])).type,'platform');assert.equal((await render(['learn',id(1),id(2)])).type,'platform');privateRelease=false;
+  privateRelease=true;assert.equal((await render(['my','classes'])).type,'platform');assert.equal((await render(['learn',id(1),id(2)])).type,'platform');
+  // While private, a lesson opened from inside the campus still gets the way back (and only the way back).
+  const back=await output.default({params:Promise.resolve({path:['learn',id(1),id(2)]}),searchParams:Promise.resolve({campusReturn:'/campus/workspace?enrollmentId='+id(1)+'&room=study'})});
+  const bar=back.props.children.filter(Boolean)[0];assert.equal(bar.type,'campus-entry');assert.equal(bar.props.backOnly,true);
+  assert.equal((await output.default({params:Promise.resolve({path:['learn',id(1),id(2)]}),searchParams:Promise.resolve({campusReturn:'https://evil.example/'})})).type,'platform');privateRelease=false;
   const lesson=await render(['learn',id(1),id(2)]);assert.deepEqual(lesson.props.children.filter(Boolean).map(c=>c.type),['campus-entry','platform','focus']);
  }finally{if(original===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=original;if(space===undefined)delete process.env.EDU_CAMPUS_SPACE_ENABLED;else process.env.EDU_CAMPUS_SPACE_ENABLED=space;}
 });

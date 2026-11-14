@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {build} from 'esbuild';
 const out=await build({entryPoints:['features/campus/ui/navigation.ts'],bundle:true,write:false,format:'esm',platform:'node'});
-const {campusReturnPath,withCampusReturn,validSection,requestedEnrollment}=await import('data:text/javascript;base64,'+Buffer.from(out.outputFiles[0].text).toString('base64'));
+const {campusReturnPath,withCampusReturn,validSection,requestedEnrollment,requestedRoom}=await import('data:text/javascript;base64,'+Buffer.from(out.outputFiles[0].text).toString('base64'));
 const source='/campus/workspace?enrollmentId=00000000-0000-4000-8000-000000000001&section=space&view=immersive';
 test('return hints keep only known campus routes and parameters',()=>{
  assert.equal(campusReturnPath(source+'&admin=true'),source);
@@ -16,4 +16,9 @@ test('lesson handoff preserves its mission query and returns to the right view',
 test('entry accepts only a well-formed enrollment hint; server authorization still applies',()=>{
  assert.equal(requestedEnrollment('?enrollmentId=00000000-0000-4000-8000-000000000001'),'00000000-0000-4000-8000-000000000001');
  assert.equal(requestedEnrollment('?enrollmentId=../admin'),null);assert.equal(requestedEnrollment(''),null);
+});
+test('the way back keeps the room the learner was in, and only a known room',()=>{
+ const base='/campus/workspace?enrollmentId=00000000-0000-4000-8000-000000000001&section=learning';
+ assert.equal(campusReturnPath(base+'&room=study'),base+'&room=study');assert.equal(campusReturnPath(base+'&room=admin'),base);
+ assert.equal(requestedRoom('?enrollmentId=x&room=office'),'office');assert.equal(requestedRoom('?room=../admin'),null);assert.equal(requestedRoom('?section=learning'),null);
 });
