@@ -95,3 +95,5 @@
 .studyEntry p{grid-column:1;margin:2px 0 0}
 .studyEntry>button{grid-column:2;grid-row:1 / span 2}
 }
+
+.presenceNote{flex:1 1 200px;min-width:0;text-align:left}
