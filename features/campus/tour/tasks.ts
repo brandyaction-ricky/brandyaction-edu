@@ -4,7 +4,7 @@ const task=(id:string,room:TourRoom,group:string,title:string,description:string
 export const tourTasks:TourTask[]=[
  task('library:all','library','무료로 배우기','자료·다시보기','무료 자료와 다시보기를 한 화면에서 선택'),
  task('library:files','library','무료로 배우기','무료 자료','공개 자료 보기와 다운로드'),task('library:replay','library','무료로 배우기','다시보기','공개 유튜브 영상으로 복습하기'),
- task('learning','study','배우고 실행하기','수업·과제','오늘 할 수업과 제출할 과제'),
+ task('learning','study','배우고 실행하기','수업','오늘 볼 수업과 이어 볼 수업'),
  task('growth','study','배우고 실행하기','성장·미션 지도','일차별 진행과 완료한 수업'),
  task('focus','study','배우고 실행하기','집중과 휴식','25분·50분·자유 집중과 짧은 휴식'),
  task('journal','study','배우고 실행하기','실행 수첩','15분 실행과 지난 기록'),

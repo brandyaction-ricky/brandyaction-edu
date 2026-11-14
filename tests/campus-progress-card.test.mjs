@@ -56,7 +56,7 @@ test('demo export has a visible watermark while real export retains the scope di
   for (const svg of [demo, real]) {
     assert.match(svg, /개인 학습 기록/);
     assert.match(svg, /수료증\/사업 성과 인증서가 아닙니다/);
-    assert.match(svg, /현재 공개된 수업·과제 기준/);
+    assert.match(svg, /현재 공개된 수업 기준/);
   }
 });
 
