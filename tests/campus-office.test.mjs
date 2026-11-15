@@ -126,6 +126,12 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  // A revision request needs a memo; an approval does not (the second job below is approved with none).
  await assert.rejects(mutate({...approve,requestId:uid(297),action:'request_revision',note:''}),/note/i);
  assert.equal((await mutate(approve)).status,'approved');await assert.rejects(mutate({...approve,requestId:uid(301)}),/revision conflict/i);
+ // As 40001 the API layer retried this conflict until it timed out; after the conflict-code migration it is 23505 (mapped to 409).
+ const conflict=async()=>{try{await mutate({...approve,requestId:uid(303)});return'ok';}catch(e){return e.code+' '+e.message;}};
+ assert.match(await conflict(),/^40001 revision conflict/);
+ await db.exec('reset role');await db.exec(readFileSync(new URL('../supabase/migrations/20261115100000_campus_conflict_code_everywhere.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));await login(1);
+ assert.match(await conflict(),/^23505 revision conflict/);
+ await db.exec('reset role');assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in('public','private') and p.proname like '%campus%' and pg_get_functiondef(p.oid) like '%errcode=''40001''%'")).rows[0].n,0);await login(1);
  await mutate({...approve,requestId:uid(302),action:'archive',expectedRevision:5,note:''});
  assert.equal((await db.query('select * from edu_campus_office_history where job_id=$1',[uid(100)])).rows.length,6);
  // Hiding is undone: the job returns to the state before it was hidden, with the memo of its last review, any number of times.
