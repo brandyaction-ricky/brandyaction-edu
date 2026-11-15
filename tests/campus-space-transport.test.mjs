@@ -41,3 +41,12 @@ test('focus transitions reach a peer immediately and survive a stale snapshot',a
   assert.equal(focus(),null);
  }finally{a.close();b.close();}
 });
+test('the campus tools pane (follow:false) opens only the roster channel, still sees peers and their focus times',async()=>{
+ const h=harness(30),seen=[];const t=await createLiveTransport(uid(50),uid(1),uid(101),s=>seen.push(s),()=>{},{client:h.client(),request:h.request,follow:false});
+ try{await t.command({kind:'join'});await new Promise(r=>setTimeout(r,20));
+  assert.equal(h.channels.filter(c=>c.topic.startsWith('campus-space:')).length,0);
+  assert.equal(h.channels.filter(c=>!c.removed&&c.topic.startsWith('campus-roster:')).length,1);
+  assert.equal(seen.at(-1).peers.length,30);
+  t.move({x:5,y:5,sitting:false});await new Promise(r=>setTimeout(r,600));assert.equal(h.transmissions.length,0);
+ }finally{t.close();}
+});

@@ -151,7 +151,7 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
   const entering={...saved,status:participationStatus(participation)};
   setSaved(entering);setDraft(p=>({...p,status:entering.status}));
   transport.current?.close();
-  const t=demo?createDemoTransport(cohortId,snapshot.viewer.id,sessionId,entering,setState):await createLiveTransport(cohortId,snapshot.viewer.id,sessionId,setState,setError);
+  const t=demo?createDemoTransport(cohortId,snapshot.viewer.id,sessionId,entering,setState):await createLiveTransport(cohortId,snapshot.viewer.id,sessionId,setState,setError,toolsPane?{follow:false}:undefined);
   if(!mounted.current){t.close();return;}
   transport.current=t;
   try{

@@ -2,7 +2,11 @@ import {watchStudyRoster} from './roster-channel';
 import {avatarAppearance, createMotionQueue, makeLimiter, position, publicPeer, initialMetrics, isNearby, nearText, type NearbyMessage, type SpaceChat, type SpacePeer, type SpaceProfile, type SpaceSeat, type SpaceState } from './domain';
 import type { SpaceCommand } from './server';
 export type SpaceTransport = { command:(command:Partial<SpaceCommand>&{kind:string})=>Promise<SpaceState>; move:(value:unknown)=>void; setFocusDeadline?:(end:number|null)=>void; setChatVisible?:(visible:boolean)=>void; close:()=>void };
-export async function createLiveTransport(cohortId:string,userId:string,sessionId:string,onState:(s:SpaceState)=>void,onError:(message:string)=>void,overrides?:{client?:ReturnType<typeof import('@/lib/supabase/client').createClient>;request?:typeof fetch}):Promise<SpaceTransport>{
+export async function createLiveTransport(cohortId:string,userId:string,sessionId:string,onState:(s:SpaceState)=>void,onError:(message:string)=>void,overrides?:{client?:ReturnType<typeof import('@/lib/supabase/client').createClient>;request?:typeof fetch;follow?:boolean}):Promise<SpaceTransport>{
+ // follow:false (the campus tools pane) opens no per-peer channels: that pane draws no peers and has no nearby talk, and
+ // following 24 peers per learner (re-joined every minute) exhausted the realtime pool at 120 learners on DEV.
+ // Peers' focus times still arrive with every heartbeat (15 s) and roster refresh.
+ const follow=overrides?.follow!==false;
  const db=overrides?.client??(await import('@/lib/supabase/client')).createClient(),request=overrides?.request??fetch,channels=new Map<string,ReturnType<typeof db.channel>>(),receivers=new Map<string,ReturnType<typeof makeLimiter>>();
  let closed=false,lastState:SpaceState|null=null,sequence=0,localStatus='quiet';const metrics=initialMetrics(),nearby:NearbyMessage[]=[],canNear=makeLimiter(3000);
  let roster:ReturnType<typeof watchStudyRoster>|undefined;
@@ -35,7 +39,7 @@ export async function createLiveTransport(cohortId:string,userId:string,sessionI
   state.peers=state.peers.map(p=>{const previous=lastState?.peers.find(v=>v.userId===p.userId);if(previous&&previous.sessionId!==p.sessionId)lastSequence.delete(p.userId);const old=previous?.sessionId===p.sessionId?previous:null;return old?{...p,x:old.x,y:old.y,sitting:old.sitting}:p;});lastState=state;if(state.controls?.paused){closeRoster();focusSignals.clear();state.peers=[];state.seats=[];nearby.length=0;disconnect();metrics.status='closed';publish();return;}publish();
   const ids=new Set(state.peers.map(p=>p.userId));
   for(const [id,ch] of channels)if(!ids.has(id)){void db.removeChannel(ch);channels.delete(id);focusSignals.delete(id);receivers.delete(id);lastSequence.delete(id);}
-  for(const peer of state.peers){
+  for(const peer of follow?state.peers:[]){
    if(channels.has(peer.userId))continue;
    const limiter=makeLimiter(400),nearLimiter=makeLimiter(1000);receivers.set(peer.userId,limiter);
    const channel=db.channel(`campus-space:${cohortId}:${peer.userId}`,{config:{private:true,broadcast:{self:false,ack:false}}});
