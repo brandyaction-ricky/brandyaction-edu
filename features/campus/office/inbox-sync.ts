@@ -111,7 +111,9 @@ export function startInboxSync(options: InboxOptions) {
     const attempt = new AbortController();
     connection = attempt;
     const ready = () => {
-      if (attempt.signal.aborted || connected) return;
+      if (attempt.signal.aborted) return;
+      // A socket that dropped and re-joined reports ready again: re-read what changed while it was away.
+      if (connected) { invalidate(); return; }
       clearTimeout(handshakeTimer);
       stopProbing?.();
       connected = true;
@@ -138,6 +140,9 @@ export function startInboxSync(options: InboxOptions) {
     const slow = connected || (!options.join && options.slow());
     if (!slow || Date.now() - lastReadAt >= reconcileMs) void read();
   }, pollMs);
+  // Back online: changes sent while offline never arrive as events, so read now instead of waiting for the poll.
+  const online = () => invalidate();
+  if (typeof window !== 'undefined') window.addEventListener('online', online);
   void read();
   probeWhileWaiting();
   if (options.join) joinTimer = setTimeout(connect, Math.random() * firstJoinWindowMs);
@@ -146,6 +151,7 @@ export function startInboxSync(options: InboxOptions) {
     invalidate,
     close() {
       closed = true;
+      if (typeof window !== 'undefined') window.removeEventListener('online', online);
       stopProbing?.();
       clearInterval(poll);
       clearTimeout(changeTimer);

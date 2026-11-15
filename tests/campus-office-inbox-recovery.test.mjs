@@ -137,3 +137,27 @@ test('a stalled version read times out and a late response cannot replace the ne
   assert.equal(requests.length,3);
   assert.deepEqual(reads,[0,4480,5980]);
 });
+
+test('coming back online or a re-joined socket reads at once instead of waiting for the next reconcile', async t => {
+  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'], now:0});
+  t.mock.method(Math, 'random', () => 0);
+  const listeners = new Map();
+  globalThis.window = {addEventListener:(name, fn) => listeners.set(name, fn), removeEventListener:name => listeners.delete(name)};
+  const reads = [], joins = [];
+  const box = startInboxSync({
+    refresh: async () => { reads.push(Date.now()); }, slow: () => false,
+    onConnected: () => {}, onError: assert.fail,
+    join: async (signal, ready, failed) => { joins.push({signal, ready, failed}); },
+  });
+  try {
+    await Promise.resolve(); t.mock.timers.tick(0); await Promise.resolve();
+    joins.at(-1).ready(); t.mock.timers.tick(100); await Promise.resolve();
+    const afterConnect = reads.length;
+    t.mock.timers.tick(20_000); await Promise.resolve();
+    assert.equal(reads.length, afterConnect, 'while connected, nothing reads before the reconcile');
+    listeners.get('online')(); t.mock.timers.tick(100); await Promise.resolve();
+    assert.equal(reads.length, afterConnect + 1, 'online reads at once');
+    joins.at(-1).ready(); t.mock.timers.tick(100); await Promise.resolve();
+    assert.equal(reads.length, afterConnect + 2, 'a re-join reads at once');
+  } finally { box.close(); assert.equal(listeners.has('online'), false); delete globalThis.window; }
+});
