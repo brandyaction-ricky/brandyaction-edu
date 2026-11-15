@@ -19,6 +19,10 @@ test('space database enforces private notes, actor identity, cohort access, seat
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102151632_edu_campus_space_presence.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102225154_edu_campus_space_controls.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../supabase/migrations/20261103060120_edu_campus_original_avatar_appearance.sql',import.meta.url),'utf8'));
+ // Every access check below runs against the policies as rewritten to compute the learner's cohorts once per statement.
+ await db.exec("create schema if not exists private;grant usage on schema private to authenticated;");
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261115130000_campus_space_member_once.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
+ assert.equal((await db.query("select count(*)::int n from pg_policies where schemaname='public' and tablename like 'edu_campus_space_%' and (coalesce(qual,'')||coalesce(with_check,'')) like '%edu_campus_space_member(cohort_id)%'")).rows[0].n,0);
  const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
  const join=async n=>db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status,expires_at) values($1,$2,$3,'동료','male','#527086','joinable','2099-01-01')`,[uid(20),uid(n),uid(100+n)]);
  await login(1);await join(1);
@@ -82,7 +86,7 @@ test('space database enforces private notes, actor identity, cohort access, seat
  await db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values($1,$2,$3,'자리 생김','male','#527086','joinable')`,[uid(20),uid(900),uid(1901)]);
  await assert.rejects(db.query(`update edu_campus_space_presence set status='quiet' where user_id=$1`,[uid(601)]),/capacity/i);
  await login(1);
- await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}'`);await login(1);assert.equal((await db.query('select edu_campus_space_member($1) allowed',[uid(20)])).rows[0].allowed,false);assert.equal((await db.query('select edu_campus_space_topic($1,true) allowed',[`campus-space:${uid(20)}:${uid(1)}`])).rows[0].allowed,false);
+ await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}'`);await login(1);assert.equal((await db.query('select edu_campus_space_member($1) allowed',[uid(20)])).rows[0].allowed,false);assert.equal((await db.query('select count(*)::int n from edu_campus_space_presence where user_id<>$1',[uid(1)])).rows[0].n,0);assert.equal((await db.query('select count(*)::int n from edu_campus_space_chat')).rows[0].n,0);assert.equal((await db.query('select edu_campus_space_topic($1,true) allowed',[`campus-space:${uid(20)}:${uid(1)}`])).rows[0].allowed,false);
  await db.exec('reset role;set role anon;');await assert.rejects(db.query('select * from edu_campus_space_profiles'),/permission denied/i);
  }finally{await db.close();}
 });
