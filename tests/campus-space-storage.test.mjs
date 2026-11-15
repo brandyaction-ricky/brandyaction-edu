@@ -23,9 +23,20 @@ test('space database enforces private notes, actor identity, cohort access, seat
  await db.exec("create schema if not exists private;grant usage on schema private to authenticated;");
  await db.exec(readFileSync(new URL('../supabase/migrations/20261115130000_campus_space_member_once.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
  assert.equal((await db.query("select count(*)::int n from pg_policies where schemaname='public' and tablename like 'edu_campus_space_%' and (coalesce(qual,'')||coalesce(with_check,'')) like '%edu_campus_space_member(cohort_id)%'")).rows[0].n,0);
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261115140000_campus_space_state_rpc.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
  const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
  const join=async n=>db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status,expires_at) values($1,$2,$3,'동료','male','#527086','joinable','2099-01-01')`,[uid(20),uid(n),uid(100+n)]);
  await login(1);await join(1);
+ // One-call state and heartbeat: the learner is listed first with the head count; a non-member is refused; a heartbeat
+ // writes through the same policies and triggers; a heartbeat from an ended session or a paused room behaves as before.
+ {const st=(await db.query('select public.edu_campus_space_state($1) s',[uid(20)])).rows[0].s;assert.equal(st.own.user_id,uid(1));assert.equal(st.count,1);assert.deepEqual(st.peers,[]);
+  await login(3);await assert.rejects(db.query('select public.edu_campus_space_state($1)',[uid(20)]),/Membership required/);await login(1);
+  await db.exec("reset role;set session_replication_role=replica;update edu_campus_space_presence set touched_at=now()-interval '10 seconds';set session_replication_role=origin;");await login(1);
+  const beat=(await db.query('select public.edu_campus_space_beat($1,$2,$3::jsonb) s',[uid(20),uid(101),JSON.stringify({nickname:'바뀐 별명',gender:'female',coat:'#112233',status:'quiet',photo_opt_in:false,accessory:'none',focus_until:null,focus_mode:0,avatar_model:null,hair_color:'#302825',skin_color:'#e8b68b',pants_color:'#36485d',held_item:'none'})])).rows[0].s;
+  assert.equal(beat.own.nickname,'바뀐 별명');assert.equal(beat.own.status,'quiet');
+  await assert.rejects(db.query('select public.edu_campus_space_beat($1,$2,$3::jsonb)',[uid(20),uid(999),JSON.stringify({nickname:'x',gender:'male',coat:'#112233',status:'quiet'})]),/session ended|rate limit/i);
+  await assert.rejects(db.query('select public.edu_campus_space_beat($1,$2,$3::jsonb)',[uid(20),uid(101),JSON.stringify({nickname:'x',gender:'male',coat:'#112233',status:'quiet'})]),/rate limit/i);}
+
  assert.ok(Date.parse((await db.query('select expires_at from edu_campus_space_presence')).rows[0].expires_at)<Date.now()+80000);
  await db.exec(`insert into edu_campus_space_profiles(user_id,nickname,gender,coat,status,note,desk) values('${uid(1)}','나','male','#527086','quiet','비밀 메모','비밀 책상');`);
  await db.exec("update edu_campus_space_profiles set avatar_model=5,hair_color='#00465b',skin_color='#63f5ec',pants_color='#425a78',held_item='book'");
