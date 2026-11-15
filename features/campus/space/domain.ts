@@ -18,7 +18,7 @@ export const initialMetrics=():SpaceMetrics=>({sent:0,received:0,errors:0,reconn
 export function isNearby(a:{x:number;y:number},b:{x:number;y:number}){return Math.hypot(a.x-b.x,a.y-b.y)<=4;}
 export function nearText(value:unknown){return typeof value==='string'&&value.trim()&&value.trim().length<=120?value.trim():null;}
 export function participationStatus(mode:'quiet'|'together'|'help'):SpaceStatus{return mode==='together'?'joinable':mode;}
-export type SpaceState = { profile: SpaceProfile; peers: SpacePeer[]; messages: SpaceChat[]; seats: SpaceSeat[]; serverNow: string; controls?:SpaceControls; nearby?:NearbyMessage[]; metrics?:SpaceMetrics };
+export type SpaceState = { profile: SpaceProfile; peers: SpacePeer[]; messages: SpaceChat[]; seats: SpaceSeat[]; serverNow: string; /** Everyone present in the room; `peers` is at most 24 of them. */ peerCount?: number; controls?:SpaceControls; nearby?:NearbyMessage[]; metrics?:SpaceMetrics };
 export type FocusClock = { phase: 'idle' | 'focus' | 'break'; duration: number; elapsed: number; runningSince: number | null };
 export const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const defaultProfile = (name = '문샷 동료'): SpaceProfile => ({ ...avatarAppearance({}),nickname: name.slice(0,24), gender: 'male', coat: '#527086', status: 'joinable', lowMotion: false, photoOptIn: false, note: '', desk: '오늘의 작은 한 걸음', accessory:'none',deskTheme:'orbital' });

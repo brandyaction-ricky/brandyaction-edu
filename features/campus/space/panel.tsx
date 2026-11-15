@@ -222,8 +222,8 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
  const peers=state?.peers||[];
  const entryCard=studyEntry?.host&&createPortal(
   <section className={styles.studyEntry} aria-label="지금 공부 중인 수강생">
-   <header><h2>지금 공부 중</h2>{active&&<span>{peers.length}명</span>}</header>
-   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}</ul>
+   <header><h2>지금 공부 중</h2>{active&&<span>{Math.max(peers.length,state?.peerCount??0)}명</span>}</header>
+   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}{(state?.peerCount??0)>peers.length&&<li className={styles.rosterMore}>외 {(state?.peerCount??0)-peers.length}명</li>}</ul>
     :<p role="status">{state?.controls?.paused?'공부방 참여가 잠시 중지됐어요.':busy||(!state&&!error)?'동료를 확인하고 있어요…':error||'동료 연결을 해제했어요.'}</p>}
    <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':'공부방에 참여하기'}</button>
   </section>,studyEntry.host);

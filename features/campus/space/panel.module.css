@@ -97,3 +97,5 @@
 }
 
 .presenceNote{flex:1 1 200px;min-width:0;text-align:left}
+
+.rosterMore{color:var(--text-secondary, #626770);font-size:13px}

@@ -67,6 +67,21 @@ test('space database enforces private notes, actor identity, cohort access, seat
  const arrivals=await Promise.allSettled(Array.from({length:24},(_,index)=>{const n=300+index;return db.exec(`begin;set local role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',true);insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values('${uid(20)}','${uid(n)}','${uid(n+100)}','합성 동료','male','#527086','joinable');commit;`);}));
  // PGlite serializes queued SQL requests: this verifies the admission invariant, not multi-server latency.
  assert.equal(arrivals.filter(r=>r.status==='fulfilled').length,23);assert.equal(arrivals.filter(r=>r.status==='rejected').length,1);await db.exec('rollback;reset role;');await login(1);assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,24);
+ // After the capacity migration: up to 200 are admitted, and a heartbeat of someone already present is never refused for capacity.
+ await db.exec('reset role;');await db.exec(readFileSync(new URL('../supabase/migrations/20261115120000_campus_space_capacity.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
+ for(let i=600;i<776;i++){await db.query(`insert into profiles values($1,'active')`,[uid(i)]);await db.query(`insert into enrollments(id,user_id,course_id,cohort_id,status)values($1,$2,$3,$4,'active')`,[uid(1000+i),uid(i),uid(10),uid(20)]);await db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values($1,$2,$3,'합성 동료','male','#527086','joinable')`,[uid(20),uid(i),uid(i+1000)]);}
+ assert.equal((await db.query('select count(*)::int n from edu_campus_space_presence where expires_at>now()')).rows[0].n,200);
+ await db.query(`insert into profiles values($1,'active')`,[uid(900)]);await db.query(`insert into enrollments(id,user_id,course_id,cohort_id,status)values($1,$2,$3,$4,'active')`,[uid(1900),uid(900),uid(10),uid(20)]);
+ await assert.rejects(db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values($1,$2,$3,'201번째','male','#527086','joinable')`,[uid(20),uid(900),uid(1901)]),/capacity/i);
+ // Fixture ages two rows directly (triggers off), then the real heartbeat and revival paths run with triggers on.
+ await db.exec("set session_replication_role=replica");
+ await db.query(`update edu_campus_space_presence set touched_at=now()-interval '10 seconds' where user_id=$1`,[uid(600)]);
+ await db.query(`update edu_campus_space_presence set touched_at=now()-interval '2 minutes',expires_at=now()-interval '1 second' where user_id=$1`,[uid(601)]);
+ await db.exec("set session_replication_role=origin");
+ await db.query(`update edu_campus_space_presence set status='quiet' where user_id=$1`,[uid(600)]);
+ await db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values($1,$2,$3,'자리 생김','male','#527086','joinable')`,[uid(20),uid(900),uid(1901)]);
+ await assert.rejects(db.query(`update edu_campus_space_presence set status='quiet' where user_id=$1`,[uid(601)]),/capacity/i);
+ await login(1);
  await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}'`);await login(1);assert.equal((await db.query('select edu_campus_space_member($1) allowed',[uid(20)])).rows[0].allowed,false);assert.equal((await db.query('select edu_campus_space_topic($1,true) allowed',[`campus-space:${uid(20)}:${uid(1)}`])).rows[0].allowed,false);
  await db.exec('reset role;set role anon;');await assert.rejects(db.query('select * from edu_campus_space_profiles'),/permission denied/i);
  }finally{await db.close();}
