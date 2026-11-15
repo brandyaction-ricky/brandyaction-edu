@@ -117,7 +117,8 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    if(e instanceof TypeError)return;
    statusError(e);setActive(false);connection.close();transport.current=null;
   }finally{running=false;}};
-  const timer=setInterval(beat,15000);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
+  // Presence lasts 75 s, so a 30 s heartbeat survives one miss; at 15 s, 120 learners kept the DEV database saturated.
+  const timer=setInterval(beat,30000);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
   return()=>{clearInterval(timer);window.removeEventListener('pagehide',unload);};
  },[active,command,cohortId,sessionId,demo]);
  async function selectSound(kind:AmbientKind|null){const generation=++soundGeneration.current;const previous=audio.current;audio.current=null;setSound(null);await previous?.stop();if(kind){try{const next=await createAmbient(kind,volume);if(!mounted.current||generation!==soundGeneration.current){await next.stop();return;}audio.current=next;setSound(kind);}catch{if(mounted.current)setError('소리를 재생할 수 없는 브라우저입니다.');}}}

@@ -12,8 +12,8 @@ export async function authorizeSpace(db: DB, cohortId: string) {
  if(!ID.test(cohortId))fail(400);
  const ok=check(await db.rpc('edu_campus_space_member',{p_cohort:cohortId}));if(ok!==true)fail(403,'이용 가능한 기수를 선택해 주세요.');
 }
-export async function loadSpace(db:DB, viewer:Viewer, cohortId:string):Promise<SpaceState>{
- await authorizeSpace(db,cohortId);
+export async function loadSpace(db:DB, viewer:Viewer, cohortId:string, authorized=false):Promise<SpaceState>{
+ if(!authorized)await authorizeSpace(db,cohortId);
  const now=new Date().toISOString();
  const results=await Promise.all([
   db.from('edu_campus_space_profiles').select('nickname,gender,coat,status,low_motion,photo_opt_in,note,desk,accessory,desk_theme,avatar_model,hair_color,skin_color,pants_color,held_item').eq('user_id',viewer.id).maybeSingle(),
@@ -36,8 +36,10 @@ export async function saveSpace(db:DB,viewer:Viewer,cmd:SpaceCommand):Promise<Sp
   check(await db.from('edu_campus_space_presence').delete().eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).eq('session_id',cmd.sessionId));
   return {profile:profile(cmd.profile,viewer.full_name||'문샷 동료'),peers:[],messages:[],seats:[],serverNow:new Date().toISOString()};
  }
- await authorizeSpace(db,cmd.cohortId);
- if(!['profile','stand','delete-chat'].includes(cmd.kind)){const controls=check(await db.from('edu_campus_space_controls').select('paused,closed_zones').eq('cohort_id',cmd.cohortId).maybeSingle());if((cmd.kind==='seat'&&controls?.closed_zones?.includes('desk'))||(cmd.kind==='chat'&&controls?.closed_zones?.includes('chat')))fail(409,'이 공간은 잠시 쉬고 있어요. 다른 공간을 이용해 주세요.');if(controls?.paused){if(cmd.kind==='heartbeat')return loadSpace(db,viewer,cmd.cohortId);fail(409);}}
+ // Membership and room controls are independent reads: one round trip instead of two.
+ const needsControls=!['profile','stand','delete-chat'].includes(cmd.kind);
+ const [,controlsRead]=await Promise.all([authorizeSpace(db,cmd.cohortId),needsControls?db.from('edu_campus_space_controls').select('paused,closed_zones').eq('cohort_id',cmd.cohortId).maybeSingle():null]);
+ if(needsControls){const controls=check(controlsRead!);if((cmd.kind==='seat'&&controls?.closed_zones?.includes('desk'))||(cmd.kind==='chat'&&controls?.closed_zones?.includes('chat')))fail(409,'이 공간은 잠시 쉬고 있어요. 다른 공간을 이용해 주세요.');if(controls?.paused){if(cmd.kind==='heartbeat')return loadSpace(db,viewer,cmd.cohortId,true);fail(409);}}
  if(cmd.kind==='profile'){
   const p=profile(cmd.profile,viewer.full_name||'문샷 동료');
   check(await db.from('edu_campus_space_profiles').upsert({...appearanceRow(p),user_id:viewer.id,nickname:p.nickname,gender:p.gender,coat:p.coat,status:p.status,low_motion:p.lowMotion,photo_opt_in:p.photoOptIn,note:p.note,desk:p.desk,accessory:p.accessory,desk_theme:p.deskTheme},{onConflict:'user_id'}));
@@ -46,8 +48,8 @@ export async function saveSpace(db:DB,viewer:Viewer,cmd:SpaceCommand):Promise<Sp
   const focusUntil=typeof cmd.focusUntil==='string'&&Number.isFinite(Date.parse(cmd.focusUntil))?cmd.focusUntil:null;
   const row={...appearanceRow(p),cohort_id:cmd.cohortId,user_id:viewer.id,session_id:cmd.sessionId,nickname:p.nickname,gender:p.gender,coat:p.coat,status:p.status,photo_opt_in:p.photoOptIn,accessory:p.accessory,focus_until:focusUntil,focus_mode:[0,3,5,25,50].includes(Number(cmd.focusMode))?Number(cmd.focusMode):0};
   if(cmd.kind==='join'){check(await db.from('edu_campus_space_presence').upsert(row,{onConflict:'cohort_id,user_id'}));check(await db.from('edu_campus_space_seats').delete().eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).neq('session_id',cmd.sessionId));}
-  else {const updated=check(await db.from('edu_campus_space_presence').update(row).eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).eq('session_id',cmd.sessionId).select('user_id'));if(!updated?.length)fail(409,'다른 창에서 입장했거나 연결이 끝났습니다.');}
-  check(await db.from('edu_campus_space_seats').update({session_id:cmd.sessionId}).eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).eq('session_id',cmd.sessionId));
+  else {const [presence,seat]=await Promise.all([db.from('edu_campus_space_presence').update(row).eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).eq('session_id',cmd.sessionId).select('user_id'),db.from('edu_campus_space_seats').update({session_id:cmd.sessionId}).eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).eq('session_id',cmd.sessionId)]);const updated=check(presence);check(seat);if(!updated?.length)fail(409,'다른 창에서 입장했거나 연결이 끝났습니다.');}
+  if(cmd.kind==='join')check(await db.from('edu_campus_space_seats').update({session_id:cmd.sessionId}).eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).eq('session_id',cmd.sessionId));
  }else if(cmd.kind==='seat'){
   if(!['desk-1','desk-2','desk-3'].includes(cmd.seatId||''))fail(400);
   check(await db.rpc('edu_campus_space_claim_seat',{p_cohort:cmd.cohortId,p_session:cmd.sessionId,p_seat:cmd.seatId}));
@@ -60,5 +62,5 @@ export async function saveSpace(db:DB,viewer:Viewer,cmd:SpaceCommand):Promise<Sp
  }else if(cmd.kind==='delete-chat'){
   if(!ID.test(cmd.messageId||''))fail(400);check(await db.from('edu_campus_space_chat').delete().eq('id',cmd.messageId).eq('user_id',viewer.id).eq('cohort_id',cmd.cohortId));
  }else fail(400);
- return loadSpace(db,viewer,cmd.cohortId);
+ return loadSpace(db,viewer,cmd.cohortId,true);
 }
