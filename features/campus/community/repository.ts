@@ -1,6 +1,6 @@
 import type { createClient } from '@/lib/supabase/server';
 import { campusError } from '../snapshot';
-import { loadCampusSnapshot } from '../repository';
+import { loadCampusScope } from '../repository';
 import { validateCommunityCommand, type CommunityState, type CommunityCommand, type CommunityRewards } from './domain';
 type Database = Awaited<ReturnType<typeof createClient>>;
 const columns = {
@@ -17,9 +17,8 @@ async function all<T>(query: PromiseLike<QueryResult>): Promise<T[]> {
   return r.data as T[];
 }
 export async function loadCommunityState(db: Database, viewer: { id: string }, enrollmentId: string, operator = false, page = 0, view = 'all',postId?:string): Promise<CommunityState> {
-  const campus = await loadCampusSnapshot(db, viewer, enrollmentId);
-  const scope = campus.scopes.find(s => s.enrollmentId === enrollmentId);
-  if (!scope) campusError(403, '이용 가능한 기수를 선택해 주세요.');
+  // Only the cohort is needed here; reading the whole curriculum on every list took about 1 s per call under load.
+  const scope = await loadCampusScope(db, viewer, enrollmentId);
   if (!Number.isSafeInteger(page) || page < 0 || page > 10000) campusError(400, '조회 범위를 확인해 주세요.');
   let postQuery = db.from('edu_campus_posts').select(columns.posts, { count: 'exact' }).eq('cohort_id', scope.cohortId).eq('hidden', false);
   if(postId)postQuery=postQuery.eq('id',postId);

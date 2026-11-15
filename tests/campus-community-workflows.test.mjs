@@ -27,6 +27,8 @@ async function setup() {
  insert into curriculum_missions(id,lesson_id,is_published,is_required,archived_at) values('${uid(60)}','${uid(50)}',true,true,null);
  insert into mission_submissions(id,enrollment_id,mission_id,attempt_number,status) values('${uid(70)}','${uid(31)}','${uid(60)}',1,'approved');`);
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102151403_edu_campus_community_workflows.sql',import.meta.url),'utf8'));
+ // Every read check in this file runs against the set-wise policies.
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261115150000_campus_community_read_once.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
  const login=async n=>db.exec(`reset role; set role authenticated; select set_config('request.jwt.claim.sub','${uid(n)}',false)`);
  const mutate=async c=>(await db.query('select public.edu_campus_community_mutate($1::jsonb) as result',[JSON.stringify(c)])).rows[0].result;
  const rewards=async n=>(await db.query('select public.edu_campus_community_rewards($1) as result',[uid(n)])).rows[0].result;

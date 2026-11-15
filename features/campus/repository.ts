@@ -17,6 +17,20 @@ async function rows(query: PromiseLike<ReadResult>): Promise<Row[]> {
 }
 const ids = (values: unknown[]) => [...new Set(values.map(String))];
 
+/** Just the verified scope of one enrollment: no curriculum reads. For handlers that only need the cohort. */
+export async function loadCampusScope(db: Database, viewer: { id: string }, enrollmentId: string, now = Date.now()) {
+  const enrollments = (await rows(db.from('enrollments')
+    .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
+    .eq('user_id', viewer.id).eq('id', enrollmentId).eq('status', 'active').limit(1))).filter(e => hasLearningAccess(e, now));
+  if (!enrollments.length) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  const [courses, cohorts] = await Promise.all([
+    rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(1)),
+    rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(1)),
+  ]);
+  const scope = campusScopes(viewer.id, enrollments, courses, cohorts, now).find(s => s.enrollmentId === enrollmentId);
+  if (!scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  return scope;
+}
 export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from'> | Promise<Pick<Database, 'from'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
