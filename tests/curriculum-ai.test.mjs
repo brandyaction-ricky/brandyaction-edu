@@ -1,8 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadTs} from './helpers/question-ai.mjs';
-const {retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback,studentCapabilityAnswer,studentImageHandoff}=loadTs('lib/curriculum-ai.ts');
+const {curriculumText,retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback,studentCapabilityAnswer,studentImageHandoff}=loadTs('lib/curriculum-ai.ts');
 const {measuredUsage}=loadTs('lib/curriculum-ai-server.ts',{'./supabase/admin':{},'./curriculum-ai-image':{}});
+test('quoted day-27 review criterion survives many generic matching sections',()=>{
+ const question='27일차에서 “실제 고객 질문과 예상 질문이 구분돼 있는지도 봅니다”라고 하는데 제가 받은 답변에는 없어요. 어떻게 확인하고 수정하나요?';
+ const blocks=Array.from({length:8},(_,i)=>[
+  {id:'h'+i,type:'heading',content:'영상 답변 확인하고 수정하기 '+i},
+  {id:'p'+i,type:'text',content:'27일차에서 받은 답변을 확인하고 수정하나요? 영상 만들기 순서를 확인합니다. 예상 질문을 확인합니다.'},
+ ]).flat();
+ blocks.push({id:'review',type:'heading',content:'검토 기준'},{id:'rule',type:'text',content:'실제 고객 질문과 예상 질문이 구분돼 있는지도 봅니다. 실제 질문은 고객 문의 원문으로 확인하고, 추정한 질문은 예상으로 표시합니다.'});
+ const lessons=[{id:'day27',title:'유입형 영상 기획',revision:'published-v2',document:{schemaVersion:1,blocks,checklist:[]}}];
+ const r=retrieveCurriculum(lessons,question,'day27');
+ assert.equal(r.sources[0].blockId,'review');
+ assert.match(r.sources[0].excerpt,/고객 문의 원문/);
+ assert.equal(r.sources[0].revision,'published-v2');
+ assert.ok(r.sources.length<=6);
+});
+test('a quotation across a long-paragraph boundary stays whole and grounded',()=>{
+ const phrase='실제 고객 질문과 예상 질문이 구분돼 있는지도 봅니다';
+ const body='가'.repeat(1480)+' '+phrase+' 고객 문의 원문을 확인하세요.'+' 나'.repeat(900);
+ const r=retrieveCurriculum([{id:'current',title:'영상 검토',body_text:body}],`“${phrase}”의 뜻은?`,'current',false);
+ assert.ok(r.sources.some(s=>s.excerpt.includes(phrase)));
+ assert.ok(r.sources.every(s=>s.excerpt.length<=1500&&curriculumText({title:'영상 검토',body_text:body},false).includes(s.excerpt)));
+});
+test('previous conversation quotes do not override the latest quoted criterion',()=>{
+ const lessons=[{id:'current',title:'수업',body_text:'새로운 공개 문장을 먼저 확인합니다.'},{id:'old',title:'이전 수업',body_text:'이전에 물었던 긴 문장을 확인합니다.'}];
+ const latest='“새로운 공개 문장을 먼저 확인합니다”가 무슨 뜻인가요?';
+ const r=retrieveCurriculum(lessons,'“이전에 물었던 긴 문장을 확인합니다”\n'+latest,'current',false,latest);
+ assert.match(r.sources[0].excerpt,/새로운 공개 문장/);
+});
 test('retrieval searches beyond the old 12000-character prefix and finds related lessons, preserving authoritative revision',()=>{
  const lessons=[{id:'current',title:'첫 수업',body_text:'기본 소개'},{id:'related',title:'고객 인터뷰',revision:'version-2',body_text:'소개\n'.repeat(6000)+'고객 질문은 열린 질문으로 작성하고 고객의 실제 경험을 확인합니다.'}];
  const r=retrieveCurriculum(lessons,'고객 인터뷰에서 열린 질문 작성 방법','current',false);

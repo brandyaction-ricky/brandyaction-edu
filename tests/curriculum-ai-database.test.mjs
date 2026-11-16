@@ -14,6 +14,31 @@ async function fixture(t, beforeNotifications) {
 }
 const begin=(h,overrides={})=>h.rpc('edu_ai_begin',Object.values({actor:h.student,request:id(),mode:'student',enrollment:h.enrollment,lesson:h.lesson,question:null,fingerprint:'a'.repeat(64),...overrides}));
 const enable=h=>h.owner('insert into edu_ai_cohort_settings(cohort_id,enabled) values($1,true)',[h.cohort]);
+test('AI reads the newly published revision, never the saved author draft, and drops a hidden source',async t=>{
+ const h=await fixture(t);await enable(h);
+ await h.owner(`alter table curriculum_lessons add column duration_label text,add column content_type text not null default 'text',add column is_preview boolean not null default false,add column display_order integer not null default 0,add column updated_at timestamptz not null default now();
+ alter table lesson_contents add column vod_url text,add column external_url text,add column resource_storage_path text,add column resource_name text,add column updated_at timestamptz not null default now();
+ alter table audit_logs alter column entity_id type text using entity_id::text;`);
+ await h.owner(read('20261001065746_lesson_author_drafts.sql'));
+ const request=id();await begin(h,{request});
+ const original=await h.rpc('edu_ai_curriculum',[h.student,request]);
+ const before=await h.rpc('edu_read_lesson_author',[h.admin,h.lesson,null]);
+ const payload=structuredClone(before.payload);
+ payload.form.basic.title='게시 후 새 제목';
+ payload.blocks.document.blocks.unshift({id:'new-rule',type:'text',content:'QA_ONLY_NEW_PUBLISHED_RULE'});
+ const draft=id();
+ await h.rpc('edu_save_lesson_author',[h.admin,h.lesson,before.revision,draft,before.public.stamp,payload,false,false]);
+ const unpublished=await h.rpc('edu_ai_curriculum',[h.student,request]);
+ assert.deepEqual(unpublished,original);
+ assert.doesNotMatch(JSON.stringify(unpublished),/QA_ONLY_NEW_PUBLISHED_RULE|게시 후 새 제목/);
+ const publication=id();await h.rpc('edu_publish_lesson_author',[h.admin,h.lesson,draft,publication]);
+ const published=await h.rpc('edu_ai_curriculum',[h.student,request]);
+ assert.equal(published[0].revision,publication);
+ assert.equal(published[0].title,'게시 후 새 제목');
+ assert.match(JSON.stringify(published),/QA_ONLY_NEW_PUBLISHED_RULE/);
+ await h.owner('update edu_cohort_lesson_visibility set is_published=false where cohort_id=$1 and lesson_id=$2',[h.cohort,h.lesson]);
+ await assert.rejects(()=>h.rpc('edu_ai_curriculum',[h.student,request]),/AI_FORBIDDEN/);
+});
 test('AI is off until explicit cohort activation; ownership, public/private visibility and duplicate checks precede paid requests',async t=>{
  const h=await fixture(t);
  await assert.rejects(()=>begin(h),/AI_DISABLED/);await enable(h);
