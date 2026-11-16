@@ -46,6 +46,7 @@ export function Classroom({
   send,
   loading,
   missionId,
+  progression: sharedProgression,
   blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   path: string[];
@@ -55,11 +56,13 @@ export function Classroom({
   loading: boolean;
   missionId: string | null;
   blockLearningEnabled?: boolean;
+  progression?: ReturnType<typeof useLessonProgression>;
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const enrollmentPathId = path[1], lessonPathId = path[2];
-  const progression = useLessonProgression(path[1], blockLearningEnabled);
+  const ownProgression = useLessonProgression(path[1], blockLearningEnabled && !sharedProgression);
+  const progression = sharedProgression ?? ownProgression;
   const navigationKey = progression.lessons?.map(item => `${item.lessonId}:${item.track}:${item.ongoing}`).join("|");
   // Scroll only the lesson list; opening a lesson must not move the page itself.
   useEffect(() => {

@@ -74,7 +74,9 @@ export function FloatingLearningQuestion({ member, current, resumeLessons }: { m
     || contexts?.find(context => context.recent) || contexts?.[0];
   const activeClass = selected?.enrollmentId || suggested?.enrollmentId || '';
   const lessons = contexts?.filter(context => context.enrollmentId === activeClass) || [];
-  const target = selected ?? current ?? suggested;
+  // Stored selections preserve the question target, not an outdated lesson label.
+  const target = current && (!selected || contextKey(selected) === contextKey(current))
+    ? current : selected ?? suggested;
   const targetKey = contextKey(target);
 
   function toggle(open: boolean) {

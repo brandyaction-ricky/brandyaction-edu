@@ -36,6 +36,7 @@ function renderClass({ loading = true, error = '', data = {}, preview } = {}) {
     'next/navigation': { useRouter: () => ({}), useSearchParams: () => new URLSearchParams() },
     'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
     './final/use-course-catalog': { useCatalogLocation: () => ({ filter: '전체', query: '', page: 1 }), useCatalogClock: () => Date.now() },
+    './final/use-lesson-progression': { useLessonProgression: () => ({ lessons: undefined, error: undefined, reload() {} }) },
     './final/primitives': {
       Empty: ({ title }) => React.createElement('h2', null, title), Brand: () => null,
       courseType: () => '무료 클래스',

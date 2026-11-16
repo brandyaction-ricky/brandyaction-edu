@@ -7,6 +7,8 @@ import { MobileRefresh } from './final/mobile-refresh';
 import { articleDiscoveryVisible, contentVisibility } from '@/lib/content-visibility';
 import { NextClassBanner } from './final/next-class-banner';
 import { learningOverview } from '@/lib/learning-overview';
+import { curriculumDay } from '@/lib/curriculum-days';
+import { useLessonProgression } from './final/use-lesson-progression';
 import { MemberErasureQueue } from './final/member-erasure-queue';
 import { TipsErasureMonitorNotice } from './final/tips-erasure-monitor-notice';
 import { TipsSourceNotice } from './final/tips-source-notice';
@@ -305,7 +307,10 @@ export function Platform({
   const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
-  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionLesson.day_number != null ? String(questionLesson.day_number)+'일차' : '', t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
+  const questionProgression = useLessonProgression(learning ? path[1] || '' : '', learning && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
+  const questionGate = questionProgression.lessons?.find(item => item.lessonId === questionLesson?.id);
+  const questionDayLabel = questionGate?.ongoing ? '지속 챌린지' : `${questionGate?.dayNumber ?? curriculumDay(data, questionLesson)}일차`;
+  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionDayLabel, t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
   const resumeQuestionLessons = new Map<string, string>();
   if (account && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true') {
     for (const enrollment of data.enrollments || []) {
@@ -904,6 +909,7 @@ export function Platform({
   else if (learning)
     body = (
       <Classroom
+        progression={questionProgression}
         key={user?.id}
         path={path}
         data={data}
