@@ -46,7 +46,7 @@ try{
   if(path.startsWith('/v13/deployments/')){res.end(JSON.stringify(deployment(path.endsWith('fixture.invalid')?live:path.split('/').at(-1))));return;}
   if(path.endsWith('/git/ref/heads/main')){res.end(JSON.stringify({object:{sha:candidate}}));return;}
   if(path.endsWith('/check-runs')){res.end(JSON.stringify({check_runs:[{id:1,name:'required-ci',head_sha:candidate,app:{id:1},status:'completed',conclusion:'success'}]}));return;}
-  if(req.method==='POST'&&path==='/v10/projects/prj_fixture/promote/dpl_candidate'){live='dpl_candidate';res.writeHead(promotionFails?503:200);res.end('{}');return;}
+  if(req.method==='POST'&&path==='/v10/projects/prj_fixture/promote/dpl_candidate'){live='dpl_candidate';res.writeHead(promotionFails?503:201);res.end(promotionFails?'{}':'');return;}
   res.writeHead(404);res.end('{}');
  });server.listen(0,'127.0.0.1');await once(server,'listening');const origin=`http://127.0.0.1:${server.address().port}`;
  const config={mode:'rehearsal',executionEnabled:true,repository:'qa/repo',project:'prj_fixture',team:'team_fixture',branch:'main',productionHost:'fixture.invalid',vercelOrigin:origin,githubOrigin:origin,smokeUrl:origin+'/health',actionsAppId:1,requiredChecks:['required-ci'],checkout,dbConnectionFile:join(root,'db'),migrationConnectionFile:join(root,'db'),vercelTokenFile:join(root,'token'),githubTokenFile:join(root,'token'),approvalPublicKeyFile:join(root,'key.pem'),requestRoot:join(root,'requests'),journalRoot:join(root,'journal'),lockRoot:join(root,'locks')};

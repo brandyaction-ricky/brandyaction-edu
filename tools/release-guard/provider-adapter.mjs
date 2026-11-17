@@ -1,5 +1,6 @@
 // Fixed provider operations only. Never execute candidate scripts on this runner.
-import {execFileSync} from 'node:child_process';
+import {execFileSync,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {createHash} from 'node:crypto';
 import {readFile, readdir} from 'node:fs/promises';
 import {dirname, join} from 'node:path';
@@ -9,6 +10,7 @@ import {atomicRecord, privateFile, verifyEnvelope} from './registry.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const hash = data => createHash('sha256').update(data).digest('hex');
+const execute=promisify(execFile);
 export function sourceFingerprint(tree) {
   const files=[];
   const walk=(entries,prefix='')=>{for(const entry of entries){const path=prefix+entry.name;if(entry.type==='directory')walk(entry.children||[],path+'/');else if(path.startsWith('src/'))files.push([path,entry.uid]);}};
@@ -21,27 +23,39 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
   if (!/^[\w.-]+\/[\w.-]+$/.test(config.repository) || !/^[\w/-]+$/.test(config.branch)) throw Error('Invalid repository target');
   if (!/^prj_[A-Za-z0-9]+$/.test(config.project) || !/^team_[A-Za-z0-9]+$/.test(config.team)) throw Error('Invalid provider target');
   const rehearsal=config.mode==='rehearsal';
+  const providerQa=config.mode==='provider-qa', cli=config.transport==='cli';
+  if(cli&&!providerQa)throw Error('CLI credential reuse is restricted to isolated provider QA');
   for (const [name,expected] of [['vercelOrigin','https://api.vercel.com'],['githubOrigin','https://api.github.com']]) {
     const url=new URL(config[name]);
     if (rehearsal ? url.hostname!=='127.0.0.1'||url.protocol!=='http:' : config[name]!==expected) throw Error('Untrusted provider origin');
   }
   const connectionString=await privateFile(config.dbConnectionFile);
-  if(rehearsal && new URL(connectionString.trim()).hostname!=='127.0.0.1')throw Error('Rehearsal DB must be loopback');
+  if((rehearsal||providerQa) && new URL(connectionString.trim()).hostname!=='127.0.0.1')throw Error('QA DB must be loopback');
   const client=new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
-  const tokens={vercel:await privateFile(config.vercelTokenFile),github:await privateFile(config.githubTokenFile)};
+  const tokens=cli?{}:{vercel:await privateFile(config.vercelTokenFile),github:await privateFile(config.githubTokenFile)};
   await client.connect();
   const git=(...args)=>execFileSync('git',args,{cwd:config.checkout,maxBuffer:20_000_000,encoding:'utf8'});
   async function api(provider,path,method='GET') {
     const url=new URL(path,config[provider+'Origin']);
     if(provider==='vercel')url.searchParams.set('teamId',config.team);
+    if(cli){
+      const executable=provider==='vercel'?config.vercelCli:config.githubCli;
+      if(!executable?.startsWith('/'))throw Error('Fixed installed CLI path required');
+      const args=['api',url.pathname+url.search,'--method',method,...(provider==='vercel'?['--raw']:[])];
+      const {stdout}=await execute(executable,args,{encoding:'utf8',timeout:30000,maxBuffer:20_000_000});
+      return stdout.trim()?JSON.parse(stdout):{};
+    }
     const response=await fetcher(url,{method,headers:{Authorization:`Bearer ${tokens[provider].trim()}`,Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:'{}'}:{}),redirect:'error',signal:AbortSignal.timeout(15000)});
     if(!response.ok)throw Error(`${provider} ${method} failed (${response.status}); reconcile before retry`);
-    return response.status===204?{}:response.json();
+    // Promotion can acknowledge with an empty 201/202 body. Its final result is
+    // independently checked through the live alias, never inferred from a body.
+    if(method==='POST'||response.status===204){await response.arrayBuffer();return {};}
+    return response.json();
   }
   const deployment=id=>api('vercel',`/v13/deployments/${encodeURIComponent(id)}`);
   const deploymentProject=d=>d.projectId||d.project?.id;
   async function shaOf(d,allowBase=false){
-    const sha=d.gitSource?.sha||d.meta?.githubCommitSha;
+    const sha=d.gitSource?.sha||(providerQa?d.meta?.githubCommitSha:null);
     if(sha)return sha;
     if(allowBase&&d.id===plan.baseDeployment&&payload.baseAttestation?.sha===plan.base){
       const files=await api('vercel',`/v6/deployments/${d.id}/files`);
@@ -78,6 +92,12 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
     }
   }
   const writeAllowed=()=>{if(config.executionEnabled!==true)throw Error('Execution disabled pending activation approval');};
+  if(providerQa){
+    const project=await api('vercel',`/v9/projects/${config.project}`);
+    if(project.id!==config.project||!/^brandyaction-release-qa-\d{8}$/.test(project.name)||project.link||project.env?.length){
+      await client.end();throw Error('Provider QA requires a disposable unlinked project without environment variables');
+    }
+  }
   async function unresolved(){
     let files;try{files=await readdir(config.journalRoot);}catch(e){if(e.code==='ENOENT')return false;throw e;}
     for(const file of files.filter(f=>f.endsWith('.json'))){
