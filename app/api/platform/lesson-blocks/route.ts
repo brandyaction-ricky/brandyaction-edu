@@ -151,7 +151,13 @@ export async function POST(request: Request) {
       // completion flags and a different values object are never authoritative.
       const savedValues = validateBlockAnswers(loaded.data.draft.values, document);
       const assessment = assessBlockCompletion(document, savedValues);
-      if (!assessment.ready) return reply({ error: '필수 항목과 시험 통과 기준을 확인해 주세요.', code: 'BLOCK_REQUIREMENTS_MISSING', assessment }, 422);
+      if (!assessment.ready) {
+        // Say what is missing: up to two required items, and quiz questions by their number across the lesson.
+        const wrong = assessment.quizzes.flatMap(q => q.results).map((r, i) => r.answered && !r.correct ? i + 1 : 0).filter(Boolean);
+        const labels = assessment.missing.map(m => m.label.length > 30 ? m.label.slice(0, 30) + '…' : m.label);
+        const parts = [labels.length ? `빠진 필수 항목: ${labels.slice(0, 2).join(', ')}${labels.length > 2 ? ` 외 ${labels.length - 2}개` : ''}` : '', wrong.length && (document.completion?.requireQuizPass ?? true) ? `쪽지시험 ${wrong.join('·')}번을 다시 풀어 주세요` : ''].filter(Boolean);
+        return reply({ error: parts.length ? parts.join(' / ') : '필수 항목과 시험 통과 기준을 확인해 주세요.', code: 'BLOCK_REQUIREMENTS_MISSING', assessment }, 422);
+      }
       const { data, error } = await db.rpc('edu_submit_lesson_blocks', {
         p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision,
         p_write: writeId, p_request: requestId, p_values: savedValues,
