@@ -154,9 +154,16 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
       const sha=await shaOf(d);if(d.id!==plan.candidateDeployment)throw Error('Promotion did not settle');
       const url=new URL(config.smokeUrl);
       if(rehearsal?url.hostname!=='127.0.0.1':url.protocol!=='https:'||url.hostname!==config.productionHost)throw Error('Invalid smoke target');
-      const response=await fetcher(url,{method:'GET',redirect:'error',signal:AbortSignal.timeout(10000)});
-      const body=response.ok?await response.json():{};
-      return {sha,ready:d.readyState==='READY',smoke:response.ok&&body.ok===true&&body.release===sha.slice(0,12)?'passed':'failed',deployment:d.id};
+      let status=0;
+      for(let attempt=0;attempt<30;attempt++){
+        try{
+          const response=await fetcher(url,{method:'GET',headers:{'Cache-Control':'no-cache'},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(5000)});
+          status=response.status;const body=response.ok?await response.json():{};
+          if(response.ok&&body.ok===true&&body.release===sha.slice(0,12))return {sha,ready:d.readyState==='READY',smoke:'passed',deployment:d.id,healthAttempts:attempt+1};
+        }catch{status=0;}
+        await new Promise(resolve=>setTimeout(resolve,1000));
+      }
+      throw Error(`Post-deploy health did not converge (last HTTP ${status}); keep lock`);
     },
     async recordComplete(result){await atomicRecord(config.journalRoot,requestId,{state:'complete',plan,result,completedAt:new Date().toISOString()});},
   };

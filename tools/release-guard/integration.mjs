@@ -18,7 +18,7 @@ const checkout=join(root,'checkout');await mkdir(checkout);
 const socket=createTcpServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');const port=socket.address().port;await new Promise(r=>socket.close(r));
 const password=randomBytes(24).toString('hex');
 const pg=new EmbeddedPostgres({databaseDir:join(root,'pg'),user:'postgres',password,port,persistent:true,autoRehydrateSymlinks:true,createPostgresUser:false,postgresFlags:['-h','127.0.0.1','-k',root],onLog:()=>{},onError:()=>{}});
-let db,server,base,candidate;const calls=[];let live='dpl_base',promotionFails=false;
+let db,server,base,candidate;const calls=[];let live='dpl_base',promotionFails=false,staleHealthResponses=0;
 const git=(...args)=>execFileSync('git',args,{cwd:checkout,encoding:'utf8'}).trim();
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const results=[];
@@ -41,7 +41,7 @@ try{
  const deployment=id=>({id,projectId:'prj_fixture',target:'production',readyState:'READY',gitSource:{sha:id==='dpl_base'?base:candidate}});
  server=createServer((req,res)=>{calls.push(req.method+' '+req.url);res.setHeader('Content-Type','application/json');
   const path=new URL(req.url,'http://localhost').pathname;
-  if(path==='/health'){res.end(JSON.stringify({ok:true,release:(live==='dpl_base'?base:candidate).slice(0,12)}));return;}
+  if(path==='/health'){const stale=staleHealthResponses-->0;res.end(JSON.stringify({ok:true,release:(stale||live==='dpl_base'?base:candidate).slice(0,12)}));return;}
   if(req.headers.authorization!=='Bearer local-rehearsal-only'){res.writeHead(401);res.end('{}');return;}
   if(path.startsWith('/v13/deployments/')){res.end(JSON.stringify(deployment(path.endsWith('fixture.invalid')?live:path.split('/').at(-1))));return;}
   if(path.endsWith('/git/ref/heads/main')){res.end(JSON.stringify({object:{sha:candidate}}));return;}
@@ -64,7 +64,7 @@ try{
  await prepare('disabled',{enabled:false});assert.notEqual((await run('disabled')).code,0);assert.equal(calls.length,0);results.push('activation disabled: zero provider/DB writes');
  await prepare('preflight');const preflight=await run('preflight','--preflight');assert.equal(preflight.code,0,preflight.output);assert.equal(calls.filter(c=>c.startsWith('POST')).length,0);results.push('real child preflight: HTTP + DB read, zero promotion');
  const tampered=await prepare('tampered');tampered.payload.plan.candidate=base;await writeFile(join(config.requestRoot,'tampered.json'),JSON.stringify(tampered));assert.notEqual((await run('tampered')).code,0);assert.equal(calls.length,0);results.push('tampered signed request blocked');
- await prepare('success');let result=await run('success');assert.equal(result.code,0,result.output);assert.equal(live,'dpl_candidate');assert.equal(JSON.parse(await readFile(join(config.journalRoot,'success.json'),'utf8')).state,'complete');await assert.rejects(access(join(config.lockRoot,'production.lock')));results.push('code promotion + live check + durable completion');
+ await prepare('success');staleHealthResponses=1;let result=await run('success');assert.equal(result.code,0,result.output);assert.equal(live,'dpl_candidate');const completion=JSON.parse(await readFile(join(config.journalRoot,'success.json'),'utf8'));assert.equal(completion.state,'complete');assert.equal(completion.result.healthAttempts,2);await assert.rejects(access(join(config.lockRoot,'production.lock')));results.push('code promotion + stale edge response retry + durable completion');
  assert.notEqual((await run('success')).code,0);results.push('completed request cannot replay');
  await prepare('migration',{migration:true});result=await run('migration');assert.equal(result.code,0,result.output);assert.equal(await fingerprint(),dbAfter);assert.equal((await db.query('select count(*)::int n from supabase_migrations.schema_migrations')).rows[0].n,1);results.push('real transaction applies SQL + history once before promotion');
  await db.query('drop table public.release_fixture; delete from supabase_migrations.schema_migrations');
