@@ -7,6 +7,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {Client} from 'pg';
 import {atomicRecord, privateFile, verifyEnvelope} from './registry.mjs';
+import {createMetadataReader, MIGRATION_VERSIONS_QUERY} from './metadata-reader.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -29,9 +30,10 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
     const url=new URL(config[name]);
     if (rehearsal ? url.hostname!=='127.0.0.1'||url.protocol!=='http:' : config[name]!==expected) throw Error('Untrusted provider origin');
   }
-  const connectionString=await privateFile(config.dbConnectionFile);
+  const managedRead=config.dbTransport==='supabase-read-only';
+  const connectionString=managedRead?'':await privateFile(config.dbConnectionFile);
   if((rehearsal||providerQa) && new URL(connectionString.trim()).hostname!=='127.0.0.1')throw Error('QA DB must be loopback');
-  const client=new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
+  const client=managedRead?await createMetadataReader(config,fetcher):new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
   const publicGithub=config.mode==='production'&&config.githubPublicRead===true&&config.repository==='brandyaction-ricky/brandyaction-edu';
   const tokens=cli?{}:{vercel:await privateFile(config.vercelTokenFile),github:publicGithub?null:await privateFile(config.githubTokenFile)};
   await client.connect();
@@ -113,12 +115,13 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
     isAncestor:async(base,candidate)=>{try{git('merge-base','--is-ancestor',base,candidate);return true;}catch{return false;}},
     async observe(){
       const d=await live(),head=await api('github',`/repos/${config.repository}/git/ref/heads/${config.branch}`);
-      const applied=await client.query('select version from supabase_migrations.schema_migrations order by version');
+      const applied=await client.query(MIGRATION_VERSIONS_QUERY);
       const versions=new Set(applied.rows.map(r=>r.version));
       return {project:config.project,repository:config.repository,environment:'production',liveSha:await shaOf(d,true),liveDeployment:d.id,releaseHead:head.object.sha,dbFingerprint:await fingerprint(),pendingMigrations:plan.migrations.filter(m=>!versions.has(m.path.split('/').at(-1).slice(0,14))),unresolvedRun:await unresolved()};
     },
     async verifyApprovals(){verifyEnvelope(envelope,publicKey);await ci();await verifyCandidate();},
     async applyMigrations(migrations){
+      if(managedRead)throw Error('SQL authority is not installed for read-only metadata transport');
       writeAllowed();
       const migrationConnection=(await privateFile(config.migrationConnectionFile)).trim();
       const migrationUrl=new URL(migrationConnection),readUrl=new URL(connectionString.trim());
