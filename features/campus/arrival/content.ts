@@ -58,7 +58,7 @@ export const audienceContent: Record<Audience, AudienceContent> = {
   },
   exploring: {
     label: '아직 아이템이 없어요', shortLabel: '아이템 탐색', greeting: '어디서부터 시작할지 찾고 있는 당신께.',
-    goal: '살펴볼 문제 카드 한 장', staff: '내 경험을 정리하는 직원',
+    goal: '도울 사람과 해결할 일 정리', staff: '내 경험을 정리하는 직원',
     intro: '거창한 아이디어가 없어도 괜찮아요. 내가 겪거나 도와준 일에서 시작해봐요.',
     q1: '최근 겪었거나 다른 사람을 도와준 불편한 일은요?', q2: '누가, 어떤 상황에서 겪는 일이었나요?',
     hint1: '일상이나 회사에서 반복해서 설명해준 일도 좋아요.',

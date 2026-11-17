@@ -215,6 +215,7 @@
   margin: 0;
   word-break: keep-all;
   white-space: pre-line;
+  text-wrap: balance;
 }
 .intro h1 em { font-style: normal; color: var(--ink); }
 .intro > p { font-size: 17px; line-height: 1.75; margin-top: 14px; color: var(--muted); word-break: keep-all; }
@@ -282,7 +283,7 @@
 .choices small { display: block; font-size: 14px; color: var(--muted); line-height: 1.6; margin-top: 5px; word-break: keep-all; }
 .welcomeFoot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--muted); margin: 15px 1px 24px; }
 .liveTeaser { border-top: 1px solid var(--line); padding-top: 20px; line-height: 1.75; font-size: 16px; color: var(--muted); }
-.liveTeaser strong { font-weight: 600; color: var(--ink); }
+.liveTeaser strong { display: block; margin-top: 5px; font-weight: 600; color: var(--ink); word-break: keep-all; }
 .resultPaper { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
 .paperTop { display: flex; align-items: center; gap: 7px; margin-bottom: 18px; font-size: 16px; color: var(--ink); }
 .paperTop small { margin-left: auto; font-size: 14px; white-space: nowrap; color: var(--muted); background: var(--surface-subtle); padding: 4px 6px; border-radius: 4px; }

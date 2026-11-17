@@ -85,7 +85,7 @@ export type LiveEvent = {
 /** Start confirmed by the owner: Dec 7, 21:00 KST. End and YouTube URL remain pending. */
 export const liveEvent: LiveEvent = {
   id: 'moonshot-live-20261207', date: '2026-12-07', title: '문샷 챌린지 · AI 직원 라이브 시작',
-  description: '12월 7일 오후 9시(한국시간)에 시작합니다. 오늘 만든 작은 결과에서, 내 기준을 참고하며 일하는 AI 직원으로. 종료 시간은 추후 안내합니다. YouTube 참여 링크는 카톡방에서 추가 안내할 예정입니다. 이 일정은 시작 시각을 기억하기 위한 알림입니다.',
+  description: '12월 7일 오후 9시(한국시간)에 시작합니다. 내 자료와 업무 기준으로 AI 직원을 만드는 방법을 배웁니다. 종료 시간은 추후 안내합니다. YouTube 참여 링크는 카톡방에서 추가 안내할 예정입니다. 이 일정은 시작 시각을 기억하기 위한 알림입니다.',
   timeZone: 'Asia/Seoul', startsAt: '2026-12-07T21:00:00+09:00', endsAt: null, infoUrl: null,
 };
 function validCalendarEvent(event: LiveEvent): {start: Date; end: Date | null; url: URL | null} | null {

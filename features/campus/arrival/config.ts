@@ -34,9 +34,9 @@ export const ARRIVAL_CONFIG_LIMITS = {
 } as const;
 
 const choiceLabels: Record<Audience, string> = {
-  business: '내 상품 소개하기',
-  preparing: '사업 아이디어 확인하기',
-  exploring: '시작할 아이디어 찾기',
+  business: '상품 소개글 만들기',
+  preparing: '고객에게 물어볼 질문 만들기',
+  exploring: '내 경험에서 아이디어 찾기',
 };
 function defaultAudience(id: Audience): ArrivalAudienceConfig {
   const source = audienceContent[id];
@@ -50,12 +50,12 @@ function defaultAudience(id: Audience): ArrivalAudienceConfig {
 /** Editorial defaults only. Saving the settings never executes an AI request. */
 export const DEFAULT_ARRIVAL: ArrivalConfig = {
   version: 1,
-  title: 'AI에게 맡겨볼 일,\n하나만 골라보세요.',
-  description: '내 상황을 알려주면 달라지는 답. 작은 결과 하나로 먼저 경험해봐요.',
+  title: 'AI에게 맡기고 싶은 일부터\n골라보세요.',
+  description: '내 상품, 고객, 경험을 담아 AI에 일을 맡겨보세요. 평소 쓰는 ChatGPT나 Claude에서 직접 해볼 수 있습니다.',
   instructorName: '윤익 · 브랜디액션 팀',
-  instructorIntro: '맡길 자료를 정리하고, 결과를 확인하고, 내 기준을 더하는 과정. 윤익님과 브랜디액션 팀이 AI 직원과 함께 일하는 방법을 안내합니다.',
+  instructorIntro: '윤익님과 브랜디액션 팀이 내 자료와 업무 기준을 AI 직원에게 연결하는 방법을 알려드립니다. 어떤 일을 맡길지 정하고, 원하는 결과가 나오도록 지시하고 확인하는 과정을 배웁니다.',
   videoUrl: '',
-  liveTitle: '내 기준을 알고 일하는 AI 직원, 어떻게 만들까요?',
+  liveTitle: '내 자료와 업무 기준으로 AI 직원 만드는 법',
   startsAt: liveEvent.startsAt!, endsAt: liveEvent.endsAt, liveUrl: liveEvent.infoUrl ?? '',
   audiences: {business: defaultAudience('business'), preparing: defaultAudience('preparing'), exploring: defaultAudience('exploring')},
 };
