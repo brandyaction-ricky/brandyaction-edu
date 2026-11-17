@@ -21,7 +21,8 @@ export function aiErrorReply(error: unknown, mode?: 'student') {
  if (/AI_PENDING/.test(code)) return { error:'답변을 생성 중이거나 결과를 확인 중이에요. 대화 새로고침으로 확인해 주세요.',status:409 };
  if (/AI_PREVIOUS_FAILED/.test(code)) return { error:'이전 요청은 완료하지 못했어요. 대화를 새로고침한 뒤 새 질문으로 시도해 주세요.',status:409 };
  if (/AI_DUPLICATE/.test(code)) return { error:'이미 처리한 요청입니다. 답변을 확인한 뒤 새 질문으로 시도해 주세요.',status:409 };
- if (/AI_DISABLED/.test(code)) return { error:'이 기수의 AI 질문 기능은 아직 준비 중이에요. 멘토 질문은 그대로 이용할 수 있어요.',status:503 };
+ if (/AI_DISABLED/.test(code)) // Not transient: the client must show this and must not hold the question for a retry.
+  return { error:'이 기수의 AI 질문 기능은 아직 준비 중이에요. 멘토 질문은 그대로 이용할 수 있어요.',status:403 };
  if (/FORBIDDEN|LOCKED|AI_ANSWERED|AI_LESSON_REQUIRED/.test(code)) return { error:'수업 이용 권한이나 질문 상태가 변경됐어요. 현재 수업과 질문을 다시 확인해 주세요.',status:403 };
  return { error:'AI 답변을 확인하지 못했어요. 입력은 그대로 두고 멘토에게 질문할 수 있어요.',status:503 };
 }

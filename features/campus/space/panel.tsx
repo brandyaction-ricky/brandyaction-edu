@@ -2,7 +2,7 @@
 import {createPortal} from 'react-dom';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CampusSnapshot } from '../contracts';
-import { avatarAppearance, publicAvatar, clockText, focusDeadline, peerFocusClock, cohortGoalReached, participationStatus, defaultProfile, elapsed, isWorldMessage, pauseClock, profile, resumeClock, type FocusClock, type SpacePeer, type SpaceProfile, type SpaceState } from './domain';
+import { SPACE_REPLACED, avatarAppearance, publicAvatar, clockText, focusDeadline, peerFocusClock, cohortGoalReached, participationStatus, defaultProfile, elapsed, isWorldMessage, pauseClock, profile, resumeClock, type FocusClock, type SpacePeer, type SpaceProfile, type SpaceState } from './domain';
 import {FocusJournalForm} from './focus-journal';
 import { createDemoTransport, createLiveTransport, type SpaceTransport } from './transport';
 import type { SpaceCommand } from './server';
@@ -120,7 +120,8 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    if(status===429)return;
    // A background tab or covered window can stretch timers past the 75 s presence; the session then
    // ends on the server (409). Re-enter quietly once instead of showing a connection error.
-   if(status===409&&!demo){try{await connection.command({kind:'join',profile:current.current.saved});return;}catch{/* show the error below */}}
+   // Another window of the same account took over: stop here and offer to continue in this window (no ping-pong).
+   if(status===409&&!demo&&(e as Error).message!==SPACE_REPLACED){try{await connection.command({kind:'join',profile:current.current.saved});return;}catch{/* show the error below */}}
    statusError(e);setActive(false);connection.close();transport.current=null;
   }finally{running=false;}};
   // Presence lasts 75 s, so a 30 s heartbeat survives one miss; at 15 s, 120 learners kept the DEV database saturated.
@@ -232,22 +233,22 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    <header><h2>지금 공부 중</h2>{active&&<span>{Math.max(peers.length,state?.peerCount??0)}명</span>}</header>
    {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}{(state?.peerCount??0)>peers.length&&<li className={styles.rosterMore}>외 {(state?.peerCount??0)-peers.length}명</li>}</ul>
     :<p role="status">{state?.controls?.paused?'공부방 참여가 잠시 중지됐어요.':busy||(!state&&!error)?'동료를 확인하고 있어요…':error||'동료 연결을 해제했어요.'}</p>}
-   <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':'공부방에 참여하기'}</button>
+   <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':error===SPACE_REPLACED?'여기서 계속하기':'공부방에 참여하기'}</button>
   </section>,studyEntry.host);
  if(toolsPane)return <><section className={styles.space} aria-label="공부방 도구">
   <div className={styles.toolStatus}>{demo
    ? <p className={styles.demo}>브라우저 안의 체험입니다. 실제 수강생·서버 기록과 연결되지 않습니다.</p>
    : <p className={styles.caption}>{scope.cohortName} 공부방 · 같은 기수 동료와 함께하는 공간이에요.</p>}
   {['focus','lounge','profile'].includes(toolsPane)&&<div className={styles.controls}>
-   <span className={styles.presenceNote}>{active?(demo?'이 브라우저의 체험 동료와 연결됨':Math.max(peers.length,state?.peerCount??0)>1?`공부방에 연결됐어요. 나 외에 동료 ${Math.max(peers.length,state?.peerCount??0)-1}명이 함께 있어요.`:'공부방에 연결됐어요. 지금은 혼자 공부 중이에요. 동료가 들어오면 여기에 보여요.'):'아직 공부방에 참여하지 않았어요.'}</span>
-   <button disabled={busy||!sessionId||(!active&&!!state?.controls?.paused)} onClick={()=>void(active?leave():join())}>{active?'동료 연결 끊기':'동료와 함께하기'}</button>
+   <span className={styles.presenceNote}>{active?(demo?'이 브라우저의 체험 동료와 연결됨':Math.max(peers.length,state?.peerCount??0)>1?`공부방에 연결됐어요. 나 외에 동료 ${Math.max(peers.length,state?.peerCount??0)-1}명이 함께 있어요.`:'공부방에 연결됐어요. 지금은 혼자 공부 중이에요. 동료가 들어오면 여기에 보여요.'):error===SPACE_REPLACED?'다른 창(기기)에서 공부방에 들어와 있어요. 여기서 계속하려면 ‘여기서 계속하기’를 눌러 주세요.':'아직 공부방에 참여하지 않았어요. 참여하면 대화를 보내고 동료를 볼 수 있어요.'}</span>
+   <button disabled={busy||!sessionId||(!active&&!!state?.controls?.paused)} onClick={()=>void(active?leave():join())}>{active?'동료 연결 끊기':error===SPACE_REPLACED?'여기서 계속하기':'동료와 함께하기'}</button>
   </div>}</div>
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}{tools}
  </section>{entryCard}</>;
  return <section className={`${styles.space} ${immersive?styles.immersive:''} ${toolsOpen?styles.toolsOpen:''} ${spatial?styles.spatial:''}`} aria-label="문샷 캠퍼스 공간" data-compact={compact}>
   {spatial&&(compact||renderer==='classic')&&<button className={styles.fallbackGuide} onClick={()=>{setPane('directory');setToolsOpen(true);}}>공간 안내</button>}
   {spatial&&clock.phase!=='idle'&&<button className={styles.focusBadge} aria-label="집중 타이머 열기" onClick={()=>{setPane('focus');setToolsOpen(true);}}>{clock.phase==='break'?'휴식':'집중'} · {clockText(clock,now)} <span>기록 열기 ↗</span></button>}
-  <header className={styles.header}><div><span className={styles.eyebrow}>문샷 우주 캠퍼스</span><h2>같은 공간, 각자의 한 걸음.</h2><p>{scope.courseTitle} · {scope.cohortName}</p></div><div className={styles.controls}>{immersive&&!spatial&&<button aria-expanded={toolsOpen} onClick={()=>setToolsOpen(v=>!v)}>{toolsOpen?'도구 닫기':'집중·대화·내 자리'}</button>}<span className={styles.connection}>{active?`${state?.peers.length||1}명 연결됨`:'혼자 둘러보는 중'}{demo?' · 체험 탭':''}</span><button className={styles.primary} disabled={busy||!sessionId||!!state?.controls?.paused} onClick={()=>void(active?leave():join())}>{active?'동료 연결 끊기':'동료와 함께하기'}</button></div></header>
+  <header className={styles.header}><div><span className={styles.eyebrow}>문샷 우주 캠퍼스</span><h2>같은 공간, 각자의 한 걸음.</h2><p>{scope.courseTitle} · {scope.cohortName}</p></div><div className={styles.controls}>{immersive&&!spatial&&<button aria-expanded={toolsOpen} onClick={()=>setToolsOpen(v=>!v)}>{toolsOpen?'도구 닫기':'집중·대화·내 자리'}</button>}<span className={styles.connection}>{active?`${state?.peers.length||1}명 연결됨`:'혼자 둘러보는 중'}{demo?' · 체험 탭':''}</span><button className={styles.primary} disabled={busy||!sessionId||!!state?.controls?.paused} onClick={()=>void(active?leave():join())}>{active?'동료 연결 끊기':error===SPACE_REPLACED?'여기서 계속하기':'동료와 함께하기'}</button></div></header>
   {demo&&<p className={styles.demo}>체험 공간 · 같은 브라우저에서 다른 탭을 열면 서로 만날 수 있어요. 실제 수강생이나 가상 동료를 접속자로 표시하지 않습니다.</p>}
   {state?.controls&&(state.controls.announcement||state.controls.paused)&&<div className={styles.notice} role="status"><strong>{state.controls.paused?'공간이 잠시 쉬고 있어요':'문샷 공간 공지'}</strong><p>{state.controls.announcement}</p>{state.controls.paused&&<button onClick={()=>void refreshRoom()}>공간 상태 다시 확인</button>}</div>}
   <div className={styles.controls} aria-label="오늘의 참여 방식">{([['quiet','조용히 집중'],['together','함께 공부'],['help','도움 필요']] as const).map(([mode,label])=><button key={mode} disabled={!modeLoaded||busy} aria-pressed={participation===mode} onClick={()=>void changeParticipation(mode)}>{label}</button>)}<small>지원실 참여 설정과 함께 저장돼요.</small></div>
