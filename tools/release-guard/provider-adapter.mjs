@@ -7,6 +7,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {Client} from 'pg';
 import {atomicRecord, privateFile, verifyEnvelope} from './registry.mjs';
+import {createMetadataReader, MIGRATION_VERSIONS_QUERY} from './metadata-reader.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -29,10 +30,12 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
     const url=new URL(config[name]);
     if (rehearsal ? url.hostname!=='127.0.0.1'||url.protocol!=='http:' : config[name]!==expected) throw Error('Untrusted provider origin');
   }
-  const connectionString=await privateFile(config.dbConnectionFile);
+  const managedRead=config.dbTransport==='supabase-read-only';
+  const connectionString=managedRead?'':await privateFile(config.dbConnectionFile);
   if((rehearsal||providerQa) && new URL(connectionString.trim()).hostname!=='127.0.0.1')throw Error('QA DB must be loopback');
-  const client=new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
-  const tokens=cli?{}:{vercel:await privateFile(config.vercelTokenFile),github:await privateFile(config.githubTokenFile)};
+  const client=managedRead?await createMetadataReader(config,fetcher):new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
+  const publicGithub=config.mode==='production'&&config.githubPublicRead===true&&config.repository==='brandyaction-ricky/brandyaction-edu';
+  const tokens=cli?{}:{vercel:await privateFile(config.vercelTokenFile),github:publicGithub?null:await privateFile(config.githubTokenFile)};
   await client.connect();
   const git=(...args)=>execFileSync('git',args,{cwd:config.checkout,maxBuffer:20_000_000,encoding:'utf8'});
   async function api(provider,path,method='GET') {
@@ -45,7 +48,8 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
       const {stdout}=await execute(executable,args,{encoding:'utf8',timeout:30000,maxBuffer:20_000_000});
       return stdout.trim()?JSON.parse(stdout):{};
     }
-    const response=await fetcher(url,{method,headers:{Authorization:`Bearer ${tokens[provider].trim()}`,Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:'{}'}:{}),redirect:'error',signal:AbortSignal.timeout(15000)});
+    if(provider==='github'&&publicGithub&&method!=='GET')throw Error('Public GitHub transport is read-only');
+    const response=await fetcher(url,{method,headers:{...(tokens[provider]?{Authorization:`Bearer ${tokens[provider].trim()}`}:{'User-Agent':'brandyaction-release-coordinator'}),Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:'{}'}:{}),redirect:'error',signal:AbortSignal.timeout(15000)});
     if(!response.ok)throw Error(`${provider} ${method} failed (${response.status}); reconcile before retry`);
     // Promotion can acknowledge with an empty 201/202 body. Its final result is
     // independently checked through the live alias, never inferred from a body.
@@ -111,12 +115,13 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
     isAncestor:async(base,candidate)=>{try{git('merge-base','--is-ancestor',base,candidate);return true;}catch{return false;}},
     async observe(){
       const d=await live(),head=await api('github',`/repos/${config.repository}/git/ref/heads/${config.branch}`);
-      const applied=await client.query('select version from supabase_migrations.schema_migrations order by version');
+      const applied=await client.query(MIGRATION_VERSIONS_QUERY);
       const versions=new Set(applied.rows.map(r=>r.version));
       return {project:config.project,repository:config.repository,environment:'production',liveSha:await shaOf(d,true),liveDeployment:d.id,releaseHead:head.object.sha,dbFingerprint:await fingerprint(),pendingMigrations:plan.migrations.filter(m=>!versions.has(m.path.split('/').at(-1).slice(0,14))),unresolvedRun:await unresolved()};
     },
     async verifyApprovals(){verifyEnvelope(envelope,publicKey);await ci();await verifyCandidate();},
     async applyMigrations(migrations){
+      if(managedRead)throw Error('SQL authority is not installed for read-only metadata transport');
       writeAllowed();
       const migrationConnection=(await privateFile(config.migrationConnectionFile)).trim();
       const migrationUrl=new URL(migrationConnection),readUrl=new URL(connectionString.trim());

@@ -51,6 +51,20 @@ jobs:
             echo 'Verified current production preserved; only validated N6 recovery and existing main release controls included.'
             exit 0
           fi
+          if [ "$head_ref" = "codex/release-activation-bridge-20261117" ]; then
+            expected_main=7ad2b223d027c418c6027ed250154cb3175989dd
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git diff --exit-code "$expected_main" HEAD -- app features lib public package.json package-lock.json supabase
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|.github/workflows/release-authorization.yml|tools/release-guard/approval-bridge.mjs|tools/release-guard/service-once.mjs|tools/release-guard/provider-adapter.mjs|tools/release-guard/metadata-reader.mjs|tests/release-activation-bridge.test.mjs|tests/release-service-process.test.mjs|tests/release-metadata-reader.test.mjs) ;;
+                *) echo "Unexpected release connection change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified coordinator-only scope; activation and credentials remain local.'
+            exit 0
+          fi
           if [ "$head_ref" = "codex/edu-coordinator-review-check" ]; then
             expected_main=93be0fa782480cba7464527be99e935c0d10dbdf
             test "$(git rev-parse HEAD^1)" = "$expected_main"
