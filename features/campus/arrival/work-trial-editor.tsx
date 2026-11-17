@@ -2,7 +2,7 @@
 
 import {AdminInput, AdminTextarea} from '@/features/admin-ui/components/admin-system';
 import {EditorDisclosure} from '../content/disclosure';
-import {WORK_TRIAL_LIMITS as limits, type WorkTrialConfig} from './work-trial';
+import {DEFAULT_WORK_TRIAL, WORK_TRIAL_LIMITS as limits, type WorkTrialConfig} from './work-trial';
 import styles from './editor.module.css';
 
 /** Uses the enclosing webinar form's save, revision checks and preview. */
@@ -11,6 +11,7 @@ export function WorkTrialEditor({value, onChange, disabled = false}: {
   onChange: (value: WorkTrialConfig) => void;
   disabled?: boolean;
 }) {
+  const valueExplanation = value.valueExplanation ?? DEFAULT_WORK_TRIAL.valueExplanation;
   function patch<K extends keyof WorkTrialConfig>(key: K, next: WorkTrialConfig[K]) {
     onChange({...value, [key]: next});
   }
@@ -83,6 +84,13 @@ export function WorkTrialEditor({value, onChange, disabled = false}: {
         <AdminTextarea label="두 번째 업무 · 체험용 예시 자료" required rows={7} maxLength={limits.task} value={value.secondTask.sample} onChange={event => task('secondTask', 'sample', event.target.value)} helper="첫 업무와 다른 자료를 넣어주세요. 보완한 업무 기준이 새로운 상황에도 적용되는지 확인합니다."/>
         <EditorDisclosure title="AI에게 보낼 재사용 요청문">
           <AdminTextarea label="두 번째 업무 요청문 틀" required rows={8} maxLength={limits.template} value={value.reuseTemplate} onChange={event => patch('reuseTemplate', event.target.value)} helper="{{manual}}에는 피드백까지 반영한 기준, {{task}}에는 두 번째 업무 자료가 들어갑니다. 두 표시를 모두 유지하세요."/>
+        </EditorDisclosure>
+        <EditorDisclosure title="체험의 의미 · 요청 방식 비교">
+          <p className={styles.scope}>방문자가 체험에서 얻는 점을 설명합니다. AI의 실제 답변을 비교한 결과가 아니라, 요청하는 방식의 차이가 드러나도록 작성하세요.</p>
+          <AdminTextarea label="체험에서 얻는 점 · 제목" required rows={2} maxLength={limits.title} value={valueExplanation.title} onChange={event => patch('valueExplanation', {...valueExplanation, title: event.target.value})}/>
+          <AdminTextarea label="기준을 남기지 않고 요청할 때" required rows={3} maxLength={limits.description} value={valueExplanation.before} onChange={event => patch('valueExplanation', {...valueExplanation, before: event.target.value})}/>
+          <AdminTextarea label="업무 기준을 보완하고 재사용할 때" required rows={3} maxLength={limits.description} value={valueExplanation.after} onChange={event => patch('valueExplanation', {...valueExplanation, after: event.target.value})}/>
+          <AdminTextarea label="체험 후 기억할 핵심" required rows={3} maxLength={limits.description} value={valueExplanation.takeaway} onChange={event => patch('valueExplanation', {...valueExplanation, takeaway: event.target.value})}/>
         </EditorDisclosure>
         <div className={styles.groupHeading}><h4>체험 후 확인과 라이브 안내</h4><p>체험 결과는 방문자가 직접 확인합니다. 캠퍼스가 개인 AI의 답변을 읽거나 채점하지 않습니다.</p></div>
         <AdminTextarea label="체험 정리 화면 제목" required rows={2} maxLength={limits.title} value={value.summaryTitle} onChange={event => patch('summaryTitle', event.target.value)}/>

@@ -1,11 +1,22 @@
 'use client';
 
 import {useEffect, useId, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Download, FileText} from 'lucide-react';
-import {buildWorkManual, buildWorkPrompt, criteriaReady, secondTaskReady, updateWorkTrial, WORK_TRIAL_LIMITS, type WorkTrialConfig, type WorkTrialState} from './work-trial';
+import {ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Download, FileText, ListChecks, Plus, RefreshCw} from 'lucide-react';
+import {buildWorkManual, buildWorkPrompt, criteriaReady, DEFAULT_WORK_TRIAL, secondTaskReady, updateWorkTrial, WORK_TRIAL_LIMITS, type WorkTrialConfig, type WorkTrialState} from './work-trial';
 import s from './work-trial-panel.module.css';
 
 const stages = ['업무 기준', '첫 업무', '피드백', '재사용'];
+
+function RequestPicture({reusing}: {reusing: boolean}) {
+  return <figure className={s.requestPicture} aria-label="업무 기준과 이번 자료를 합쳐 AI에게 보낼 전체 요청을 만듭니다">
+    <div className={s.requestParts}>
+      <div className={s.rulePaper}><ListChecks size={22}/><span>계속 사용할 기준</span><strong>내 업무 기준{reusing && <small>+ 반영한 피드백</small>}</strong><i/><i/></div>
+      <Plus size={18} aria-hidden="true"/>
+      <div className={s.taskPaper}><FileText size={22}/><span>이번에 바뀌는 내용</span><strong>이번 업무 자료</strong><i/><i/></div>
+    </div>
+    <figcaption><ArrowDown size={17}/><span>두 가지가 담긴 <strong>전체 요청문</strong>을 복사해요</span></figcaption>
+  </figure>;
+}
 
 export function WorkTrialPanel({config, state, onChange, onExit, onLive, persistenceEnabled, storageBlocked = false}: {
   config: WorkTrialConfig;
@@ -19,15 +30,20 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
   const priorityName = useId();
   const [notice, setNotice] = useState('');
   const [copied, setCopied] = useState('');
-  const [fallback, setFallback] = useState('');
+  const [manualCopied, setManualCopied] = useState('');
+  const [manualNotice, setManualNotice] = useState('');
+  const [copying, setCopying] = useState<'prompt' | 'manual' | null>(null);
+  const [fallback, setFallback] = useState<{text: string; purpose: 'prompt' | 'manual'} | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const fallbackField = useRef<HTMLTextAreaElement>(null);
+  const handoff = useRef<HTMLDivElement>(null);
   const activeStage = Math.min(state.step, 3);
   const stageName = state.step === 1 ? 'first' : state.step === 2 ? 'feedback' : 'reuse';
   const prompt = state.step > 0 && state.step < 4 ? buildWorkPrompt(config, state, stageName) : '';
   const hasCopied = Boolean(prompt && copied === prompt);
   const manual = buildWorkManual(config, state, {includeFeedback: state.step >= 2});
+  const valueExplanation = config.valueExplanation ?? DEFAULT_WORK_TRIAL.valueExplanation;
   const stageContent = state.step === 0 ? config : state.step === 1 ? config.firstTask : state.step === 2 ? config.feedback : state.step === 3 ? config.secondTask : {title: config.summaryTitle, description: config.summaryDescription};
 
   useEffect(() => {
@@ -37,10 +53,13 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
   useEffect(() => {
     if (fallback) {fallbackField.current?.focus(); fallbackField.current?.select();}
   }, [fallback]);
+  useEffect(() => {
+    if (hasCopied) handoff.current?.scrollIntoView({block: 'nearest', behavior: 'instant'});
+  }, [hasCopied]);
 
   function patch(next: Partial<WorkTrialState>) {
     onChange(updateWorkTrial(state, next));
-    setNotice(''); setFallback('');
+    setNotice(''); setManualNotice(''); setFallback(null);
   }
   function go(step: WorkTrialState['step']) {
     patch({step}); setCopied('');
@@ -50,22 +69,24 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
     else go((state.step - 1) as WorkTrialState['step']);
   }
   async function copy(text: string, purpose: 'prompt' | 'manual' = 'prompt') {
-    if (!text) return;
+    if (!text || copying) return;
+    setCopying(purpose);
     try {
       await navigator.clipboard.writeText(text);
-      setFallback('');
-      if (purpose === 'prompt') setCopied(text);
-      setNotice(purpose === 'manual' ? '업무 매뉴얼을 복사했습니다. 다음 업무를 맡길 때 다시 사용할 수 있어요.' : '복사했습니다. 개인 AI에 붙여넣고 전송한 뒤 이 화면으로 돌아오세요.');
+      setFallback(null);
+      if (purpose === 'prompt') {setCopied(text); setNotice('전체 요청문을 복사했어요. 개인 AI에 붙여넣고 전송해 주세요.');}
+      else {setManualCopied(text); setManualNotice('복사했어요. 메모장에 보관한 뒤, 다음 업무 자료와 함께 AI에 보내세요.');}
     } catch {
-      setFallback(text);
-      setNotice('아래 내용을 전체 선택해 직접 복사해 주세요.');
-    }
+      setFallback({text, purpose});
+      if (purpose === 'manual') {setManualCopied(''); setManualNotice('브라우저에서 복사를 허용하지 않았어요. 바로 아래 내용을 직접 복사해 주세요.');}
+      else setNotice('아래 내용을 전체 선택해 직접 복사해 주세요.');
+    } finally {setCopying(null);}
   }
   function download() {
     const url = URL.createObjectURL(new Blob([manual], {type: 'text/plain;charset=utf-8'}));
     const link = document.createElement('a'); link.href = url; link.download = '내-AI-직원-업무-매뉴얼.txt'; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    setNotice('업무 매뉴얼 파일 내려받기를 시작했습니다. 새 AI 대화에서는 이 매뉴얼을 함께 보내주세요.');
+    setManualNotice('업무 매뉴얼 파일 내려받기를 시작했어요. 다음 업무 자료와 함께 사용하세요.');
   }
   function useSampleCriteria() {
     patch({role: config.roleDefault, reader: config.readerDefault, priority: config.priorities[0].id, boundary: config.boundaryDefault, format: config.formatDefault});
@@ -87,6 +108,11 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
     {label: config.boundaryLabel, value: state.boundary.trim() || config.boundaryDefault},
     {label: config.formatLabel, value: state.format.trim() || config.formatDefault},
   ];
+
+  function directCopy(purpose: 'prompt' | 'manual') {
+    if (!fallback || fallback.purpose !== purpose) return null;
+    return <div className={s.fallback}><label>{purpose === 'manual' ? '직접 복사할 업무 매뉴얼' : '직접 복사할 전체 요청문'}<textarea ref={fallbackField} rows={5} readOnly value={fallback.text}/></label><button type="button" className={s.secondary} onClick={() => {if (purpose === 'prompt' && fallback.text === prompt) {setCopied(prompt); setNotice('직접 복사한 전체 요청문을 개인 AI에 보내주세요.');} else if (purpose === 'manual') {setManualCopied(fallback.text); setManualNotice('직접 복사한 매뉴얼을 메모장에 보관해 주세요.');} setFallback(null);}}>직접 복사했어요<Check size={15}/></button></div>;
+  }
 
   return <div className={s.panel} data-work-step={state.step}>
     <div className={s.top}><span>내 AI 직원 · 회사 업무 체험</span><button type="button" onClick={back}><ArrowLeft size={15}/>이전</button></div>
@@ -110,12 +136,12 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
       </>}
 
       {(state.step === 1 || state.step === 3) && <>
-        {state.step === 3 && <div className={s.retainedRule}><span>이번 업무에도 적용할 수정 기준</span><p>{state.feedback}</p></div>}
+        <RequestPicture reusing={state.step === 3}/>
         <div className={s.taskHeading}><label htmlFor="work-trial-task">{task.label}</label><button type="button" className={s.textButton} onClick={() => patch(state.step === 1 ? {firstTask: task.sample} : {secondTask: task.sample})}>예시 메모 넣기</button></div>
         <textarea id="work-trial-task" className={s.taskInput} rows={5} maxLength={WORK_TRIAL_LIMITS.task} value={taskValue} onChange={event => patch(state.step === 1 ? {firstTask: event.target.value} : {secondTask: event.target.value})} placeholder={task.sample}/>
         <p className={s.fieldHint}>{task.hint}</p>
         {state.step === 3 && state.secondTask.trim() && !secondTaskReady(state) && <p className={s.fieldError} role="status">첫 업무와 다른 메모를 넣어주세요. 같은 기준이 새로운 업무에도 적용되는지 확인합니다.</p>}
-        {state.step === 1 && <details className={s.disclosure}><summary>AI에게 함께 보낼 업무 기준<ChevronDown size={16}/></summary><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}</div></details>}
+        <details className={s.disclosure}><summary>AI에게 함께 보낼 업무 기준{state.step === 3 ? '·피드백' : ''}<ChevronDown size={16}/></summary><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}{state.step === 3 && <p><strong>이번 업무에도 적용할 피드백</strong>{state.feedback}</p>}</div></details>
       </>}
 
       {state.step === 2 && <>
@@ -126,27 +152,29 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
       </>}
 
       {state.step > 0 && state.step < 4 && <>
-        {prompt && <details className={s.disclosure}><summary>{state.step === 2 ? '수정 기준과 요청문 확인' : '개인 AI에게 보낼 내용 확인'}<ChevronDown size={16}/></summary><div><textarea className={s.promptText} aria-label="개인 AI에게 보낼 요청문" readOnly value={prompt}/><button type="button" className={s.textButton} onClick={() => copy(prompt)}><Copy size={14}/>요청문 복사</button></div></details>}
-        <div className={s.handoff}><h2>{hasCopied ? '개인 AI에 보내고 돌아오세요' : '개인 AI에서 실행합니다'}</h2><p>{state.step === 1 ? '요청문을 복사해 새 대화에 붙여넣으세요. 답변을 받으면 여기서 다음 단계를 이어갑니다.' : '첫 업무를 실행한 AI 대화에 이어서 보내세요. 업무 기준도 함께 담겨 있어 새 대화에서도 사용할 수 있습니다.'}</p><div className={s.aiLinks}><a href="https://chatgpt.com/" target="_blank" rel="noreferrer">ChatGPT<ArrowUpRight size={15}/></a><a href={state.step === 1 ? "https://claude.ai/new" : "https://claude.ai/"} target="_blank" rel="noreferrer">Claude<ArrowUpRight size={15}/></a></div><p className={s.fine}>캠퍼스는 개인 AI의 대화를 읽지 않습니다. 답변 확인은 직접 알려주세요.</p>{prompt && !hasCopied && <button type="button" className={s.textButton} onClick={confirmResponse}>이미 답변을 받았어요<ArrowRight size={14}/></button>}</div>
+        {prompt && <details className={s.disclosure}><summary>복사할 전체 요청문 미리보기<ChevronDown size={16}/></summary><div><p className={s.packageHint}>내 업무 기준{state.step > 1 ? '과 피드백' : ''}에 {state.step === 2 ? '첫 업무 자료' : '위에 입력한 자료'}를 합쳤어요. 아래 내용 전체가 복사됩니다.</p><textarea className={s.promptText} aria-label="개인 AI에게 보낼 요청문" readOnly value={prompt}/></div></details>}
+        <div ref={handoff} className={s.handoff} data-copied={hasCopied}><h2>{hasCopied ? '복사했어요. 이제 개인 AI에 붙여넣으세요.' : '자료를 넣었다면, 아래 버튼으로 전체 요청을 복사하세요.'}</h2><p>{state.step === 1 ? 'ChatGPT나 Claude를 열어 붙여넣고 전송하세요. 답변을 받은 뒤 여기로 돌아와 이어갑니다.' : '첫 업무를 맡긴 AI 대화에 붙여넣고 전송하세요. 새 대화에서도 업무 기준이 함께 전달됩니다.'}</p><div className={s.aiLinks}><a href="https://chatgpt.com/" target="_blank" rel="noreferrer">ChatGPT 열기<ArrowUpRight size={15}/></a><a href={state.step === 1 ? "https://claude.ai/new" : "https://claude.ai/"} target="_blank" rel="noreferrer">Claude 열기<ArrowUpRight size={15}/></a></div><p className={s.fine}>캠퍼스는 개인 AI의 대화를 읽지 않습니다. 답변 확인은 직접 알려주세요.</p>{prompt && !hasCopied && <button type="button" className={s.textButton} onClick={confirmResponse}>이미 답변을 받았어요<ArrowRight size={14}/></button>}</div>
       </>}
 
       {state.step === 4 && <>
-        <fieldset className={s.checks}><legend>두 번째 답변에서 직접 확인해보세요</legend>{config.checks.map((item, index) => <label key={index}><input type="checkbox" checked={state.checks[index] ?? false} onChange={event => patch({checks: config.checks.map((_, current) => current === index ? event.target.checked : Boolean(state.checks[current]))})}/><span>{item}</span></label>)}</fieldset>
-        <p className={s.fine}>실제로 반영된 항목만 체크하세요. 부족한 부분은 기준을 더 구체적으로 고쳐 다시 맡겨볼 수 있습니다.</p>
-        <button type="button" className={s.textButton} onClick={() => go(2)}>피드백을 보완하고 다시 해보기<ArrowRight size={14}/></button>
-        <article className={s.manual}><header><FileText size={18}/><div><h2>내 AI 직원의 업무 매뉴얼</h2><p>다음 업무에도 사용할 기준</p></div></header><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}<p className={s.newRule}><strong>피드백으로 추가한 기준</strong>{state.feedback}</p></div><div className={s.manualActions}><button type="button" className={s.secondary} onClick={() => copy(manual, 'manual')}><Copy size={16}/>매뉴얼 복사</button><button type="button" className={s.textButton} onClick={download}><Download size={16}/>파일로 받기</button></div></article>
+        <section className={s.valueExplanation} aria-label="업무 기준을 남기는 이유"><h2>{valueExplanation.title}</h2><div className={s.valueComparison}>
+          <article><div className={s.paperSketch} aria-hidden="true"><FileText size={29}/><span/><span/><span/></div><h3>매번 처음부터 설명</h3><p>{valueExplanation.before}</p></article>
+          <article><div className={`${s.paperSketch} ${s.reuseSketch}`} aria-hidden="true"><ListChecks size={29}/><RefreshCw size={22}/><FileText size={29}/></div><h3>내 기준에 새 자료만 추가</h3><p>{valueExplanation.after}</p></article>
+        </div><p className={s.takeaway}>{valueExplanation.takeaway}</p></section>
+        <article className={s.manual}><header><FileText size={20}/><div><h2>내 AI 직원의 업무 매뉴얼</h2><p>이번에 정한 기준과 피드백을 한곳에 모았어요</p></div></header><div className={s.manualPreview}><p><strong>맡길 일</strong>{state.role}</p><p><strong>다음에도 적용할 피드백</strong>{state.feedback}</p></div><div className={s.manualActions}><button type="button" className={s.secondary} data-copied={manualCopied === manual} disabled={copying === 'manual'} aria-busy={copying === 'manual'} onClick={() => copy(manual, 'manual')}>{manualCopied === manual ? <Check size={16}/> : <Copy size={16}/>}<span>{copying === 'manual' ? '복사 중…' : manualCopied === manual ? '매뉴얼 복사됨' : '매뉴얼 복사'}</span></button><button type="button" className={s.textButton} onClick={download}><Download size={16}/>파일로 받기</button></div><div className={s.manualFeedback} role="status" aria-live="polite">{manualNotice}</div>{directCopy('manual')}<details className={s.fullManual}><summary>업무 기준 전체 보기<ChevronDown size={16}/></summary><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}<p className={s.newRule}><strong>피드백으로 추가한 기준</strong>{state.feedback}</p></div></details></article>
         <p className={s.fine}>새 AI 대화에서는 이 매뉴얼과 새 업무 자료를 함께 보내주세요. 이번 체험이 AI의 영구 기억이나 자동 실행을 설정하지는 않습니다.</p>
-        <p className={s.liveBridge}>{config.liveBridge}</p>
+        <details className={s.disclosure}><summary>두 번째 답변에서 기준이 지켜졌는지 확인하기<ChevronDown size={16}/></summary><div><fieldset className={s.checks}><legend>실제 답변을 보고 체크하세요</legend>{config.checks.map((item, index) => <label key={index}><input type="checkbox" checked={state.checks[index] ?? false} onChange={event => patch({checks: config.checks.map((_, current) => current === index ? event.target.checked : Boolean(state.checks[current]))})}/><span>{item}</span></label>)}</fieldset><button type="button" className={s.textButton} onClick={() => go(2)}>피드백을 보완하고 다시 해보기<ArrowRight size={14}/></button></div></details>
+        <aside className={s.nextLearning}><span>이제, 내 자료로 일하는 AI 직원으로</span><p>{config.liveBridge}</p></aside>
       </>}
 
-      {fallback && <div className={s.fallback}><label>직접 복사할 내용<textarea ref={fallbackField} rows={5} readOnly value={fallback}/></label><button type="button" className={s.secondary} onClick={() => {if (fallback === prompt) setCopied(prompt); setFallback(''); setNotice('직접 복사한 내용을 개인 AI에 보내주세요.');}}>직접 복사했어요<Check size={15}/></button></div>}
+      {directCopy('prompt')}
       {notice && <p className={s.notice} role="status">{notice}</p>}
       {storageBlocked && <p className={s.fieldError} role="status">이 브라우저에서는 진행 내용을 보관할 수 없습니다. 화면을 닫기 전에 업무 매뉴얼을 복사해두세요.</p>}
     </div>
     <footer className={s.footer}>
       {state.step === 0 ? <><p>{firstReady ? '내 기준과 첫 업무를 함께 AI에 보냅니다.' : '맡길 일과 읽을 사람을 적고, 우선순위를 골라주세요.'}</p><button type="button" className={s.primary} disabled={!firstReady} onClick={() => go(1)}>이 기준으로 첫 업무 맡기기<ArrowRight size={17}/></button></> : state.step === 4 ? <button type="button" className={s.primary} onClick={onLive}>라이브에서 이어서 배우기<ArrowRight size={17}/></button> : <>
         <p>{hasCopied ? 'AI에서 답변을 받은 뒤 아래 버튼을 눌러주세요.' : state.step === 2 ? '수정할 기준을 담아 첫 답변을 다시 요청합니다.' : state.step === 3 ? '수정한 기준과 새 메모를 함께 보냅니다.' : '내 업무 기준과 메모가 하나의 요청문으로 준비됩니다.'}</p>
-        <div className={s.footerActions}>{hasCopied ? <><button type="button" className={s.primary} onClick={confirmResponse}>{state.step === 1 ? '첫 답변을 받았어요' : state.step === 2 ? '수정한 답변을 확인했어요' : '두 번째 답변을 받았어요'}<Check size={17}/></button><button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button></> : <button type="button" className={s.primary} disabled={!prompt} onClick={() => copy(prompt)}><Copy size={17}/>{state.step === 2 ? '수정 요청 복사하기' : state.step === 3 ? '두 번째 업무 요청 복사' : '첫 업무 요청 복사하기'}</button>}</div>
+        <div className={s.footerActions}>{hasCopied ? <><button type="button" className={s.primary} onClick={confirmResponse}>{state.step === 1 ? '첫 답변을 받았어요' : state.step === 2 ? '수정한 답변을 확인했어요' : '두 번째 답변을 받았어요'}<Check size={17}/></button><button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button></> : <button type="button" className={s.primary} disabled={!prompt || copying === 'prompt'} aria-busy={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={17}/>{copying === 'prompt' ? '복사 중…' : state.step === 2 ? '피드백 반영 요청 복사' : '기준과 자료 함께 복사'}</button>}</div>
       </>}
     </footer>
   </div>;

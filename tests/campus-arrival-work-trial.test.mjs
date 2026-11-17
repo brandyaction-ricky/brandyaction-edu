@@ -61,6 +61,25 @@ test('administrator changes survive validation and change the actual manual and 
   assert.ok(!prompt.includes('새 첫 예시'), 'sample text is only used when the visitor chooses it');
 });
 
+test('saved work trials add only missing value explanation and preserve every existing editorial choice', () => {
+  const legacy = structuredClone(config);
+  delete legacy.valueExplanation;
+  legacy.summaryTitle = '관리자가 작성한 기존 마무리';
+  legacy.secondTask.hint = '기존 자료 입력 도움말';
+  const snapshot = structuredClone(legacy);
+  const restored = trial.validateWorkTrialConfig(legacy);
+  assert.deepEqual(restored.valueExplanation, config.valueExplanation);
+  assert.notEqual(restored.valueExplanation, config.valueExplanation);
+  const existing = {...restored}; delete existing.valueExplanation;
+  assert.deepEqual(existing, snapshot);
+  assert.deepEqual(legacy, snapshot, 'reading a legacy campaign does not write back defaults');
+  const edited = {...restored, valueExplanation: {title: '편집한 가치 제목', before: '이전 요청 작성 설명', after: '새 자료와 기준을 함께 전달', takeaway: '관리자가 편집한 체험 활용 안내'}};
+  assert.deepEqual(trial.validateWorkTrialConfig(JSON.parse(JSON.stringify(edited))), edited);
+  for (const valueExplanation of [null, undefined, [], {}, {...config.valueExplanation, extra: true}, {...config.valueExplanation, before: ''}, {...config.valueExplanation, after: '가'.repeat(trial.WORK_TRIAL_LIMITS.description + 1)}]) {
+    rejects({...legacy, valueExplanation});
+  }
+});
+
 test('invalid editable schema, repeated priorities, duplicate sample tasks and unknown tokens are rejected', () => {
   for (const value of [null, {}, [], {...config, extra: true}]) rejects(value);
   for (const mutate of [

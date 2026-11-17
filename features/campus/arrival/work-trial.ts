@@ -12,6 +12,7 @@ export type WorkTrialConfig = {
   feedback: {title: string; description: string; hint: string; suggestions: string[]};
   secondTask: WorkTrialTask;
   summaryTitle: string; summaryDescription: string; checks: string[]; liveBridge: string;
+  valueExplanation: {title: string; before: string; after: string; takeaway: string};
   firstTemplate: string; updateTemplate: string; reuseTemplate: string;
 };
 export const WORK_TRIAL_LIMITS = {
@@ -38,9 +39,9 @@ export const DEFAULT_WORK_TRIAL: WorkTrialConfig = {
   formatDefault: '선택한 우선순위를 맨 위에 두고, 현재 상황과 다음 행동을 이어서 간결하게 정리한다. 확인된 사실과 제안을 구분하고, 정보가 없는 항목은 확인 필요라고 표시한다.',
   firstTask: {
     title: '첫 업무를 맡겨보세요.',
-    description: '업무 매뉴얼과 메모를 함께 복사해 평소 쓰는 AI에 보냅니다. 답변을 받으면 이 화면으로 돌아와주세요.',
-    label: '첫 번째 업무 메모',
-    hint: '회의나 업무 메모를 넣어주세요. 회사 기밀·개인정보는 빼고, 준비된 가상 메모로 체험해도 됩니다.',
+    description: '아래에 AI가 처리할 자료를 넣어주세요. 앞에서 만든 업무 기준과 이 자료를 합친 전체 요청문을 복사해 개인 AI에 보냅니다.',
+    label: '이번에 AI에게 맡길 자료 · 첫 업무',
+    hint: '이 칸에는 회의·업무 메모만 넣습니다. 회사 기밀·개인정보는 빼고, 준비된 가상 메모로 체험해도 됩니다. 복사 버튼은 업무 기준까지 포함한 전체 요청문을 복사합니다.',
     sample: '신입 동료 안내자료를 만드는 중이다. 자료 목차는 정리했다. 계정 신청 안내는 담당 부서의 회신을 기다리고 있다. 연락처 목록도 최신 정보인지 확인해야 한다. 팀장은 이번 주 안에 공유하기를 원하지만 전체 내용을 다 확인할 수 있을지는 아직 모른다. 계정 안내를 빼고 먼저 공유할지 논의가 필요하다. 확정된 담당자와 최종 마감일은 없다.',
   },
   feedback: {
@@ -55,25 +56,31 @@ export const DEFAULT_WORK_TRIAL: WorkTrialConfig = {
   },
   secondTask: {
     title: '새 메모에도,\n같은 기준이 적용될까요?',
-    description: '다른 업무 메모를 맡겨보세요. 방금 보완한 기준을 요청문에 함께 넣으므로 같은 대화에서도, 새 대화에서도 사용할 수 있습니다.',
-    label: '두 번째 업무 메모',
-    hint: '첫 번째와 다른 메모를 넣어주세요. 답변을 비교할 수 있도록 같은 종류의 업무를 고르면 좋습니다.',
+    description: '첫 업무와 다른 자료를 넣어주세요. 앞서 정한 기준과 피드백은 전체 요청에 함께 담깁니다.',
+    label: '이번에 AI에게 맡길 자료 · 두 번째 업무',
+    hint: '이 칸의 메모는 전체 요청문의 일부입니다. 새 자료를 넣고 전체 요청문을 복사해 AI에 보내세요. 같은 종류의 다른 업무를 고르면 기준이 유지되는지 확인하기 쉽습니다.',
     sample: '팀 워크숍 준비 상황이다. 장소 후보 두 곳을 찾았다. 한 곳은 사무실에서 가깝지만 예약 가능 여부가 확인되지 않았다. 다른 곳은 예약 가능하나 이동 시간이 더 걸린다. 참석 인원과 예산은 아직 확정하지 않았다. 장소를 먼저 정할지, 인원과 예산을 확인한 뒤 정할지 결정이 필요하다. 예약 담당자와 마감일은 정하지 않았다.',
   },
-  summaryTitle: '다음 업무에도 꺼내 쓸,\n내 AI 직원의 업무 매뉴얼.',
-  summaryDescription: '두 번째 답변을 보며 직접 확인해보세요. 잘 지켜지지 않은 기준은 피드백 단계로 돌아가 더 구체적으로 보완할 수 있습니다.',
+  summaryTitle: '매번 다시 설명하던 기준,\n다음 업무에도 가져가세요.',
+  summaryDescription: '맡길 역할과 목적, 우선순위에 내가 고친 내용까지 한 문서로 모았습니다. 다음 업무에서는 이 매뉴얼에 새 자료를 붙여 보내고, 원하는 기준이 지켜졌는지 확인해보세요.',
   checks: ['내가 고른 우선순위가 반영됐나요?', '첫 답변을 보고 추가한 기준도 지켰나요?', '없는 정보를 만들지 않고 확인할 사항을 남겼나요?'],
-  liveBridge: '오늘 만든 업무 기준에 내 자료를 연결하고, 역할을 나누고, 텔레그램으로 업무를 맡기는 과정은 라이브에서 이어집니다.',
+  liveBridge: '체험에서는 내 기준을 매뉴얼로 만들고 새 업무에 다시 사용해봤습니다. 라이브에서는 여기에 실제 업무 자료를 연결하고 직원별 역할을 정해, 텔레그램으로 일을 맡기는 과정까지 보여드립니다.',
+  valueExplanation: {
+    title: '이번에 만든 것은,\n다음 업무에도 쓸 수 있는 기준입니다.',
+    before: '업무를 맡길 때마다 역할·목적·주의사항을 다시 적고, 답변을 보며 빠진 기준을 추가합니다.',
+    after: '저장한 업무 기준에 이번 자료를 붙여 보냅니다. 새로 고친 기준도 매뉴얼에 남겨 다음 요청에 함께 넣습니다.',
+    takeaway: '반복해서 설명하던 내용을 한곳에 모아두면, 다음에는 자료를 바꿔 맡기고 결과를 검토하는 데 집중할 수 있습니다.',
+  },
   firstTemplate: '아래 업무 매뉴얼에 따라 첫 업무를 처리해줘. 매뉴얼과 업무 메모를 구분해서 읽고, 메모에 없는 사실을 만들지 마. 결과를 보여준 뒤 내가 검토할 수 있도록 확인이 필요한 사항을 남겨줘.\n\n[내 AI 직원의 업무 매뉴얼]\n{{manual}}\n\n[이번 업무 메모]\n{{task}}',
   updateTemplate: '아래 보완된 업무 매뉴얼과 내 피드백을 적용해 첫 업무의 결과를 다시 작성해줘. 피드백을 이번 문장 수정에만 쓰지 말고, 아래 매뉴얼의 기준으로 적용해줘. 다른 기준과 충돌하면 마음대로 결정하지 말고 확인해줘.\n\n[보완된 업무 매뉴얼]\n{{manual}}\n\n[이번에 추가한 피드백]\n{{feedback}}\n\n[다시 처리할 첫 업무 메모]\n{{task}}',
   reuseTemplate: '아래 업무 매뉴얼을 적용해 새로운 업무 메모를 처리해줘. 이전 업무의 사실·담당자·일정을 새 업무에 섞지 마. 우선순위와 피드백으로 보완한 기준을 유지하고, 확인되지 않은 정보는 질문으로 남겨줘.\n\n[재사용할 업무 매뉴얼]\n{{manual}}\n\n[새로운 업무 메모]\n{{task}}',
 };
 
 function fail(message: string): never {throw Object.assign(Error(message), {status: 400});}
-function record(value: unknown, keys: string[], label: string): Record<string, unknown> {
+function record(value: unknown, keys: string[], label: string, optional: string[] = []): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} 설정을 확인해 주세요.`);
   const result = value as Record<string, unknown>;
-  if (Object.keys(result).some(key => !keys.includes(key)) || keys.some(key => !Object.hasOwn(result, key))) fail(`${label} 설정 항목을 확인해 주세요.`);
+  if (Object.keys(result).some(key => !keys.includes(key)) || keys.some(key => !optional.includes(key) && !Object.hasOwn(result, key))) fail(`${label} 설정 항목을 확인해 주세요.`);
   return result;
 }
 function text(value: unknown, limit: number, label: string): string {
@@ -97,7 +104,7 @@ function template(value: unknown, keys: string[], label: string): string {
   return result;
 }
 export function validateWorkTrialConfig(value: unknown): WorkTrialConfig {
-  const v = record(value, Object.keys(DEFAULT_WORK_TRIAL), '직장인 업무 체험');
+  const v = record(value, Object.keys(DEFAULT_WORK_TRIAL), '직장인 업무 체험', ['valueExplanation']);
   if (!Array.isArray(v.priorities) || v.priorities.length !== 3) fail('업무 우선순위는 세 항목을 입력해 주세요.');
   const ids = new Set<string>();
   const priorities = v.priorities.map(item => {
@@ -108,6 +115,7 @@ export function validateWorkTrialConfig(value: unknown): WorkTrialConfig {
   });
   const f = record(v.feedback, ['title', 'description', 'hint', 'suggestions'], '피드백');
   const firstTask = task(v.firstTask, '첫 업무'), secondTask = task(v.secondTask, '두 번째 업무');
+  const explanation = record(Object.hasOwn(v, 'valueExplanation') ? v.valueExplanation : DEFAULT_WORK_TRIAL.valueExplanation, ['title', 'before', 'after', 'takeaway'], '업무 기준을 재사용하는 이유');
   if (normalizeTask(firstTask.sample) === normalizeTask(secondTask.sample)) fail('두 번째 예시 메모는 첫 업무와 다른 내용으로 입력해 주세요.');
   return {
     title: text(v.title, WORK_TRIAL_LIMITS.title, '업무 기준 제목'), description: text(v.description, WORK_TRIAL_LIMITS.description, '업무 기준 설명'),
@@ -117,6 +125,7 @@ export function validateWorkTrialConfig(value: unknown): WorkTrialConfig {
     firstTask, secondTask,
     feedback: {title: text(f.title, WORK_TRIAL_LIMITS.title, '피드백 제목'), description: text(f.description, WORK_TRIAL_LIMITS.description, '피드백 설명'), hint: text(f.hint, WORK_TRIAL_LIMITS.hint, '피드백 도움말'), suggestions: texts(f.suggestions, '피드백 제안')},
     summaryTitle: text(v.summaryTitle, WORK_TRIAL_LIMITS.title, '마무리 제목'), summaryDescription: text(v.summaryDescription, WORK_TRIAL_LIMITS.description, '마무리 설명'), checks: texts(v.checks, '재사용 확인 항목'), liveBridge: text(v.liveBridge, WORK_TRIAL_LIMITS.description, '라이브 연결 안내'),
+    valueExplanation: {title: text(explanation.title, WORK_TRIAL_LIMITS.title, '체험 가치 제목'), before: text(explanation.before, WORK_TRIAL_LIMITS.description, '기존 요청 작성 방식'), after: text(explanation.after, WORK_TRIAL_LIMITS.description, '업무 기준 재사용 방식'), takeaway: text(explanation.takeaway, WORK_TRIAL_LIMITS.description, '체험 활용 안내')},
     firstTemplate: template(v.firstTemplate, ['manual', 'task'], '첫 업무 요청문'), updateTemplate: template(v.updateTemplate, ['manual', 'task', 'feedback'], '피드백 요청문'), reuseTemplate: template(v.reuseTemplate, ['manual', 'task'], '재사용 요청문'),
   };
 }
