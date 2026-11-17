@@ -151,7 +151,7 @@ export function PersonalOffice({enrollmentId,demo=false,onChange,onJobs}:{enroll
  {link&&<button type="button" className={styles.quiet} disabled={busy||conn.busy} onClick={()=>void release(p,link.id)}>연결 해제</button>}
  <button type="button" className={styles.danger} disabled={busy} onClick={()=>void remove(p)}>직원 삭제</button></div></article>;};
  const roster=<>
- <h3>전체 직원 목록 <small>{employees.length}명{hiddenStaff.length>0&&' · 숨김 '+hiddenStaff.length+'명'}</small></h3>{dir.error&&<p role="alert">{dir.error}</p>}{!employees.length&&<p className={styles.note}>아직 등록한 직원이 없어요. 아래 ‘직원 추가’에서 수업에서 만든 봇을 등록해 보세요.</p>}
+ <h3>전체 직원 목록 <small>{employees.length}명{hiddenStaff.length>0&&' · 숨김 '+hiddenStaff.length+'명'}</small></h3>{dir.error&&<p role="alert">{dir.error}</p>}{!employees.length&&<p className={styles.note}>아직 등록한 직원이 없어요. 30일차 수업에서 직원 전원을 사무실에 앉혀요. 이미 만든 봇이 있다면 아래 ‘직원 추가’에서 미리 등록해도 돼요.</p>}
  <div className={styles.roster}>{shownStaff.map(card)}</div>
  {hiddenStaff.length>0&&<details className={styles.hiddenGroup}><summary>숨긴 직원 {hiddenStaff.length}명</summary><p className={styles.note}>사무실에는 안 보이지만 텔레그램으로 맡긴 일은 그대로 작업함에 기록돼요.</p><div className={styles.roster}>{hiddenStaff.map(card)}</div></details>}
  {!demo&&(dir.page>1||!!dir.data?.next)&&<><div className={styles.controls}><button disabled={dir.page===1} onClick={dir.prev}>이전 직원 목록</button><span>{dir.page}페이지</span><button disabled={!dir.data?.next} onClick={dir.next}>다음 직원 목록</button></div>
