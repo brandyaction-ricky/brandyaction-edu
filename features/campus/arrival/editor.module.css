@@ -33,6 +33,11 @@
 .previewLoading { padding: 32px; text-align: center; color: #626770; }
 @media (max-width: 600px) {
   .grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  /* The welcome editor wraps this editor in its own card. Do not nest another
+     pair of padded cards around each small-screen work-trial input. */
+  .editor > details > .fields:has(> .workEditor) { padding-inline: 0; }
+  .editor .workEditor .fields { padding: 12px 0 0; }
+  .editor .workEditor details { padding-inline: 0; border-inline: 0; border-radius: 0; }
   .previewHeader { align-items: flex-start; padding: 10px 12px; }
   .previewHeader h2 { font-size: 14px; }
   .previewHeader p { max-width: 220px; font-size: 12px; }
