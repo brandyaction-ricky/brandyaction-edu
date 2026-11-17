@@ -15,7 +15,7 @@ type SceneProps = {
 
 const tasks = [
   { id: 'welcome:begin', title: '체험용 AI 사무실로', description: '내가 맡길 첫 업무를 찾아요', custom: true },
-  { id: 'office:demo', title: '업무가 완성되는 과정', description: '요청부터 수정까지 · 시연', custom: true },
+  { id: 'office:demo', title: '예시 결과 보기', description: '미리 준비한 예시 결과를 열어요', custom: true },
   { id: 'office:request', title: '내 AI에게 맡겨보기', description: '나에게 맞는 요청문 만들기', custom: true },
   { id: 'live:calendar', title: '12월 7일 라이브', description: '배울 내용과 일정 확인', custom: true },
 ];

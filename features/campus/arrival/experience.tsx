@@ -13,6 +13,14 @@ const icons = {business: BriefcaseBusiness, preparing: Compass, exploring: Light
 const chapters = ['웰컴존', '체험 사무실', '라이브 홀'];
 const rooms = ['welcome', 'office', 'live'] as const;
 
+/** Optional [section] lines keep editable examples readable; other text stays literal. */
+function ResultExample({text}: {text: string}) {
+  return <div className={s.resultSections}>{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => {
+    const section = block.match(/^\[([^\]\n]{1,60})\]\n([\s\S]*)$/);
+    return section ? <section key={index}><h3>{section[1]}</h3><p>{section[2]}</p></section> : <p key={index}>{block}</p>;
+  })}</div>;
+}
+
 export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false}: {config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean}) {
   const [state, setState] = useState<ArrivalState>(initialArrivalState);
   const [hydrated, setHydrated] = useState(false);
@@ -20,16 +28,18 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [notice, setNotice] = useState('');
   const [copyFallback, setCopyFallback] = useState('');
   const [showReset, setShowReset] = useState(false);
+  const [showExample, setShowExample] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [explore, setExplore] = useState(false);
   const resetDialog = useRef<HTMLDialogElement>(null);
+  const exampleDialog = useRef<HTMLDialogElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
   const visited = useRef(false);
   const step = state.step;
-  const chapter = step === 0 ? 0 : step === 7 ? 2 : 1;
+  const chapter = step === 0 || step === 8 ? 0 : step === 7 ? 2 : 1;
   const content = {...audienceContent[state.audience], ...config.audiences[state.audience]};
   const answers = state.answers[state.audience];
   const effectiveAnswers = state.mode === 'example' ? content.example : answers;
@@ -69,6 +79,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     if (showReset) resetDialog.current?.showModal();
     else resetDialog.current?.close();
   }, [showReset]);
+  useEffect(() => {
+    if (showExample) exampleDialog.current?.showModal();
+    else exampleDialog.current?.close();
+  }, [showExample]);
   useEffect(() => {
     if (copyFallback) {fallbackRef.current?.focus(); fallbackRef.current?.select();}
   }, [copyFallback]);
@@ -114,7 +128,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={rooms[chapter]}>
     <a href="#arrival-content" className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label={`${chapters[chapter]} 공간`}>
-      <ArrivalScene room={rooms[chapter]} demoTitle={config.audiences[state.audience].goal} demoPhase={step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={() => {setExplore(false); go(1);}} className={s.scene}/>
+      <ArrivalScene room={rooms[chapter]} demoTitle={config.audiences[state.audience].goal} demoPhase={step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={() => setShowExample(true)} className={s.scene}/>
       <div className={s.worldShade}/>
     </div>
     <header className={s.header}>
@@ -126,17 +140,22 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     <div className={s.place}><span className={s.placeDot}/>{chapters[chapter]}<small>{!sceneReady ? '공간을 준비하는 동안에도 시작할 수 있어요' : chapter === 0 ? 'AI에게 맡길 일 선택하기' : chapter === 1 ? '내 상황으로 AI 체험하기' : `${dateLabel} ${timeLabel} · 무료 라이브`}</small></div>
 
     <section className={`${s.dock} ${step === 0 ? s.welcomeDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
-      <div className={s.dockTop}><span>{step === 0 ? '처음 오셨나요? 여기서 시작해요' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].goal}</span>{step > 0 && <button type="button" className={s.back} onClick={() => go(arrivalBackStep(state))}><ArrowLeft size={14}/>이전</button>}</div>
+      <div className={s.dockTop}><span>{step === 0 ? '문샷 캠퍼스에 오신 것을 환영합니다' : step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span>{step > 0 && <button type="button" className={s.back} onClick={() => go(arrivalBackStep(state))}><ArrowLeft size={14}/>이전</button>}</div>
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
         {step === 0 && <>
+          <p className={s.welcomeEyebrow}>문샷 캠퍼스 · 무료 라이브 사전 체험</p>
           {title(config.title, config.description)}
-          <div className={s.choices}>{audiences.map(id => {const Icon = icons[id]; return <button type="button" key={id} onClick={() => selectAudience(id)}><span className={s.choiceIcon}><Icon size={21}/></span><span><strong>{config.audiences[id].label}</strong><small>{audienceContent[id].shortLabel} · {config.audiences[id].goal}</small></span><ArrowRight size={17}/></button>;})}</div>
-          <div className={s.welcomeFoot}><span>캠퍼스 가입·프로그램 설치 없이 체험할 수 있어요.</span></div>
+          <div className={s.welcomeOverview}><h2>내 상황에 맞춰, 이런 일을 해볼 수 있어요</h2><ul>{audiences.map(id => <li key={id}><Check size={16}/><span>{config.audiences[id].goal}</span></li>)}</ul></div>
+          <p className={s.welcomeHow}>결과 예시를 본 뒤, 내 상황에 맞는 요청문을 만들어 평소 쓰는 ChatGPT나 Claude에 보내보세요.</p>
+        </>}
+        {step === 8 && <>
+          {title(<>지금 어떤 상황이신가요?</>, '가장 가까운 상황을 골라주세요. 나에게 맞는 결과 예시부터 보여드릴게요.')}
+          <div className={s.choices} aria-label="내 상황에 맞는 체험 선택">{audiences.map(id => {const Icon = icons[id]; return <button type="button" key={id} onClick={() => selectAudience(id)}><span className={s.choiceIcon}><Icon size={21}/></span><span><strong>{config.audiences[id].label}</strong><small>{config.audiences[id].goal}</small></span><ArrowRight size={17}/></button>;})}</div>
           <p className={s.liveTeaser}>{dateLabel} {timeLabel} · 무료 라이브<strong>{config.liveTitle}</strong></p>
         </>}
         {step === 1 && <>
-          {title(<>먼저, 결과 예시를<br/><em>확인해보세요.</em></>)}
-          <article className={s.resultPaper}><div className={s.paperTop}><FileText size={16}/><span>{config.audiences[state.audience].goal}</span><small>체험용 예시</small></div><p className={s.resultText}>{content.example.before}</p></article>
+          {title(config.audiences[state.audience].goal)}
+          <article className={s.resultPaper}><div className={s.paperTop}><FileText size={16}/><span>이렇게 정리할 수 있습니다</span><small>체험용 예시</small></div><ResultExample text={content.example.before}/></article>
           <details className={s.disclosure}><summary>AI에게 알려준 내용 보기<ChevronDown size={16}/></summary><div><p><strong>{state.audience === 'exploring' ? '겪은 일' : '상품과 고객'}</strong>{content.example.a}</p><p><strong>{state.audience === 'business' ? '알려줄 장점' : state.audience === 'preparing' ? '궁금한 점' : '사람과 상황'}</strong>{content.example.b}</p></div></details>
           <p className={s.insight}><strong>누구를 위한 결과인지, 무엇을 담아야 하는지.</strong> 내 상황을 알려주면 AI가 답변을 만들 때 참고할 수 있습니다.</p>
           <button className={s.textButton} type="button" onClick={exampleFinish}>입력 없이 예시로 계속하기</button>
@@ -163,7 +182,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 5 && <>
           <span className={s.achievement}><Check size={15}/>{state.experience === 'example-viewed' ? '체험 예시 확인' : state.experience === 'self-reported' ? '개인 AI 답변 확인' : '요청문 준비 완료'}</span>
           {title(<>매번 같은 설명을<br/><em>반복하지 않으려면?</em></>, '자주 쓰는 자료와 원하는 결과의 기준을 정리해두세요. AI 직원이 일을 할 때 참고할 업무 매뉴얼이 됩니다.')}
-          {state.mode === 'example' ? <details className={s.disclosure}><summary>수정 요청과 결과 예시 보기<ChevronDown size={16}/></summary><div><span className={s.miniLabel}>이렇게 부탁했어요</span><p>“{content.example.revision}”</p><span className={s.miniLabel}>다듬은 결과 · 체험용 예시</span><p className={s.resultText}>{content.example.after}</p></div></details> : <details className={s.disclosure}><summary>답변을 한 번 더 다듬고 싶어요<ChevronDown size={16}/></summary><div><p>아쉬운 점을 골라 같은 AI 대화에 이어서 보내세요.</p><div className={s.revisionChoices}>{revisionOptions.map(option => <button type="button" key={option.id} aria-pressed={state.revision === option.id} onClick={() => update({revision: option.id})}>{option.label}</button>)}</div>{state.revision === 'different' && <label className={s.extraLabel}>어떤 부분이 달랐나요?<textarea rows={2} maxLength={300} value={state.extra} onChange={e => update({extra: e.target.value})} placeholder="예: 선생님이 아니라 학부모에게 보내는 글이에요."/></label>}<p className={s.resultText}>{revision}</p><button type="button" className={s.secondary} disabled={!revision} onClick={() => copy(revision)}><Copy size={15}/>수정 요청 복사</button></div></details>}
+          {state.mode === 'example' ? <details className={s.disclosure}><summary>수정 요청과 결과 예시 보기<ChevronDown size={16}/></summary><div><span className={s.miniLabel}>이렇게 부탁했어요</span><p>“{content.example.revision}”</p><span className={s.miniLabel}>다듬은 결과 · 체험용 예시</span><ResultExample text={content.example.after}/></div></details> : <details className={s.disclosure}><summary>답변을 한 번 더 다듬고 싶어요<ChevronDown size={16}/></summary><div><p>아쉬운 점을 골라 같은 AI 대화에 이어서 보내세요.</p><div className={s.revisionChoices}>{revisionOptions.map(option => <button type="button" key={option.id} aria-pressed={state.revision === option.id} onClick={() => update({revision: option.id})}>{option.label}</button>)}</div>{state.revision === 'different' && <label className={s.extraLabel}>어떤 부분이 달랐나요?<textarea rows={2} maxLength={300} value={state.extra} onChange={e => update({extra: e.target.value})} placeholder="예: 선생님이 아니라 학부모에게 보내는 글이에요."/></label>}<p className={s.resultText}>{revision}</p><button type="button" className={s.secondary} disabled={!revision} onClick={() => copy(revision)}><Copy size={15}/>수정 요청 복사</button></div></details>}
           <details className={s.disclosure}><summary>{state.mode === 'example' ? '예시에서 AI에게 알려준 내용' : 'AI에게 알려준 내용 보기'}<ChevronDown size={16}/></summary><div className={s.criteria}>{criteria.slice(0,3).map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}<button className={s.textButton} type="button" onClick={() => copy(criteria.slice(0,3).map(x => `${x.label}: ${x.value}`).join('\n'))}><Copy size={14}/>기준 복사하기</button></div></details>
           <p className={s.insight}>{content.bridge}<br/><strong>{dateLabel} 라이브에서 방법을 알려드립니다.</strong></p>
           {state.mode === 'example' && <button type="button" className={s.textButton} onClick={personalStart}>내 상황으로 직접 해보기<ArrowRight size={14}/></button>}
@@ -179,7 +198,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {notice && <p className={s.notice} role="status">{notice}</p>}
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
-      {step > 0 && <footer className={s.dockFooter}>
+      {step !== 8 && <footer className={s.dockFooter}>
+        {step === 0 && <><span className={s.footerHint}>{dateLabel} {timeLabel} 무료 라이브 전에 체험해보세요.</span><button type="button" className={s.primary} onClick={() => go(8)}>내 상황에 맞는 체험 시작하기<ArrowRight size={18}/></button></>}
         {step === 1 && <button type="button" className={s.primary} onClick={personalStart}>내 상황으로 요청문 만들기<ArrowRight size={18}/></button>}
         {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={s.primary} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={s.primary} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
@@ -188,6 +208,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </footer>}
     </section>
     <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>
+    <dialog ref={exampleDialog} className={s.exampleDialog} onCancel={() => setShowExample(false)} aria-labelledby="arrival-example-title">
+      <header><div><span>미리 준비한 결과 예시</span><h2 id="arrival-example-title">{content.goal}</h2></div><button type="button" aria-label="결과 예시 닫기" onClick={() => setShowExample(false)}><X size={20}/></button></header>
+      <div className={s.exampleBody}><ResultExample text={content.example.before}/></div>
+      <footer><button type="button" className={s.primary} onClick={() => {setShowExample(false); setExplore(false); personalStart();}}>내 상황으로 직접 해보기<ArrowRight size={17}/></button></footer>
+    </dialog>
     <dialog ref={resetDialog} className={s.dialog} onCancel={() => setShowReset(false)} aria-labelledby="arrival-reset-title"><button type="button" className={s.close} aria-label="닫기" onClick={() => setShowReset(false)}><X size={20}/></button><h2 id="arrival-reset-title">처음부터 다시 볼까요?</h2><p>이 브라우저에 적은 내용과 진행 위치를 지워요. 개인 AI의 대화는 그대로 남습니다.</p><div className={s.dialogActions}><button type="button" className={s.secondary} onClick={() => setShowReset(false)}>계속 체험하기</button><button type="button" className={s.primary} onClick={reset}>지우고 처음부터</button></div></dialog>
   </main>;
 }

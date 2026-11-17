@@ -2,7 +2,7 @@ import {audiences, isAudience, isRevision, cleanAnswer, REVISION_LIMIT, type Aud
 
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
-export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type ArrivalState = {
   version: 1;
   step: ArrivalStep;
@@ -30,7 +30,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
   try {
     const value: unknown = JSON.parse(raw);
     if (!object(value) || value.version !== ARRIVAL_VERSION) return state;
-    if (typeof value.step === 'number' && Number.isInteger(value.step) && value.step >= 0 && value.step <= 7) {
+    if (typeof value.step === 'number' && Number.isInteger(value.step) && value.step >= 0 && value.step <= 8) {
       // Existing drafts return to the merged handoff and outcome screens.
       state.step = value.step === 4 ? 3 : value.step === 6 ? 5 : value.step as ArrivalStep;
     }
@@ -61,7 +61,8 @@ export function serializeArrivalState(state: ArrivalState): string {
 /** Back follows the visitor's chosen path, including the optional example route. */
 export function arrivalBackStep(state: ArrivalState): ArrivalStep {
   switch (state.step) {
-    case 1: return 0;
+    case 8: return 0;
+    case 1: return 8;
     case 2: return 1;
     case 3:
     case 4: return 2;
@@ -85,7 +86,7 @@ export type LiveEvent = {
 /** Start confirmed by the owner: Dec 7, 21:00 KST. End and YouTube URL remain pending. */
 export const liveEvent: LiveEvent = {
   id: 'moonshot-live-20261207', date: '2026-12-07', title: '문샷 챌린지 · AI 직원 라이브 시작',
-  description: '12월 7일 오후 9시(한국시간)에 시작합니다. 내 자료와 업무 기준으로 AI 직원을 만드는 방법을 배웁니다. 종료 시간은 추후 안내합니다. YouTube 참여 링크는 카톡방에서 추가 안내할 예정입니다. 이 일정은 시작 시각을 기억하기 위한 알림입니다.',
+  description: '12월 7일 오후 9시(한국시간)에 시작합니다. 내가 하는 일과 원하는 결과를 알려주고 반복해서 업무를 맡길 AI 직원을 만드는 방법을 배웁니다. 종료 시간은 추후 안내합니다. YouTube 참여 링크는 카톡방에서 추가 안내할 예정입니다. 이 일정은 시작 시각을 기억하기 위한 알림입니다.',
   timeZone: 'Asia/Seoul', startsAt: '2026-12-07T21:00:00+09:00', endsAt: null, infoUrl: null,
 };
 function validCalendarEvent(event: LiveEvent): {start: Date; end: Date | null; url: URL | null} | null {

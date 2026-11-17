@@ -7,8 +7,8 @@ import {slugPattern} from '@/features/campus/webinar/domain';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: '내 일이 시작되는 곳 · 문샷 오픈 캠퍼스',
-  description: '작은 일 하나를 AI에게 맡겨보세요. 문샷 캠퍼스에서 나에게 맞는 첫 결과를 만납니다.',
+  title: '혼자 하던 일, AI에게 맡길 수 있을까요? · 문샷',
+  description: '사업 중이거나, 창업을 준비하거나, 아직 아이템이 없어도. 내 상황에 맞는 AI 업무 체험과 문샷 무료 라이브를 만나보세요.',
   robots: {index: false, follow: false},
 };
 export const dynamic = 'force-dynamic';

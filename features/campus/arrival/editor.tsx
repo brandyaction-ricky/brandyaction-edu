@@ -98,7 +98,7 @@ export function ArrivalEditor({value, onChange, disabled = false, savedSlug}: {
       return <EditorDisclosure key={id} title={`${index + 2}. ${audienceNames[id]} · 체험 내용`}>
         <fieldset disabled={disabled} className={styles.fields}>
           <div className={styles.grid}>
-            <AdminInput label="선택 버튼 문구" required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
+            <AdminInput label="대상 안내 · 버튼의 큰 제목" helper="예: 이미 사업을 하고 있어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요." required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
             <AdminInput label="체험 후 얻는 결과" required maxLength={limits.goal} value={item.goal} onChange={event => updateAudience(id, {goal: event.target.value})}/>
           </div>
           <div className={styles.grid}>
@@ -111,7 +111,7 @@ export function ArrivalEditor({value, onChange, disabled = false, savedSlug}: {
           <div className={styles.grid}>
             <AdminTextarea label="예시에서 사용할 첫 번째 답변" required maxLength={limits.exampleAnswer} rows={3} value={item.example.a} onChange={event => updateAudience(id, {example: {...item.example, a: event.target.value}})}/>
             <AdminTextarea label="예시에서 사용할 두 번째 답변" required maxLength={limits.exampleAnswer} rows={3} value={item.example.b} onChange={event => updateAudience(id, {example: {...item.example, b: event.target.value}})}/>
-            <AdminTextarea label="첫 결과 예시" required maxLength={limits.exampleResult} rows={5} value={item.example.before} onChange={event => updateAudience(id, {example: {...item.example, before: event.target.value}})}/>
+            <AdminTextarea label="첫 결과 예시" helper="문단을 빈 줄로 나누세요. [고객이 선택할 이유]처럼 대괄호 제목 뒤에 줄을 바꾸면 제목과 본문으로 구분됩니다." required maxLength={limits.exampleResult} rows={5} value={item.example.before} onChange={event => updateAudience(id, {example: {...item.example, before: event.target.value}})}/>
             <AdminTextarea label="수정 요청 후 결과 예시" required maxLength={limits.exampleResult} rows={5} value={item.example.after} onChange={event => updateAudience(id, {example: {...item.example, after: event.target.value}})}/>
           </div>
           <AdminTextarea label="예시를 더 다듬는 요청" required maxLength={limits.exampleRevision} rows={3} value={item.example.revision} onChange={event => updateAudience(id, {example: {...item.example, revision: event.target.value}})}/>

@@ -116,12 +116,29 @@ test('copy status persists independently of AI completion and rejects unrecogniz
 
 test('back navigation follows the personal, example and direct-calendar paths', () => {
   const state = model.initialArrivalState();
-  for (const [step, expected] of [[0, 0], [1, 0], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 0]]) {
+  for (const [step, expected] of [[0, 0], [8, 0], [1, 8], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 0]]) {
     assert.equal(model.arrivalBackStep({...state, step}), expected);
   }
   assert.equal(model.arrivalBackStep({...state, step: 5, mode: 'example', experience: 'example-viewed'}), 1);
   assert.equal(model.arrivalBackStep({...state, step: 7, experience: 'self-reported'}), 5);
   assert.equal(model.arrivalBackStep({...state, step: 7, mode: 'example', experience: 'example-viewed'}), 5);
+});
+
+test('the audience selection resumes separately from the welcome introduction without losing drafts', () => {
+  const state = model.initialArrivalState();
+  assert.equal(state.step, 0, 'new visitors start with the welcome introduction');
+  state.step = 8;
+  state.audience = 'exploring';
+  state.answers.exploring = {a: '동료에게 엑셀 정리를 설명했어요.', b: '엑셀을 처음 쓰는 동료예요.'};
+  const restored = model.parseArrivalState(model.serializeArrivalState(state));
+  assert.deepEqual(restored, state);
+  assert.equal(restored.experience, 'none');
+  const oldWelcome = model.parseArrivalState(JSON.stringify({...state, step: 0}));
+  assert.equal(oldWelcome.step, 0, 'an older welcome draft remains on the welcome introduction');
+  assert.deepEqual(oldWelcome.answers, state.answers);
+  for (const step of [9, -1, 8.5, '8']) {
+    assert.equal(model.parseArrivalState(JSON.stringify({...state, step})).step, 0);
+  }
 });
 
 test('example viewing and self-reported AI completion stay separate on restoration', () => {

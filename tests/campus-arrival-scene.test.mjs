@@ -79,15 +79,57 @@ test('the prepared result follows the audience goal without changing any member 
 });
 
 test('the guided marker announces a prepared example rather than real AI completion', () => {
-  const caption = {}, attributes = {};
-  const button = {querySelector: () => caption, setAttribute: (key, value) => {attributes[key] = value;}};
+  const attributes = {}, classes = [];
+  let label = '', openResult;
+  const sent = [];
+  const button = {classList: {add: value => classes.push(value)}, replaceChildren: value => {label = value;}, setAttribute: (key, value) => {attributes[key] = value;}};
   const context = {guidedPreview: true, guidedDemoTitle: '내 경험으로 할 일 후보 찾기', room: 'office', currentRole: 'student', deskMarkers: [],
-    layer: {}, officeSeats: [], deskProfiles: [], deskJobs: [], deskLive: false, makeDeskMarkers: () => [{b: button}]};
+    layer: {}, officeSeats: [], deskProfiles: [], deskJobs: [], deskLive: false,
+    send: (type, payload) => sent.push([type, payload.id]),
+    makeDeskMarkers: (_layer, _seats, _profiles, _jobs, open) => {openResult = open; return [{b: button}];}};
   vm.createContext(context);
-  vm.runInContext(functionSource(source, 'renderDeskMarkers', 'refreshDeskLabels') + '\nrenderDeskMarkers();', context);
-  assert.equal(button.title, '내 경험으로 할 일 후보 찾기 · 미리 준비한 시연 결과');
-  assert.equal(attributes['aria-label'], '내 경험으로 할 일 후보 찾기 · 시연 결과 보기');
-  assert.equal(caption.textContent, '시연 결과 보기');
+  vm.runInContext(functionSource(source, 'renderDeskMarkers', 'positionCurrentDeskMarkers') + '\nrenderDeskMarkers();', context);
+  assert.equal(button.title, '내 경험으로 할 일 후보 찾기 · 미리 준비한 예시');
+  assert.equal(attributes['aria-label'], '예시 결과 보기');
+  assert.equal(attributes['aria-description'], button.title);
+  assert.equal(label, '예시 결과 보기');
+  assert.deepEqual(classes, ['guided-example-action']);
+  openResult('demo-copy');
+  assert.deepEqual(sent, [['action', 'office:demo']], 'one click opens the prepared example, never a member job');
+});
+
+test('the short mobile scene keeps its one action clear of the top route and bottom room label', () => {
+  for (const [width, height] of [[320, 160], [390, 160], [390, 210], [390, 120]]) {
+    for (const point of [{x: -100, y: -100}, {x: width / 2, y: height / 2}, {x: width + 100, y: height + 100}]) {
+      const button = {style: {}};
+      const context = {guidedPreview: true, office: {cw: width, ch: height, projectInteriorPoint: () => point}, deskMarkers: [{b: button, item: {}}]};
+      vm.createContext(context);
+      vm.runInContext(functionSource(source, 'positionCurrentDeskMarkers', 'configureGuidedLabels') + '\npositionCurrentDeskMarkers();', context);
+      const [x, y] = button.style.transform.match(/[\d.]+/g).map(Number);
+      assert.equal(x, 12);
+      assert.ok(x + 144 <= width - 12);
+      assert.ok(y >= 44, 'the route ends above the 44px action lane');
+      assert.ok(y + 44 <= height - 32, 'the room caption remains clear');
+      assert.equal(button.hidden, false);
+    }
+  }
+});
+
+test('member markers keep the existing positioning and names', () => {
+  let positioned = 0, bubbles = 0, names = 0;
+  const office = {bubble: () => bubbles++, drawCampusAvatarLabel: () => names++};
+  const context = {guidedPreview: false, office, deskMarkers: [{b: {}}], positionDeskMarkers: (received, markers) => {assert.equal(received, office); assert.equal(markers.length, 1); positioned++;}};
+  vm.createContext(context);
+  vm.runInContext(functionSource(source, 'positionCurrentDeskMarkers', 'refreshDeskLabels') + '\npositionCurrentDeskMarkers();configureGuidedLabels();', context);
+  office.bubble(); office.drawCampusAvatarLabel();
+  assert.equal(positioned, 1);
+  assert.equal(bubbles, 1);
+  assert.equal(names, 1);
+  context.guidedPreview = true;
+  vm.runInContext('configureGuidedLabels();', context);
+  office.bubble(); office.drawCampusAvatarLabel();
+  assert.equal(bubbles, 1, 'only synthetic employee bubbles are suppressed');
+  assert.equal(names, 1, 'only the guided visitor name is suppressed');
 });
 
 test('room transition honors reduced motion and does not schedule delayed navigation', () => {
