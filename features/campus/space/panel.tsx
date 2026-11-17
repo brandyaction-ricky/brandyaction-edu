@@ -115,11 +115,17 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    // A suspended radio can fail a heartbeat before the browser reports offline.
    // Keep the session so the next heartbeat can retry. Server rejections still end it.
    if(e instanceof TypeError)return;
+   const status=(e as {status?:number}).status;
+   // A heartbeat that landed right after another one is only rate-limited; the next one will go through.
+   if(status===429)return;
+   // A background tab or covered window can stretch timers past the 75 s presence; the session then
+   // ends on the server (409). Re-enter quietly once instead of showing a connection error.
+   if(status===409&&!demo){try{await connection.command({kind:'join',profile:current.current.saved});return;}catch{/* show the error below */}}
    statusError(e);setActive(false);connection.close();transport.current=null;
   }finally{running=false;}};
   // Presence lasts 75 s, so a 30 s heartbeat survives one miss; at 15 s, 120 learners kept the DEV database saturated.
-  const timer=setInterval(beat,30000);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
-  return()=>{clearInterval(timer);window.removeEventListener('pagehide',unload);};
+  const timer=setInterval(beat,30000);const back=()=>{if(!document.hidden)void beat();};document.addEventListener('visibilitychange',back);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
+  return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',back);window.removeEventListener('pagehide',unload);};
  },[active,command,cohortId,sessionId,demo]);
  async function selectSound(kind:AmbientKind|null){const generation=++soundGeneration.current;const previous=audio.current;audio.current=null;setSound(null);await previous?.stop();if(kind){try{const next=await createAmbient(kind,volume);if(!mounted.current||generation!==soundGeneration.current){await next.stop();return;}audio.current=next;setSound(kind);}catch{if(mounted.current)setError('소리를 재생할 수 없는 브라우저입니다.');}}}
  useEffect(()=>{const enrollmentId=snapshot.selectedEnrollmentId;if(!enrollmentId)return;let stopped=false,inflight=false;const controller=new AbortController();
@@ -233,7 +239,7 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    ? <p className={styles.demo}>브라우저 안의 체험입니다. 실제 수강생·서버 기록과 연결되지 않습니다.</p>
    : <p className={styles.caption}>{scope.cohortName} 공부방 · 같은 기수 동료와 함께하는 공간이에요.</p>}
   {['focus','lounge','profile'].includes(toolsPane)&&<div className={styles.controls}>
-   <span className={styles.presenceNote}>{active?(demo?'이 브라우저의 체험 동료와 연결됨':'지금 동료와 함께 있어요. 내 별명이 동료에게 보여요.'):'지금은 혼자 있어요.'}</span>
+   <span className={styles.presenceNote}>{active?(demo?'이 브라우저의 체험 동료와 연결됨':Math.max(peers.length,state?.peerCount??0)>1?`공부방에 연결됐어요. 나 외에 동료 ${Math.max(peers.length,state?.peerCount??0)-1}명이 함께 있어요.`:'공부방에 연결됐어요. 지금은 혼자 공부 중이에요. 동료가 들어오면 여기에 보여요.'):'아직 공부방에 참여하지 않았어요.'}</span>
    <button disabled={busy||!sessionId||(!active&&!!state?.controls?.paused)} onClick={()=>void(active?leave():join())}>{active?'동료 연결 끊기':'동료와 함께하기'}</button>
   </div>}</div>
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}{tools}

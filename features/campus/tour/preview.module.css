@@ -5,7 +5,7 @@
 @media(min-width:1100px){.mapGrid{grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:12px}.destinationBody{padding:16px}.destinationBody h3{font-size:18px}.destinationBody>div{align-items:flex-start;flex-direction:column;gap:8px}.destinationBody p{min-height:44px}.miniature{height:125px}.miniFloor{left:15%;right:12%}.miniBack{left:27%;width:90px}.office .miniBack{width:110px}.mapIntro{padding-bottom:18px}}
 @media(min-width:1100px){.mapIntro{position:relative;padding-right:380px;min-height:116px}.mapIntro>p{margin-top:0}.mapIntro h2{font-size:25px}.mapRole{position:absolute;right:0;top:0;width:350px;margin:0;padding:10px 14px}.mapRole small{width:100%}.destinationBody{padding:13px 16px}.destinationBody p{margin-bottom:10px}.mapNote{margin-top:14px}}
 /* Room-specific work and always-available personal/view controls, one level deep. */
-.bottomActions{flex-wrap:wrap;justify-content:flex-end}.bottomActions button{white-space:nowrap}.bottom{pointer-events:none}.bottomActions,.qa{pointer-events:auto}
+.bottomActions{flex-wrap:wrap;justify-content:flex-end}.bottomActions button{white-space:nowrap}.bottom{pointer-events:none}.bottomActions,.qa,.backLink,.reviewLabel{pointer-events:auto}
 @media(max-width:650px){.bottom{display:block;bottom:10px}.qa{margin-bottom:8px;width:max-content}.bottomActions{display:grid;grid-template-columns:1fr 1fr;gap:5px}.bottomActions button{justify-content:center;min-height:44px;padding:9px;font-size:12px}.activity{bottom:115px}.qa[open]{bottom:105px}.notice{bottom:170px}}
 
 .root[data-editing=true] .top,.root[data-editing=true] .bottom,.root[data-editing=true] .notice,.root[data-editing=true] .activity{visibility:hidden}
@@ -148,3 +148,8 @@ p.loading{pointer-events:none}
 .flatRoom li{border:0;padding:0;background:transparent}
 /* Wider screens: the study room keeps its cards on the left, so the simple screen sits to their right. */
 @media(min-width:651px){.root[data-room=study] .flatRoom{left:auto;right:24px;transform:translateY(-50%);width:min(820px,calc(100% - 372px))}}
+.inlineLink{display:inline!important;width:auto!important;min-height:0!important;padding:0!important;color:#9fd0ff!important;text-decoration:underline;background:none!important}
+/* Students: their own rooms first, event rooms grouped below in smaller cards. */
+.mapGroup{display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;font-size:15px;color:#18324f;letter-spacing:-.02em}.mapGroup:first-of-type{margin-top:4px}.mapGroup small{font-size:12px;font-weight:500;color:#64788d}
+.eventGrid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important}.eventGrid .miniature{height:84px}.eventGrid .destinationBody{padding:12px 14px}.eventGrid .destinationBody h3{font-size:15px}.eventGrid .destinationBody p{display:none}.eventGrid .miniFloor{bottom:6px;height:60px}.eventGrid .miniBack{top:12px;height:30px}.eventGrid .miniDesk{top:50px}.eventGrid .miniDesk2{top:40px}
+@media(max-width:650px){.eventGrid{grid-template-columns:1fr!important}.eventGrid .miniature{display:none}}

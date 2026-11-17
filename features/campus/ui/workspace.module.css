@@ -33,3 +33,9 @@
 .ai :global(button.btn.primary){width:100%;min-height:48px;border-color:var(--ba-red,#c9232d);background:var(--ba-red,#c9232d);color:#fff;font-size:15px}
 .ai :global(button.btn:disabled){opacity:.5;cursor:default}
 .ai :global(.curriculum-ai-guide)>summary{display:flex;min-height:44px}
+/* Mentor question form: labels above full-width inputs, phone-friendly sizes. */
+.ai :global(.question-composer) :global(label.field){display:grid;gap:6px;font-size:14px;font-weight:600;color:#22344d;margin:0 0 14px}
+.ai :global(.question-composer) :global(label.field) input,.ai :global(.question-composer) textarea{width:100%;box-sizing:border-box;min-height:46px;padding:12px;border:1px solid var(--border-strong, #cfd3d8);border-radius:10px;font:inherit;font-size:16px;font-weight:400;background:#fff;color:#161719}
+.ai :global(.question-composer) textarea{min-height:180px;resize:vertical;line-height:1.6}
+.ai :global(.question-composer) :global(label.field) select{margin:0}
+.ai :global(.question-context-fields){display:grid;gap:0}
