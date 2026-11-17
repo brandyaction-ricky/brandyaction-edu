@@ -195,3 +195,14 @@ test('unknown, invalid, exhausted or stale allowance cannot start a paid rewrite
  await expect(page.getByText('새로 작성 최대 2회 · 남은 1회',{exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'보고서 새로 작성',exact:true})).toBeDisabled();expect(writes).toHaveLength(0);
 });
+
+test('revoked learner has a clear restricted state while peers remain readable and retry stays disabled',async({page})=>{
+ await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,rows:[data.rows[2],{...data.rows[0],statusAvailable:false,statusReason:'access_denied',report:null}]}}));
+ await page.goto('/diagnosis-test?manage');
+ await expect(page.getByText('이용 권한 확인이 필요한 수강생은 보고서 상태와 재발급을 표시하지 않습니다. 다른 수강생의 조회는 계속할 수 있습니다.')).toBeVisible();
+ const row=page.getByRole('row',{name:/학생 A/});await expect(row).toContainText('이용 권한 확인 필요');
+ await expect(page.getByRole('row',{name:/학생 C/})).toContainText('발급 완료');
+ await openRowActions(page,'학생 A');await expect(row.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();
+ await page.getByRole('group',{name:'현재 페이지 진단 상태 필터'}).getByRole('button',{name:'상태 확인 중 1'}).click();
+ await expect(row).toBeVisible();await expect(page.getByRole('row',{name:/학생 C/})).toHaveCount(0);
+});
