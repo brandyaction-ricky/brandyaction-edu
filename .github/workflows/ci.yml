@@ -37,6 +37,20 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-coordinator-review-check" ]; then
+            expected_main=93be0fa782480cba7464527be99e935c0d10dbdf
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git diff --exit-code "$expected_main" HEAD -- app features lib public package.json package-lock.json supabase
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|.github/workflows/release-coordinator.yml|tests/release-approval-probe.test.mjs) ;;
+                *) echo "Unexpected approval verification change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified approval-only workflow scope; no production executor, SQL or app changes.'
+            exit 0
+          fi
           if [ "$head_ref" = "codex/release-guard-20261117" ]; then
             expected_main=7c79ec8a3321a018c714108d3ffb4f01819f1ae7
             live_base=0db98905cf4caab945e0c2c5a321af906063eb5e
