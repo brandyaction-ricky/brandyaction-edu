@@ -63,6 +63,8 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   // Read with the member's own client: the elevated client stays limited to visibility settings.
   const courseLessons=allWeeks.length?await rows(db.from('curriculum_lessons').select('id,week_id,day_number,archived_at',{count:'exact'}).in('week_id',allWeeks.map(w=>w.id)).eq('is_published',true).is('archived_at',null).limit(2000)):[];
   const dayNumbers=curriculumDayNumbers({curriculum_weeks:allWeeks,curriculum_lessons:courseLessons});
+  // The same open/locked rule the classroom uses; a failed read leaves lessons unmarked rather than hiding them.
+  const gates = lessons.length ? Promise.resolve().then(() => db.rpc('edu_read_lesson_progression', { p_actor: viewer.id, p_enrollment: scope.enrollmentId })).then(r => r.error || !Array.isArray(r.data) ? null : r.data as { lessonId: string; isUnlocked: boolean }[], () => null) : Promise.resolve(null);
   const [missions, progress] = lessons.length ? await Promise.all([
     rows(db.from('curriculum_missions').select('id,lesson_id,title,updated_at,is_required,is_published,archived_at', { count: 'exact' })
       .in('lesson_id', lessons.map(l => l.id)).eq('is_published', true).is('archived_at', null).limit(500)),
@@ -72,5 +74,7 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   const submissions = missions.length ? await rows(db.from('mission_submissions')
     .select('id,enrollment_id,mission_id,attempt_number,status', { count: 'exact' })
     .eq('enrollment_id', scope.enrollmentId).in('mission_id', missions.map(m => m.id)).limit(1000)) : [];
-  return { ...campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now, dayNumbers }), guidedLessons };
+  const snapshot = campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now, dayNumbers }), open = await gates;
+  if (open) snapshot.lessons = snapshot.lessons.map(l => ({ ...l, locked: !open.some(g => g.lessonId === l.id && g.isUnlocked) }));
+  return { ...snapshot, guidedLessons };
 }

@@ -15,7 +15,7 @@ const statusText:Record<string,string>={not_started:'아직 제출하지 않았�
 /** One lesson and its next action. The full progress dashboard lives outside the room. */
 export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initialLesson}:{initialLesson?:string;snapshot:CampusSnapshot;live?:boolean;mayLeave?:()=>boolean;onCompleted?:()=>void;onOpen:(lesson:string,mission?:string)=>void}){
  const metrics=learnerMetrics(snapshot),recommended=metrics.nextActions[0];
- const [chosen,setChosen]=useState(initialLesson||recommended?.lessonId||snapshot.lessons[0]?.id||'');
+ const [chosen,setChosen]=useState(initialLesson||(snapshot.lessons.find(l=>l.id===recommended?.lessonId&&!l.locked)||snapshot.lessons.find(l=>!l.completed&&!l.locked)||snapshot.lessons[0])?.id||'');
  const lesson=snapshot.lessons.find(l=>l.id===chosen)||snapshot.lessons[0];
  const enrollment = snapshot.selectedEnrollmentId || '';
  const enabled = !!live && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
@@ -63,7 +63,7 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const action=primaryMission?(primaryMission.status==='not_started'?'과제 시작하기':'보완 의견 확인하기'):lesson.completed?'수업 다시 보기':'수업 이어보기';
  return <section className={styles.panel} aria-label={lesson.missions.length?'지금 할 수업과 과제':'지금 할 수업'}>
   {enabled && gates.error && <p role="alert">{gates.error} <button type="button" onClick={gates.reload}>실습 목록 다시 불러오기</button></p>}
-  <div className={styles.top}><label>수업 선택<select value={lesson.id} onChange={e=>setChosen(e.target.value)}>{snapshot.lessons.map(l=><option key={l.id} value={l.id}>{l.week !== undefined ? l.week === 0 ? '준비 주차 · ' : l.week + '주차 · ' : ''}{l.day}일차 · {l.title}</option>)}</select></label></div>
+  <div className={styles.top}><label>수업 선택<select value={lesson.id} onChange={e=>setChosen(e.target.value)}>{snapshot.lessons.map(l=><option key={l.id} value={l.id} disabled={l.locked}>{l.week !== undefined ? l.week === 0 ? '준비 주차 · ' : l.week + '주차 · ' : ''}{l.day}일차 · {l.title}{l.completed?' · 완료':l.locked?' · 잠김':''}</option>)}</select></label></div>
   <article className={styles.next}><span className={styles.day}>{lesson.day}일차</span><h2>{lesson.title}</h2><p>{primaryMission?'과제의 안내와 검토 의견을 확인해 주세요.':!lesson.missions.length?(lesson.completed?'필요한 부분을 다시 볼 수 있어요.':'공부하던 수업을 이어서 보세요.'):lesson.completed?'필요한 부분을 다시 보거나 아래에서 과제를 확인하세요.':'공부하던 수업을 이어서 보고, 배운 내용을 과제로 적용해 보세요.'}</p>{enabled ? <>
     <button className={styles.primary} disabled={!gate?.isUnlocked} onClick={() => setReading(lesson.id)}>{lesson.completed ? '캠퍼스에서 다시 보기' : '캠퍼스에서 수업 열기'}</button>
     {!gate?.isUnlocked && <p role="status">{gate?.reason || (gates.lessons ? '수업 개방 상태를 확인해 주세요.' : '수업 개방 상태를 확인하고 있어요.')}</p>}
