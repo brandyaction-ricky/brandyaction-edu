@@ -118,3 +118,5 @@
 .lb-page-toc button:hover{background:#eaf1fa}
 .lb-page-toc button[aria-current=step]{background:#225cca;color:#fff;font-weight:650}.lb-page-toc button[aria-current=step] span{background:#fff;color:#225cca}
 .lb-page-toc button:disabled{cursor:default;opacity:.6}
+.lb-pages>nav.lb-page-toc{display:block;margin-top:.25rem}.lb-pages>nav.lb-page-toc ol{width:100%}.lb-pages>nav.lb-page-toc button{width:100%;max-width:none;flex:none;min-height:40px}
+.lb-pages>nav.lb-page-toc ol{padding:0!important;margin:0!important}
