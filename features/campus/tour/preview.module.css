@@ -149,3 +149,7 @@ p.loading{pointer-events:none}
 /* Wider screens: the study room keeps its cards on the left, so the simple screen sits to their right. */
 @media(min-width:651px){.root[data-room=study] .flatRoom{left:auto;right:24px;transform:translateY(-50%);width:min(820px,calc(100% - 372px))}}
 .inlineLink{display:inline!important;width:auto!important;min-height:0!important;padding:0!important;color:#9fd0ff!important;text-decoration:underline;background:none!important}
+/* Students: their own rooms first, event rooms grouped below in smaller cards. */
+.mapGroup{display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;font-size:15px;color:#18324f;letter-spacing:-.02em}.mapGroup:first-of-type{margin-top:4px}.mapGroup small{font-size:12px;font-weight:500;color:#64788d}
+.eventGrid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important}.eventGrid .miniature{height:84px}.eventGrid .destinationBody{padding:12px 14px}.eventGrid .destinationBody h3{font-size:15px}.eventGrid .destinationBody p{display:none}.eventGrid .miniFloor{bottom:6px;height:60px}.eventGrid .miniBack{top:12px;height:30px}.eventGrid .miniDesk{top:50px}.eventGrid .miniDesk2{top:40px}
+@media(max-width:650px){.eventGrid{grid-template-columns:1fr!important}.eventGrid .miniature{display:none}}
