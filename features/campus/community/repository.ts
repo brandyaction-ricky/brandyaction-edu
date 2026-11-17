@@ -6,7 +6,7 @@ type Database = Awaited<ReturnType<typeof createClient>>;
 const columns = {
   posts: 'id,owner_id,enrollment_id,cohort_id,alias,kind,title,body,url,image_urls,lesson_id,visibility,revision,hidden,created_at,updated_at',
   revisions: 'id,post_id,revision,title,body,url,image_urls,visibility,change_note,created_at',
-  comments: 'id,post_id,author_id,alias,body,post_revision,hidden,created_at',
+  comments: 'id,post_id,author_id,alias,body,post_revision,hidden,created_at,edited_at',
   acknowledgments: 'comment_id,owner_id,useful,decision,reason,applied_revision,revision,updated_at',
   reports: 'id,reporter_id,post_id,comment_id,reason,status,created_at',
 };
@@ -46,6 +46,17 @@ export async function loadCommunityState(db: Database, viewer: { id: string }, e
   return { posts, revisions, comments, acknowledgments, reports, blockedIds: blocks.map(b => b.target_id), rewards: rewardsResult.data as CommunityRewards, operator, demo: false, pageInfo: { page, hasNext: (page + 1) * 30 < postsResult.count } };
 }
 export async function saveCommunityCommand(db: Database, command: unknown) {
+  // Author-only controls (take back, share again, remove; edit/remove own comment) live in their own small function.
+  const raw = command && typeof command === 'object' ? command as Record<string, unknown> : {};
+  if (['withdraw', 'share', 'remove', 'edit_comment', 'remove_comment'].includes(String(raw.action))) {
+    const id = (v: unknown) => typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v) ? v : campusError(400, '대상을 선택해 주세요.');
+    const owner = String(raw.action).endsWith('comment')
+      ? { action: raw.action, commentId: id(raw.commentId), ...(raw.action === 'edit_comment' ? { body: typeof raw.body === 'string' ? raw.body.slice(0, 2000) : '' } : {}) }
+      : { action: raw.action, postId: id(raw.postId) };
+    const done = await db.rpc('edu_campus_community_owner', { p_command: owner });
+    if (done.error) campusError(done.error.code === '42501' ? 403 : done.error.code === '23514' ? 400 : 503, done.error.code === '23514' ? '내용을 10자 이상 적어 주세요.' : '요청을 처리하지 못했습니다.');
+    return done.data as { postId?: string; commentId?: string };
+  }
   const normalized = validateCommunityCommand(command);
   const result = await db.rpc('edu_campus_community_mutate', { p_command: normalized });
   if (result.error) {

@@ -130,3 +130,31 @@ test('explicit file sharing is CAS and cohort scoped; report hold, block, privat
  await db.exec('reset role;set role anon;');await assert.rejects(db.query('select * from edu_campus_portfolio_files'),/permission denied/i);
  }finally{await db.close();}
 });
+
+test('authors take a work back, share it again or remove it; commenters edit or remove their own comment; others cannot',async()=>{
+ const {db,login,mutate,make}=await setup();try{
+ // Production has the withdrawn-account guard; the test database gets a stand-in that allows active accounts.
+ await db.exec("reset role;create or replace function private.edu_account_access_allowed() returns boolean language sql stable as 'select true'");
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261117200000_campus_community_owner_controls.sql',import.meta.url),'utf8').replace(/notify pgrst[^;]*;/,''));
+ const owner=async c=>(await db.query('select public.edu_campus_community_owner($1::jsonb) as result',[JSON.stringify(c)])).rows[0].result;
+ const sees=async(table,id)=>(await db.query(`select count(*)::int n from public.${table} where id=$1`,[id])).rows[0].n===1;
+ await login(1);await mutate(make(400,{visibility:'cohort'}));
+ await login(2);await mutate({requestId:uid(401),enrollmentId:uid(32),action:'comment',postId:uid(400),expectedRevision:1,body:'첫 문장에서 누구를 위한 제안인지 바로 보여요.',alias:'동료'});
+ const comment=(await db.query('select id from public.edu_campus_comments where post_id=$1',[uid(400)])).rows[0].id;
+ assert.ok(await sees('edu_campus_posts',uid(400)));
+ await assert.rejects(owner({action:'withdraw',postId:uid(400)}),/permission|privilege/i);
+ await login(1);await owner({action:'withdraw',postId:uid(400)});
+ await login(2);assert.equal(await sees('edu_campus_posts',uid(400)),false);
+ await login(1);await owner({action:'share',postId:uid(400)});
+ await login(2);assert.ok(await sees('edu_campus_posts',uid(400)));
+ await assert.rejects(owner({action:'edit_comment',commentId:comment,body:'짧음'}));
+ await owner({action:'edit_comment',commentId:comment,body:'첫 문장이 고객의 고민으로 시작해서 바로 읽혀요.'});
+ assert.match((await db.query('select body,edited_at from public.edu_campus_comments where id=$1',[comment])).rows[0].body,/고객의 고민/);
+ await login(1);await assert.rejects(owner({action:'remove_comment',commentId:comment}),/permission|privilege/i);
+ await login(2);await owner({action:'remove_comment',commentId:comment});
+ await login(1);assert.equal(await sees('edu_campus_comments',comment),false);
+ await owner({action:'remove',postId:uid(400)});assert.equal(await sees('edu_campus_posts',uid(400)),false);
+ await login(2);assert.equal(await sees('edu_campus_posts',uid(400)),false);
+ await db.exec('reset role');assert.ok((await db.query('select removed_at from public.edu_campus_posts where id=$1',[uid(400)])).rows[0].removed_at);
+ }finally{await db.close();}
+});

@@ -2,3 +2,4 @@
 @media(prefers-reduced-motion:reduce){.root *{transition:none!important;animation:none!important}}
 
 .immersive>.header,.immersive>.footer,.immersive>.demo{display:none}.immersive>.main{max-width:none;padding:0}.immersive{background:#071421}
+.lesson:disabled{opacity:.6;cursor:default}.lesson:disabled:hover{transform:none;box-shadow:none}

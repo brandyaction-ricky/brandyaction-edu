@@ -20,8 +20,9 @@ test('private portfolio -> shared revision -> before/after history; mobile layou
  await page.getByRole('button',{name:'개선한 새 버전 저장',exact:true}).click();
  await page.getByLabel('제목',{exact:true}).fill('공방의 첫 문의를 만드는 개선된 제안');
  await page.getByLabel('이번에 바꾼 점').fill('대상을 구체화하고 버튼에서 얻는 결과를 바꿨습니다.');
- await page.getByRole('radio',{name:'같은 기수와 공유'}).check();
- await page.getByRole('button',{name:'기수에 공유하며 저장',exact:true}).click();
+ // A revision keeps the work's visibility; sharing is its own button (staff QA 11-17, N5).
+ await page.getByRole('button',{name:'나만 보도록 저장',exact:true}).click();
+ await page.getByRole('button',{name:'기수에 다시 공유',exact:true}).click();
  await page.getByRole('button',{name:'버전 2개 비교'}).click();
  await expect(page.getByLabel('수정 전')).toHaveValue('1');await expect(page.getByLabel('수정 후')).toHaveValue('2');
  await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();
@@ -100,7 +101,7 @@ test('private real-file selection and drag/paste attach bytes locally, not to co
 test('file sharing is a separate unchecked choice and private post changes revoke it',async({page})=>{
  await page.goto('/community');await compose(page,true);const files=page.getByRole('region',{name:'작업물 첨부'});await files.getByText(/파일 더 올리기/).click();await files.getByLabel('캡처·PDF 파일 첨부').setInputFiles({name:'공개할 캡처.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\nsample')});
  const check=files.getByRole('checkbox',{name:'이 파일을 같은 기수에 공개합니다'});await expect(check).not.toBeChecked();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();await check.check();await files.getByRole('button',{name:'확인한 파일 기수에 공유'}).click();await expect(files.getByText(/공개할 캡처.pdf.*기수 공개/)).toBeVisible();
- await page.getByRole('button',{name:'개선한 새 버전 저장'}).click();await page.getByLabel('이번에 바꾼 점').fill('내 작업을 비공개로 바꾸면서 첨부 공개를 회수합니다.');await page.getByRole('radio',{name:'나만 보기'}).check();await page.getByRole('button',{name:'나만 보도록 저장'}).click();await expect(files.getByText(/공개할 캡처.pdf.*나만 보기/)).toBeVisible();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();
+ page.once('dialog',d=>void d.accept());await page.getByRole('button',{name:'나만 보기로 돌리기',exact:true}).click();await expect(files.getByText(/공개할 캡처.pdf.*나만 보기/)).toBeVisible();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();
 });
 test('a landing page needs an address or a capture; the capture is shared with the post and reviews use three parts',async({page})=>{
  const requests:string[]=[];page.on('request',r=>{if(r.url().includes('/api/campus/'))requests.push(r.url());});await page.goto('/community');
