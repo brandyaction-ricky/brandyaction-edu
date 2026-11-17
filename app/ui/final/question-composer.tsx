@@ -48,7 +48,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
       const same = (c: QuestionContext | null) => Boolean(initialContext && c && c.enrollmentId === initialContext.enrollmentId && c.lessonId === initialContext.lessonId);
       if (initialContext && !data.contexts.some(same)) {
         setContext(current => same(current) ? null : current);
-        setContextNote(`「${initialContext.label}」은 아직 열리지 않은 수업이라 질문에 연결할 수 없어요. 열린 수업을 고르거나 학습 선택 없이 질문해 주세요.`);
+        setContextNote(`「${initialContext.label}」 수업은 아직 열리지 않아 질문에 연결할 수 없어요. 열린 수업을 고르거나 학습 선택 없이 질문해 주세요.`);
       } else setContextNote('');
       if (!touchedContext.current) { setContext(data.contexts.find(c => c.recent) || data.contexts[0] || null); touchedContext.current = true; }
     }).catch(() => { if (alive) setContextError('학습 목록을 불러오지 못했습니다. 일반 문의로 등록하거나 다시 불러올 수 있어요.'); });
