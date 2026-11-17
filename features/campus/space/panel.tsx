@@ -115,11 +115,17 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    // A suspended radio can fail a heartbeat before the browser reports offline.
    // Keep the session so the next heartbeat can retry. Server rejections still end it.
    if(e instanceof TypeError)return;
+   const status=(e as {status?:number}).status;
+   // A heartbeat that landed right after another one is only rate-limited; the next one will go through.
+   if(status===429)return;
+   // A background tab or covered window can stretch timers past the 75 s presence; the session then
+   // ends on the server (409). Re-enter quietly once instead of showing a connection error.
+   if(status===409&&!demo){try{await connection.command({kind:'join',profile:current.current.saved});return;}catch{/* show the error below */}}
    statusError(e);setActive(false);connection.close();transport.current=null;
   }finally{running=false;}};
   // Presence lasts 75 s, so a 30 s heartbeat survives one miss; at 15 s, 120 learners kept the DEV database saturated.
-  const timer=setInterval(beat,30000);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
-  return()=>{clearInterval(timer);window.removeEventListener('pagehide',unload);};
+  const timer=setInterval(beat,30000);const back=()=>{if(!document.hidden)void beat();};document.addEventListener('visibilitychange',back);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
+  return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',back);window.removeEventListener('pagehide',unload);};
  },[active,command,cohortId,sessionId,demo]);
  async function selectSound(kind:AmbientKind|null){const generation=++soundGeneration.current;const previous=audio.current;audio.current=null;setSound(null);await previous?.stop();if(kind){try{const next=await createAmbient(kind,volume);if(!mounted.current||generation!==soundGeneration.current){await next.stop();return;}audio.current=next;setSound(kind);}catch{if(mounted.current)setError('소리를 재생할 수 없는 브라우저입니다.');}}}
  useEffect(()=>{const enrollmentId=snapshot.selectedEnrollmentId;if(!enrollmentId)return;let stopped=false,inflight=false;const controller=new AbortController();
