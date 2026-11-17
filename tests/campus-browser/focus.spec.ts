@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 
-const focus=(page:Page)=>page.getByRole('region',{name:'오늘은 15분만, 한 걸음.'});
+const focus=(page:Page)=>page.getByRole('region',{name:'오늘 한 일, 다음 할 일.'});
 const action='제안서 첫 문장을 고객이 얻는 변화 중심으로 고치기';
 const nextStep='실제 고객 한 명에게 이 문장이 이해되는지 물어보기';
 async function start(page:Page){
@@ -66,9 +66,17 @@ test('timer expiry asks for an explicit finish without changing lesson or missio
   await expect(focus(page).getByText('목표 시간이 지났어요. 결과를 남겨볼까요?',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'오늘 한 일 남기기',exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'지난번에 남겨둔 다음 한 걸음',exact:true})).toHaveCount(0);
+  await expect(page.getByLabel('오늘 어디까지 했나요?')).toBeVisible();
+  await page.getByLabel('오늘 어디까지 했나요?').fill('시간 종료 후에도 작성 중인 기록');
+  await page.getByRole('button',{name:'계속 작업하기',exact:true}).click();
+  await page.clock.fastForward(5_000);
+  await expect(page.getByLabel('오늘 어디까지 했나요?')).toHaveCount(0);
+  await page.getByRole('button',{name:'오늘 한 일 남기기',exact:true}).click();
+  await expect(page.getByLabel('오늘 어디까지 했나요?')).toHaveValue('시간 종료 후에도 작성 중인 기록');
   await page.reload();
   await expect(page.getByLabel('남은 실행 시간')).toHaveText('00:00');
   await expect(page.getByRole('button',{name:'오늘 한 일 남기기',exact:true})).toBeVisible();
+  await expect(page.getByLabel('오늘 어디까지 했나요?')).toBeVisible();
   expect(focusRequests).toEqual([]); // This synthetic preview must never write member records or poll the server.
 });
 

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     if (!viewer) return reply({ error: '로그인이 필요합니다.' }, 401);
     // The snapshot decides which lessons this learner's cohort may see; only those are searched.
     const snapshot = await loadCampusSnapshot(await createClient(), viewer, enrollmentId);
-    return reply({ hits: searchLessons(await loadLessonTexts(createAdminClient(), snapshot.lessons), q) });
+    return reply({ hits: searchLessons(await loadLessonTexts(createAdminClient(), snapshot.lessons.filter(l => !l.locked)), q) });
   } catch (error) {
     const denied = error instanceof Error && 'status' in error && error.status === 403;
     return reply({ error: denied ? '현재 이용 가능한 수강권을 선택해 주세요.' : '수업을 찾지 못했습니다. 다시 시도해 주세요.' }, denied ? 403 : 503);

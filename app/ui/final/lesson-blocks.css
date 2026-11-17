@@ -110,3 +110,14 @@
 .lb-next-lesson > .btn { width:auto; min-height:44px; }
 .lb-next-lesson small,.lb-course-end { font-size:.875rem; color:#526376; }
 .lb-course-end { align-self:center; }
+/* Today's big tasks: always-visible table of contents; the current task is marked. */
+.lb-page-toc{margin:.25rem 0 .75rem;padding:.5rem;border:1px solid #d7e1ec;border-radius:12px;background:#f7f9fc;max-height:min(16rem,40vh);overflow:auto;overscroll-behavior:contain}
+.lb-page-toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.lb-page-toc button{display:flex;align-items:flex-start;gap:.6rem;width:100%;min-height:40px;padding:.5rem .6rem;border:0;border-radius:8px;background:none;color:#2c4058;font:inherit;font-size:.9rem;line-height:1.45;text-align:left;cursor:pointer}
+.lb-page-toc button span{flex:none;display:grid;place-items:center;width:1.5rem;height:1.5rem;border-radius:50%;background:#e3ebf5;color:#33557d;font-size:.75rem;font-weight:700}
+.lb-page-toc button:hover{background:#eaf1fa}
+.lb-page-toc button[aria-current=step]{background:#225cca;color:#fff;font-weight:650}.lb-page-toc button[aria-current=step] span{background:#fff;color:#225cca}
+.lb-page-toc button:disabled{cursor:default;opacity:.6}
+.lb-pages>nav.lb-page-toc{display:block;margin-top:.25rem}.lb-pages>nav.lb-page-toc ol{width:100%}.lb-pages>nav.lb-page-toc button{width:100%;max-width:none;flex:none;min-height:40px}
+.lb-pages>nav.lb-page-toc ol{padding:0!important;margin:0!important}
+.lb-page-toc{max-height:min(11rem,30vh)!important;position:relative}.lb-pages>progress{scroll-margin-block-start:1rem}

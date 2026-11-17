@@ -75,7 +75,7 @@ function PromptGenerator({ block, answer, disabled, onChange, live = false }: { 
   </section>;
 }
 
-function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void; grade?: (blockId: string) => Promise<BlockGrade> }) {
+function BlockQuiz({ block, answer, disabled, onChange, grade, start = 0 }: { block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void; grade?: (blockId: string) => Promise<BlockGrade>; start?: number }) {
   const radioGroup = useId();
   const [result, setResult] = useState<BlockGrade | null>(null), [message, setMessage] = useState(''), [pending, setPending] = useState(false);
   const choices = answer && typeof answer === 'object' ? answer : {};
@@ -88,7 +88,7 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
   }
   return <section className="lb-card" aria-label={block.content || '확인 문제'}><h3>{block.content || '확인 문제'}</h3>
     {(block.quiz?.questions || []).map((question, index) => <fieldset key={question.id} disabled={disabled || pending}>
-      <legend>{index + 1}. {question.prompt}</legend>
+      <legend>{start + index + 1}. {question.prompt}</legend>
       {question.options.map((option, n) => <label className="lb-choice" key={n}><input type="radio" name={`${radioGroup}-${block.id}-${question.id}`} checked={choices[question.id] === n} onChange={() => { setResult(null); setMessage(''); onChange({ ...choices, [question.id]: n }); }} />{option}</label>)}
       {result && <p>{result.results.find(item => item.id === question.id)?.correct ? '정답입니다.' : '다시 살펴보세요.'}</p>}
     </fieldset>)}
@@ -126,6 +126,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
   const embeddedImages = useMemo(() => lessonEmbeddedImageIds(document.blocks), [document.blocks]);
   const visibleBlocks = useMemo(() => document.blocks.filter(block => !embeddedImages.has(block.id)), [document.blocks, embeddedImages]);
+  // Quiz questions are numbered across the whole lesson, the same numbers the completion check reports.
+  const quizStart = useMemo(() => { const starts = new Map<string, number>(); let n = 0; for (const b of document.blocks) if (b.quiz) { starts.set(b.id, n); n += b.quiz.questions.length; } return starts; }, [document.blocks]);
   const imageColumns = lessonImageColumns(visibleBlocks);
   const embedded = new Map<string, ReactNode>();
   function renderBlock(block: PublicLessonBlock) {
@@ -150,7 +152,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'recipe-calculator':
         case 'margin-calculator':
         case 'marketing-funnel': content = <LessonCalculator block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;
-        case 'quiz': content = <BlockQuiz block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} grade={grade} />; break;
+        case 'quiz': content = <BlockQuiz block={block} start={quizStart.get(block.id) ?? 0} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} grade={grade} />; break;
         default: content = <p role="alert">이 학습 도구의 연결을 확인하고 있습니다.</p>;
       }
       const column = imageColumns.get(block.id);

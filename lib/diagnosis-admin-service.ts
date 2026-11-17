@@ -2,7 +2,7 @@ import type { MemberPaymentContact } from './member-directory';
 import { DiagnosisBridgeError } from './diagnosis-bridge';
 import { validAdminDiagnosisBinding, validateAdminReportRows, validateAdminRetry, type AdminDiagnosisBinding, type AdminReportStatus } from './diagnosis-admin-bridge';
 
-export type DiagnosisAdminRow = {id:string; name:string; email?:string|null; phone?:string|null; paymentContacts?:MemberPaymentContact[]; published:boolean; override?:boolean|null; attemptId:string|null; state:string; startedAt:string|null; updatedAt:string|null; report:(AdminReportStatus & {checkedAt:string})|null; statusAvailable:boolean};
+export type DiagnosisAdminRow = {id:string; name:string; email?:string|null; phone?:string|null; paymentContacts?:MemberPaymentContact[]; published:boolean; override?:boolean|null; attemptId:string|null; state:string; startedAt:string|null; updatedAt:string|null; report:(AdminReportStatus & {checkedAt:string})|null; statusAvailable:boolean; statusReason?:'access_denied'|null};
 export type DiagnosisCohort = {id:string;name:string;code:string;courseTitle:string;enabled:boolean;inherited:boolean};
 export type DiagnosisAdminList = {enabled:boolean; allPublished:boolean; revision:number; eligibleCount:number; startedCount:number; nextCursor:string|null; rows:DiagnosisAdminRow[]; remoteAvailable:boolean;cohorts?:DiagnosisCohort[];cohort?:{id:string;name:string;enabled:boolean;inherited:boolean;individualCount:number}|null};
 type InternalRow = DiagnosisAdminRow & {binding: AdminDiagnosisBinding|null};
@@ -20,20 +20,42 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
     if(input.cohort&&data.cohort?.id!==input.cohort)throw new DiagnosisBridgeError('UNAVAILABLE',503);
     const bindings=data.rows.map(r=>r.binding).filter((b):b is AdminDiagnosisBinding=>validAdminDiagnosisBinding(b));
     const checkedAt=new Date(now()).toISOString();let remoteAvailable=true;
+    const deniedAttempts=new Set<string>();
     let reports=new Map<string,AdminReportStatus>();
     if(bindings.length){
       try{
         const rows=validateAdminReportRows(await send({action:'status',actorId:actor.id,bindings}),bindings);
-        await call('edu_diagnosis_admin_observe',{p_rows:rows});reports=new Map(rows.map(r=>[r.attemptId,r]));
+        try{
+          await call('edu_diagnosis_admin_observe',{p_rows:rows});
+        }catch(error){
+          if(!(error instanceof DiagnosisBridgeError)||error.code!=='FORBIDDEN')throw error;
+          // A locally revoked learner must not hide the rest of an authorized admin's page.
+          // Only recover a rejected local observation; a rejected MYIN response still fails closed.
+          await call('edu_diagnosis_assert_admin',{});
+          for(let start=0;start<bindings.length;start+=5){
+            await Promise.all(bindings.slice(start,start+5).map(async binding=>{
+              let current:unknown;
+              try{current=await call('edu_diagnosis_admin_context',{p_attempt:binding.attemptId});}
+              catch(e){if(e instanceof DiagnosisBridgeError&&e.code==='FORBIDDEN'){deniedAttempts.add(binding.attemptId);return;}throw e;}
+              if(!validAdminDiagnosisBinding(current)||(['subject','attemptId','responseId','releaseId','packageVersion'] as const).some(key=>current[key]!==binding[key]))throw new DiagnosisBridgeError('FORBIDDEN',403);
+            }));
+          }
+          await call('edu_diagnosis_assert_admin',{});
+          if(!deniedAttempts.size)throw error;
+          const allowed=rows.filter(row=>!deniedAttempts.has(row.attemptId));
+          if(allowed.length)await call('edu_diagnosis_admin_observe',{p_rows:allowed});
+        }
+        reports=new Map(rows.filter(row=>!deniedAttempts.has(row.attemptId)).map(r=>[r.attemptId,r]));
       }catch(e){if(e instanceof DiagnosisBridgeError&&e.code==='FORBIDDEN')throw e;remoteAvailable=false;}
     }
     // A role change during the remote read must not expose the earlier list.
     await call('edu_diagnosis_assert_admin',{});
     return {enabled:data.enabled,allPublished:data.allPublished,revision:data.revision,eligibleCount:data.eligibleCount,startedCount:data.startedCount,nextCursor:data.nextCursor,remoteAvailable,cohorts:data.cohorts,cohort:data.cohort,
       rows:data.rows.map(r=>{const fresh=r.attemptId?reports.get(r.attemptId):undefined;
-        const prior=r.report;
+        const denied=!!r.attemptId&&deniedAttempts.has(r.attemptId);
+        const prior=denied?null:r.report;
         return {id:r.id,name:r.name,email:r.email,phone:r.phone,paymentContacts:r.paymentContacts,published:r.published,override:r.override,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
-          statusAvailable:!r.binding||remoteAvailable,
+          statusAvailable:!denied&&(!r.binding||remoteAvailable),statusReason:denied?'access_denied':null,
           report:fresh?{queuePosition:fresh.queuePosition,queuedAt:fresh.queuedAt,queueObservedAt:fresh.queueObservedAt,retryMode:fresh.retryMode,rewritesRemaining:fresh.rewritesRemaining,startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
   }
   if(input.action==='publish_cohort')return call('edu_diagnosis_admin_cohort_publication',{p_request:input.requestId,p_cohort:input.cohortId,p_enabled:input.enabled,p_revision:input.revision});

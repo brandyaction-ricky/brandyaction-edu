@@ -28,6 +28,8 @@ export type CampusSnapshot = {
     week?: number;
     version: string;
     completed: boolean;
+    /** Not open yet for this enrollment (classroom progression rule); absent when unknown. */
+    locked?: boolean;
     href: string;
     missions: CampusMission[];
   }[];

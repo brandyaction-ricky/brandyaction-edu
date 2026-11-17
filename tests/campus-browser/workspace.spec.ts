@@ -21,3 +21,8 @@ test('refresh checks hidden drafts and a new guided question cannot silently rep
 test('header navigation cannot bypass the mounted draft warning',async({page})=>{
  await page.goto('/support');await page.getByLabel('한 줄 요약').fill('헤더 이동 보호');let asked=false;page.once('dialog',async d=>{asked=true;await d.dismiss();});await page.getByRole('banner').getByRole('link',{name:/^MOONSHOT/}).click();expect(asked).toBe(true);await expect(page.getByLabel('한 줄 요약')).toHaveValue('헤더 이동 보호');expect(new URL(page.url()).pathname).toBe('/support');
 });
+test('journal records what was done and what comes next without starting the timer',async({page})=>{
+ await page.goto('/journal');await page.locator('#focus-done').fill('어사이드 설치와 클로드 연결을 마쳤어요');await page.locator('#focus-then').fill('옵시디언 볼트 만들기');
+ await page.getByRole('button',{name:'기록 저장',exact:true}).click();await expect(page.getByText('오늘의 실행과 다음 할 일을 저장했어요.')).toBeVisible();
+ await expect(page.getByText('옵시디언 볼트 만들기').first()).toBeVisible();await expect(page.getByRole('button',{name:'15분 실행 시작',exact:true})).toBeVisible();
+});

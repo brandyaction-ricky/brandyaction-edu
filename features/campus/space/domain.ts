@@ -63,3 +63,7 @@ export function createMotionQueue(send:(value:NonNullable<ReturnType<typeof posi
 }
 
 export function cohortGoalReached(progress:{cohortLaunches?:number;cohortGoal?:number}|null|undefined){return !!progress&&Number.isSafeInteger(progress.cohortLaunches)&&Number.isSafeInteger(progress.cohortGoal)&&progress.cohortGoal!>0&&progress.cohortLaunches!>=progress.cohortGoal!;}
+
+// Heartbeat 409 reasons the learner should see as they are.
+export const SPACE_REPLACED='다른 창(기기)에서 공부방에 들어와 이 창의 연결이 끝났어요.';
+export const SPACE_ENDED='공부방 연결이 끝났어요.';

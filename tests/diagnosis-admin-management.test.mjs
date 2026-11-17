@@ -91,3 +91,51 @@ test('local account/payment contacts remain visible to EDU admins without going 
  h.rpc=async(...args)=>{const r=await rpc(...args);if(args[0]==='edu_diagnosis_admin_list')Object.assign(r.data.rows[0],{email:'account@example.test',paymentContacts:contacts});return r;};
  const result=await runDiagnosisAdmin(h,{action:'list',query:'buyer@example.test'});assert.equal(result.rows[0].email,'account@example.test');assert.deepEqual(result.rows[0].paymentContacts,contacts);assert.doesNotMatch(JSON.stringify(h.sends),/example.test|paymentContacts|결제자/);
 });
+
+function revokedPageFixture({roleLost=false,foreignContext=false,remoteDenied=false,observeAlwaysDenied=false}={}){
+ const h=fixture(),rpc=h.rpc,second={...binding,subject:id(5),attemptId:id(6),responseId:id(7)},observed=[];let deniedOnce=false,contextReads=0;
+ h.send=async()=>{if(remoteDenied)throw new (load('diagnosis-bridge').DiagnosisBridgeError)('FORBIDDEN',403);return{version:1,rows:[report,{...report,...second}]};};
+ h.rpc=async(name,a)=>{
+  if(name==='edu_diagnosis_admin_list'){const r=await rpc(name,a);r.data.rows.push({...r.data.rows[0],id:second.subject,name:'권한 확인 대상',attemptId:second.attemptId,binding:second});return r;}
+  if(name==='edu_diagnosis_admin_observe'){observed.push(a.p_rows);if(!deniedOnce||observeAlwaysDenied){deniedOnce=true;return{error:{message:'DIAGNOSIS_FORBIDDEN'}};}return{data:null};}
+  if(name==='edu_diagnosis_assert_admin'&&roleLost&&deniedOnce)return{error:{message:'DIAGNOSIS_FORBIDDEN'}};
+  if(name==='edu_diagnosis_admin_context'){contextReads++;return a.p_attempt===second.attemptId?{error:{message:'DIAGNOSIS_FORBIDDEN'}}:{data:foreignContext?{...binding,subject:id(500)}:binding};}
+  return rpc(name,a);
+ };
+ return{h,second,observed,contextReads:()=>contextReads};
+}
+test('one revoked learner does not block authorized page peers or disclose cached report status',async()=>{
+ const {h,second,observed}=revokedPageFixture();const list=await runDiagnosisAdmin(h,{action:'list'});
+ assert.equal(list.remoteAvailable,true);assert.equal(list.rows.length,2);
+ assert.equal(list.rows[0].statusAvailable,true);assert.equal(list.rows[0].report.canRetry,true);
+ assert.equal(list.rows[1].statusAvailable,false);assert.equal(list.rows[1].statusReason,'access_denied');assert.equal(list.rows[1].report,null);
+ assert.equal(observed.length,2);assert.deepEqual(observed[1].map(r=>r.attemptId),[binding.attemptId]);
+ await assert.rejects(runDiagnosisAdmin(h,{action:'retry',attemptId:second.attemptId,requestId:id(89),expectedVersion:version}),e=>e.code==='FORBIDDEN');
+});
+test('revoked-row recovery never masks lost admin role, foreign context, or repeated observation refusal',async()=>{
+ for(const options of [{roleLost:true},{foreignContext:true},{observeAlwaysDenied:true}]){
+  const {h}=revokedPageFixture(options);await assert.rejects(runDiagnosisAdmin(h,{action:'list'}),e=>e.code==='FORBIDDEN');
+ }
+});
+test('remote forbidden is never converted into a partially authorized local page',async()=>{
+ const f=revokedPageFixture({remoteDenied:true});await assert.rejects(runDiagnosisAdmin(f.h,{action:'list'}),e=>e.code==='FORBIDDEN');
+ assert.equal(f.contextReads(),0);assert.equal(f.observed.length,0);
+});
+test('unexpected observation refusal without an actually denied learner stays forbidden',async()=>{
+ const h=fixture(),rpc=h.rpc;
+ h.rpc=(name,args)=>name==='edu_diagnosis_admin_observe'?Promise.resolve({error:{message:'DIAGNOSIS_FORBIDDEN'}}):rpc(name,args);
+ await assert.rejects(runDiagnosisAdmin(h,{action:'list'}),e=>e.code==='FORBIDDEN');
+});
+test('recovery checks at most five contexts at once and rechecks admin before returning',async()=>{
+ const bindings=Array.from({length:100},(_,n)=>({...binding,subject:id(1000+n),attemptId:id(2000+n),responseId:id(3000+n)}));
+ let inflight=0,peak=0,checked=0,observations=0,assertions=0;
+ const h={actor,send:async()=>({version:1,rows:bindings.map(b=>({...report,...b}))}),rpc:async(name,args)=>{
+  if(name==='edu_diagnosis_admin_list')return{data:{enabled:true,allPublished:false,revision:0,eligibleCount:100,startedCount:100,nextCursor:null,rows:bindings.map(b=>({id:b.subject,name:'합성 수강생',attemptId:b.attemptId,binding:b,state:'submitted',report:null}))}};
+  if(name==='edu_diagnosis_admin_observe'){observations++;return observations===1?{error:{message:'DIAGNOSIS_FORBIDDEN'}}:{data:null};}
+  if(name==='edu_diagnosis_assert_admin'){assertions++;return assertions===3?{error:{message:'DIAGNOSIS_FORBIDDEN'}}:{data:null};}
+  if(name==='edu_diagnosis_admin_context'){inflight++;peak=Math.max(peak,inflight);await new Promise(resolve=>setImmediate(resolve));inflight--;checked++;return args.p_attempt===bindings[99].attemptId?{error:{message:'DIAGNOSIS_FORBIDDEN'}}:{data:bindings.find(b=>b.attemptId===args.p_attempt)};}
+  assert.fail(name);
+ }};
+ await assert.rejects(runDiagnosisAdmin(h,{action:'list'}),e=>e.code==='FORBIDDEN');
+ assert.equal(checked,100);assert.equal(peak,5);assert.equal(observations,2);assert.equal(assertions,3);
+});
