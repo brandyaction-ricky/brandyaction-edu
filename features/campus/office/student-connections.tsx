@@ -51,7 +51,7 @@ export function ConnectionSetup({enrollmentId,employees,conn}:{enrollmentId:stri
   return <section aria-label="직원 보고 연결" className={styles.setup}><h3>직원 보고 연결 <small>{connected} / {employees.length}명 연결됨</small></h3>
     <p>직원(봇)이 맡은 일의 시작과 결과를 이 사무실로 보내도록 연결해요. 직원마다 한 번만 하면 돼요.</p>
     <ol className={styles.steps}>
-      <li><strong>보고 스킬 설치</strong><span><a className={styles.download} href={`/api/campus/office/skill?enrollmentId=${encodeURIComponent(enrollmentId)}`} download>Aside 보고 스킬 받기</a> 압축을 풀고 내 Aside 계정의 <code>skills/user</code>에 <code>moonshot-campus-report</code> 폴더를 넣으세요.</span></li>
+      <li><strong>보고 스킬 설치</strong><span><a className={styles.download} href={`/api/campus/office/skill?enrollmentId=${encodeURIComponent(enrollmentId)}`} download>Aside 보고 스킬 받기</a> 압축을 풀고 내 Aside 계정의 <code>skills/user</code>에 <code>moonshot-campus-report</code> 폴더를 넣으세요. 폴더 위치: Mac은 Finder에서 ⌘ + Shift + G를 누르고 <code>~/.aside/u</code>, Windows는 탐색기 주소 칸에 <code>%USERPROFILE%\.aside\u</code>를 넣은 뒤 내 계정 폴더 › skills › user 순서로 여세요. zip 그대로가 아니라 압축을 푼 폴더를 넣고, 폴더를 열었을 때 SKILL.md가 바로 보여야 해요. 어렵다면 어사이드에게 “받은 보고 스킬 폴더를 skills/user에 넣어줘”라고 맡겨도 돼요.</span></li>
       <li><strong>연결 코드 받기</strong><span>봇 대화에 <strong>/new</strong>를 한 번 보낸 뒤 <strong>캠퍼스 연결 준비</strong>를 보내세요. 받은 코드는 10분 동안 쓸 수 있어요. 실패하면 Aside 앱의 File permissions에 내 Aside 계정의 <code>campus-office</code> 폴더를 추가(허용)하고 다시 시도하세요.</span></li>
       <li><strong>코드 입력</strong><span>아래에서 직원을 고르고 받은 코드를 넣으세요. 직원 카드에 나오는 확인 명령을 같은 대화에 보내면 연결이 끝나요.</span></li>
     </ol>
