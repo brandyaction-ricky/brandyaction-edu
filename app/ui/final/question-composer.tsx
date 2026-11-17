@@ -35,7 +35,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
   const [contexts, setContexts] = useState<QuestionContext[]>(initialContext ? [initialContext] : []), [context, setContext] = useState<QuestionContext | null>(initialContext || null);
   const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : initialCategory), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(initialContent), [visibility, setVisibility] = useState<'cohort' | 'private'>(initialPrivate ? 'private' : 'cohort');
   const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: initialImage?.id || null, busy: false, draft: Boolean(initialImage || initialFile) }), [imageKey, setImageKey] = useState(0);
-  const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [error, setError] = useState(''), [contextError, setContextError] = useState(''), [contextVersion, setContextVersion] = useState(0);
+  const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [error, setError] = useState(''), [contextError, setContextError] = useState(''), [contextNote, setContextNote] = useState(''), [contextVersion, setContextVersion] = useState(0);
   const gate = useRef(false), retry = useRef<Record<string, unknown> | null>(null), imagePicker = useRef<QuestionImagePickerHandle>(null), touchedContext = useRef(Boolean(initialContext || order));
   const locked = busy || uncertain, imagesEnabled = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
   useUnsavedLearningChanges(Boolean(content || title || image.draft) || busy || uncertain);
@@ -44,6 +44,12 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
     const abort = new AbortController(); let alive = true;
     void questionRequest<{ contexts: QuestionContext[] }>('/api/platform/question-hub?mode=contexts', undefined, abort.signal).then(data => {
       if (!alive) return; setContexts(data.contexts); setContextError('');
+      // A lesson picked outside this form (e.g. the campus lesson list) may not be open for questions yet; say so instead of showing a blank choice.
+      const same = (c: QuestionContext | null) => Boolean(initialContext && c && c.enrollmentId === initialContext.enrollmentId && c.lessonId === initialContext.lessonId);
+      if (initialContext && !data.contexts.some(same)) {
+        setContext(current => same(current) ? null : current);
+        setContextNote(`「${initialContext.label}」은 아직 열리지 않은 수업이라 질문에 연결할 수 없어요. 열린 수업을 고르거나 학습 선택 없이 질문해 주세요.`);
+      } else setContextNote('');
       if (!touchedContext.current) { setContext(data.contexts.find(c => c.recent) || data.contexts[0] || null); touchedContext.current = true; }
     }).catch(() => { if (alive) setContextError('학습 목록을 불러오지 못했습니다. 일반 문의로 등록하거나 다시 불러올 수 있어요.'); });
     return () => { alive = false; abort.abort(); };
@@ -66,7 +72,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
   const options = <>
     <label className="field">질문 제목 (선택)<input maxLength={200} value={title} onChange={e => setTitle(e.target.value)} disabled={locked} placeholder="비워 두면 질문 내용으로 제목을 만들어요"/></label>
     <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setVisibility('private'); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    {category === 'learning' && <label className="field">관련 학습<select value={context ? context.enrollmentId + ':' + context.lessonId : ''} disabled={locked || image.busy} onChange={e => changeContext(contexts.find(c => c.enrollmentId + ':' + c.lessonId === e.target.value) || null)}><option value="">학습 선택 없이 질문하기</option>{contexts.map(c => <option key={c.enrollmentId + c.lessonId} value={c.enrollmentId + ':' + c.lessonId}>{c.label}</option>)}</select></label>}</div>
+    {category === 'learning' && <label className="field">관련 학습<select value={context ? context.enrollmentId + ':' + context.lessonId : ''} disabled={locked || image.busy} onChange={e => { if (changeContext(contexts.find(c => c.enrollmentId + ':' + c.lessonId === e.target.value) || null)) setContextNote(''); }}><option value="">학습 선택 없이 질문하기</option>{contexts.map(c => <option key={c.enrollmentId + c.lessonId} value={c.enrollmentId + ':' + c.lessonId}>{c.label}</option>)}</select></label>}</div>
   </>;
   return <QuestionImageDropzone enabled={imagesEnabled} locked={locked || image.busy} onFiles={files => imagePicker.current?.paste(files)}><form className={'question-composer' + (quick ? ' question-composer-quick' : '')} onSubmit={submit} onPaste={event => {
     if (!imagesEnabled) return;
@@ -74,6 +80,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
     if (files.length) { event.preventDefault(); imagePicker.current?.paste(files); }
   }}>
     {!quick && options}
+    {contextNote && category === 'learning' && <p role="status" className="meta">{contextNote}</p>}
     {contextError && <p role="status" className="meta">{contextError} <button type="button" className="link" disabled={locked} onClick={() => setContextVersion(v => v + 1)}>목록 다시 불러오기</button></p>}
     <label className="field">질문 내용<textarea autoFocus={quick} required={!image.id} rows={quick ? 4 : 6} maxLength={10000} disabled={locked} value={content} onChange={e => { setContent(e.target.value); imagePicker.current?.clearValidation(); }} placeholder={'예: 이 수업의 프롬프트를 실행했는데 예시와 다른 결과가 나와요. 어떤 부분을 확인하면 될까요?'}/></label>
     {category === 'learning' && <RelatedAnswers query={content} context={context}/>}
