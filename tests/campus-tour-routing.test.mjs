@@ -27,9 +27,9 @@ test('preview archive validates updates and stores only locally with revision pr
 });
 test('tasks behind a switched-off server module leave the study menu, the rest stay',()=>{
  const off={focus:false,support:false,community:false},study=roomTasks('study','student');
- assert.deepEqual(study.filter(t=>taskOpen(t.id,off)).map(t=>t.id),['learning','growth','ai','support:library','lounge','sound']);
- const on={focus:true,support:true,community:true},kept=['learning','growth','journal','ai','support:library','feedback','lounge','sound'];
- // 2026-11-17: 집중과 휴식 left the menu; its 15-minute timer lives inside 실행 수첩.
+ assert.deepEqual(study.filter(t=>taskOpen(t.id,off)).map(t=>t.id),['learning','growth','focus','ai','support:library','lounge','sound']);
+ const on={focus:true,support:true,community:true},kept=['learning','growth','focus','journal','ai','support:library','feedback','lounge','sound'];
+ // 2026-11-17: 집중과 휴식 is still openable from the 3D desks; only the menu hides it (menuHidden).
  // The CEO's utility review left eight study tasks, and 수업 자료 찾기 came back on 2026-11-14 (it needs no staff and no support switch); the rest stay out with every switch on and in the demo tour.
  assert.deepEqual(study.filter(t=>taskOpen(t.id,on)).map(t=>t.id),kept);assert.deepEqual(study.filter(t=>taskOpen(t.id)).map(t=>t.id),kept);
  assert.equal(taskOpen('admin:support',on),false);assert.equal(taskOpen('admin:moderation',on),true);

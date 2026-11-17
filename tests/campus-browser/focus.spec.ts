@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 
-const focus=(page:Page)=>page.getByRole('region',{name:'오늘은 15분만, 한 걸음.'});
+const focus=(page:Page)=>page.getByRole('region',{name:'오늘 한 일, 다음 할 일.'});
 const action='제안서 첫 문장을 고객이 얻는 변화 중심으로 고치기';
 const nextStep='실제 고객 한 명에게 이 문장이 이해되는지 물어보기';
 async function start(page:Page){

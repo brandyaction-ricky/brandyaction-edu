@@ -2,9 +2,8 @@
 
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicBlockDocument, PublicLessonBlock } from '@/lib/lesson-blocks';
-import { lessonBodyPlainText } from '@/lib/lesson-body';
 import { practiceSteps } from '@/lib/lesson-practice-steps';
-import { lessonReadingPages, withoutBlankPages } from '@/lib/lesson-reading-pages';
+import { lessonSections, withoutBlankPages } from '@/lib/lesson-reading-pages';
 
 
 export type RenderContinuation = (ready: boolean) => ReactNode;
@@ -34,18 +33,16 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
   children: (pageBlocks: PublicLessonBlock[] | undefined, last: boolean) => ReactNode;
 }) {
   const steps = useMemo(() => enabled && document ? practiceSteps(lessonId, document.blocks) : null, [enabled, document, lessonId]);
+  // Big-task units: the reviewed step plan, else one section per heading. Inside a unit the reader scrolls.
   const shown = useMemo(() => {
-    const raw = steps?.map(step => step.blocks) ?? (enabled && document ? lessonReadingPages(document.blocks) : []);
-    const names = steps?.map(step => step.label) ?? raw.map(page => {
-      const first = page.find(b => b.type === 'heading' || b.type === 'subheading')
-        || page.find(b => b.content?.trim() || b.question?.label || b.alt);
-      return first && lessonBodyPlainText(first.question?.label || first.content || first.alt || '').trim().split('\n')[0].slice(0, 34);
-    });
-    return withoutBlankPages(raw, names);
+    if (!enabled || !document) return [];
+    if (steps) return withoutBlankPages(steps.map(step => step.blocks), steps.map(step => step.label));
+    const sections = lessonSections(document.blocks);
+    return withoutBlankPages(sections.map(s => s.blocks), sections.map(s => s.label));
   }, [steps, document, enabled]);
-  const pages = shown.map(p => p.blocks), labels = shown.map(p => p.label);
+  const pages = shown.map(p => p.blocks), labels = shown.map((p, n) => p.label || (n ? `작업 ${n + 1}` : '오늘의 시작'));
   const [index, setIndex] = useState(() => {
-    try { return positionKey ? Math.max(0, Number.parseInt(sessionStorage.getItem(positionKey) || '0', 10) || 0) : 0; }
+    try { return positionKey ? Math.max(0, Number.parseInt(localStorage.getItem(positionKey) || '0', 10) || 0) : 0; }
     catch { return 0; }
   });
   const position = useRef<HTMLParagraphElement>(null);
@@ -54,20 +51,20 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
   const last = page === pages.length - 1;
   function move(next: number) {
     setIndex(next);
-    try { if (positionKey) sessionStorage.setItem(positionKey, String(next)); } catch { /* Storage is optional. */ }
+    try { if (positionKey) localStorage.setItem(positionKey, String(next)); } catch { /* Storage is optional. */ }
     position.current?.focus({ preventScroll: true });
     position.current?.scrollIntoView({ block: 'start' });
   }
   return <div className="lb-pages">
-    <p ref={position} tabIndex={-1} aria-live="polite" className="lb-page-position">{page + 1} / {pages.length} 페이지</p>
-    {pages.length > 1 && <label className="lb-page-jump">페이지 이동 <select aria-label="페이지 이동" value={page} disabled={busy} onChange={event => move(Number(event.target.value))}>
-      {pages.map((_, n) => <option key={n} value={n}>{n + 1}페이지{labels[n] ? ' · ' + labels[n] : ''}</option>)}
-    </select></label>}
-    <progress aria-label="수업 페이지" value={page + 1} max={pages.length} />
+    <p ref={position} tabIndex={-1} aria-live="polite" className="lb-page-position">오늘의 작업 {page + 1} / {pages.length} · {labels[page]}</p>
+    {pages.length > 1 && <nav aria-label="오늘의 작업 목차" className="lb-page-toc"><ol>
+      {pages.map((_, n) => <li key={n}><button type="button" aria-current={n === page ? 'step' : undefined} disabled={busy} onClick={() => move(n)}><span>{n + 1}</span>{labels[n]}</button></li>)}
+    </ol></nav>}
+    <progress aria-label="오늘의 작업 진행" value={page + 1} max={pages.length} />
     {children(pages[page], last)}
-    {(pages.length > 1 || continuation) && <nav aria-label="수업 페이지 이동">
-      {pages.length > 1 && <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 페이지</button>}
-      {!last && <button type="button" className="btn primary" disabled={busy} onClick={() => move(page + 1)}>다음 페이지</button>}
+    {(pages.length > 1 || continuation) && <nav aria-label="작업 이동">
+      {pages.length > 1 && <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 작업</button>}
+      {!last && <button type="button" className="btn primary" disabled={busy} onClick={() => move(page + 1)}>다음 작업 · {labels[page + 1]}</button>}
       {last && continuation}
     </nav>}
   </div>;

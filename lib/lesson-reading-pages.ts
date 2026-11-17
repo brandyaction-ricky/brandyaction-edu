@@ -121,3 +121,29 @@ export function withoutBlankPages<L>(pages: PublicLessonBlock[][], labels: L[]) 
   });
   return out;
 }
+
+// A lesson whose reviewed step plan no longer matches is shown as its big tasks:
+// a new section at every heading block and at every level-1/2 title inside rich text
+// (smaller titles stay inside), never 1,000-character slices. Embedded media stays inline.
+export function lessonSections(blocks: PublicLessonBlock[]): { blocks: PublicLessonBlock[]; label?: string }[] {
+  const embedded = lessonEmbeddedImageIds(blocks);
+  const sections: { blocks: PublicLessonBlock[]; label?: string }[] = [];
+  const open = (label?: string) => { const last = sections.at(-1); if (last && !last.blocks.some(b => b.type !== 'heading')) { last.label ??= label; return; } sections.push({ blocks: [], label }); };
+  const add = (block: PublicLessonBlock) => { if (!sections.length) sections.push({ blocks: [] }); sections.at(-1)!.blocks.push(block); };
+  const title = (node: LessonNode) => (node.content || []).map(c => c.text || '').join('').trim().slice(0, 40) || undefined;
+  for (const block of blocks) {
+    if (embedded.has(block.id)) continue;
+    if (block.type === 'heading') { open(lessonBodyPlainText(block.content || '').trim().slice(0, 40) || undefined); add(block); continue; }
+    const doc = block.type === 'text' ? parseLessonDocument(block.content || '') : null;
+    const nodes = doc?.content || [];
+    const cuts = nodes.flatMap((n, i) => i > 0 && n.type === 'heading' && Number(n.attrs?.level ?? 1) <= 2 ? [i] : []);
+    const leads = nodes[0]?.type === 'heading' && Number(nodes[0].attrs?.level ?? 1) <= 2;
+    if (!doc || (!cuts.length && !leads)) { add(block); continue; }
+    [0, ...cuts].forEach((start, k) => {
+      const part = nodes.slice(start, cuts[k] ?? nodes.length);
+      if (k > 0 || leads) open(title(part[0]));
+      add(cuts.length ? { ...block, content: LESSON_BODY_PREFIX + JSON.stringify({ ...doc, content: part }) } : block);
+    });
+  }
+  return sections;
+}
