@@ -7,6 +7,7 @@ import { QuestionComposer } from './question-composer';
 import { CurriculumAiConversation } from './curriculum-ai-conversation';
 import './learning-question-dialog.css';
 
+export const openFloatingQuestionEvent = 'edu:open-floating-question';
 export const learningQuestionCreatedEvent = 'edu:learning-question-created';
 
 export function LearningQuestionShortcut({ context, label = "질문·답변" }: { context?: QuestionContext; label?: string }) {

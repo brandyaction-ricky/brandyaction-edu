@@ -1,4 +1,5 @@
 "use client";
+import { CourseReviewButton } from "./product-reviews";
 import usability from './usability.module.css';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
@@ -51,7 +52,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   LiveSchedule,
   type Data,
@@ -62,6 +63,7 @@ import { Badge, Empty, Heading, ResourceRow } from "./primitives";
 import { DigitalContentOutline, ProductResourceRow } from "./primitives";
 import { productDigitalSections, productResources } from "@/lib/product-metadata";
 import './member-learning-ux.css';
+import { MobileLearningDetails } from './mobile-learning-details';
 import memberTheme from './member-theme.module.css';
 
 const accountGroups = [
@@ -71,6 +73,7 @@ const accountGroups = [
       ["", "마이페이지", LayoutDashboard],
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
+      ["resources", "수강 자료·구매 파일", Download],
       ["questions", process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === "true" ? "질문·답변" : "내 질문", MessageCircle],
     ],
   ],
@@ -228,6 +231,36 @@ function EnrolledCard({
     </article>
   );
 }
+function ArticleShortcut({ data }: { data: Data }) {
+  const [revision, setRevision] = useState(0);
+  const [result, setResult] = useState<{ count: number; videos: boolean; articlesEnabled: boolean; lecturesEnabled: boolean } | 'error' | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => { setResult('error'); controller.abort(); }, 10000);
+    void fetch('/api/platform?view=articles', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error('콘텐츠 조회 실패');
+        const body = await response.json();
+        const setting = body?.data?.article_banner?.[0]?.value;
+        if (!setting || typeof setting.articleCount !== 'number') throw new Error('콘텐츠 조회 결과 누락');
+        if (!controller.signal.aborted) setResult({ count: setting.articleCount, videos: Array.isArray(setting.videos) && setting.videos.some((video: { available?: boolean }) => video.available), articlesEnabled: setting.articlesEnabled !== false, lecturesEnabled: setting.enabled !== false });
+      }).catch(() => { if (!controller.signal.aborted) setResult('error'); }).finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [revision]);
+  const visible = contentVisibility(data);
+  const articles = result && result !== 'error' ? result.articlesEnabled && result.count > 0 : visible.articles;
+  const videos = result && result !== 'error' ? result.lecturesEnabled && result.videos : visible.lectures;
+  const empty = result && result !== 'error' && !articles && !videos;
+  return <>
+    <Link href={empty ? '/classes?type=free' : '/articles'}>
+      <Play />
+      <div><b>{empty ? '무료 클래스 둘러보기' : articles ? videos ? '무료강의와 아티클' : '아티클' : '무료강의'}</b><span>{empty ? '지금 신청할 수 있는 클래스를 찾아보세요' : '업무에 적용할 인사이트'}</span></div>
+      <ArrowRight />
+    </Link>
+    {result === 'error' && <p className="meta" role="status">콘텐츠 현황을 확인하지 못했습니다. <button type="button" className="btn small" onClick={() => { setResult(null); setRevision(value => value + 1); }}>다시 확인</button></p>}
+  </>;
+}
+
 function Dashboard({
   data,
   user,
@@ -289,7 +322,7 @@ function Dashboard({
         </Link>
       </Heading>
       <div className="member-focus-grid">
-        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><div className="member-journey-head"><div><span className="member-journey-eyebrow">나의 학습</span><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 현재 공개된 학습을 이어가세요.</p></div>{primaryOverview?.status === 'ready' && <Link className="btn primary" href={'/learn/' + e.id + (upcomingLesson ? '/' + upcomingLesson.id : '')}>{upcomingLesson ? '이어서 학습하기' : '공개된 학습 보기'} <ArrowRight /></Link>}</div><div className="member-next-lesson"><span>다음 학습</span><b>{upcomingLesson ? `${nextAvailableItem?.day ? `DAY ${nextAvailableItem.day} · ` : ''}${t(upcomingLesson, 'title')}` : lessons.length && complete.length === lessons.length ? '현재 공개된 학습을 완료했습니다.' : lessons.length ? '다음 학습을 기다리고 있습니다.' : '공개된 학습을 준비하고 있습니다.'}</b><small>{upcomingLesson ? '이어보기를 눌러 학습을 시작하세요.' : '다음 학습이 열리면 이곳에서 확인할 수 있습니다.'}</small></div>{visibleWeeks.length > 0 && <div className="member-week-journey" aria-label="현재 공개된 주차">{visibleWeeks.map(week => { const weekLessons = lessons.filter(lesson => lesson.week_id === week.id); const weekDone = weekLessons.filter(lesson => complete.some(progress => progress.lesson_id === lesson.id)).length; return <div className="member-week-step" key={week.id}><span>{num(week, 'week_number') === 0 ? 'W0' : `W${num(week, 'week_number')}`}</span><b>{t(week, 'title')}</b><small>{weekDone} / {weekLessons.length}개 완료</small></div>; })}</div>}{!(primaryOverview?.status === 'ready' && primaryOverview.groups.length === 0) && <EnrollmentLearningOverview data={data} enrollment={e}/>}</section> : <>
+        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><div className="member-journey-head"><div><span className="member-journey-eyebrow">나의 학습</span><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 현재 공개된 학습을 이어가세요.</p></div>{primaryOverview?.status === 'ready' && <Link className="btn primary" href={'/learn/' + e.id + (upcomingLesson ? '/' + upcomingLesson.id : '')}>{upcomingLesson ? '이어서 학습하기' : '공개된 학습 보기'} <ArrowRight /></Link>}</div><div className="member-next-lesson"><span>다음 학습</span><b>{upcomingLesson ? `${nextAvailableItem?.day ? `DAY ${nextAvailableItem.day} · ` : ''}${t(upcomingLesson, 'title')}` : lessons.length && complete.length === lessons.length ? '현재 공개된 학습을 완료했습니다.' : lessons.length ? '다음 학습을 기다리고 있습니다.' : '공개된 학습을 준비하고 있습니다.'}</b><small>{upcomingLesson ? '이어보기를 눌러 학습을 시작하세요.' : '다음 학습이 열리면 이곳에서 확인할 수 있습니다.'}</small></div><MobileLearningDetails collapsible={primaryOverview?.status === 'ready' && primaryOverview.groups.length > 0}>{visibleWeeks.length > 0 && <><p className="member-scroll-hint">좌우로 밀어 다른 주차를 확인하세요.</p><div className="member-week-journey" aria-label="현재 공개된 주차">{visibleWeeks.map(week => { const weekLessons = lessons.filter(lesson => lesson.week_id === week.id); const weekDone = weekLessons.filter(lesson => complete.some(progress => progress.lesson_id === lesson.id)).length; return <div className={"member-week-step" + (upcomingLesson?.week_id === week.id ? " is-current" : "")} aria-current={upcomingLesson?.week_id === week.id ? "step" : undefined} key={week.id}><span>{num(week, 'week_number') === 0 ? 'W0' : `W${num(week, 'week_number')}`}</span><b>{t(week, 'title')}</b>{upcomingLesson?.week_id === week.id && <span className="member-current-week">현재 학습 주차</span>}<small>{weekDone} / {weekLessons.length}개 완료</small></div>; })}</div></>}{!(primaryOverview?.status === 'ready' && primaryOverview.groups.length === 0) && <EnrollmentLearningOverview data={data} enrollment={e}/>}</MobileLearningDetails></section> : <>
         <section className="member-continue">
           <div className="member-kicker">
             이어서 학습하기 <span>{t(cohort, "name") || "MY LEARNING"}</span>
@@ -504,14 +537,7 @@ function Dashboard({
           </div>
           <ArrowRight />
         </Link>}
-        {(contentVisibility(data).articles || contentVisibility(data).lectures) && <Link href="/articles">
-          <Play />
-          <div>
-            <b>{contentVisibility(data).articles ? contentVisibility(data).lectures ? "무료강의와 아티클" : "아티클" : "무료강의"}</b>
-            <span>업무에 적용할 인사이트</span>
-          </div>
-          <ArrowRight />
-        </Link>}
+        <ArticleShortcut data={data}/>
         <Link href="/my/reviews">
           <Star />
           <div>
@@ -547,7 +573,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
         description="공개된 미션의 제출 상태와 다음에 할 일을 확인하세요."
       />
       <section className="member-mission-journey" aria-label="미션 진행 안내"><div><b>1. 미션 작성</b><span>공개된 수업에서 제출</span></div><div><b>2. 검토·보완</b><span>피드백을 확인하고 수정</span></div><div><b>3. 승인 완료</b><span>완료 기록 확인</span></div></section>
-      <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/>
+      {entries.length ? <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/> : <p className="notice">아직 공개된 미션이 없습니다.</p>}
       <div className="member-mission-filter">
         <label>
           클래스 · 기수
@@ -862,7 +888,7 @@ function Orders({ data }: { data: Data }) {
             </div>
             <div className="order-card-body">
               <div className="summary-thumb">
-                {num(o, "total_amount") === 0 ? "FREE" : "CLASS"}
+                {num(o, "total_amount") === 0 ? "무료 신청" : "CLASS"}
               </div>
               <div>
                 <h3>
@@ -932,6 +958,7 @@ function Coupons({ data }: { data: Data }) {
         {["available", "used", "revoked"].map((s) => (
           <button
             className={"tab " + (tab === s ? "active" : "")}
+            aria-pressed={tab === s}
             key={s}
             onClick={() => setTab(s)}
           >
@@ -1081,7 +1108,7 @@ function Profile({
       <form onSubmit={submit}>
         <section className="panel">
           <div className="panel-head">
-            <h2>기본 정보</h2>
+            <h2>기본 정보</h2><span className="meta">변경 내용 저장 버튼으로 저장</span>
           </div>
           <div className="panel-body">
             <div className="flex mb24">
@@ -1159,37 +1186,14 @@ function Profile({
 function Reviews({
   data,
   active,
-  pending,
   send,
 }: {
   data: Data;
   active: Row[];
-  pending: boolean;
   send: WorkflowSend;
 }) {
-  const [tab, setTab] = useState("write"),
-    [selected, setSelected] = useState(""),
-    [message, setMessage] = useState("");
+  const [tab, setTab] = useState("write");
   const mine = rows(data, "my_reviews");
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    try {
-      await send(
-        {
-          action: "review",
-          enrollmentId: selected,
-          rating: Number(f.get("rating")),
-          content: f.get("content"),
-        },
-        "후기를 등록했습니다. 운영자 검토 후 공개됩니다.",
-      );
-      setSelected("");
-      setTab("mine");
-    } catch (cause) {
-      setMessage((cause as Error).message);
-    }
-  }
   return (
     <>
       <Heading
@@ -1212,7 +1216,7 @@ function Reviews({
       </div>
       {tab === "write" ? (
         <>
-          {active.map((e) => (
+          {active.filter((e, index) => active.findIndex(other => other.course_id === e.course_id) === index).map((e) => (
             <article className="order-card member-review-invite" key={e.id}>
               <div className="order-card-body">
                 <div className="row-text">
@@ -1226,47 +1230,10 @@ function Reviews({
                   <p>배우기 전과 달라진 점이나 직접 해본 일을 들려주세요.</p>
                   <small>짧은 경험도 다음 수강생의 선택에 도움이 됩니다.</small>
                 </div>
-                <button className="btn primary" onClick={() => setSelected(e.id)}>
-                  내 경험 남기기<ArrowRight aria-hidden="true"/>
-                </button>
+                <CourseReviewButton courseId={String(e.course_id)} courseTitle={t(rows(data, "courses").find(c => c.id === e.course_id), "title")} label={mine.some(r => r.course_id === e.course_id) ? "리뷰 수정" : "리뷰 작성"} save={send} onSaved={() => setTab("mine")}/>
               </div>
             </article>
           ))}
-          {selected && (
-            <form className="panel pad mt24" onSubmit={submit}>
-              <label className="field">
-                만족도
-                <select name="rating">
-                  {[5, 4, 3, 2, 1].map((v) => (
-                    <option key={v} value={v}>
-                      {v}점
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                실행 경험
-                <textarea name="content" required rows={5} />
-              </label>
-              <div className="flex">
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => setSelected("")}
-                >
-                  취소
-                </button>
-                <button className="btn primary" disabled={pending}>
-                  후기 등록
-                </button>
-              </div>
-              {message && (
-                <p role="alert" className="form-error">
-                  {message}
-                </p>
-              )}
-            </form>
-          )}
           {!active.length && (
             <Empty title="수강 신청 후 후기를 작성할 수 있습니다." />
           )}
@@ -1289,6 +1256,7 @@ function Reviews({
               </div>
               <p>{t(r, "body")}</p>
               <div className="meta mt16">{date(r.created_at)}</div>
+              {active.some(e => e.course_id === r.course_id) && <CourseReviewButton courseId={String(r.course_id)} courseTitle={t(rows(data, "courses").find(c => c.id === r.course_id), "title")} label="리뷰 수정" save={send}/>}
             </article>
           ))}
           {!mine.length && <Empty title="아직 작성한 후기가 없습니다." />}
@@ -1320,6 +1288,21 @@ export function MemberViews({
   ongoingLesson?: string;
   blockLearningEnabled?: boolean;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const showActive = () => {
+      const activeLink = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!activeLink || nav.scrollWidth <= nav.clientWidth) return;
+      const bounds = nav.getBoundingClientRect(), item = activeLink.getBoundingClientRect();
+      if (item.left < bounds.left) nav.scrollLeft += item.left - bounds.left;
+      else if (item.right > bounds.right) nav.scrollLeft += item.right - bounds.right;
+    };
+    showActive();
+    window.addEventListener('resize', showActive);
+    return () => window.removeEventListener('resize', showActive);
+  }, [section]);
   const enrollments = rows(data, "enrollments"),
     active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
@@ -1343,7 +1326,7 @@ export function MemberViews({
               )}
             </div>
           ))}
-          {hasMemberResources(data) && <div className="member-resource-cta"><Link className="btn primary" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link></div>}
+          {hasMemberResources(data) && <div className="member-resource-cta"><Link className="btn" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link></div>}
           {!enrollments.length && (
             <Empty title="신청한 클래스가 없습니다.">
               <Link href="/classes">클래스 찾아보기</Link>
@@ -1377,7 +1360,7 @@ export function MemberViews({
       break;
     case "reviews":
       content = (
-        <Reviews data={data} active={active} pending={pending} send={send} />
+        <Reviews data={data} active={active} send={send} />
       );
       break;
     default:
@@ -1396,7 +1379,8 @@ export function MemberViews({
               <p>나의 배움과 실행</p>
             </div>
           </div>
-          <nav className="account-nav" aria-label="마이페이지">
+          <p className="member-scroll-hint" id="member-menu-hint">메뉴를 좌우로 밀어 더 보기 ↔</p>
+          <nav ref={navRef} className="account-nav" aria-label="마이페이지" aria-describedby="member-menu-hint">
             {["admin", "staff"].includes(user.role) && (
               <Link className="member-mobile-admin-tab" href="/admin">
                 <Settings />

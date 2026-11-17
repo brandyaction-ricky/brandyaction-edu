@@ -4,13 +4,13 @@ import type { QuestionContext } from '@/lib/question-hub';
 import { CurriculumAiConversation } from './curriculum-ai-conversation';
 import { QuestionComposer, questionRequest } from './question-composer';
 
-export function QuestionEntry({order,onCreated}:{order?:string|null;onCreated:()=>void}) {
+export function QuestionEntry({order,initialGeneral=false,onCreated}:{order?:string|null;initialGeneral?:boolean;onCreated:()=>void}) {
  const enabled=process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' && !order;
- const [contexts,setContexts]=useState<QuestionContext[]>([]),[chosen,setChosen]=useState(''),[general,setGeneral]=useState(false),[error,setError]=useState(''),[version,setVersion]=useState(0),[ready,setReady]=useState(false);
+ const [contexts,setContexts]=useState<QuestionContext[]>([]),[chosen,setChosen]=useState(''),[general,setGeneral]=useState(initialGeneral),[error,setError]=useState(''),[version,setVersion]=useState(0),[ready,setReady]=useState(false);
  const state=useRef({dirty:false,locked:false});
  const update=useCallback((next:{dirty:boolean;locked:boolean})=>{state.current=next;},[]);
  useEffect(()=>{if(!enabled)return;const abort=new AbortController();void questionRequest<{contexts:QuestionContext[]}>('/api/platform/question-hub?mode=contexts',undefined,abort.signal).then(data=>{setContexts(data.contexts);setReady(true);setError('');}).catch(()=>{if(!abort.signal.aborted){setError('수업 목록을 불러오지 못했어요. 다시 불러오거나 일반 문의를 남겨 주세요.');setReady(true);}});return()=>abort.abort();},[enabled,version]);
- if(!enabled)return <QuestionComposer order={order} onCreated={onCreated}/>;
+ if(!enabled)return <QuestionComposer order={order} initialCategory={initialGeneral?'general':'learning'} onCreated={onCreated}/>;
  const context=contexts.find(c=>c.enrollmentId+':'+c.lessonId===chosen);
  function change(action:()=>void) {if(state.current.locked)return;if(state.current.dirty&&!window.confirm('수업이나 문의 종류를 바꾸면 아직 보내지 않은 질문·첨부가 사라집니다. 저장된 AI 대화는 남아 있어요. 바꿀까요?'))return;state.current={dirty:false,locked:false};action();}
  return <section className="question-entry" aria-label="질문할 수업 선택">

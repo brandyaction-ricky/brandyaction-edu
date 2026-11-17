@@ -98,6 +98,21 @@ function fakeDb(handler) {
   const calls = [];
   return { calls, from(table) { const call = { table, steps: [] }; calls.push(call); const chain = new Proxy({}, { get(_, key) { if (key === 'then') return (resolve, reject) => Promise.resolve(handler(call)).then(resolve, reject); return (...args) => { call.steps.push([key, ...args]); return chain; }; } }); return chain; } };
 }
+function periodSessionReads(db) {
+  const sessions = db.calls.filter(call => call.table === 'funnel_sessions');
+  const isCoverageRead = call => call.steps.some(([verb, columns]) => verb === 'select' && columns === 'created_at');
+  const edges = sessions.filter(isCoverageRead);
+  assert.deepEqual(edges.map(call => call.steps.find(([verb]) => verb === 'order')?.[2].ascending).sort(), [false, true]);
+  for (const { steps } of edges) {
+    assert.deepEqual(steps.find(([verb]) => verb === 'eq'), ['eq', 'landing_id', campaign.landing_id]);
+    assert.deepEqual(steps.find(([verb]) => verb === 'limit'), ['limit', 1]);
+    assert.ok(steps.some(([verb, column]) => verb === 'lte' && column === 'created_at'));
+    assert.ok(!steps.some(([verb]) => ['in', 'or', 'gte', 'lt'].includes(verb)));
+  }
+  const periodReads = sessions.filter(call => !isCoverageRead(call));
+  assert.equal(periodReads.length, 2);
+  return periodReads;
+}
 test('supplemental reads are paginated, campaign-scoped, filtered and preserve real zero presence', async () => {
   const db = fakeDb(call => {
     if (call.table === 'landing_campaign_actuals') return { data: [{ day: '2026-09-01', kakao_members: 100, new_payments: 0, existing_payments: null }, { day: '2026-09-02', kakao_members: 105, new_payments: null, existing_payments: null }], error: null };
@@ -108,7 +123,7 @@ test('supplemental reads are paginated, campaign-scoped, filtered and preserve r
   const result = await server.performanceUiDetails(db, campaign, query, new AbortController().signal);
   assert.equal(result.daily_a[0].cta_clicks, 3); assert.equal(result.last_collected_at, '2026-09-14T04:00:00Z');
   assert.deepEqual(result.actual_presence, { new_payments: true, existing_payments: false }); assert.equal(result.previous_day_members['2026-09-02'], 100);
-  for (const call of db.calls.filter(call => call.table === 'funnel_sessions')) {
+  for (const call of periodSessionReads(db)) {
     assert.ok(call.steps.some(step => step[0] === 'eq' && step[1] === 'landing_id' && step[2] === campaign.landing_id));
     assert.ok(call.steps.some(step => step[0] === 'in' && step[1] === 'attribution->>utm_term')); assert.ok(call.steps.some(step => step[0] === 'range'));
     assert.ok(call.steps.some(step => step[0] === 'gte' && step[1] === 'created_at'));
@@ -122,7 +137,7 @@ test('supplemental reads use explicit multi UTM filters without an implicit conf
   const db = fakeDb(() => ({ data: [], error: null }));
   const query = makeQuery(); query.append('utm_campaign', 'ad-a'); query.append('utm_campaign', 'organic');
   await server.performanceUiDetails(db, campaign, query, new AbortController().signal);
-  for (const call of db.calls.filter(call => call.table === 'funnel_sessions')) {
+  for (const call of periodSessionReads(db)) {
     assert.deepEqual(call.steps.find(step => step[0] === 'in' && step[1] === 'attribution->>utm_campaign'), ['in', 'attribution->>utm_campaign', ['ad-a', 'organic']]);
     assert.ok(!call.steps.some(step => step[0] === 'or' && step[1].includes('utm_campaign')));
   }

@@ -216,7 +216,7 @@
 }
 @media (max-width: 680px) {
   .workspace.workspace :global(.account-layout) { padding-top: var(--space-4); }
-  .workspace.workspace :global(.page-head) { margin-bottom: var(--space-6); }
+  .workspace.workspace :global(.page-head) { padding:var(--space-2) 0 0; margin-bottom:var(--space-4); }
   .workspace.workspace :global(.member-learning-intro),
   .workspace.workspace :global(.care-personal),
   .workspace.workspace :global(.panel.pad),

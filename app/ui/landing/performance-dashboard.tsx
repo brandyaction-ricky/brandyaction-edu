@@ -28,7 +28,7 @@ export function OperationsSummary({ report, collection = false }: { report: Dash
   const presence = automatic ? { new_payments: ready, existing_payments: ready } : report.ui?.actual_presence;
   const newCount = presence ? presence.new_payments ? summary.new_payments : null : report.ui ? null : summary.new_payments;
   const existingCount = presence ? presence.existing_payments ? summary.existing_payments : null : report.ui ? null : summary.existing_payments;
-  const members = report.ui ? report.ui.period_actuals?.kakao_members : summary.kakao_members, increase = report.ui ? report.ui.period_actuals?.kakao_delta : summary.kakao_delta;
+  const members = report.ui ? report.ui.current_kakao?.members : summary.kakao_members, increase = report.ui ? report.ui.period_actuals?.kakao_delta : summary.kakao_delta;
   const values = [
     ['현재 카카오톡방 인원', count(members) + (members == null ? '' : '명')],
     ['조회 기간 증가분', signed(increase) + (increase == null ? '' : '명')],
@@ -39,7 +39,20 @@ export function OperationsSummary({ report, collection = false }: { report: Dash
     [automatic ? '주문당 광고비' : 'CAC', (!automatic || r?.spend != null) && summary.new_payments + summary.existing_payments > 0 ? money(summary.spend / (summary.new_payments + summary.existing_payments)) : '—'],
     ['동시시청당 광고비', !automatic && summary.live_peak && summary.spend > 0 ? money(summary.spend / summary.live_peak) : '—'],
   ];
-  return <dl className="tracking-ops-strip">{values.map(([label, value]) => <div key={label} title={label === '마지막 데이터 수집' ? '현재 기간·필터에 해당하는 방문 세션의 마지막 수집 시각 (KST)' : undefined}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
+  return <><dl className="tracking-ops-strip">{values.map(([label, value]) => <div key={label} title={label === '마지막 데이터 수집' ? '현재 기간·필터에 해당하는 방문 세션의 마지막 수집 시각 (KST)' : undefined}><dt>{label}</dt><dd>{value}{label === '현재 카카오톡방 인원' && report.ui?.current_kakao && <small className="tracking-help">{report.ui.current_kakao.day} 입력 기준</small>}</dd></div>)}</dl>{report.ui?.errors.current_kakao && <p role="status" className="tracking-help">{report.ui.errors.current_kakao}</p>}</>;
+}
+export function CollectionRangeNotice({ report }: { report: DashboardReport }) {
+  const ranges = report.ui?.collection_ranges;
+  if (report.ui?.errors.collection_ranges) return <p role="status" className="tracking-help">{report.ui.errors.collection_ranges}</p>;
+  if (!ranges) return null;
+  const covered = (range: { start: string; end: string } | null) => range && range.start <= report.range.startDay && range.end >= report.range.endDay;
+  const mismatch = report.data_state.meta_exists && (!covered(ranges.edu) || !covered(ranges.meta));
+  const format = (range: { start: string; end: string } | null) => range ? `${range.start} — ${range.end}` : '수집 기록 없음';
+  return <div className={mismatch ? 'tracking-range-notice' : 'tracking-help'} role="status">
+    {mismatch && <strong>EDU와 Meta의 수집 기간을 확인해 주세요.</strong>}
+    <p>캠페인 전체 수집 범위 · EDU {format(ranges.edu)} / Meta {format(ranges.meta)}</p>
+    {mismatch && <p>선택 기간의 일부가 수집 범위 밖입니다. 등록 수와 EDU 방문 수를 같은 기간의 전환율로 비교하지 마세요. 첫·마지막 기록 기준이며 중간 날짜의 누락 여부는 별도 확인이 필요합니다.</p>}
+  </div>;
 }
 const SERIES = [
   { key: 'sessions', label: '방문', color: '#2563eb' },
@@ -104,6 +117,7 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
   const linked = !!report.campaign.meta_ad_account_id && metaCampaignIds(report.campaign).length > 0;
   const metaValue = (value: number) => report.data_state.meta_exists ? count(value) : linked ? '—' : '연동 전';
   return <div className="tracking-stack" data-metric-detail={details}>
+    <CollectionRangeNotice report={report}/>
     <section aria-label="선택 기간 전환 퍼널" className="tracking-funnel">
       <div className="tracking-subsection-head"><h2>한눈에 보는 모집 성과</h2><span className="tracking-help">{report.range.startDay} — {report.range.endDay} · KST</span></div>
       <AdminMetricGrid columns={4}>

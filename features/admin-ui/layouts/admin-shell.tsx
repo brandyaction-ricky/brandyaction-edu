@@ -6,6 +6,7 @@ import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
   Compass,
+  Gift,
   LogOut,
   Menu,
   MessageCircle,
@@ -60,6 +61,7 @@ export function AdminShell({
   const byKey = new Map(available.map(item => [item.key, item]));
   const visibility = createAdminMenuVisibility(available);
   const groups = visibility.groups(adminNavigationGroups);
+  const groupTitle = groups.find(([, keys]) => keys.some(key => key === selected))?.[0];
   const contentWidth = adminContentWidth(selected);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -150,7 +152,10 @@ export function AdminShell({
     );
   };
   const extra = ['staff'].filter(key => byKey.has(key) && matchesMenu(key));
-  const matchingDirect = (matchesMenu('overview', '운영 홈') ? 1 : 0) + (user.role === 'admin' ? Number(matchesMenu('diagnosis-management')) + Number(matchesMenu('diagnosis', 'N6 진단 받기')) : 0);
+  const showWebinars = visibility.has('campaigns') && matchesMenu('campus-webinars', '웨비나·캠퍼스 관리 입장 링크 자료실');
+  const showCampus = matchesMenu('campus-enter', '캠퍼스 입장 공부방 AI 사무실 문샷');
+  const showEvents = visibility.has('campaigns') && matchesMenu('campus-events', '당첨자 이벤트 존 전용 자료 초대 링크 중복 쿠폰');
+  const matchingDirect = Number(showCampus) + Number(showEvents) + Number(showWebinars) + (matchesMenu('overview', '운영 홈') ? 1 : 0) + (user.role === 'admin' ? Number(matchesMenu('diagnosis-management')) + Number(matchesMenu('diagnosis', 'N6 진단 받기')) : 0);
   return (
     <>
       <a className="skip" href="#admin-content">본문으로 이동</a>
@@ -176,6 +181,9 @@ export function AdminShell({
         </div>
         <nav aria-label="관리자 카테고리">
           {matchesMenu('overview', '운영 홈') && navLink('overview')}
+          {showCampus&&<Link className="nav-link" href="/campus/workspace" onClick={()=>setMobile(false)}><Compass aria-hidden="true"/><span>캠퍼스 입장</span></Link>}
+          {showWebinars&&<Link className="nav-link" href="/admin/campus/webinars" onClick={()=>setMobile(false)}><Compass aria-hidden="true"/><span>웨비나·캠퍼스 관리</span></Link>}
+          {showEvents&&<Link className="nav-link" href="/admin/campus/events" onClick={()=>setMobile(false)}><Gift aria-hidden="true"/><span>당첨자 이벤트 존</span></Link>}
           {user.role === 'admin' && matchesMenu('diagnosis-management') && <Link href="/admin/diagnosis/manage" className={`nav-link${selected === 'diagnosis-management' ? ' active' : ''}`} aria-current={selected === 'diagnosis-management' ? 'page' : undefined} onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 관리</Link>}
           {user.role === 'admin' && matchesMenu('diagnosis', 'N6 진단 받기') && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 받기</Link>}
           {query && <p className="admin-menu-search-result" role="status">{matchingGroups.reduce((count, [, keys]) => count + keys.length, extra.length + matchingDirect)}개 메뉴 · 검색어를 지우면 전체 메뉴가 보입니다.</p>}
@@ -195,7 +203,7 @@ export function AdminShell({
                 });
               }}
             >
-              <summary>{title}<span className="nav-category-count">{keys.filter(key => byKey.has(key)).length}</span></summary>
+              <summary>{title}</summary>
               {keys.map(navLink)}
             </details>
           ))}
@@ -242,8 +250,8 @@ export function AdminShell({
             >
               <Menu aria-hidden="true" />
             </button>
-            <span className="crumb-root">관리자</span>
-            <span className="crumb-root">/</span>
+            <span className="crumb-root">{groupTitle || "관리자"}</span>
+            <span className="crumb-root" aria-hidden="true">›</span>
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">

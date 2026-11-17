@@ -1,0 +1,46 @@
+name: Release DB contract
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-db-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix tools/release-guard
+      - name: Install pinned local REST test binary
+        shell: bash
+        run: |
+          mkdir -p tools/release-guard/.bin
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/PostgREST/postgrest/releases/download/v16.6/postgrest-v16.6-linux-static-x86-64.tar.xz \
+            -o tools/release-guard/.bin/postgrest.tar.xz
+          echo '335ea29f00145705fb569b1268b9c8e53d062f8f6f9188192e92ea3781d2dca1  tools/release-guard/.bin/postgrest.tar.xz' | sha256sum --check
+          tar -xJf tools/release-guard/.bin/postgrest.tar.xz -C tools/release-guard/.bin
+      - name: Check deployment lock and core EDU access rules
+        run: >-
+          node --test tests/release-guard.test.mjs
+          tests/campus-entry.test.mjs tests/campus-welcome-account.test.mjs
+          tests/preserved-lesson-access.test.mjs
+          tests/diagnosis-partial-refund-database.test.mjs
+      - name: Reproduce schema compatibility through real REST
+        run: node tools/release-guard/db-compatibility.mjs
+      - name: Run isolated coordinator integration
+        run: node tools/release-guard/integration.mjs

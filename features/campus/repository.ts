@@ -1,0 +1,76 @@
+import { cohortReaderEnabled } from './cohort-reader';
+import { curriculumDayNumbers } from '@/lib/curriculum-days';
+import type { createClient } from '@/lib/supabase/server';
+import type { Row } from '@/lib/platform';
+import { hasLearningAccess } from '@/lib/platform-rules';
+import { campusError, campusScopes, campusSnapshot } from './snapshot';
+import {cohortWeekVisible,cohortLessonVisible} from '@/lib/cohort-curriculum-visibility';
+
+type Database = Awaited<ReturnType<typeof createClient>>;
+type ReadResult = { data: unknown; error: unknown; count: number | null };
+// Fail visibly on truncation instead of showing a partial mission map as complete.
+async function rows(query: PromiseLike<ReadResult>): Promise<Row[]> {
+  const result = await query;
+  if (result.error) campusError(503, '학습 정보를 불러오지 못했습니다. 다시 시도해 주세요.');
+  if (!Array.isArray(result.data) || result.count !== result.data.length) campusError(503, '학습 목록 전체를 확인하지 못했습니다. 내 클래스에서 확인해 주세요.');
+  return result.data as Row[];
+}
+const ids = (values: unknown[]) => [...new Set(values.map(String))];
+
+/** Just the verified scope of one enrollment: no curriculum reads. For handlers that only need the cohort. */
+export async function loadCampusScope(db: Database, viewer: { id: string }, enrollmentId: string, now = Date.now()) {
+  const enrollments = (await rows(db.from('enrollments')
+    .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
+    .eq('user_id', viewer.id).eq('id', enrollmentId).eq('status', 'active').limit(1))).filter(e => hasLearningAccess(e, now));
+  if (!enrollments.length) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  const [courses, cohorts] = await Promise.all([
+    rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(1)),
+    rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(1)),
+  ]);
+  const scope = campusScopes(viewer.id, enrollments, courses, cohorts, now).find(s => s.enrollmentId === enrollmentId);
+  if (!scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  return scope;
+}
+export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from'> | Promise<Pick<Database, 'from'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
+  const enrollments = (await rows(db.from('enrollments')
+    .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
+    .eq('user_id', viewer.id).eq('status', 'active').order('created_at', { ascending: false }).limit(200))).filter(e => hasLearningAccess(e, now));
+  if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  const [courses, cohorts] = enrollments.length ? await Promise.all([
+    rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
+    rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),
+  ]) : [[], []];
+  const scopes = campusScopes(viewer.id, enrollments, courses, cohorts, now);
+  const scope = scopes.find(s => s.enrollmentId === enrollmentId);
+  if (enrollmentId && !scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  if (!scope) return campusSnapshot({ viewer, scopes, enrollmentId: null, now });
+  // Publication overrides intentionally have no student SELECT grant. Only read
+  // this verified owner's cohort with the server client; content stays under RLS.
+  const visibilityDb=await getVisibilityDb();
+  const [allWeeks,weekVisibility,lessonVisibility,guidedLessons]=await Promise.all([
+    rows(db.from('curriculum_weeks').select('id,course_id,week_number,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
+    rows(visibilityDb.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+    rows(visibilityDb.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+    cohortReaderEnabled(visibilityDb, scope.cohortId),
+  ]);
+  const visibility={curriculum_weeks:allWeeks,edu_cohort_week_visibility:weekVisibility,edu_cohort_lesson_visibility:lessonVisibility};
+  const weeks=allWeeks.filter(w=>cohortWeekVisible(visibility,scope.cohortId,w));
+  const allLessons = weeks.length ? await rows(db.from('curriculum_lessons')
+    .select('id,week_id,title,day_number,updated_at,is_published,archived_at', { count: 'exact' })
+    .in('week_id', weeks.map(w => w.id)).eq('is_published', true).is('archived_at',null).order('day_number').limit(500)) : [];
+  const lessons=allLessons.filter(l=>cohortLessonVisible(visibility,scope.cohortId,l));
+  // Course-wide day ordinals like the classroom, counted over every published lesson before cohort visibility.
+  // Read with the member's own client: the elevated client stays limited to visibility settings.
+  const courseLessons=allWeeks.length?await rows(db.from('curriculum_lessons').select('id,week_id,day_number,archived_at',{count:'exact'}).in('week_id',allWeeks.map(w=>w.id)).eq('is_published',true).is('archived_at',null).limit(2000)):[];
+  const dayNumbers=curriculumDayNumbers({curriculum_weeks:allWeeks,curriculum_lessons:courseLessons});
+  const [missions, progress] = lessons.length ? await Promise.all([
+    rows(db.from('curriculum_missions').select('id,lesson_id,title,updated_at,is_required,is_published,archived_at', { count: 'exact' })
+      .in('lesson_id', lessons.map(l => l.id)).eq('is_published', true).is('archived_at', null).limit(500)),
+    rows(db.from('lesson_progress').select('id,enrollment_id,lesson_id,completed_at', { count: 'exact' })
+      .eq('enrollment_id', scope.enrollmentId).in('lesson_id', lessons.map(l => l.id)).limit(500)),
+  ]) : [[], []];
+  const submissions = missions.length ? await rows(db.from('mission_submissions')
+    .select('id,enrollment_id,mission_id,attempt_number,status', { count: 'exact' })
+    .eq('enrollment_id', scope.enrollmentId).in('mission_id', missions.map(m => m.id)).limit(1000)) : [];
+  return { ...campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now, dayNumbers }), guidedLessons };
+}

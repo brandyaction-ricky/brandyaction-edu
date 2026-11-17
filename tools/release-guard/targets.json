@@ -1,0 +1,21 @@
+{
+  "activation": "disabled-pending-review",
+  "coordinatorRepository": "brandyaction-ricky/brandyaction-edu",
+  "sharedLockGroup": "brandyaction-shared-production",
+  "targets": {
+    "edu": {
+      "repository": "brandyaction-ricky/brandyaction-edu",
+      "projectId": "prj_sZrdpSZEC9IxKLLzEDGlAK17WWPx",
+      "productionHost": "brandyaction-edu.com",
+      "releaseBranch": "main",
+      "blocker": "Alignment PR preserves all 2267 verified live source files; main merge and activation await review"
+    },
+    "myin": {
+      "repository": "brandyaction/myinlab-server",
+      "projectId": "prj_55Q1BZJQGVuCJug7M5WWoMe3prI4",
+      "productionHost": "server.myinlab.co.kr",
+      "releaseBranch": "main",
+      "blocker": "Git production deploy currently bypasses this coordinator; change requires approval"
+    }
+  }
+}

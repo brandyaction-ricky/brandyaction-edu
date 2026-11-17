@@ -150,6 +150,7 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, openQuestions: 2, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
+  assert.match(navigationMarkup, /href="\/admin\/campus\/webinars"[\s\S]*?웨비나·캠퍼스 관리/);
   assert.match(navigationMarkup, /상품·판매 설정/);
   assert.match(navigationMarkup, /커리큘럼 편집/);
   assert.match(navigationMarkup, /수강생 현황/);
@@ -176,6 +177,7 @@ test('five admin categories and scoped navigation render from the admin UI featu
     assert.match(markup, new RegExp(`href="/admin/${key}"[\\s\\S]*?lucide-${icon}`), key);
   }
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
+  assert.doesNotMatch(restricted, /href="\/admin\/campus\/webinars"/);
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
 });
 test('home customer stories carousel and accessible profile dropdown are present', () => {
@@ -251,7 +253,7 @@ test('article hub includes the managed free-video banner and representative thum
   assert.match(footerStyles, /\.edu-front \.learning-footer-links/);
 });
 
-test('product HTML takes precedence over old images and per-product CTA settings reach both layouts', () => {
+test('product HTML takes precedence over old images and both layouts retain the product CTA destination and label with the shared primary style', () => {
   const integrationStyles = read('app/ui/final/integration.css');
   assert.match(integrationStyles, /\.bottom-cta\.single-cta \.btn \{[^}]*max-width: none/);
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
@@ -264,7 +266,8 @@ test('product HTML takes precedence over old images and per-product CTA settings
     assert.match(markup, campaigns.length ? /class="campaign-sticky"/ : /bottom-cta single-cta/);
     assert.doesNotMatch(markup, /class="cta-price"[^>]*>지금 무료/);
     assert.match(markup, /href="https:\/\/example.test\/webinar"/);
-    assert.match(markup, /background-color:#123456/);
+    assert.doesNotMatch(markup, /background-color:#123456/);
+    assert.match(markup, /class="btn primary[^"]*"[^>]*data-product-cta/);
   }
   const emptyFreeMarkup = html(ProductDetail, { course: changed, data: { ...data, enrollments: [], landing_configs: [], lesson_contents: [] } });
   assert.doesNotMatch(emptyFreeMarkup, /free-downloads|클래스와 함께 사용할 자료|신청·구매 후 제공되는 자료/);
@@ -547,7 +550,11 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.doesNotMatch(html(ProductDetail, { course, data: { ...data, landing_configs: [{ ...cfg, enabled: false }] } }), /data-landing-cta/);
   const untracked = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, enabled: false }] } });
   assert.equal((untracked.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
-  assert.doesNotMatch(untracked, /href="\/(?:apply|signup|login)/);
+  assert.doesNotMatch(untracked, /href="\/(?:apply|signup)/);
+  // Review sign-in is independent of the external free-class registration CTA.
+  const loginHrefs = [...untracked.matchAll(/href="(\/login[^\"]*)"/g)].map(match => match[1]);
+  assert.deepEqual(loginHrefs, ['/login?next=%2Fclasses%2Fcourse%23product-reviews']);
+  assert.match(untracked, /href="https:\/\/open.kakao.com\/o\/testRoom"[^>]*data-product-cta="sticky_cta"/);
   const missing = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, kakao_url: '' }] } });
   assert.match(missing, /disabled="">참여 링크 준비 중/);
   assert.doesNotMatch(missing, /href="\/apply/);

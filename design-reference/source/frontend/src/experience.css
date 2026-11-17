@@ -80,3 +80,16 @@
 .header-questions{white-space:nowrap;min-height:44px;align-items:center}
 @media(max-width:680px){.header-user>.header-questions{display:inline-flex;font-size:12px}.header-user{gap:6px}.header-inner,.learning-chrome{gap:8px}.story-feature{scroll-margin-top:90px}}
 @media(max-width:380px){.site-header .brand img{max-width:112px}.site-header .brand small{display:none}.header-user .avatar{width:32px;height:32px}.header-user .icon-btn{width:36px;min-width:36px}}
+
+.graduate-learning-notice{margin-bottom:16px;color:var(--text-secondary,#626770);font-size:13px;border-bottom:1px solid var(--line,#e2e5e9)}
+.graduate-learning-notice summary{min-height:44px;padding:12px 0;cursor:pointer;box-sizing:border-box;font-weight:600}
+.graduate-learning-notice p{margin:0;padding:0 0 12px;line-height:1.7}
+.graduate-learning-notice summary:focus-visible{outline:2px solid var(--ba-red,#c9232d);outline-offset:2px}
+
+/* EDU v2 public shell */
+:root {
+  --font-sans: "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --text-tertiary: var(--ba-neutral-600);
+  --line: var(--border-default);
+}
+:focus-visible { outline: 2px solid #315f9a; outline-offset: 2px; }

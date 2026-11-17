@@ -29,7 +29,7 @@ test('automatic daily approval opens the next lesson; separate learning has its 
  await studentBackend(page);await page.goto('/lesson-progression-test');await expect(page.getByRole('button',{name:'학습 완료 후 다음 학습'})).toBeDisabled();
  await page.getByRole('button',{name:'미션 제출하기'}).click();await expect(page.getByText('자동승인되어 학습을 완료했습니다.',{exact:true})).toBeVisible();
  await expect(page.locator('.lesson-header')).toContainText('학습 완료');await page.getByRole('link',{name:/^다음 학습 · 데일리 둘째 날$/}).click();await expect(page.locator('.lesson-header')).toContainText('데일리 둘째 날');
- if(info.project.name!=='desktop')await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
+ if(await page.getByRole('button',{name:/학습 목차|학습 목록/}).isVisible())await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
  await page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'별도 학습',exact:true}).click();await expect(page.getByText('별도 학습 본문',{exact:true})).toBeVisible();await expect(page.locator('.lesson-header')).toContainText('DAY 1');await expect(page.locator('.lesson-header')).not.toContainText('DAY 11');await expect(page.getByRole('button',{name:'학습 완료 후 다음 학습'})).toBeDisabled();
  await page.getByRole('button',{name:'학습 완료하기',exact:true}).click();await expect(page.getByRole('link',{name:/^다음 학습 ·/})).toHaveAttribute('href',`/learn/${id(1)}/${id(13)}`);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('separate-learning.png'),fullPage:true});
@@ -58,11 +58,23 @@ test('settings preserve a conflicting choice until explicit reload and never sav
  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'저장된 설정 다시 불러오기'}).click();await expect(page.getByRole('combobox',{name:'데일리 미션 자동승인 범위'})).toHaveValue('1');expect(writes).toHaveLength(1);
 });
 
-test('legacy orientation stays reachable beside both imported learning tracks',async({page},info)=>{
+test('legacy orientation stays reachable beside both imported learning tracks',async({page})=>{
  await studentBackend(page);await page.goto('/lesson-progression-test');
- if(info.project.name!=='desktop')await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
+ if(await page.getByRole('button',{name:/학습 목차|학습 목록/}).isVisible())await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
  await page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'기타 학습'}).click();
  await expect(page.locator('.lesson-header')).toContainText('기존 오리엔테이션');
  await expect(page.locator('.learning-nav .lesson-nav')).toHaveCount(1);
  await expect(page.getByRole('link',{name:'다음 학습',exact:true})).toHaveCount(0);
+});
+
+test('inserting between completed and open lessons preserves the classroom link and completion count',async({page})=>{
+ const fixture='/lesson-progression-test?middleInserted=1&target=';
+ await page.goto(fixture+'12');
+ await expect(page.getByText('기존 다음 수업 본문',{exact:true})).toBeVisible();
+ await expect(page.getByText(/1개 학습 완료/)).toBeVisible();
+ await page.goto(fixture+'10');
+ await expect(page.getByRole('button',{name:'학습 완료하기',exact:true})).toBeEnabled();
+ await page.goto(fixture+'13');
+ await expect(page.getByText('이후 잠긴 수업 본문',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('공개된 학습이 없습니다.',{exact:true})).toBeVisible();
 });

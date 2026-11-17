@@ -1,3 +1,4 @@
+import { threadLearningContext } from '@/lib/question-learning-context-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { getOperatorUser } from '@/lib/operator-permissions';
@@ -25,8 +26,9 @@ export async function GET(request: Request) {
  try {
   const user = await actor(), q = new URL(request.url).searchParams, before = q.get('before');
   if (before !== null && (!/^[1-9]\d{0,18}$/.test(before) || BigInt(before) > BigInt('9223372036854775807'))) fail('조회 위치를 확인해 주세요.');
-  const r = await createAdminClient().rpc(process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' ? 'edu_read_question_thread_with_images' : 'edu_read_question_thread', { p_actor: user.id, p_question: id(q.get('question')), p_before: before });
-  if (r.error) throw r.error; return reply(r.data);
+  const db = createAdminClient();
+  const r = await db.rpc(process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' ? 'edu_read_question_thread_with_images' : 'edu_read_question_thread', { p_actor: user.id, p_question: id(q.get('question')), p_before: before });
+  if (r.error) throw r.error; return reply(await threadLearningContext(db, r.data));
  } catch (e) { return failure(e); }
 }
 export async function POST(request: Request) {

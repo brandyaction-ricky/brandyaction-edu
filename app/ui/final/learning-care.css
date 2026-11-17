@@ -143,6 +143,60 @@
 .edu-admin .learning-care .care-band-starting{--band:var(--adm-error,#a71922);--band-bg:var(--adm-error-soft,#fff0f1);--band-border:#f3c7ca}
 .edu-admin .learning-care .care-band-progressing{--band:var(--adm-warning,#865600);--band-bg:var(--adm-warning-soft,#fff6df);--band-border:#f0dca8}
 .edu-admin .learning-care .care-band-finishing{--band:var(--adm-success,#176345);--band-bg:var(--adm-success-soft,#eaf5ef);--band-border:#c7e3d1}
+
+/* Use the same hierarchy and surface rhythm as the other operator menus. */
+.adm.edu-admin .learning-care { min-width:0; }
+.adm.edu-admin .learning-care .care-header { border:0;margin:0 0 20px;padding:0;align-items:start; }
+.adm.edu-admin .learning-care .care-header h1 { margin:0;font-size:20px;line-height:28px; }
+.adm.edu-admin .learning-care .care-header p { margin:4px 0 0;font-size:14px;line-height:22px; }
+.adm.edu-admin .learning-care .care-eyebrow { font-size:12px;letter-spacing:0;color:var(--adm-text-sub);font-weight:600; }
+.adm.edu-admin .learning-care .care-header .care-eyebrow { display:none; }
+.adm.edu-admin .learning-care .care-header-actions { flex:0 1 480px;min-width:0;align-items:end; }
+.adm.edu-admin .learning-care .care-header-actions .care-controls { flex:1;min-width:0; }
+.adm.edu-admin .learning-care .care-header-actions label { min-width:0; }
+.adm.edu-admin .learning-care .care-header-actions select { width:100%;max-width:100%;text-overflow:ellipsis; }
+.adm.edu-admin .learning-care .care-header-actions>.btn { flex:none;align-self:center; }
+.adm.edu-admin .learning-care .care-cohort-context { margin:12px 0; }
+.adm.edu-admin .learning-care .care-tabs { margin:16px 0;gap:2px; }
+.adm.edu-admin .learning-care .care-tabs button { min-height:40px;padding:8px 14px;font-size:13px;line-height:20px; }
+.adm.edu-admin .learning-care .care-board-heading { margin:24px 0 16px;align-items:start; }
+.adm.edu-admin .learning-care .care-board-heading h2 { font-size:16px;line-height:24px;margin:4px 0; }
+.adm.edu-admin .learning-care .care-band-filters { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px; }
+.adm.edu-admin .learning-care .care-band-filters button { min-width:0;padding:12px;gap:8px;border-radius:8px; }
+.adm.edu-admin .learning-care .care-band-filters button>span { min-width:0; }
+.adm.edu-admin .learning-care .care-band-filters button b { font-size:20px; }
+.adm.edu-admin .learning-care .care-board-tools { margin:16px 0; }
+.adm.edu-admin .learning-care .care-student-tile { border-top-width:1px;box-shadow:none; }
+.adm.edu-admin .learning-care .care-student-tile:hover { border-color:var(--adm-border-strong);box-shadow:none; }
+.adm.edu-admin .learning-care .care-tile-number { font-size:24px; }
+.adm.edu-admin .learning-care .care-day-overview { margin-top:24px;padding-top:20px;border-color:var(--adm-border); }
+.adm.edu-admin .learning-care .care-day-overview h2 { font-size:16px;line-height:24px; }
+.adm.edu-admin .learning-care .care-table { font-size:13px; }
+.adm.edu-admin .learning-care .care-table :is(th,td) { padding:10px 12px; }
+.adm.edu-admin .learning-care .care-table thead th { height:40px;font-size:12px; }
+@media (max-width:1100px) {
+ .adm.edu-admin .learning-care .care-header { flex-wrap:wrap; }
+ .adm.edu-admin .learning-care .care-header-actions { flex-basis:100%; }
+ .adm.edu-admin .learning-care .care-band-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:720px) {
+ .adm.edu-admin .learning-care .care-tabs { display:flex;overflow-x:auto;max-width:100%; }
+ .adm.edu-admin .learning-care .care-tabs button { min-height:44px;flex:0 0 auto;padding:10px 12px; }
+ .adm.edu-admin .learning-care .care-board-heading { flex-direction:column;gap:8px; }
+ .adm.edu-admin .learning-care .care-board-heading-actions { justify-content:flex-start;gap:8px; }
+ .adm.edu-admin .learning-care .care-band-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .adm.edu-admin .learning-care .care-band-filters button:first-child { grid-column:1/-1; }
+ .adm.edu-admin .learning-care .care-band-filters button { min-height:64px; }
+ .adm.edu-admin .learning-care .care-board-tools label { flex:1 1 100%; }
+ .adm.edu-admin .learning-care .care-student-tiles { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .adm.edu-admin .learning-care .care-student-tile { padding:12px; }
+ .adm.edu-admin .learning-care .care-student-tile>*,.adm.edu-admin .learning-care .care-day-tiles article>* { min-width:0;overflow-wrap:anywhere; }
+ .adm.edu-admin .learning-care .care-controls { align-items:stretch;gap:12px; }
+ .adm.edu-admin .learning-care .care-controls label { min-width:0; }
+}
+@media (max-width:359px) {
+ .adm.edu-admin .learning-care .care-student-tiles { grid-template-columns:minmax(0,1fr); }
+}
 .edu-admin .learning-care .care-band-unknown{--band:var(--adm-neutral,#50545b);--band-bg:var(--adm-neutral-soft,#f0f2f4);--band-border:var(--adm-border,#e2e5e9)}
 .edu-admin .learning-care .care-band-filters button{background:var(--adm-surface,#fff);border-color:var(--adm-border,#e2e5e9);color:var(--adm-text,#161719);border-radius:var(--adm-radius-md,8px)}
 .edu-admin .learning-care .care-band-filters button[aria-pressed=true]{outline:2px solid var(--adm-primary,#c9232d);outline-offset:1px}

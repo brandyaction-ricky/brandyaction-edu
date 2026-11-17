@@ -1,14 +1,22 @@
 "use client";
+import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
+import { rememberAccountHint } from '@/lib/recent-account-hint';
 import { readJson } from '@/lib/read-json';
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
 import { articleDiscoveryVisible, contentVisibility } from '@/lib/content-visibility';
 import { NextClassBanner } from './final/next-class-banner';
+import { learningOverview } from '@/lib/learning-overview';
+import { curriculumDay } from '@/lib/curriculum-days';
+import { useLessonProgression } from './final/use-lesson-progression';
 import { MemberErasureQueue } from './final/member-erasure-queue';
+import { TipsErasureMonitorNotice } from './final/tips-erasure-monitor-notice';
+import { TipsSourceNotice } from './final/tips-source-notice';
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { LearningNoticeBar } from './final/learning-notice';
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
+import { campusLoginReturn, campusReturnCookie } from '@/lib/oauth-callback';
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
 import { sectionScopes } from "@/lib/operator-scopes";
@@ -67,7 +75,8 @@ import {
   sectionDescription,
 } from "./final/admin-shell";
 import { MemberViews, enrollmentLessons } from "./final/member-views";
-import { LearningQuestionShortcut } from './final/learning-question-dialog';
+import { FloatingLearningQuestion } from './final/floating-learning-question';
+import { MentorReplyBell } from './final/mentor-reply-bell';
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
@@ -202,10 +211,13 @@ export function Platform({
   path,
   user: initialUser,
   adminContent,
+  preview,
 }: {
   path: string[];
   user: User | null;
   adminContent?: ReactNode;
+  // Server-read name and summary of a public class/article, shown (and crawled) while the page loads.
+  preview?: { title: string; summary: string };
 }) {
   const router = useRouter();
   const admin = path[0] === "admin";
@@ -216,6 +228,9 @@ export function Platform({
   const [user, setUser] = useState(() =>
     initialUser || (admin ? cachedAdminUser : null),
   );
+  useEffect(() => {
+    if (!admin && user?.email) rememberAccountHint(user.email);
+  }, [admin, user?.email]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
@@ -292,7 +307,17 @@ export function Platform({
   const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
-  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionLesson.day_number != null ? String(questionLesson.day_number)+'일차' : '', t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
+  const questionProgression = useLessonProgression(learning ? path[1] || '' : '', learning && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
+  const questionGate = questionProgression.lessons?.find(item => item.lessonId === questionLesson?.id);
+  const questionDayLabel = questionGate?.ongoing ? '지속 챌린지' : `${questionGate?.dayNumber ?? curriculumDay(data, questionLesson)}일차`;
+  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionDayLabel, t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
+  const resumeQuestionLessons = new Map<string, string>();
+  if (account && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true') {
+    for (const enrollment of data.enrollments || []) {
+      const next = learningOverview(data, enrollment).groups.find(group => group.key !== 'ongoing' && group.next)?.next;
+      if (next) resumeQuestionLessons.set(enrollment.id, next.id);
+    }
+  }
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -544,6 +569,9 @@ export function Platform({
           }
         } catch { /* Fall back to the existing Kakao login. */ }
       }
+      const campus = campusLoginReturn(next);
+      document.cookie = campusReturnCookie + '=' + encodeURIComponent(campus || '') +
+        '; Path=/; SameSite=Lax; Max-Age=' + (campus ? 600 : 0) + (location.protocol === 'https:' ? '; Secure' : '');
       const { error } = await createClient().auth.signInWithOAuth({
         provider,
         options: {
@@ -609,10 +637,10 @@ export function Platform({
             </nav>
           )}
           <div className="header-user">
-            {learning && <MobileRefresh />}
             {user ? (
               <>
-                {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
+                {!admin && (account || learning) && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <MentorReplyBell key={user.id}/>}
+                <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions?view=mine"}>질문·답변</Link>
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
@@ -650,7 +678,8 @@ export function Platform({
             )}
             {(account || learning) && <button
               className="icon-btn mobile-only"
-              aria-label="메뉴 열기"
+              aria-label={mobile ? "메뉴 닫기" : "메뉴 열기"}
+              aria-controls="member-mobile-navigation"
               aria-expanded={mobile}
               onClick={() => setMobile(!mobile)}
             >
@@ -662,14 +691,15 @@ export function Platform({
           </div>
         </div>
         {mobile && (account || learning) && (
-          <nav className="mobile-nav open">
+          <nav id="member-mobile-navigation" className="mobile-nav open" aria-label="모바일 메뉴">
             {nav.filter(([href]) => href !== "/articles" || articleDiscoveryVisible(data)).map(([href, label]) => (
               <Link href={href} key={href}>
                 {label}
               </Link>
             ))}
             <Link href="/my">마이페이지</Link>
-            {account && <MobileRefresh />}
+            <Link href="/my/questions?view=mine">질문·답변</Link>
+            <MobileRefresh />
           </nav>
         )}
       </header>
@@ -699,6 +729,7 @@ export function Platform({
     body = (
       <AuthView
         signup={path[0] === "signup"}
+        supportUrl={safeUrl(support.url) || MOONSHOT_SUPPORT_URL}
         pending={pending}
         social={social}
         next={safeNext(searchParams.get("next"))}
@@ -878,6 +909,7 @@ export function Platform({
   else if (learning)
     body = (
       <Classroom
+        progression={questionProgression}
         key={user?.id}
         path={path}
         data={data}
@@ -897,8 +929,8 @@ export function Platform({
         {loading || (!error && loadedReadKey !== publicReadKey) ? (
           <section className="page-loading" role="status" aria-live="polite" aria-busy="true">
             <span className="page-loading-spinner" aria-hidden="true" />
-            <h1>{path[0] === "classes" ? "클래스 정보를 불러오는 중입니다." : "페이지 정보를 불러오는 중입니다."}</h1>
-            <p>잠시만 기다려 주세요.</p>
+            <h1>{preview?.title || (path[0] === "classes" ? "클래스 정보를 불러오는 중입니다." : "페이지 정보를 불러오는 중입니다.")}</h1>
+            <p>{preview?.summary || "잠시만 기다려 주세요."}</p>
           </section>
         ) : (
           <>
@@ -1105,6 +1137,8 @@ export function Platform({
           </>
         )}
         {key === 'customers' && user?.role === 'admin' && <MemberErasureQueue key={notice} />}
+        {key === 'customers' && user?.role === 'admin' && <TipsErasureMonitorNotice />}
+        {key === 'customers' && user?.role === 'admin' && <TipsSourceNotice />}
       </AdminShell>
     );
   }
@@ -1138,6 +1172,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
+      {user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext} resumeLessons={resumeQuestionLessons}/>}
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
@@ -1277,6 +1312,7 @@ function LegacyEditor({
         values.applicable_course_ids = form.getAll("applicable_course_ids");
         values.is_draft = form.get("is_draft") === "on";
         values.is_alumni = form.get("is_alumni") === "on";
+        values.is_stackable = form.get("is_stackable") === "on";
         values.is_active = form.get("is_active") === "on";
         values.exclude_free = form.get("discount_type") === "ADMIN_FREE" || form.get("exclude_free") === "on";
         await save(values, row ? undefined : requestId.current);

@@ -12,10 +12,10 @@ test('operations work stays ahead of every menu shortcut', async ({ page }, info
   await page.screenshot({ path: info.outputPath('operations-priority.png'), fullPage: true });
 });
 
-test('order summary discloses its independent scope without removing orders', async ({ page }, info) => {
+test('order summary follows applied dates and preserves its scope across list filters', async ({ page }, info) => {
   await page.goto('/admin-pilot-orders-test');
-  const summary = page.getByRole('region', { name: '전체 기간 결제 요약' });
-  await expect(summary).toContainText('조건은 아래 주문 목록에만 적용됩니다');
+  const summary = page.getByRole('region', { name: '기간별 결제 요약' });
+  await expect(summary).toContainText('상품·상태·검색 조건은 목록에만 적용됩니다');
   await expect(summary).toContainText('시험·내부·무료 주문');
   const originalSummary = await summary.innerText();
   await expect(summary).toContainText('24,000');
@@ -26,7 +26,49 @@ test('order summary discloses its independent scope without removing orders', as
   await expect(summary).toHaveText(originalSummary, { useInnerText: true });
   await page.getByRole('searchbox', { name: '주문 검색' }).fill('');
   await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(3);
+  await page.getByLabel('주문일 시작 · KST').fill('2026-09-25');
+  await page.getByLabel('주문일 종료 · KST').fill('2026-09-25');
+  await expect(summary).toContainText('24,000');
+  await page.getByRole('button', { name: '기간 조회', exact: true }).click();
+  await expect(summary).toContainText('선택 기간 결제 요약');
+  await expect(summary).not.toContainText('24,000');
+  await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(0);
+  await page.getByRole('button', { name: '초기화', exact: true }).click();
+  await expect(summary).toContainText('전체 기간 결제 요약');
+  await expect(summary).toContainText('24,000');
   await page.screenshot({ path: info.outputPath('orders-scope.png'), fullPage: true });
+});
+
+test('order date shortcuts immediately update the dates, summary and list while preserving other filters', async ({ page }, info) => {
+  await page.clock.setFixedTime(new Date('2026-09-24T00:30:00Z'));
+  await page.goto('/admin-pilot-orders-test');
+  const shortcuts = page.getByRole('group', { name: '기간 빠른 선택' });
+  const summary = page.getByRole('region', { name: '기간별 결제 요약' });
+  const start = page.getByLabel('주문일 시작 · KST'), end = page.getByLabel('주문일 종료 · KST');
+  await shortcuts.getByRole('button', { name: '오늘', exact: true }).click();
+  await expect(start).toHaveValue('2026-09-24');
+  await expect(end).toHaveValue('2026-09-24');
+  await expect(summary).toContainText('24,000');
+  await shortcuts.getByRole('button', { name: '어제', exact: true }).click();
+  await expect(start).toHaveValue('2026-09-23');
+  await expect(end).toHaveValue('2026-09-23');
+  await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(0);
+  await expect(summary).not.toContainText('24,000');
+  await page.getByRole('searchbox', { name: '주문 검색' }).fill('PILOT-FAIL');
+  for (const [label, expected] of [['최근 7일', '2026-09-18'], ['이번 달', '2026-09-01'], ['최근 3개월', '2026-06-24']]) {
+    await shortcuts.getByRole('button', { name: label, exact: true }).click();
+    await expect(start).toHaveValue(expected);
+    await expect(end).toHaveValue('2026-09-24');
+    await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(1);
+    await expect(summary).toContainText('24,000');
+    await expect(shortcuts.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  }
+  await page.screenshot({ path: info.outputPath('order-period-shortcuts.png'), fullPage: true });
+  await shortcuts.getByRole('button', { name: '전체 기간', exact: true }).click();
+  await expect(start).toHaveValue('');
+  await expect(end).toHaveValue('');
+  await expect(page.getByRole('searchbox', { name: '주문 검색' })).toHaveValue('PILOT-FAIL');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('empty cohort uses a compact notice and retains every tab', async ({ page }, info) => {

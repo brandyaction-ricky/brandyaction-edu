@@ -1,0 +1,52 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {build} from 'esbuild';
+const r=await build({entryPoints:['features/campus/space/transport.ts'],bundle:true,platform:'node',format:'esm',write:false,external:['@/lib/supabase/client']});const {createLiveTransport}=await import('data:text/javascript;base64,'+Buffer.from(r.outputFiles[0].text).toString('base64'));
+const uid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+const peer=n=>({userId:uid(n),sessionId:uid(100+n),nickname:'합성 검수 '+n,gender:'male',coat:'#527086',status:'joinable',photoOptIn:false,focusUntil:null,focusMode:0,expiresAt:new Date(Date.now()+75000).toISOString(),x:12,y:8.8,sitting:false});
+function harness(count){const channels=[],transmissions=[],clients=[];let revoked=false,paused=false;
+ const client=()=>({channel(topic){const callbacks=[],c={topic,state:'joined',removed:false,on(_kind,event,fn){callbacks.push({event:event.event,fn});return c;},subscribe(fn){c.status=fn;queueMicrotask(()=>fn('SUBSCRIBED'));return c;},async send(message){transmissions.push({topic,message});for(const ch of channels)if(ch!==c&&!ch.removed&&ch.topic===topic)for(const cb of ch.callbacks)if(cb.event===message.event)cb.fn({payload:message.payload});return 'ok';},callbacks};channels.push(c);return c;},async removeChannel(c){c.removed=true;c.state='closed';return 'ok';}});
+ const request=async()=>Response.json(revoked?{error:'권한 만료'}:{profile:{},peers:Array.from({length:count},(_,i)=>peer(i+1)),messages:[],seats:[],serverNow:new Date().toISOString(),controls:{announcement:paused?'쉬어갑니다':'',paused,revision:1,updatedAt:null}},{status:revoked?403:200});
+ return{channels,transmissions,clients,client,request,revoke(){revoked=true;},pause(){paused=true;}};
+}
+test('24 synthetic authorized clients coalesce 24000 moves, bound sends, bind received identity and clean up all channels',async()=>{
+ const h=harness(24),states=new Map();try{await Promise.all(Array.from({length:24},async(_,i)=>{const n=i+1,t=await createLiveTransport(uid(50),uid(n),uid(100+n),s=>states.set(n,s),()=>{}, {client:h.client(),request:h.request});h.clients.push(t);await t.command({kind:'join'});}));
+ assert.equal(h.channels.filter(c=>!c.removed&&c.topic.startsWith('campus-space:')).length,576);
+ assert.equal(h.channels.filter(c=>!c.removed&&c.topic.startsWith('campus-roster:')).length,24);
+ for(const t of h.clients)for(let i=0;i<1000;i++)t.move({x:12+i/1000,y:8.8});await new Promise(r=>setTimeout(r,550));
+ assert.ok(h.transmissions.length<=48,`bounded send count: ${h.transmissions.length}`);assert.equal(h.transmissions.length,48);assert.equal(states.size,24);assert.ok(states.get(1).metrics.received<=46);
+ const forged=h.channels.find(c=>c.topic.endsWith(uid(1)));const before=states.get(2).peers.find(p=>p.userId===uid(1)).x;for(const cb of forged.callbacks)if(cb.event==='move')cb.fn({payload:{x:1,y:1,sessionId:uid(999),seq:999,userId:uid(2)}});assert.equal(states.get(2).peers.find(p=>p.userId===uid(1)).x,before);
+ }finally{h.clients.forEach(t=>t.close());}assert.ok(h.channels.every(c=>c.removed));
+});
+test('channel errors become observed reconnects; revoked membership clears state and prohibits further send',async()=>{const h=harness(2);let state;const t=await createLiveTransport(uid(50),uid(1),uid(101),s=>state=s,()=>{},{client:h.client(),request:h.request});try{await t.command({kind:'join'});const own=h.channels.find(c=>c.topic.endsWith(uid(1)));own.status('CHANNEL_ERROR');assert.equal(state.metrics.errors,1);assert.equal(state.metrics.status,'reconnecting');own.status('SUBSCRIBED');assert.equal(state.metrics.reconnects,1);h.revoke();await assert.rejects(t.command({kind:'heartbeat'}),/권한/);assert.equal(state.peers.length,0);assert.equal(state.metrics.status,'closed');const count=h.transmissions.length;t.move({x:5,y:5});await assert.rejects(t.command({kind:'nearby',text:'계속 보내기'}),/끝났/);assert.equal(h.transmissions.length,count);assert.ok(h.channels.every(c=>c.removed));}finally{t.close();}});
+test('operator pause clears peers and prevents nearby messages without stopping the local study clock',async()=>{const h=harness(2);let state;const t=await createLiveTransport(uid(50),uid(1),uid(101),s=>state=s,()=>{},{client:h.client(),request:h.request});try{await t.command({kind:'join'});h.pause();await t.command({kind:'heartbeat'});assert.equal(state.controls.paused,true);assert.equal(state.peers.length,0);assert.ok(h.channels.every(c=>c.removed));await assert.rejects(t.command({kind:'nearby',text:'우회'}));}finally{t.close();}});
+test('nearby delivery uses authorized topic identity, local quiet preference, distance and bounded text',async()=>{const h=harness(2);let a,b;const first=await createLiveTransport(uid(50),uid(1),uid(101),s=>a=s,()=>{},{client:h.client(),request:h.request}),second=await createLiveTransport(uid(50),uid(2),uid(102),s=>b=s,()=>{},{client:h.client(),request:h.request});try{await first.command({kind:'join',profile:{status:'joinable'}});await second.command({kind:'join',profile:{status:'joinable'}});await first.command({kind:'nearby',text:'근처의 동료'});assert.equal(b.nearby[0].userId,uid(1));assert.equal(b.nearby[0].text,'근처의 동료');assert.equal(b.messages.length,0);await second.command({kind:'profile',profile:{status:'quiet'}});const channel=h.channels.find(c=>c.topic.endsWith(uid(1)));await channel.send({type:'broadcast',event:'nearby',payload:{id:'quiet-test',sessionId:uid(101),text:'조용히 집중하면 안 보임'}});assert.equal(b.nearby.length,1);assert.equal(a.metrics.sent,1);await assert.rejects(first.command({kind:'nearby',text:'x'.repeat(121)}));}finally{first.close();second.close();}});
+
+test('focus transitions reach a peer immediately and survive a stale snapshot',async()=>{
+ const h=harness(2);
+ let latest;
+ const a=await createLiveTransport(uid(50),uid(1),uid(101),()=>{},()=>{},{client:h.client(),request:h.request});
+ const b=await createLiveTransport(uid(50),uid(2),uid(102),state=>{latest=state;},()=>{},{client:h.client(),request:h.request});
+ const focus=()=>latest.peers.find(p=>p.userId===uid(1)).focusUntil;
+ try{
+  await a.command({kind:'join'});await b.command({kind:'join'});
+  const end=Date.now()+25*60000;
+  a.setFocusDeadline(end);
+  assert.equal(Date.parse(focus()),end);
+  await b.command({kind:'heartbeat'});
+  assert.equal(Date.parse(focus()),end);
+  a.setFocusDeadline(null);
+  assert.equal(focus(),null);
+  const sent=h.transmissions.filter(v=>v.message.event==='focus');
+  assert.equal(sent.length,2);
+  await h.channels.find(c=>c.topic.endsWith(uid(1))).send(sent[0].message);
+  assert.equal(focus(),null);
+ }finally{a.close();b.close();}
+});
+test('the campus tools pane (follow:false) opens only the roster channel, still sees peers and their focus times',async()=>{
+ const h=harness(30),seen=[];const t=await createLiveTransport(uid(50),uid(1),uid(101),s=>seen.push(s),()=>{},{client:h.client(),request:h.request,follow:false});
+ try{await t.command({kind:'join'});await new Promise(r=>setTimeout(r,20));
+  assert.equal(h.channels.filter(c=>c.topic.startsWith('campus-space:')).length,0);
+  assert.equal(h.channels.filter(c=>!c.removed&&c.topic.startsWith('campus-roster:')).length,1);
+  assert.equal(seen.at(-1).peers.length,30);
+  t.move({x:5,y:5,sitting:false});await new Promise(r=>setTimeout(r,600));assert.equal(h.transmissions.length,0);
+ }finally{t.close();}
+});

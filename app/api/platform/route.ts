@@ -1,3 +1,4 @@
+import { questionLearningContexts } from '@/lib/question-learning-context-server';
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -21,7 +22,7 @@ import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
-import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel } from '@/lib/admin-order-list';
+import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel, readOrderPeriodSummary } from '@/lib/admin-order-list';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
@@ -223,15 +224,20 @@ export async function GET(request: Request) {
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
                     if (sectionKey === 'orders') {
-                        const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
-                        if (processing.error) throw processing.error;
-                        data.order_summary = [{
-                            id: 'order-summary',
-                            approvedRevenue: row.approvedRevenue,
-                            refundedRevenue: row.refundedRevenue,
-                            netRevenue: row.netRevenue,
-                            processingRefunds: processing.count || 0,
-                        }];
+                        const scope = parseOrderListScope(params);
+                        if (scope.from || scope.to) {
+                            data.order_summary = [{ id: 'order-summary', ...await readOrderPeriodSummary(db, scope) }];
+                        } else {
+                            const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
+                            if (processing.error) throw processing.error;
+                            data.order_summary = [{
+                                id: 'order-summary',
+                                approvedRevenue: row.approvedRevenue,
+                                refundedRevenue: row.refundedRevenue,
+                                netRevenue: row.netRevenue,
+                                processingRefunds: processing.count || 0,
+                            }];
+                        }
                         if (operator?.role === 'admin' || operator?.permissions.members) {
                             data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews, openQuestions: row.openQuestions }];
                         }
@@ -369,6 +375,10 @@ export async function GET(request: Request) {
                 data.curriculum_lessons = rows.flatMap(week => week.curriculum_lessons);
             })()] : []),
         ]);
+        if (adminMode && sectionKey === 'questions' && data.edu_questions?.length) {
+            const labels = await questionLearningContexts(db, data.edu_questions);
+            data.edu_questions = data.edu_questions.map(question => ({ ...question, learning_context: labels.get(question.id) ?? question.learning_context }));
+        }
         for (const banner of data.site_banners || []) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
@@ -1170,7 +1180,6 @@ export async function POST(request: Request) {
                 const rating = Number(body.rating);
                 const content = String(body.content || '').trim();
                 if (!Number.isInteger(rating) || rating < 1 || rating > 5 || !content || content.length > 5000) fail('별점과 후기 내용을 확인해 주세요.');
-                const { data: existing } = await db.from('reviews').select('id').eq('user_id', user.id).eq('course_id', enrollment.course_id).maybeSingle();
                 const values = {
                     user_id: user.id,
                     course_id: enrollment.course_id,
@@ -1180,9 +1189,9 @@ export async function POST(request: Request) {
                     body: content,
                     status: 'pending',
                 };
-                const r = existing ? await db.from('reviews').update(values).eq('id', existing.id) : await db.from('reviews').insert(values);
+                const r = await db.from('reviews').upsert(values, { onConflict: 'user_id,course_id' });
                 if (r.error) throw r.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             const lessonId = String(body.lessonId || '');
             const { data: lesson } = await db.from('curriculum_lessons').select('*,curriculum_weeks!inner(course_id,is_published)').eq('id', lessonId).eq('is_published', true).single();

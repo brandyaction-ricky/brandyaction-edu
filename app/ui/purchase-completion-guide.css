@@ -1,0 +1,76 @@
+.edu-front .purchase-completion-guide {
+  display: grid;
+  gap: var(--space-4);
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.edu-front .order-complete-card > .purchase-completion-guide {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.edu-front .purchase-completion-guide h3 { font-size: var(--type-h3); }
+.edu-front .purchase-guide-message { line-height: 1.7; white-space: pre-wrap; }
+.edu-front .purchase-guide-steps {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.edu-front .purchase-guide-steps > li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.edu-front .purchase-guide-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: var(--type-caption);
+  font-weight: 700;
+}
+.edu-front .purchase-guide-step h4 { margin: 0; font-size: var(--type-small); line-height: 24px; }
+.edu-front .purchase-guide-hint { margin-top: var(--space-1); color: var(--text-secondary); font-size: var(--type-small); line-height: 1.55; }
+.edu-front .purchase-guide-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.edu-front .purchase-guide-url {
+  flex: 1 1 14rem;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-size: var(--type-small);
+  user-select: text;
+}
+.edu-front .purchase-guide-link .btn { width: auto; min-height: 44px; }
+.edu-front .purchase-guide-steps [role="status"] { color: var(--text-secondary); font-size: var(--type-small); }
+.edu-front .purchase-guide-steps [role="status"]:not(:empty) { margin-top: var(--space-1); }
+.edu-front .purchase-guide-account dl {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+.edu-front .purchase-guide-account dt { color: var(--text-secondary); font-size: var(--type-small); }
+.edu-front .purchase-guide-account dd { margin: 0; text-align: start; font-weight: 700; }
+.edu-front .purchase-guide-steps > .purchase-guide-last-step { align-items: center; padding-block: 0; border-color: transparent; }
+.edu-front .purchase-guide-enter { width: 100%; min-height: 48px; }
+@media (max-width: 420px) {
+  .edu-front .purchase-guide-steps > li { gap: var(--space-2); }
+}

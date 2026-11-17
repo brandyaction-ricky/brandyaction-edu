@@ -82,3 +82,13 @@ test('customer coupon GET never enumerates coupon names or codes',async()=>{
   assert.match(fs.readFileSync(new URL('../app/api/coupons/route.ts',import.meta.url),'utf8'),/features\/commerce\/api/);
   assert.doesNotMatch(fs.readFileSync(new URL('../app/api/platform/route.ts',import.meta.url),'utf8'),/user && view === 'checkout'[\s\S]{0,500}customer_coupons/);
 });
+
+test('coupon API accepts up to ten distinct codes and rejects duplicates or excess before querying',async()=>{
+ const h=setup({id:'member',role:'student'});
+ const codes=Array.from({length:10},(_,i)=>'STACK_'+i).join('+');
+ assert.equal((await h.POST(request({cohortId:cohort,code:codes.toLowerCase()}))).status,200);
+ assert.equal(h.calls[0].args.code,codes);
+ for(const code of [codes+'+STACK_10','STACK_0+STACK_0','OKA++OKB','OKA+bad!'])
+  assert.equal((await h.POST(request({cohortId:cohort,code}))).status,400);
+ assert.equal(h.calls.length,1);
+});

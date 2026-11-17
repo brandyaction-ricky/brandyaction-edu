@@ -279,6 +279,7 @@ export function ResourceRow({ content }: { content: Row }) {
       </div>
       <a
         className="btn small"
+        aria-label={`${t(content, "resource_name") || "학습 자료"} 다운로드`}
         href={
           "/api/platform/resource?lesson=" +
           encodeURIComponent(t(content, "lesson_id"))
@@ -295,11 +296,11 @@ export function ProductResourceRow({ resource, courseId }: { resource: ProductRe
   return <div className="resource-row">
     <div className="file-icon"><FileText /></div>
     <div className="resource-text"><b>{resource.name}</b><small>{resourceScopeLabels[resource.scope]}</small></div>
-    <a className="btn small" href={"/api/platform/resource?course=" + encodeURIComponent(courseId) + "&resource=" + encodeURIComponent(resource.id)}><Download />다운로드</a>
+    <a className="btn small" aria-label={`${resource.name} 다운로드`} href={"/api/platform/resource?course=" + encodeURIComponent(courseId) + "&resource=" + encodeURIComponent(resource.id)}><Download />다운로드</a>
   </div>;
 }
 export function DigitalContentOutline({ sections, courseId, accessible = false }: { sections: DigitalContentSection[]; courseId: string; accessible?: boolean }) {
   const total = sections.reduce((sum, section) => sum + section.items.length, 0);
   if (!sections.length) return null;
-  return <div className="digital-content-outline"><div className="digital-content-summary"><b>콘텐츠 구성</b><span><Play /> 동영상 {sections.flatMap(section => section.items).filter(item => item.type === "video").length}개</span><span><FileText /> 디지털 상품 {sections.flatMap(section => section.items).filter(item => item.type === "file").length}개</span><small>총 {total}개</small></div>{sections.map(section => <details className="accordion" key={section.id} open><summary>{section.title}</summary>{section.items.map(item => <div className="lesson-line digital-content-line" key={item.id}>{item.type === "video" ? <Play aria-hidden="true" /> : <FileText aria-hidden="true" />}<div><b>{item.title}</b>{item.body && <small>{item.body}</small>}</div><span className="spacer" />{item.durationLabel && <small>{item.durationLabel}</small>}{accessible && (item.type === "file" ? <a className="btn small" href={`/api/platform/resource?course=${encodeURIComponent(courseId)}&resource=${encodeURIComponent(item.resourceId)}`}><Download />다운로드</a> : <a className="btn small" href={`/api/platform/resource?course=${encodeURIComponent(courseId)}&content=${encodeURIComponent(item.id)}`} target="_blank" rel="noreferrer"><Play />재생</a>)}</div>)}</details>)}</div>;
+  return <div className="digital-content-outline"><div className="digital-content-summary"><b>콘텐츠 구성</b><span><Play /> 동영상 {sections.flatMap(section => section.items).filter(item => item.type === "video").length}개</span><span><FileText /> 디지털 상품 {sections.flatMap(section => section.items).filter(item => item.type === "file").length}개</span><small>총 {total}개</small></div>{sections.map(section => <details className="accordion" key={section.id} open><summary>{section.title}</summary>{section.items.map(item => <div className="lesson-line digital-content-line" key={item.id}>{item.type === "video" ? <Play aria-hidden="true" /> : <FileText aria-hidden="true" />}<div><b>{item.title}</b>{item.body && <small>{item.body}</small>}</div><span className="spacer" />{item.durationLabel && <small>{item.durationLabel}</small>}{accessible && (item.type === "file" ? <a className="btn small" aria-label={`${item.title} 다운로드`} href={`/api/platform/resource?course=${encodeURIComponent(courseId)}&resource=${encodeURIComponent(item.resourceId)}`}><Download />다운로드</a> : <a className="btn small" href={`/api/platform/resource?course=${encodeURIComponent(courseId)}&content=${encodeURIComponent(item.id)}`} target="_blank" rel="noreferrer"><Play />재생</a>)}</div>)}</details>)}</div>;
 }

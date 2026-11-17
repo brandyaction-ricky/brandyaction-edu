@@ -8,7 +8,7 @@ test('header help stays accessible in the mobile menu and desktop header', async
     if(width<=900) await page.getByRole('button',{name:'메뉴 열기',exact:true}).click();
     const action=width<=900?page.getByRole('navigation',{name:'모바일 메뉴'}).getByRole('link',{name:'질문·답변',exact:true}):page.locator('.header-questions');
     await expect(action).toBeVisible();
-    await expect(action).toHaveAttribute('href','/my/questions');
+    await expect(action).toHaveAttribute('href','/my/questions?view=mine');
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     if(width<=900) await page.keyboard.press('Escape');
   }

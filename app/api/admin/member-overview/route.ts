@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     if (!profile.data) return reply({ error: '조회할 회원이 없거나 탈퇴한 회원입니다.' }, 404);
     const enrollment = 'enrollments!inner(user_id,course_id,cohort_id,courses(id,title),cohorts(id,name))';
     let query;
-    if (view === 'enrollments') query = db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,created_at,courses(id,title),cohorts(id,name)', { count: 'exact' }).eq('user_id', member).order('created_at', { ascending: false });
+    if (view === 'enrollments') query = db.from('enrollments').select('id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at,created_at,courses(id,title),cohorts(id,name)', { count: 'exact' }).eq('user_id', member).order('created_at', { ascending: false });
     else if (view === 'progress') query = db.from('lesson_progress').select(`id,lesson_id,enrollment_id,progress_percent,completed_at,updated_at,curriculum_lessons(id,title,day_number),${enrollment}`, { count: 'exact' }).eq('enrollments.user_id', member).order('updated_at', { ascending: false });
     else if (view === 'submissions') query = db.from('mission_submissions').select(`id,enrollment_id,status,attempt_number,submitted_at,reviewed_at,reviewer_feedback,curriculum_missions(id,title),${enrollment}`, { count: 'exact' }).eq('enrollments.user_id', member).order('submitted_at', { ascending: false });
     else {
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     }
     const result = await query.order('id').range((page - 1) * pageSize, page * pageSize - 1);
     if (result.error) throw result.error;
-    return reply({ rows: result.data || [], total: result.count || 0, page, pageSize });
+    return reply({ rows: result.data || [], total: result.count || 0, page, pageSize, canTransferEnrollment: user.role === 'admin' && view === 'enrollments' });
   } catch {
     return reply({ error: '회원 운영 정보를 불러오지 못했습니다. 다시 시도해 주세요.' }, 503);
   }

@@ -7,6 +7,7 @@ function load(file, mocks = {}, globals = {}) {
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', ...Object.keys(globals), code)(exports, name => {
+    if(name==='@/features/campus/private-release')return{campusPrivateRelease:()=>true};
     if (name in mocks) return mocks[name];
     throw Error('Unexpected dependency ' + name);
   }, ...Object.values(globals));
@@ -113,11 +114,11 @@ test('the archived page keeps the original text after the active policy is repla
 test('only the known policy versions route successfully; unknown versions and extra segments return 404', async () => {
   const route = load('app/[[...path]]/page.tsx', {
     'react/jsx-runtime': { jsx: (type, props) => ({ type, props }) },
-    '@/lib/legal-policies': policies, '@/lib/edu-settings': {}, '@/lib/supabase/server': {},
+    '@/lib/legal-policies': policies, '@/lib/edu-settings': {}, '@/lib/supabase/server': {}, 'react': { cache: f => f }, '@/lib/edu-seo': {},
     '@/app/ui/platform': { Platform: 'platform' },
     'next/navigation': { notFound: () => { throw Error('404'); } },
     '@/lib/landing-admin-state': {}, '@/lib/platform': { sections: [] },
-    'next/headers': {}, '@/lib/product-sharing': {},
+    'next/headers': {}, '@/lib/product-sharing': {}, '@/lib/course-catalog': {},
   });
   for (const path of [['policies', 'privacy'], ['policies', 'privacy', '2026-08-11'], ['policies', 'privacy', '2026-10-20'], ['policies', 'terms'], ['policies', 'refund']]) {
     assert.deepEqual((await route.default({ params: Promise.resolve({ path }) })).props.path, path);

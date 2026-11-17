@@ -57,7 +57,7 @@ test('all 85 questions and the full selected body remain reachable without clipp
   const bounds = await last.boundingBox(), container = await list.boundingBox();
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(container!.y + container!.height + 1);
   await last.press('Enter');
-  await expect(detail.getByRole('heading')).toContainText('85번째 질문');
+  await expect(detail.getByRole('heading', { level: 2 })).toContainText('85번째 질문');
   if (viewport!.width > 900) {
     expect(await list.evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
     expect(await detail.evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
@@ -101,7 +101,10 @@ test('marketing navigation keeps all destinations, help and active state in a re
   await page.route('**/api/conversion', route => route.fulfill({ json: { cases: [], evidence: [], questions: [], courses: [], cohorts: [], runs: [], reviews: [], capabilities: { can_manage_evidence: false, can_mock: false } } }));
   await page.goto(visit('conversion'));
   const nav = page.getByRole('navigation', { name: '마케팅 작업 빠른 이동' });
-  await expect(nav.getByRole('link')).toHaveCount(8);
+  if (info.project.use.viewport!.width <= 720) {
+    await page.getByRole('button', { name: '관련 메뉴 펼치기' }).click();
+  }
+  await expect(nav.getByRole('link')).toHaveCount(9);
   await expect(nav.getByRole('link', { name: '모집·문의 검토' })).toHaveAttribute('aria-current', 'page');
   const groups = page.locator('.marketing-task-group');
   await expect(groups).toHaveCount(3);
@@ -112,4 +115,19 @@ test('marketing navigation keeps all destinations, help and active state in a re
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('.marketing-workspace-help>summary').click();
   await page.screenshot({ path: info.outputPath('marketing-grid.png') });
+});
+
+test('coupon fields stack with their column labels on mobile and keep their desktop columns', async ({ page, viewport }) => {
+  await page.goto(visit('coupons'));
+  const row = page.locator('.admin-catalog-cards tbody tr').first();
+  const cell = row.locator('td[data-label]').first();
+  await expect(cell).toBeVisible();
+  if (viewport!.width <= 720) {
+    await expect(row).toHaveCSS('display', 'grid');
+    expect(await cell.evaluate(element => getComputedStyle(element, '::before').content))
+      .toBe(JSON.stringify(await cell.getAttribute('data-label')));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  } else {
+    await expect(row).toHaveCSS('display', 'table-row');
+  }
 });

@@ -42,7 +42,7 @@ export function PublicMobileMenu({ links, signedIn, onLogout }: {
         {signedIn ? <>
           <Link href="/my">마이페이지</Link>
           <Link href="/my/classes">내 클래스</Link>
-          <Link href="/my/questions">질문·답변</Link>
+          <Link href="/my/questions?view=mine">질문·답변</Link>
           <Link href="/my/profile">내 정보 수정</Link>
           <Link href="/my/coupons">내 쿠폰함</Link>
           <Link href="/my/orders">신청·결제 내역</Link>

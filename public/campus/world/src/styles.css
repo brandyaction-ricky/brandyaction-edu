@@ -1,0 +1,425 @@
+html{color-scheme:dark}body{margin:0;background:#07101c;font-family:system-ui,sans-serif}button,input,textarea,select{font:inherit}
+
+#moonshot-workmates{--paper:light-dark(#fbfaf7,#242522);--ink:light-dark(#292f2c,#f2f0e9);--sub:light-dark(#6e756f,#b9bfb7);--line:light-dark(#e4e5dc,#41463e);--card:light-dark(#fff,#2b302a);--soft:light-dark(#f2f3ec,#343a31);--red:#016a97;--green:light-dark(#526856,#adc6ad);font-family:"Pretendard","Apple SD Gothic Neo",system-ui,sans-serif;color:var(--ink);background:var(--paper);border-radius:22px;overflow:hidden;line-height:1.55;color-scheme:light dark}
+#moonshot-workmates *{box-sizing:border-box}#moonshot-workmates h1,#moonshot-workmates h2,#moonshot-workmates h3,#moonshot-workmates p{margin:0}#moonshot-workmates button,#moonshot-workmates input,#moonshot-workmates textarea,#moonshot-workmates select{font:inherit}#moonshot-workmates button{cursor:var(--cursor-interaction,pointer);display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.4;transition:background .15s}#moonshot-workmates button:hover{background:var(--soft)}#moonshot-workmates button.active,#moonshot-workmates button.primary{background:var(--red);border-color:var(--red);color:#fff}#moonshot-workmates button:disabled{opacity:.55;cursor:default}#moonshot-workmates svg{width:17px;height:17px;flex-shrink:0}#moonshot-workmates input,#moonshot-workmates textarea,#moonshot-workmates select{width:100%;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:14px}#moonshot-workmates textarea{resize:vertical;min-height:92px}#moonshot-workmates label{display:grid;gap:7px;font-size:13px;font-weight:600}#moonshot-workmates small{font-size:12px;color:var(--sub)}#moonshot-workmates .ms-demo{padding:8px 28px;font-size:10px;letter-spacing:1.6px;color:var(--sub);border-bottom:1px solid var(--line)}#moonshot-workmates .ms-demo span{margin-left:12px;font-size:11px;letter-spacing:0}#moonshot-workmates .ms-header{display:flex;gap:30px;align-items:center;padding:22px 28px}#moonshot-workmates .ms-brand{font-size:17px;font-weight:800;letter-spacing:1.5px;line-height:1.2}#moonshot-workmates .ms-brand span{display:block;font-size:9px;font-weight:500;letter-spacing:4px;margin-top:5px;color:var(--sub)}#moonshot-workmates h1{font-size:20px;font-weight:650;letter-spacing:-.6px}#moonshot-workmates .ms-title{flex:1}#moonshot-workmates .ms-title p{font-size:12px;color:var(--sub);margin-top:3px}#moonshot-workmates .ms-profile{font-size:12px;white-space:nowrap}#moonshot-workmates .ms-dot{width:8px;height:8px;background:#70836a;border-radius:50%}#moonshot-workmates .ms-world{position:relative;background:#edeef0;isolation:isolate}#moonshot-workmates .ms-roomtop{position:absolute;z-index:2;top:18px;left:24px;right:24px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}#moonshot-workmates .ms-roomtop>*{pointer-events:auto}#moonshot-workmates .ms-roomname{background:#fffffff0;color:#2e3730;border:1px solid #fff;padding:9px 13px;border-radius:12px;font-weight:650;font-size:13px;box-shadow:0 5px 20px #394b3810}#moonshot-workmates .ms-roomname small{display:block;color:#747e74;font-size:11px;font-weight:400}#moonshot-workmates .ms-roomtop button{align-self:flex-start;background:#fffffff0;color:#4b634c;font-size:12px;border:1px solid #fff}#moonshot-workmates canvas{display:block;width:100%;height:570px;touch-action:manipulation}#moonshot-workmates .ms-status{position:absolute;left:20px;right:20px;bottom:79px;text-align:center;color:#52614e;font-size:12px;pointer-events:none;text-shadow:0 1px 3px #fff;background:#edeef0ce;border-radius:8px;margin:auto;width:fit-content;padding:5px 12px;max-width:calc(100% - 40px)}#moonshot-workmates .ms-dock{position:absolute;left:0;right:0;bottom:17px;display:flex;flex-wrap:wrap;justify-content:center;gap:7px;padding:0 16px}#moonshot-workmates .ms-dock button{background:#fffffff2;color:#343d35;border:1px solid #fff;box-shadow:0 4px 14px #3542300e;padding:12px 15px}#moonshot-workmates .ms-dock b{font-size:10px;background:#e9eee5;color:#456047;border-radius:6px;padding:2px 5px}#moonshot-workmates .ms-panel{padding:26px 30px;border-top:1px solid var(--line)}#moonshot-workmates .ms-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}#moonshot-workmates h2{font-size:20px;letter-spacing:-.6px;font-weight:650}#moonshot-workmates h3{font-size:16px;font-weight:650}#moonshot-workmates .muted{color:var(--sub);font-size:13px}#moonshot-workmates .eyebrow{color:var(--green);font-size:11px;letter-spacing:1.5px;font-weight:650;margin-bottom:5px}#moonshot-workmates .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#moonshot-workmates .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}#moonshot-workmates .ms-welcome{display:grid;grid-template-columns:1.2fr 1fr;gap:28px;align-items:center}#moonshot-workmates .ms-welcome h2{font-size:23px;margin-bottom:7px}#moonshot-workmates .ms-welcome p{max-width:410px}#moonshot-workmates .ms-list{display:grid;gap:10px}#moonshot-workmates .ms-list button{justify-content:space-between;text-align:left;padding:14px 16px}#moonshot-workmates .ms-list button span{display:grid;gap:3px}#moonshot-workmates .ms-list strong{font-size:13px;font-weight:600}#moonshot-workmates .ms-list small{font-weight:400}#moonshot-workmates .ms-card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:20px}#moonshot-workmates .ms-posts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}#moonshot-workmates .ms-post{display:flex;flex-direction:column;gap:13px;min-width:0}#moonshot-workmates .ms-post h3{line-height:1.55}#moonshot-workmates .ms-post p{font-size:13px;color:var(--sub);flex:1}#moonshot-workmates .ms-post .url{font-size:12px;color:var(--green);overflow-wrap:anywhere}#moonshot-workmates .tag{display:inline-block;font-size:11px;border-radius:6px;background:var(--soft);color:var(--green);padding:3px 7px;width:fit-content}#moonshot-workmates .ms-note{padding:12px 15px;border-radius:9px;background:var(--soft);font-size:12px;color:var(--sub);margin-top:16px}#moonshot-workmates .ms-form{display:grid;gap:15px;max-width:680px}#moonshot-workmates .error{color:var(--red);font-size:13px}#moonshot-workmates .ms-chatlist{display:grid;gap:12px;margin-bottom:18px}#moonshot-workmates .ms-message{max-width:80%;padding:12px 16px;border-radius:13px;background:var(--soft);width:fit-content;font-size:14px;overflow-wrap:anywhere}#moonshot-workmates .ms-message small{display:block;margin-bottom:4px}#moonshot-workmates .ms-message.mine{margin-left:auto;background:light-dark(#e7f5fd,#153c54)}#moonshot-workmates .ms-chatinput{display:flex;gap:8px}#moonshot-workmates .ms-chatinput input{flex:1;min-width:0}#moonshot-workmates .ms-chatinput button{white-space:nowrap}#moonshot-workmates .ms-avatar-pick{display:grid;grid-template-columns:1fr 1fr;gap:12px}#moonshot-workmates .ms-avatar-pick button{flex-direction:column;padding:12px;min-height:170px;background:var(--soft)}#moonshot-workmates .ms-avatar-pick button.active{background:light-dark(#e8ece2,#3b4a38);color:var(--ink);border:2px solid var(--green)}#moonshot-workmates .ms-avatar-pick canvas{width:90px;height:115px}#moonshot-workmates .ms-swatches button{width:39px;height:39px;border-radius:50%;padding:0;background:var(--swatch);border:3px solid var(--card);box-shadow:0 0 0 1px var(--line)}#moonshot-workmates .ms-swatches button.active{box-shadow:0 0 0 2px var(--red)}#moonshot-workmates .ms-stats{display:flex;gap:30px;flex-wrap:wrap;margin:20px 0}#moonshot-workmates .ms-stats strong{display:block;font-size:28px;letter-spacing:-1px;font-weight:650}#moonshot-workmates .ms-progress{height:7px;background:var(--soft);border-radius:9px;margin:12px 0;overflow:hidden}#moonshot-workmates .ms-progress span{height:100%;display:block;background:#0283bf;border-radius:9px}#moonshot-workmates .ms-feedback{border-top:1px solid var(--line);padding-top:18px;margin-top:18px;display:grid;gap:12px}#moonshot-workmates .ms-timer{font-size:48px;font-variant-numeric:tabular-nums;letter-spacing:-2px;font-weight:500;margin:10px 0}#moonshot-workmates .ms-bottom{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:15px 30px;background:var(--soft);font-size:11px;color:var(--sub)}#moonshot-workmates .ms-bottom span{display:flex;align-items:center;gap:7px}
+@media(max-width:680px){#moonshot-workmates .ms-header{padding:18px;gap:14px;flex-wrap:wrap}#moonshot-workmates .ms-brand{font-size:14px}#moonshot-workmates .ms-title{order:3;flex-basis:100%}#moonshot-workmates .ms-profile{margin-left:auto}#moonshot-workmates .ms-demo{padding:9px 18px}#moonshot-workmates .ms-demo span{display:block;margin:3px 0 0}#moonshot-workmates canvas{height:490px}#moonshot-workmates .ms-roomtop{left:12px;right:12px;top:12px}#moonshot-workmates .ms-roomtop button{padding:10px;font-size:11px}#moonshot-workmates .ms-dock{gap:5px;bottom:12px;padding:0 10px}#moonshot-workmates .ms-dock button{font-size:11px;padding:11px 10px;min-height:43px}#moonshot-workmates .ms-dock button:last-child{display:none}#moonshot-workmates .ms-status{bottom:110px;font-size:11px}#moonshot-workmates .ms-panel{padding:22px 18px}#moonshot-workmates .ms-welcome,#moonshot-workmates .grid2,#moonshot-workmates .ms-posts{grid-template-columns:1fr}#moonshot-workmates .ms-panel-head{align-items:flex-start;flex-wrap:wrap}#moonshot-workmates .ms-bottom{padding:14px 18px}#moonshot-workmates input,#moonshot-workmates textarea{font-size:16px}#moonshot-workmates .ms-message{max-width:95%}}
+
+
+
+#moonshot-workmates{position:relative;border-radius:0;background:#edeef0}
+#moonshot-workmates .ms-demo{padding:6px 22px;background:var(--paper)}
+#moonshot-workmates .ms-header{padding:13px 22px;gap:24px;background:var(--paper)}
+#moonshot-workmates .ms-title p{display:none}
+#moonshot-workmates .ms-title h1{font-size:16px}
+#moonshot-workmates .ms-brand{font-size:14px}
+#moonshot-workmates .ms-brand span{font-size:8px}
+#moonshot-workmates .ms-world{height:600px;overflow:hidden}
+#moonshot-workmates #ms-canvas{height:100%;width:100%;touch-action:none}
+#moonshot-workmates .ms-roomtop{top:18px;left:22px;right:22px}
+#moonshot-workmates .ms-dock{bottom:18px;z-index:4}
+#moonshot-workmates .ms-status{bottom:78px;z-index:3;background:#fff9eef0;color:#59604e;font-size:11px;padding:7px 13px;text-shadow:none;max-width:calc(100% - 40px)}
+#moonshot-workmates .ms-panel{position:absolute;z-index:8;right:22px;top:180px;bottom:105px;width:450px;max-width:calc(100% - 44px);padding:27px 24px 22px;border:1px solid var(--line);background:var(--paper);border-radius:20px;box-shadow:0 15px 70px #222e2533;overflow:auto;overscroll-behavior:contain}
+#moonshot-workmates .ms-panel[hidden]{display:none}
+#moonshot-workmates .ms-panel>.ms-close{position:sticky;top:-14px;float:right;z-index:2;width:32px;height:32px;padding:0;border-radius:50%;margin:-12px -10px 3px 5px}
+#moonshot-workmates .ms-panel-head{padding-top:7px;align-items:flex-start;flex-wrap:wrap;gap:12px}
+#moonshot-workmates .ms-panel h2{font-size:20px}
+#moonshot-workmates .grid2,#moonshot-workmates .ms-posts{grid-template-columns:1fr;gap:16px}
+#moonshot-workmates .ms-panel .ms-card{padding:16px}
+#moonshot-workmates .ms-panel .ms-post h3{font-size:15px}
+#moonshot-workmates .ms-panel .ms-posts{gap:12px}
+#moonshot-workmates .ms-panel .ms-note{font-size:11px}
+#moonshot-workmates .ms-avatar-pick button{min-height:90px}
+#moonshot-workmates .ms-avatar-pick strong{font-size:16px}
+#moonshot-workmates .ms-avatar-pick span{font-size:11px;opacity:.8}
+#moonshot-workmates .ms-bottom{display:none}
+#moonshot-workmates #ms-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+#moonshot-workmates .ms-3d-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:550;white-space:nowrap;background:#fffaf0eb;color:#4a5844;border:1px solid #ffffff80;border-radius:8px;padding:3px 8px;box-shadow:0 2px 8px #29352514}
+#moonshot-workmates .ms-3d-tag.mine{background:#0283bff2;color:#fff8ec;border-color:#0283bf}
+#moonshot-workmates .ms-3d-bubble{position:absolute;transform:translate(-50%,-100%);padding:10px 14px;max-width:220px;min-width:100px;font-size:13px;text-align:center;background:#fffdf6;color:#404a3a;border-radius:14px 14px 14px 2px;box-shadow:0 3px 15px #29352522;overflow-wrap:anywhere}
+#moonshot-workmates .ms-interact{position:absolute;z-index:3;left:50%;bottom:123px;transform:translateX(-50%);white-space:nowrap;background:#fffaf0f2;color:#495542;border-color:#fff8ee;font-size:12px;box-shadow:0 5px 20px #34402a1a}
+#moonshot-workmates .ms-interact.ready{background:#016a97;color:#fff;border-color:#016a97}
+#moonshot-workmates .ms-interact:disabled{opacity:.75}
+#moonshot-workmates .ms-keyguide{position:absolute;z-index:3;bottom:26px;left:20px;color:#63705c;font-size:11px;display:none}
+#moonshot-workmates .ms-touchpad{position:absolute;z-index:3;bottom:130px;left:15px;display:none;grid-template-columns:35px 35px 35px;grid-template-rows:35px 35px;gap:4px}
+#moonshot-workmates .ms-touchpad button{padding:0;background:#fff9edee;color:#59684c;border:1px solid #fff9ed;touch-action:none;user-select:none}
+#moonshot-workmates .ms-touchpad button:first-child{grid-column:2}
+#moonshot-workmates .ms-touchpad button:nth-child(2){grid-column:1;grid-row:2}
+#moonshot-workmates .ms-touchpad button:nth-child(3){grid-column:2;grid-row:2}
+#moonshot-workmates .ms-touchpad button:nth-child(4){grid-column:3;grid-row:2}
+#moonshot-workmates #ms-loading{position:absolute;inset:0;z-index:10;display:grid;place-items:center;background:#edeef0;color:#63705c;font-size:14px}
+#moonshot-workmates #ms-loading[hidden]{display:none}
+@media(max-width:680px){#moonshot-workmates .ms-header{padding:12px 15px;gap:10px;flex-wrap:nowrap}#moonshot-workmates .ms-title{display:none}#moonshot-workmates .ms-demo{padding:6px 15px;font-size:9px}#moonshot-workmates .ms-demo span{font-size:10px}#moonshot-workmates .ms-world{height:600px}#moonshot-workmates .ms-dock{gap:5px;bottom:12px}#moonshot-workmates .ms-dock button{padding:10px 9px;font-size:11px}#moonshot-workmates .ms-status{bottom:111px;font-size:10px;max-width:calc(100% - 24px)}#moonshot-workmates .ms-interact{bottom:157px;left:auto;right:13px;transform:none;font-size:11px;max-width:calc(100% - 140px);white-space:normal}#moonshot-workmates .ms-touchpad{display:grid;bottom:157px}#moonshot-workmates .ms-panel{left:12px;right:12px;top:160px;bottom:110px;width:auto;max-width:none;padding:22px 18px}#moonshot-workmates .ms-roomtop{left:12px;right:12px}#moonshot-workmates .ms-3d-tag{font-size:10px;padding:3px 6px}}
+
+
+
+
+#moonshot-workmates{--paper:light-dark(#fff,#17181b);--ink:light-dark(#18191b,#f6f6f7);--sub:light-dark(#696c73,#b7bac1);--line:light-dark(#e4e5e8,#3d3f45);--card:light-dark(#fff,#24262b);--soft:light-dark(#f5f5f7,#303239);--red:#016a97;--green:light-dark(#016a97,#a8e0ff)}
+#moonshot-workmates button,#moonshot-workmates input,#moonshot-workmates textarea,#moonshot-workmates select{border-radius:6px}
+#moonshot-workmates .ms-header{border-bottom:1px solid var(--line)}
+#moonshot-workmates .ms-brand{color:var(--ink)}
+#moonshot-workmates .ms-brand span{color:var(--red)}
+#moonshot-workmates .ms-roomname,#moonshot-workmates .ms-roomtop button,#moonshot-workmates .ms-dock button{background:var(--card);color:var(--ink);border:1px solid var(--line);box-shadow:0 3px 16px #16171b0c}
+#moonshot-workmates .ms-roomname small{color:var(--sub)}
+#moonshot-workmates .ms-dock b{background:light-dark(#e7f5fd,#153c54);color:light-dark(#016a97,#b1ddf3)}
+#moonshot-workmates .ms-dot{background:#0283bf}
+#moonshot-workmates .ms-status{background:var(--card);color:var(--sub);border:1px solid var(--line)}
+#moonshot-workmates .ms-3d-tag{background:#ffffffed;color:#393b40;border-color:#e5e5e880}
+#moonshot-workmates .ms-3d-tag.mine{background:#016a97;color:#fff;border-color:#016a97}
+#moonshot-workmates .ms-3d-bubble{background:var(--card);color:var(--ink)}
+#moonshot-workmates .ms-interact{background:var(--card);color:var(--ink);border-color:var(--line)}
+#moonshot-workmates .ms-interact.ready{background:#016a97;color:#fff;border-color:#016a97}
+#moonshot-workmates .ms-avatar-pick button.active{background:light-dark(#e7f5fd,#153c54);border-color:#0283bf}
+#moonshot-workmates .ms-message.mine{background:light-dark(#e7f5fd,#153c54)}
+#moonshot-workmates .ms-touchpad button{background:var(--card);color:var(--ink);border-color:var(--line)}
+#moonshot-workmates .ms-keymap{position:absolute;z-index:3;left:22px;top:91px;display:flex;flex-wrap:wrap;gap:7px 10px;max-width:280px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 11px;color:var(--sub);font-size:11px;box-shadow:0 3px 16px #16171b0c}
+#moonshot-workmates .ms-keymap span{white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+#moonshot-workmates .ms-keymap kbd{font-family:inherit;font-size:11px;font-weight:650;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;min-width:19px;text-align:center}
+#moonshot-workmates .ms-keymap small{font-size:10px;flex-basis:100%;color:var(--sub)}
+@media(max-width:680px){#moonshot-workmates .ms-dock{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}#moonshot-workmates .ms-dock button{font-size:10px;padding:9px 5px;min-height:44px}#moonshot-workmates .ms-status{bottom:132px}#moonshot-workmates .ms-touchpad,#moonshot-workmates .ms-interact{bottom:176px}#moonshot-workmates .ms-keymap{left:12px;top:86px;gap:5px 8px;max-width:255px;font-size:10px;padding:7px 9px}}
+
+
+
+#moonshot-workmates{border-radius:16px;position:relative}
+#moonshot-workmates .ms-world{height:680px;background:#dfe9ef}
+#moonshot-workmates .ms-header{padding:14px 24px}
+#moonshot-workmates .ms-keymap{top:auto;bottom:24px;left:20px;max-width:180px;background:#ffffffdc;pointer-events:none}
+#moonshot-workmates .ms-keymap small{font-size:11px}
+#moonshot-workmates .ms-dock{bottom:22px;left:auto;right:14px;justify-content:flex-end;gap:6px;padding:0}
+#moonshot-workmates .ms-dock button{border-radius:14px;min-width:60px;min-height:50px;padding:10px 14px}
+#moonshot-workmates .ms-status{bottom:85px;max-width:520px;font-size:11px;padding:7px 12px}
+#moonshot-workmates .ms-interact{bottom:128px;border-radius:24px;padding:12px 20px}
+#moonshot-workmates .ms-interact:disabled{display:none}
+#moonshot-workmates .ms-panel{top:190px;bottom:120px;width:370px;border-radius:18px;padding:24px}
+#moonshot-workmates .ms-panel h2{font-size:21px}
+#moonshot-workmates .ms-seat-invite{position:absolute;z-index:3;left:22px;top:96px;max-width:275px;padding:17px 18px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 28px #244c6a14}
+#moonshot-workmates .ms-seat-invite strong{display:block;font-size:14px;margin:4px 0}
+#moonshot-workmates .ms-seat-invite p{font-size:12px;color:var(--sub);margin:6px 0 13px}
+#moonshot-workmates .ms-seat-invite small{color:var(--red);font-size:10px;letter-spacing:1.5px}
+#moonshot-workmates .ms-seat-invite .dismiss{position:absolute;right:8px;top:8px;padding:5px;border:0;background:transparent}
+#moonshot-workmates .ms-seat-invite[hidden],#moonshot-workmates .ms-focus-hud[hidden]{display:none}
+#moonshot-workmates .ms-focus-hud{position:absolute;z-index:5;bottom:25px;left:50%;transform:translateX(-50%);width:min(550px,calc(100% - 32px));background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 40px #173c521c;padding:18px 22px;display:flex;align-items:center;gap:20px}
+#moonshot-workmates .ms-focus-hud .focus-info{flex:1;min-width:0}
+#moonshot-workmates .ms-focus-hud small{font-size:11px;color:var(--red)}
+#moonshot-workmates .ms-focus-hud strong{display:block;font-size:14px;overflow-wrap:anywhere;line-height:1.5;margin-top:3px}
+#moonshot-workmates .ms-focus-hud time{font-size:29px;font-variant-numeric:tabular-nums;letter-spacing:-1px;font-weight:500}
+#moonshot-workmates .ms-focus-hud .row{gap:6px;flex-wrap:nowrap}
+#moonshot-workmates .ms-focus-hud button{padding:9px 12px;white-space:nowrap}
+#moonshot-workmates.is-focusing .ms-dock,#moonshot-workmates.is-focusing .ms-interact,#moonshot-workmates.is-focusing .ms-keymap,#moonshot-workmates.is-focusing .ms-touchpad,#moonshot-workmates.is-focusing .ms-seat-invite{display:none}
+#moonshot-workmates.is-focusing .ms-status{bottom:143px}
+#moonshot-workmates .ms-seat-progress{display:flex;gap:8px;font-size:11px;margin:0 0 20px;color:var(--sub)}
+#moonshot-workmates .ms-seat-progress b{font-weight:500;color:var(--red)}
+#moonshot-workmates .ms-panel .ms-form{gap:16px}
+#moonshot-workmates .ms-resource{border-bottom:1px solid var(--line);padding:16px 0;display:grid;gap:7px}
+#moonshot-workmates .ms-resource:last-child{border-bottom:0}
+#moonshot-workmates .ms-resource h3{font-size:15px}
+#moonshot-workmates .ms-resource p{font-size:12px;color:var(--sub)}
+#moonshot-workmates .ms-crew-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+#moonshot-workmates .ms-crew-avatar{width:35px;height:35px;border-radius:50%;background:var(--soft);display:grid;place-items:center;color:var(--red);font-weight:600}
+#moonshot-workmates .ms-crew-row div:nth-child(2){flex:1}
+#moonshot-workmates .ms-crew-row strong{font-size:13px;display:block}
+#moonshot-workmates .ms-crew-row small{font-size:11px;display:block}
+#moonshot-workmates .ms-nextstep{border-left:3px solid #0283bf;padding:12px 14px;background:var(--soft);margin:18px 0;font-size:13px}
+#moonshot-workmates .ms-3d-tag{border-radius:20px;padding:5px 10px;font-size:11px}
+#moonshot-workmates .ms-3d-tag small{display:block;color:inherit;opacity:.8;font-size:10px;font-weight:400;text-align:center}
+@media(max-width:680px){
+#moonshot-workmates .ms-world{height:670px}
+#moonshot-workmates .ms-keymap{display:none}
+#moonshot-workmates .ms-dock{display:flex;left:12px;right:12px;bottom:16px;justify-content:center}
+#moonshot-workmates .ms-dock button{min-width:0;flex:1;max-width:100px;font-size:11px;padding:10px 5px;min-height:47px}
+#moonshot-workmates .ms-dock button:last-child{display:inline-flex}
+#moonshot-workmates .ms-seat-invite{top:86px;left:12px;max-width:245px;padding:14px 16px}
+#moonshot-workmates .ms-touchpad{left:12px;bottom:108px;grid-template-columns:40px 40px 40px;grid-template-rows:40px 40px}
+#moonshot-workmates .ms-interact{bottom:114px;right:12px;left:auto;max-width:calc(100% - 160px);white-space:normal;transform:none;font-size:11px;padding:11px 12px}
+#moonshot-workmates .ms-status{bottom:70px;left:12px;right:12px;max-width:calc(100% - 24px);font-size:10px}
+#moonshot-workmates .ms-panel{top:185px;bottom:96px;left:12px;right:12px;width:auto;max-width:none;padding:22px 18px}
+#moonshot-workmates .ms-panel[data-mode="desk"]{top:auto;bottom:95px;max-height:350px;padding:18px}
+#moonshot-workmates .ms-panel[data-mode="desk"] h2{font-size:17px}
+#moonshot-workmates .ms-panel[data-mode="desk"] .ms-panel-head{margin-bottom:14px}
+#moonshot-workmates .ms-panel[data-mode="desk"] .ms-seat-progress,#moonshot-workmates .ms-panel[data-mode="desk"] .ms-form>small,#moonshot-workmates .ms-panel[data-mode="desk"] .ms-form>.row>small{display:none}
+#moonshot-workmates .ms-panel[data-mode="desk"] .ms-form{gap:12px}
+#moonshot-workmates .ms-panel[data-mode="desk"] .ms-form>.row{display:none}
+#moonshot-workmates .ms-focus-hud{bottom:22px;display:grid;grid-template-columns:1fr auto;gap:12px;padding:16px}
+#moonshot-workmates .ms-focus-hud .row{grid-column:1 / -1}
+#moonshot-workmates .ms-focus-hud .row button{flex:1;min-height:44px}
+#moonshot-workmates.is-focusing .ms-status{bottom:175px}
+#moonshot-workmates .ms-roomtop button{font-size:11px;max-width:112px}
+}
+@media(prefers-reduced-motion:reduce){#moonshot-workmates *{transition:none!important}}
+
+
+
+#moonshot-workmates{--paper:#091526;--ink:#f0f5fc;--sub:#a9bdd2;--line:#2a405b;--card:#112239;--soft:#182d47;--red:#067eaf;--green:#82d5f7;color-scheme:dark;border-radius:16px}
+#moonshot-workmates .ms-demo{color:#8faac1;border-color:#20334d;background:#071221}
+#moonshot-workmates .ms-header{background:#081322;border-color:#20334d}
+#moonshot-workmates .ms-brand{color:#fff}#moonshot-workmates .ms-brand span{color:#72d2f7}
+#moonshot-workmates .ms-title h1{font-size:18px;font-weight:600}
+#moonshot-workmates .ms-world{height:740px;background:#050d1c}
+#moonshot-workmates .ms-roomname,#moonshot-workmates .ms-roomtop button{background:#0b1b30ed;color:#eef7ff;border-color:#2a4463;box-shadow:none}
+#moonshot-workmates .ms-roomname small{color:#9db5cf}
+#moonshot-workmates .ms-dock button{background:#10243a;color:#e9f5ff;border-color:#31506d}
+#moonshot-workmates button.primary,#moonshot-workmates button.active{background:#087fae;border-color:#25b3e7;color:#fff}
+#moonshot-workmates .ms-dock button[data-action="missionmap"]{background:#087fae;border-color:#2fb6e6}
+#moonshot-workmates .ms-keymap,#moonshot-workmates .ms-status{background:#091a2de8;color:#bfd3e7;border-color:#2a4561;text-shadow:none}
+#moonshot-workmates .ms-keymap kbd{background:#1b3550;color:#e1f5ff;border-color:#47677e}
+#moonshot-workmates .ms-3d-tag{background:#102b43ed;color:#ddecff;border-color:#416786}
+#moonshot-workmates .ms-3d-tag.mine{background:#086b96;border-color:#53c4ed;color:#fff}
+#moonshot-workmates .ms-interact{background:#102b43;color:#def3ff;border-color:#4883a6}
+#moonshot-workmates .ms-interact.ready{background:#087fae;border-color:#62ccec;color:#fff}
+#moonshot-workmates #ms-loading{background:#071322;color:#9bc6e7}
+#moonshot-workmates .ms-panel{background:#0c1e33;border:1px solid #355773;box-shadow:0 20px 70px #0007;top:180px;bottom:115px;width:390px;border-radius:18px}
+#moonshot-workmates .ms-panel .eyebrow{color:#7dcfeb;letter-spacing:2px}
+#moonshot-workmates .ms-panel h2{font-size:23px;line-height:1.35;letter-spacing:-.7px}
+#moonshot-workmates .ms-panel .muted{line-height:1.7}
+#moonshot-workmates .ms-panel-head{margin-bottom:18px}
+#moonshot-workmates .ms-panel[data-mode="entry"]{left:28px;right:auto;top:210px;bottom:auto;max-height:580px;width:390px;padding:27px}
+#moonshot-workmates .ms-panel[data-mode="entry"]>.ms-close{display:none}
+#moonshot-workmates .entry-title{font-size:32px;line-height:1.35;letter-spacing:-1.3px;margin:9px 0 15px;font-weight:600}
+#moonshot-workmates .purpose-list{display:grid;gap:9px;margin:22px 0 15px}
+#moonshot-workmates .purpose-list button{justify-content:flex-start;text-align:left;padding:13px 15px;border-radius:11px;gap:13px;background:#132b44;border-color:#284a67;min-height:63px}
+#moonshot-workmates .purpose-list button.primary{background:#087fae;border-color:#3bbce9}
+#moonshot-workmates .purpose-list span{display:grid;gap:3px}
+#moonshot-workmates .purpose-list strong{font-weight:600;font-size:14px}
+#moonshot-workmates .purpose-list small{font-size:11px;color:#b6cde1}
+#moonshot-workmates .purpose-list .primary small{color:#d5f1ff}
+#moonshot-workmates .purpose-list svg{width:22px;height:22px}
+#moonshot-workmates .text-button{border:0;background:transparent;padding:8px 0;color:#b8cede}
+#moonshot-workmates .quest-tracker{position:absolute;z-index:3;left:22px;top:90px;width:235px;background:#0a1c30ed;border:1px solid #315778;border-radius:14px;padding:14px 16px}
+#moonshot-workmates .quest-tracker small{color:#85c8e6;font-size:10px;letter-spacing:1.1px}
+#moonshot-workmates .quest-tracker strong{display:block;font-size:13px;margin:5px 0 10px;line-height:1.5}
+#moonshot-workmates .quest-tracker button{width:100%;padding:9px;font-size:12px;background:#173c58;border-color:#376c8a}
+#moonshot-workmates .quest-tracker[hidden],#moonshot-workmates.is-entry .ms-dock,#moonshot-workmates.is-entry .ms-keymap,#moonshot-workmates.is-entry .ms-status,#moonshot-workmates.is-entry .ms-touchpad,#moonshot-workmates.is-entry .ms-interact,#moonshot-workmates.is-focusing .quest-tracker{display:none}
+#moonshot-workmates .mission-options{display:grid;gap:12px;margin-top:20px}
+#moonshot-workmates .mission-option{padding:16px;background:#142b44;border:1px solid #2b4e6d;border-radius:13px;display:grid;gap:10px}
+#moonshot-workmates .mission-option h3{font-size:16px}
+#moonshot-workmates .mission-option p{font-size:12px;color:#b5ccdf;line-height:1.65}
+#moonshot-workmates .mission-option small{color:#6fc9ee}
+#moonshot-workmates .mission-option button{justify-content:space-between}
+#moonshot-workmates .ms-panel[data-mode="missionmap"]{width:min(840px,calc(100% - 44px));left:50%;right:auto;transform:translateX(-50%);top:180px;bottom:auto;max-height:620px;padding:26px}
+#moonshot-workmates .orbit-map{height:250px;position:relative;margin:8px 0 10px;border-radius:16px;background:radial-gradient(ellipse at 60% 50%,#173b5b 0%,#0b1b30 70%);overflow:hidden}
+#moonshot-workmates .orbit-map svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#moonshot-workmates .orbit-map .map-node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;min-width:88px;padding:0;background:transparent;border:0;box-shadow:none}
+#moonshot-workmates .map-node .node-circle{width:46px;height:46px;border-radius:50%;background:#142a42;border:1px solid #4a6881;display:grid;place-items:center;font-size:17px;box-shadow:0 0 0 7px #203c5533}
+#moonshot-workmates .map-node.current .node-circle{background:#119aca;border:2px solid #a0e8ff;box-shadow:0 0 0 9px #159bdc24,0 0 28px #37b7ec44}
+#moonshot-workmates .map-node.done .node-circle{background:#153c50;border:1px solid #72d5df;color:#9cf0e6}
+#moonshot-workmates .map-node strong{font-size:12px;line-height:1.3;color:#ebf7ff;font-weight:500}
+#moonshot-workmates .map-node small{font-size:10px;color:#94b1c9}
+#moonshot-workmates .map-node.current small{color:#8ee3ff}
+#moonshot-workmates .map-current{display:flex;align-items:center;gap:18px;background:#142e46;padding:16px 18px;border-radius:12px}
+#moonshot-workmates .map-current>div{flex:1;min-width:0}
+#moonshot-workmates .map-current strong{font-size:15px}
+#moonshot-workmates .map-current p{font-size:12px;color:#b5ccdf;margin-top:5px}
+#moonshot-workmates .map-current button{white-space:nowrap}
+#moonshot-workmates .quest-step{display:flex;align-items:center;gap:9px;margin-bottom:18px;color:#84d5ef;font-size:11px;letter-spacing:1px}
+#moonshot-workmates .quest-step span{background:#173e58;border-radius:7px;padding:4px 7px}
+#moonshot-workmates .quest-brief{font-size:13px;line-height:1.75;color:#c0d5e8;padding:14px 16px;background:#132c44;border-radius:10px;margin:0 0 18px}
+#moonshot-workmates .quest-feedback{padding:16px;border:1px solid #315474;background:#132b43;border-radius:12px;margin-bottom:12px;font-size:13px;line-height:1.7}
+#moonshot-workmates .quest-feedback small{display:block;color:#83cce9;font-size:11px;margin-bottom:5px}
+#moonshot-workmates .quest-check{display:flex;align-items:flex-start;gap:10px;line-height:1.7;font-size:13px;margin:15px 0}
+#moonshot-workmates .quest-check input{width:18px;height:18px;margin-top:3px;flex:none;accent-color:#159ac7}
+#moonshot-workmates .launch-stamp{width:78px;height:78px;border:1px solid #79d9f4;background:#0b4a68;border-radius:50%;display:grid;place-items:center;margin:0 0 20px;box-shadow:0 0 0 10px #1a91bd18}
+#moonshot-workmates .launch-stamp svg{width:32px;height:32px}
+#moonshot-workmates .quest-recap{padding:14px 0;border-bottom:1px solid #29415b;font-size:13px;line-height:1.75;overflow-wrap:anywhere}
+#moonshot-workmates .quest-recap small{display:block;margin-bottom:5px;color:#85c6e5}
+#moonshot-workmates .ms-focus-hud{background:#0c2035;border-color:#3a5c7d;color:#e4f4ff}
+#moonshot-workmates .ms-focus-hud small{color:#7fd7f5}
+#moonshot-workmates .error{color:#ffb5a3}
+#moonshot-workmates .ms-touchpad button{background:#122c45;color:#d6edff;border-color:#3a5a77}
+@media(max-width:680px){
+#moonshot-workmates .ms-world{height:730px}
+#moonshot-workmates .ms-panel{top:190px;bottom:105px;left:12px;right:12px;width:auto}
+#moonshot-workmates .ms-panel[data-mode="entry"]{left:12px;right:12px;top:300px;bottom:auto;width:auto;max-height:520px;padding:20px}
+#moonshot-workmates .entry-title{font-size:27px}
+#moonshot-workmates .purpose-list{grid-template-columns:1fr 1fr;gap:8px;margin:17px 0 10px}
+#moonshot-workmates .purpose-list button{padding:12px 10px;min-height:85px;align-items:flex-start;flex-direction:column;gap:8px}
+#moonshot-workmates .purpose-list small{display:none}
+#moonshot-workmates .purpose-list strong{font-size:12px}
+#moonshot-workmates .entry-title{font-size:24px}
+#moonshot-workmates .quest-tracker{left:12px;top:86px;width:205px;padding:11px 13px}
+#moonshot-workmates .quest-tracker strong{margin:3px 0 7px;font-size:12px}
+#moonshot-workmates .ms-panel[data-mode="missionmap"]{left:12px;right:12px;width:auto;transform:none;top:175px;bottom:100px;max-height:none;padding:20px}
+#moonshot-workmates .orbit-map{height:auto;margin:15px 0;padding:6px 0;background:none;overflow:visible}
+#moonshot-workmates .orbit-map svg{display:none}
+#moonshot-workmates .orbit-map .map-node{position:relative;transform:none;left:auto!important;top:auto!important;flex-direction:row;width:100%;padding:7px 2px;justify-content:flex-start;min-height:58px;text-align:left;gap:12px}
+#moonshot-workmates .map-node .node-circle{width:36px;height:36px;flex:none;box-shadow:none}
+#moonshot-workmates .map-node strong{flex:1}
+#moonshot-workmates .map-node small{min-width:56px}
+#moonshot-workmates .map-current{display:grid;padding:14px;gap:12px}
+#moonshot-workmates .ms-dock button{padding:10px 6px;font-size:11px}
+#moonshot-workmates .ms-panel[data-mode="questfocus"]{top:auto;bottom:95px;max-height:360px}
+#moonshot-workmates .ms-panel[data-mode="questfocus"] .quest-brief{display:none}
+}
+@media(min-width:481px) and (max-width:680px){
+#moonshot-workmates .orbit-map{height:250px;position:relative;padding:0;background:radial-gradient(ellipse at 60% 50%,#173b5b 0%,#0b1b30 70%);overflow:hidden}
+#moonshot-workmates .orbit-map svg{display:block}
+#moonshot-workmates .orbit-map .map-node{position:absolute;transform:translate(-50%,-50%);left:var(--node-x)!important;top:var(--node-y)!important;flex-direction:column;width:auto;min-width:70px;min-height:0;padding:0;gap:8px;text-align:center}
+#moonshot-workmates .map-node strong{flex:none;font-size:11px}
+#moonshot-workmates .map-node small{min-width:0}
+#moonshot-workmates .map-node .node-circle{width:40px;height:40px}
+}
+
+
+
+#moonshot-workmates{--paper:#070e1b;--ink:#e9f1fa;--sub:#a3b6cc;--line:#2b3e57;--card:#101d30;--soft:#17283d;background:#070e1b;border-radius:12px}
+#moonshot-workmates .ms-header{background:#080f1d;padding:17px 24px}
+#moonshot-workmates .ms-brand{letter-spacing:3px;font-weight:600}
+#moonshot-workmates .ms-brand span{letter-spacing:4px;color:#85c6ff}
+#moonshot-workmates .ms-demo{font-size:10px;letter-spacing:1px;background:#060c16}
+#moonshot-workmates .ms-world{height:800px;background:#050b17}
+#moonshot-workmates .ms-roomtop{top:20px}
+#moonshot-workmates .ms-roomname{background:transparent;border:0;padding:0;box-shadow:none;font-size:14px;letter-spacing:.5px}
+#moonshot-workmates .ms-roomname small{font-size:11px;letter-spacing:.2px;margin-top:4px}
+#moonshot-workmates .ms-roomtop button{border-radius:4px}
+#moonshot-workmates .ms-dock{bottom:20px;gap:2px;padding:5px;background:#0a1424f5;border:1px solid #35506a;left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100% - 28px);border-radius:8px}
+#moonshot-workmates .ms-dock button{border:0;box-shadow:none;background:transparent;border-radius:4px;font-size:12px;padding:12px 18px}
+#moonshot-workmates .ms-dock button[data-action="missionmap"]{background:#193956;border:0}
+#moonshot-workmates .ms-dock button:last-child{display:inline-flex}
+#moonshot-workmates .ms-status{bottom:92px;background:#071322e8;border:0;font-size:11px}
+#moonshot-workmates .ms-keymap{top:auto;bottom:150px;left:18px;max-width:190px;opacity:.9}
+#moonshot-workmates.overview .ms-keymap,#moonshot-workmates.overview .ms-interact,#moonshot-workmates.overview .ms-touchpad{display:none}
+#moonshot-workmates .ms-panel{border-radius:10px;background:#0b182a;top:165px;bottom:115px;box-shadow:0 30px 100px #0009;max-height:none}
+#moonshot-workmates .ms-panel[data-mode="curriculum"],#moonshot-workmates .ms-panel[data-mode="missionpick"]{width:490px;max-width:calc(100% - 32px);top:150px;bottom:105px}
+#moonshot-workmates .ms-panel h2{font-size:23px;letter-spacing:-.6px;font-weight:600}
+#moonshot-workmates .ms-panel .eyebrow{color:#82c7fb;letter-spacing:1.7px;font-size:10px}
+#moonshot-workmates button.primary{background:#17649b;border-color:#4894c5;border-radius:5px}
+#moonshot-workmates button.primary:hover{background:#237db6}
+#moonshot-workmates .quest-tracker{left:22px;top:90px;width:220px;border-radius:7px;border-left:2px solid #84ccff;background:#0a1728f5;padding:12px 14px}
+#moonshot-workmates .quest-tracker strong{font-size:12px;margin:6px 0}
+#moonshot-workmates.has-panel .quest-tracker{display:none}
+#moonshot-workmates .space-pins{position:absolute;inset:0;pointer-events:none;z-index:3}
+#moonshot-workmates .space-pin{pointer-events:auto;position:absolute;transform:translate(-50%,-50%);background:#081727ed;border:1px solid #68849b;border-radius:5px;display:flex;flex-direction:column;gap:3px;padding:9px 13px;white-space:nowrap;box-shadow:0 5px 22px #0005;transition:background .15s,border-color .15s}
+#moonshot-workmates .space-pin:after{content:'';height:15px;width:1px;background:#8ccfff;position:absolute;top:100%;left:50%}
+#moonshot-workmates .space-pin strong{font-size:12px;font-weight:600;letter-spacing:.2px}
+#moonshot-workmates .space-pin small{font-size:10px;color:#afc8df}
+#moonshot-workmates .space-pin:hover{background:#173e5b;border-color:#b5e7ff}
+#moonshot-workmates:not(.overview) .space-pins,#moonshot-workmates.has-panel .space-pins{display:none}
+#moonshot-workmates.overview .ms-3d-tag:not(.mine){display:none}
+#moonshot-workmates.overview .ms-3d-tag.mine{font-size:10px;background:#e2f5ff;color:#0b2b40;border-color:#fff;border-radius:4px;padding:3px 7px}
+#moonshot-workmates .overview-caption{position:absolute;left:24px;top:83px;pointer-events:none;max-width:300px;color:#e2edfa}
+#moonshot-workmates .overview-caption small{font-size:10px;color:#81b4db;letter-spacing:3px}
+#moonshot-workmates .overview-caption h2{font-size:27px;line-height:1.35;letter-spacing:-1px;margin-top:7px;font-weight:500}
+#moonshot-workmates .overview-caption p{font-size:11px;margin-top:9px;color:#a4bad0}
+#moonshot-workmates.has-mission .overview-caption,#moonshot-workmates.has-panel .overview-caption,#moonshot-workmates:not(.overview) .overview-caption{display:none}
+#moonshot-workmates .week-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:20px}
+#moonshot-workmates .week-tabs button{padding:9px 3px;font-size:11px;border-radius:4px;min-width:0}
+#moonshot-workmates .week-tabs button[aria-pressed=true]{background:#235377;border-color:#75b9eb}
+#moonshot-workmates .week-name{display:flex;justify-content:space-between;gap:10px;color:#b5d4ea;font-size:13px;margin:17px 0 10px}
+#moonshot-workmates .week-name span{font-size:10px;letter-spacing:1px;color:#89a6bf}
+#moonshot-workmates .day-track{display:grid;gap:0;padding:0 0 8px}
+#moonshot-workmates .day-stop{border:0;border-radius:0;background:transparent;text-align:left;justify-content:flex-start;padding:10px 5px;gap:13px;position:relative;min-height:65px}
+#moonshot-workmates .day-stop:before{content:'';position:absolute;left:24px;top:0;bottom:0;width:1px;background:#41637c;z-index:0}
+#moonshot-workmates .day-stop:first-child:before{top:50%}
+#moonshot-workmates .day-stop:last-child:before{bottom:50%}
+#moonshot-workmates .day-stop>span:nth-child(2){flex:1;min-width:0}
+#moonshot-workmates .day-stop strong{display:block;font-size:13px;font-weight:500;line-height:1.5}
+#moonshot-workmates .day-stop small{font-size:11px;color:#90a9c0}
+#moonshot-workmates .day-orb{position:relative;z-index:1;width:40px;height:40px;flex:none;border-radius:50%;border:1px solid #49637c;background:#0b182a;display:grid;place-items:center;color:#a6c1d6;font-size:13px}
+#moonshot-workmates .day-stop.selected{background:#16324a;border-radius:6px}
+#moonshot-workmates .day-stop.selected .day-orb{border-color:#a0e4ff;background:#245c80;color:#fff;box-shadow:0 0 22px #419cc33b}
+#moonshot-workmates .day-stop.complete .day-orb{color:#96e0da;border-color:#63b9ad}
+#moonshot-workmates .selected-lesson{border-top:1px solid #31485e;padding-top:17px;display:grid;gap:12px}
+#moonshot-workmates .selected-lesson h3{font-size:16px;line-height:1.5}
+#moonshot-workmates .selected-lesson>small{font-size:10px;color:#81c4ef;letter-spacing:1.2px}
+#moonshot-workmates .source-detail{font-size:12px;color:#b5c8d9;line-height:1.8}
+#moonshot-workmates .source-detail summary{cursor:var(--cursor-interaction,pointer);color:#bfe2fa}
+#moonshot-workmates .source-detail ul{padding-left:20px;margin:10px 0}
+#moonshot-workmates .source-detail small{font-size:10px}
+#moonshot-workmates .prototype-note{display:block;font-size:10px;line-height:1.6;margin-top:17px;color:#8fa8bd}
+#moonshot-workmates .lesson-kicker{font-size:13px;line-height:1.6;color:#b6d6ec;border-left:2px solid #428ebf;padding-left:12px;margin-bottom:20px}
+#moonshot-workmates .task-checks{display:grid;gap:9px;padding:14px;background:#12273b;margin-bottom:20px;border-radius:7px}
+#moonshot-workmates .task-checks label,#moonshot-workmates .decision-choice label{display:flex;align-items:flex-start;font-size:12px;font-weight:400;gap:9px}
+#moonshot-workmates .task-checks input,#moonshot-workmates .decision-choice input{width:17px;height:17px;flex:none;margin:2px 0 0;accent-color:#52a2d6}
+#moonshot-workmates .decision-choice{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 20px}
+#moonshot-workmates .waiting-state{display:grid;gap:12px;justify-items:center;text-align:center;padding:22px 8px;margin:15px 0;border-top:1px solid #30465d;border-bottom:1px solid #30465d}
+#moonshot-workmates .waiting-state svg{width:28px;height:28px;color:#88caff}
+#moonshot-workmates .waiting-state strong{font-size:14px}
+#moonshot-workmates .waiting-state p{font-size:12px;color:#adc0d3;line-height:1.8}
+#moonshot-workmates .error{color:#ffb3a4}
+#moonshot-workmates .orbit-map{background:#0b1b2d;border-radius:6px}
+@media(max-width:680px){#moonshot-workmates .ms-world{height:800px}#moonshot-workmates .ms-dock{display:flex;flex-wrap:nowrap;padding:4px;gap:1px}#moonshot-workmates .ms-dock button{font-size:11px;padding:10px 9px;white-space:nowrap}#moonshot-workmates .ms-dock button:last-child{display:none}#moonshot-workmates .ms-panel,#moonshot-workmates .ms-panel[data-mode="curriculum"]{top:175px;bottom:105px;left:14px;right:14px;width:auto;max-width:none}#moonshot-workmates .overview-caption{left:18px;top:90px}#moonshot-workmates .overview-caption h2{font-size:25px}#moonshot-workmates .ms-status{bottom:92px}#moonshot-workmates .quest-tracker{left:15px;top:83px;width:210px}#moonshot-workmates .space-pin{padding:8px 9px}#moonshot-workmates .space-pin strong{font-size:11px}#moonshot-workmates .space-pin small{font-size:10px}}
+@media(max-width:430px){#moonshot-workmates .ms-world{height:720px}#moonshot-workmates .overview-caption h2{font-size:22px}#moonshot-workmates .space-pin{padding:7px 6px;min-height:44px}#moonshot-workmates .space-pin small{display:none}#moonshot-workmates .space-pin strong{font-size:10px}#moonshot-workmates .ms-roomtop{top:15px}#moonshot-workmates .ms-roomname{font-size:12px}#moonshot-workmates .ms-roomtop button{font-size:10px}#moonshot-workmates .week-tabs{gap:2px}#moonshot-workmates .ms-panel h2{font-size:21px}}
+
+
+
+#moonshot-workmates{border-radius:9px;--paper:#080d14;--card:#111c28;--soft:#1c2b3b;--line:#354759;--sub:#9cb2c5}
+#moonshot-workmates .ms-header{background:#080e17;padding:14px 24px}
+#moonshot-workmates .ms-brand{font-size:13px;letter-spacing:3px}
+#moonshot-workmates .ms-brand span{font-size:8px;color:#a5c2da}
+#moonshot-workmates .ms-demo{background:#060b12;font-size:9px;color:#8193a3}
+#moonshot-workmates .ms-world{height:760px;background:#02060b}
+#moonshot-workmates .ms-roomtop{top:20px}
+#moonshot-workmates .ms-roomname{color:#d8e7f3;text-shadow:0 2px 8px #000;font-size:12px;font-weight:500}
+#moonshot-workmates .ms-roomname small{font-size:10px;color:#a8bfce}
+#moonshot-workmates .ms-roomtop button{background:#091522c9;border:1px solid #5c758866;font-size:11px}
+#moonshot-workmates .ms-keymap{left:20px;bottom:155px;background:#0b1625ba;border:1px solid #67819644;opacity:.8;font-size:10px;max-width:195px}
+#moonshot-workmates .ms-keymap small{font-size:10px}
+#moonshot-workmates .ms-status{background:#091523b3;font-size:11px;bottom:91px;color:#bbcedb;padding:6px 12px}
+#moonshot-workmates .ms-dock{background:#0a1420ed;border-color:#536c8080;border-radius:5px;padding:4px}
+#moonshot-workmates .ms-dock button{font-size:12px;padding:12px 18px;border-radius:3px}
+#moonshot-workmates .ms-dock button[data-action="missionmap"]{background:#203a4e}
+#moonshot-workmates .overview-caption{display:none!important}
+#moonshot-workmates .cabin-intro{position:absolute;pointer-events:none;left:24px;bottom:290px;color:#e6edf3;z-index:2;text-shadow:0 2px 14px #000}
+#moonshot-workmates .cabin-intro small{font-size:10px;letter-spacing:3px;color:#a9c1d2}
+#moonshot-workmates .cabin-intro h2{font-size:30px;line-height:1.4;font-weight:400;letter-spacing:-1px;margin-top:10px}
+#moonshot-workmates.has-panel .cabin-intro,#moonshot-workmates.has-mission .cabin-intro,#moonshot-workmates.overview .cabin-intro,#moonshot-workmates.is-focusing .cabin-intro{display:none}
+#moonshot-workmates .ms-3d-tag{background:#0c1c2ab3;border:1px solid #9ab5ca44;box-shadow:none;font-size:10px;padding:3px 7px;color:#bbd3e4}
+#moonshot-workmates .ms-3d-tag.mine{background:#dbeaf4;color:#122a3b}
+#moonshot-workmates .ms-interact:disabled{display:none}
+#moonshot-workmates .ms-interact.ready{background:#173b53d9;border-color:#7cacc6;bottom:145px}
+#moonshot-workmates .ms-panel{background:#0a1727f5;border-color:#465c70;border-radius:7px}
+#moonshot-workmates .space-pin{background:#101f2fed;border:1px solid #748fa5;font-size:12px;box-shadow:0 5px 24px #0005}
+#moonshot-workmates .space-pin:after{background:#91b7d1}
+#moonshot-workmates .ms-focus-hud{background:#091726ed;border:1px solid #567286;color:#e3eff8}
+@media(max-width:680px){#moonshot-workmates .ms-world{height:760px}#moonshot-workmates .ms-dock button{font-size:11px;padding:11px 10px}#moonshot-workmates .cabin-intro{left:18px;bottom:290px}#moonshot-workmates .cabin-intro h2{font-size:24px}#moonshot-workmates .ms-keymap{bottom:153px;left:14px}#moonshot-workmates:not(.overview):not(.is-focusing):not(.is-entry) .ms-touchpad{display:grid;bottom:150px;grid-template-columns:44px 44px 44px;grid-template-rows:44px 44px}#moonshot-workmates .ms-keymap{display:none}#moonshot-workmates .ms-interact.ready{right:15px;bottom:148px;max-width:calc(100% - 220px)}}
+@media(max-width:430px){#moonshot-workmates .ms-world{height:720px}#moonshot-workmates .cabin-intro h2{font-size:22px}#moonshot-workmates .ms-roomtop button{font-size:10px}#moonshot-workmates .ms-panel{top:160px}}
+
+
+
+#moonshot-workmates .ms-world{height:620px}
+#moonshot-workmates .ms-dock button[data-camera][aria-pressed="true"]{background:#315b78;color:#f0f7fb;border-color:#89b8d1}
+#moonshot-workmates .ms-dock{max-width:610px;width:max-content}
+#moonshot-workmates .cabin-intro{bottom:295px}
+@media(max-width:680px){#moonshot-workmates .ms-dock{display:flex;flex-wrap:nowrap;max-width:calc(100% - 20px);width:max-content;gap:2px}#moonshot-workmates .ms-dock button{font-size:11px;padding:10px 8px;min-width:44px}#moonshot-workmates .ms-dock button[data-action="sounds"]{display:none}#moonshot-workmates .ms-dock svg{width:14px}#moonshot-workmates .cabin-intro{bottom:280px}}
+
+
+
+#moonshot-workmates .ms-world{height:620px}
+#moonshot-workmates.overview .ms-3d-tag:not(.mine){display:none}
+#moonshot-workmates.overview .space-pin{background:#0b1b2be8;border:1px solid #759bb3;font-size:11px;padding:8px 11px;min-width:104px}
+#moonshot-workmates.overview .space-pin small{font-size:10px}
+#moonshot-workmates.overview .ms-roomname small{color:#b1cce0}
+@media(max-width:680px){#moonshot-workmates .ms-world{height:620px}#moonshot-workmates.overview .space-pin{font-size:10px;min-width:88px;padding:6px 8px}#moonshot-workmates.overview .space-pin small{display:none}}
+
+
+#moonshot-workmates .map-leaders{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;display:none}#moonshot-workmates.overview .map-leaders{display:block}#moonshot-workmates .space-pins{z-index:3}#moonshot-workmates.overview .space-pin:after{display:none}
+
+#moonshot-workmates .rocket-closeup{display:none;position:absolute;top:84px;right:22px;z-index:4;background:#112a3c;color:#c9e3f3;font-size:12px}#moonshot-workmates.overview .rocket-closeup{display:block}#moonshot-workmates.rocket-inspect .space-pins,#moonshot-workmates.rocket-inspect .map-leaders,#moonshot-workmates.rocket-inspect .rocket-closeup,#moonshot-workmates.rocket-inspect .ms-3d-tag{display:none!important}/* Host-embedded viewport: keep all controls inside the iframe, without nested scrolling. */
+html,body{height:100%;overflow:hidden}
+#moonshot-workmates{height:100vh;min-height:0;display:flex;flex-direction:column;border-radius:0}
+#moonshot-workmates .ms-demo{flex:0 0 24px;padding:4px 12px;font-size:8px;overflow:hidden;white-space:nowrap}
+#moonshot-workmates .ms-demo span{font-size:9px}
+#moonshot-workmates .ms-header{position:relative;flex:0 0 62px;height:62px;padding:10px 18px;display:flex}
+#moonshot-workmates .ms-title,#moonshot-workmates .ms-bottom{display:none}
+#moonshot-workmates .ms-profile{margin-left:auto}
+#moonshot-workmates .ms-world{height:auto!important;min-height:0;flex:1}
+#moonshot-workmates #ms-canvas{position:absolute;inset:0;width:100%;height:100%!important}
+#moonshot-workmates .cabin-intro{display:none}
+#moonshot-workmates .ms-dock{bottom:12px}
+#moonshot-workmates .ms-status{bottom:65px}
+#moonshot-workmates .overview-caption{top:85px}
+#moonshot-workmates .overview-caption h2{font-size:24px}
+#moonshot-workmates .ms-panel{top:100px;bottom:72px;max-height:calc(100vh - 172px)}
+@media(max-width:680px){
+ #moonshot-workmates .ms-header{flex-basis:55px;height:55px;padding:8px 12px}
+ #moonshot-workmates .ms-roomtop{top:10px;left:10px;right:10px}
+ #moonshot-workmates .ms-roomname small{display:none}
+ #moonshot-workmates .ms-roomtop button{max-width:100px;font-size:10px}
+ #moonshot-workmates .ms-roomname{font-size:11px;padding:7px 9px}
+ #moonshot-workmates:not(.overview):not(.is-focusing):not(.is-entry) .ms-touchpad{bottom:105px}
+ #moonshot-workmates .ms-interact.ready{bottom:105px;font-size:10px;right:10px;max-width:calc(100% - 166px)}
+ #moonshot-workmates .overview-caption{display:none}
+ #moonshot-workmates .ms-status{font-size:10px;left:8px;right:8px;max-width:calc(100% - 16px)}
+}
+
+#ms-live-demo{position:absolute;top:100px;right:24px;z-index:7;max-width:300px;padding:10px 14px;color:#dcfcef;border:1px solid #548777;background:#102e31e8;border-radius:8px;font-size:12px;text-align:left}#ms-focus-finish{position:absolute;bottom:95px;left:50%;transform:translateX(-50%);z-index:7;max-width:90%;padding:12px 18px;background:#103b36eb;color:#e0fff1;border:1px solid #6fa98e;border-radius:12px;font-size:12px;pointer-events:none}#ms-cohort-progress{display:block;margin-top:4px;color:#92d5fa}#ms-cohort-progress[hidden],#ms-live-demo[hidden],#ms-focus-finish[hidden]{display:none!important}
+
+#ms-exhibition{position:absolute;top:150px;right:24px;z-index:6;display:grid;gap:5px;max-width:240px}#ms-exhibition[hidden]{display:none}#ms-exhibition button{padding:8px 12px;text-align:left;border:1px solid #3d627d;border-radius:7px;background:#11283be8;color:#d5e9f7;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#ms-exhibition button:disabled{opacity:.5}@media(max-width:600px){#ms-exhibition{max-width:155px;right:10px}}

@@ -66,13 +66,23 @@ test('only opted-in cohorts can read and confirm the four-step checklist', async
   }
 });
 
-test('a direct guide returns only the confirmed buyer link and avoids legacy survey or progress', async () => {
-  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome' };
-  const { route, progressCalls } = handler({ purchase: { orderId, orderNumber: 'QA', itemName: '문샷', completionGuide } });
-  const response = await route.GET(new Request(`https://edu.test/api/purchase-onboarding?order=${orderId}`));
+test('a direct guide shows the paid owner login and skips legacy survey or progress', async () => {
+  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome', message: 'OT 안내를 확인해 주세요.' };
+  const user = { id: 'buyer', email: 'login@example.test', contact_email: 'billing@example.test', loginMethod: '카카오' };
+  const request = new Request(`https://edu.test/api/purchase-onboarding?order=${orderId}`);
+  const purchase = { orderId, orderNumber: 'QA', itemName: '문샷', completionGuide };
+  const { route, calls, progressCalls } = handler({ user, purchase });
+  const response = await route.GET(request);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  assert.deepEqual(await response.json(), { available: true, orderId, orderNumber: 'QA', itemName: '문샷', completionGuide });
+  assert.deepEqual(await response.json(), { available: true, ...purchase, loginId: user.email, loginMethod: '카카오' });
+  assert.deepEqual(calls, [[user.id, orderId]]);
   assert.deepEqual(progressCalls, []);
+
+  const noOwnedOrder = await handler({ user, purchase: null }).route.GET(request);
+  assert.equal(noOwnedOrder.status, 404);
+  assert.deepEqual(await noOwnedOrder.json(), { available: false, error: '안내할 결제 완료 주문이 없습니다.' });
+  const noLoginEmail = await handler({ user: { ...user, email: '' }, purchase }).route.GET(request);
+  assert.equal((await noLoginEmail.json()).loginId, undefined);
 });
 
 test('only a paid order owner receives the guide for the ordered cohort, with legacy fallback for untouched cohorts', async () => {
@@ -115,11 +125,14 @@ test('only a paid order owner receives the guide for the ordered cohort, with le
     '@/lib/purchase-onboarding': config,
   });
   assert.deepEqual((await eligiblePurchase('buyer', orderId)).completionGuide, completionGuide);
+  const messageOnly = { label: '', url: '', message: 'OT 안내를 확인해 주세요.' };
+  guideRow.value = messageOnly;
+  assert.deepEqual((await eligiblePurchase('buyer', orderId)).completionGuide, messageOnly);
   assert.equal(await eligiblePurchase('another-user', orderId), null);
   rows.orders[0].status = 'cancelled';
   assert.equal(await eligiblePurchase('buyer', orderId), null);
   rows.orders[0].status = 'paid';
-  guideRow.value = { label: '', url: '' };
+  guideRow.value = { label: '', url: '', message: '   ' };
   assert.equal(await eligiblePurchase('buyer', orderId), null);
   rows.site_settings.shift();
   assert.equal((await eligiblePurchase('buyer', orderId)).settings.inviteUrl, inviteUrl);

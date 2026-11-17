@@ -1,12 +1,21 @@
 "use client";
 import Link from 'next/link';
+import { FindEmail } from './find-email';
+import styles from './final/auth-layout.module.css';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_REQUIREMENT } from '@/lib/auth-validation';
 import { afterEmailLogin, emailAddress, emailAuthError, emailCallback, emailConfirmRedirect, signupValues } from '@/lib/email-auth';
 
-export function EmailAuth({ signup, next, disabled = false }: { signup: boolean; next: string; disabled?: boolean }) {
-  const [open, setOpen] = useState(false), [forgot, setForgot] = useState(false);
+export function EmailAuth({ signup, next, disabled = false, supportUrl }: { signup: boolean; next: string; disabled?: boolean; supportUrl: string }) {
+  const [panel, setPanel] = useState<'email' | 'password' | 'hint' | null>(null);
+  const forgot = panel === 'password';
+  function toggle(nextPanel: 'email' | 'password' | 'hint') {
+    setPanel(panel === nextPanel ? null : nextPanel);
+    setError('');
+    setNotice('');
+    setResend(false);
+  }
   const [pending, setPending] = useState(false), [notice, setNotice] = useState(''), [error, setError] = useState('');
   const [email, setEmail] = useState(''), [resend, setResend] = useState(false), [seconds, setSeconds] = useState(0);
   const busy = useRef(false);
@@ -47,8 +56,13 @@ export function EmailAuth({ signup, next, disabled = false }: { signup: boolean;
     finally { busy.current = false; setPending(false); }
   }
   return <div className="email-auth mt24">
-    <button className="btn full" type="button" disabled={disabled || pending} aria-expanded={open} aria-controls="email-auth-form" onClick={() => setOpen(!open)}>이메일로 {signup ? '회원가입' : '로그인'}</button>
-    {open && <div id="email-auth-form" className="mt24">
+    <button className="btn full" type="button" disabled={disabled || pending} aria-expanded={panel === 'email'} aria-controls="email-auth-form" onClick={() => toggle('email')}>이메일로 {signup ? '회원가입' : '로그인'}</button>
+    {!signup && <div className={styles.recoveryLinks}>
+      <button type="button" disabled={disabled || pending} aria-expanded={panel === 'hint'} aria-controls="email-hint-form" onClick={() => toggle('hint')}>이메일 찾기</button>
+      <button type="button" disabled={disabled || pending} aria-expanded={forgot} aria-controls="email-auth-form" onClick={() => toggle('password')}>비밀번호 찾기</button>
+    </div>}
+    {panel === 'hint' && <FindEmail supportUrl={supportUrl} />}
+    {(panel === 'email' || forgot) && <div id="email-auth-form" className="mt24">
       <form onSubmit={submit}>
         <h2>{forgot ? '비밀번호 찾기' : signup ? '이메일 회원가입' : '이메일 로그인'}</h2>
         <fieldset disabled={pending || disabled} className="email-auth-fields">
@@ -62,7 +76,6 @@ export function EmailAuth({ signup, next, disabled = false }: { signup: boolean;
       {error && <p className="notice mt16" role="alert">{error}</p>}
       {notice && <p className="notice mt16" role="status">{notice}</p>}
       {resend && !forgot && <button type="button" className="btn full mt16" disabled={pending || seconds > 0} onClick={() => void resendEmail()}>{seconds ? `${seconds}초 후 인증 메일 다시 받기` : '인증 메일 다시 받기'}</button>}
-      {!signup && <button type="button" className="btn ghost full mt16" disabled={pending} onClick={() => { setForgot(!forgot); setError(''); setNotice(''); }}>{forgot ? '이메일 로그인으로 돌아가기' : '비밀번호를 잊으셨나요?'}</button>}
       {signup && <p className="meta mt16">이메일 확인 후 <Link href="/policies/terms" target="_blank">이용약관</Link>과 <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의를 진행합니다.</p>}
     </div>}
   </div>;

@@ -124,3 +124,19 @@ test('zero coupon checkout previews server amount, removes coupon and never load
   await page.getByRole('button',{name:'동의하고 무료 신청하기'}).click();
   await expect(page).toHaveURL(/\/applied\?order=qa-order/);expect(orderCalls).toBe(1);expect(tossCalls).toBe(0);
 });
+
+test('winner checkout automatically applies both account coupons and submits the server amount',async({page})=>{
+ const bonus='WIN_0123456789ABCDEF01234567',pair='1108+'+bonus;
+ let quotes=0,orders=0;
+ await page.route('**/api/coupons',r=>{expect(r.request().postDataJSON()).toEqual({action:'event-benefits',cohortId:cohort});quotes++;return r.fulfill({json:{quote:{couponId:cohort,couponCode:pair,couponName:'라이브 + 이벤트 중복 할인',originalAmount:1000000,couponDiscount:400000,totalAmount:600000,coupons:[{couponCode:'1108',couponName:'라이브 30만원',couponDiscount:300000},{couponCode:bonus,couponName:'당첨 10만원',couponDiscount:100000}]}}});});
+ await page.route('**/fixture/order',r=>{orders++;expect(r.request().postDataJSON().coupon).toBe(pair);return r.fulfill({json:{orderId:'event-order',orderNumber:'EVENT-QA',totalAmount:600000}});});
+ await page.route('**/fixture/toss',r=>r.fulfill({json:{ok:true}}));
+ await page.goto('/coupon-checkout-test?event=winner&cohort='+cohort);
+ await expect(page.getByText('내 계정의 이벤트 혜택을 자동으로 적용했습니다.')).toBeVisible();
+ await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('600,000원');
+ await expect(page.locator('input[name="coupon"]')).toHaveValue(pair);
+ await expect(page.getByText('라이브 30만원',{exact:true})).toBeVisible();await expect(page.getByText('당첨 10만원',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'필수 항목 한 번에 선택',exact:true}).click();
+ const payment=page.waitForRequest('**/fixture/toss');await page.getByRole('button',{name:'동의하고 결제창 열기',exact:true}).click();
+ expect((await payment).postDataJSON().amount.value).toBe(600000);expect(orders).toBe(1);expect(quotes).toBe(1);
+});

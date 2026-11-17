@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['unpdf'],
+  outputFileTracingIncludes: { '/api/campus/office/skill': ['./skills/packages/*.zip'] },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "vjmjhaidlqkmascdjocw.supabase.co", pathname: "/storage/v1/object/public/course-assets/**" },
@@ -16,6 +18,21 @@ const nextConfig: NextConfig = {
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+      ],
+    }, {
+      // The local 3D world is embedded only by the authenticated campus host.
+      // Payment and account pages remain unframeable.
+      source: "/campus/world/:path*",
+      headers: [
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+      ],
+    }, {
+      // Public course information can be read inside this site’s campus dialog.
+      source: "/classes/:slug",
+      headers: [
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
       ],
     }];
   },

@@ -37,22 +37,23 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
-          if [ "$head_ref" = "develop" ]; then
+          if [ "$head_ref" = "codex/release-guard-20261117" ]; then
+            expected_main=7c79ec8a3321a018c714108d3ffb4f01819f1ae7
+            live_base=0db98905cf4caab945e0c2c5a321af906063eb5e
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$live_base" HEAD
+            git diff --exit-code "$live_base" HEAD -- app features lib public package.json package-lock.json
+            while IFS= read -r path; do
+              case "$path" in
+                tools/release-guard/*|tests/release-guard.test.mjs|tests/diagnosis-partial-refund-database.test.mjs|supabase/migrations/20261110101544_n6_partial_refund_access.sql|.github/workflows/ci.yml|.github/workflows/release-db-contract.yml|vercel.json|.vercelignore) ;;
+                *) echo "Unexpected production alignment change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$live_base" HEAD)
+            echo 'Verified current production source preserved; activation remains disabled.'
             exit 0
           fi
-
-          if [ "$head_ref" = "fix/precision-this-week-layout-20261108" ]; then
-            expected_main=d9dba93c905b48a5824ad922f6086cb7a178e0bf
-            release_payload=4ac0169920452915792fdc5c3d3a468195ca35f4
-            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
-              echo "Production main moved; revalidate the precision report THIS WEEK layout release."
-              exit 1
-            fi
-            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
-              echo "The merge result differs from the tested THIS WEEK layout release."
-              exit 1
-            fi
-            echo "Precision report THIS WEEK layout production release scope verified."
+          if [ "$head_ref" = "develop" ]; then
             exit 0
           fi
 
@@ -398,9 +399,35 @@ jobs:
           path: test-results/
           retention-days: 3
 
+  campus-browser:
+    name: Campus browser shard ${{ matrix.shard }}/8
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Campus browser regression tests
+        run: npx playwright test --config=playwright.campus.config.ts --shard=${{ matrix.shard }}/8
+      - name: Save campus failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: campus-browser-failures-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 3
+
   verify:
     if: always()
-    needs: [code-checks, browser, payment-widget]
+    needs: [code-checks, browser, payment-widget, campus-browser]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -409,10 +436,12 @@ jobs:
           CODE_CHECKS: ${{ needs.code-checks.result }}
           BROWSER: ${{ needs.browser.result }}
           PAYMENT_WIDGET: ${{ needs.payment-widget.result }}
+          CAMPUS_BROWSER: ${{ needs.campus-browser.result }}
         run: |
           test "$CODE_CHECKS" = success
           test "$BROWSER" = success
           test "$PAYMENT_WIDGET" = success
+          test "$CAMPUS_BROWSER" = success
 
   migrate-dev:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.apply_all_pending_dev_migrations

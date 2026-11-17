@@ -11,6 +11,7 @@ import { MemberVisits } from './member-visits';
 import { MemberConversation } from './member-conversation';
 import { AnalyticsExclusion } from './analytics-exclusion';
 import { AdminLoginEmailChange } from './admin-login-email-change';
+import { AdminEnrollmentTransfer } from './admin-enrollment-transfer';
 
 const recordDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
 function timeLabel(value: unknown) {
@@ -41,7 +42,8 @@ export function CustomerWorkspace({ member, tab, onTabChange, children, blockLea
 
 function MemberRecords({ member, email, view, blockLearningEnabled }: { member: string; email: string; view: string; blockLearningEnabled: boolean }) {
   const [page, setPage] = useState(1), [retry, setRetry] = useState(0);
-  const [state, setState] = useState<{ key: string; rows: Row[]; total: number; error?: string } | null>(null);
+  const [transferMessage, setTransferMessage] = useState('');
+  const [state, setState] = useState<{ key: string; rows: Row[]; total: number; canTransfer?: boolean; error?: string } | null>(null);
   const key = `${member}:${view}:${page}:${retry}`;
   useEffect(() => {
     const controller = new AbortController();
@@ -49,7 +51,7 @@ function MemberRecords({ member, email, view, blockLearningEnabled }: { member: 
     void fetch(`/api/admin/member-overview?${params}`, { cache: 'no-store', signal: controller.signal }).then(async response => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || '조회하지 못했습니다.');
-      if (!controller.signal.aborted) setState({ key, rows: result.rows, total: result.total });
+      if (!controller.signal.aborted) setState({ key, rows: result.rows, total: result.total, canTransfer: result.canTransferEnrollment === true });
     }).catch(error => { if (!controller.signal.aborted) setState({ key, rows: [], total: 0, error: error.message }); });
     return () => controller.abort();
   }, [member, view, page, key]);
@@ -58,6 +60,7 @@ function MemberRecords({ member, email, view, blockLearningEnabled }: { member: 
   if (state.error) return <AdminInlineError onRetry={() => { document.activeElement?.closest<HTMLElement>('[role="tabpanel"]')?.focus(); setRetry(value => value + 1); }}>{state.error}</AdminInlineError>;
   const listUrl = view === 'questions' ? `/admin/questions?member=${member}` : view === 'submissions' ? `/admin/reviews?member=${member}` : '';
   return <div className="member-records">
+    {transferMessage && <p className="notice" role="status">{transferMessage}</p>}
     <div className="spread wrap-flex"><p className="meta">총 {state.total}건 · {page}페이지 · 최근 기록 순</p>{listUrl && <AdminLinkButton size="sm" href={listUrl}>회원의 {view === 'questions' ? '질문함' : '제출물'} 열기</AdminLinkButton>}</div>
     {view === 'progress' && <><AdminLearningUsage key={`usage-${member}`} member={member}/>{blockLearningEnabled && <AdminLearningProgress key={member} member={member}/>}<p className="notice mt16">아래는 실제 저장된 개별 학습 기록입니다. 기록이 없는 학습은 이 목록에 표시되지 않습니다.</p></>}
     {!state.rows.length && <AdminEmptyState title={view === 'enrollments' ? '등록된 수강권이 없습니다.' : view === 'progress' ? '저장된 개별 학습 완료 기록이 없습니다.' : '아직 저장된 기록이 없습니다.'}>다른 탭에서 수강권과 회원 상태를 확인해 주세요.</AdminEmptyState>}
@@ -77,6 +80,7 @@ function MemberRecords({ member, email, view, blockLearningEnabled }: { member: 
           {view === 'submissions' && <><p className="meta mt8">검토 시각 · {row.reviewed_at ? timeLabel(row.reviewed_at) : '아직 검토되지 않음'}</p>{Boolean(row.reviewer_feedback) && <p className="reading-copy mt8">{t(row, 'reviewer_feedback')}</p>}<AdminLinkButton size="sm" className="mt16" href={`/admin/reviews?submission=${row.id}`}>제출물·피드백 보기</AdminLinkButton></>}
           {view === 'questions' && <AdminLinkButton size="sm" className="mt16" href={`/admin/questions?question=${row.id}`}>질문·답변 보기</AdminLinkButton>}
         </>}
+        {state.canTransfer && view === 'enrollments' && row.status === 'active' && Boolean(row.cohort_id) && !row.revoked_at && status !== '기간 만료' && <AdminEnrollmentTransfer member={member} source={row.id} onTransferred={message => { setTransferMessage(message); setRetry(value => value + 1); }}/>}
       </article>;
     })}
     <AdminPagination page={page} pages={Math.ceil(state.total / 20)} total={state.total} pageSize={20} onChange={next => { document.activeElement?.closest<HTMLElement>('[role="tabpanel"]')?.focus(); setPage(next); }}/>

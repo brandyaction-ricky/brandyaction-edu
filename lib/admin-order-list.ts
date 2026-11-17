@@ -3,6 +3,33 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export type OrderListScope = { q: string; status: string; course: string; from: string; to: string; quick: string };
 export const emptyOrderListScope: OrderListScope = { q: '', status: '', course: '', from: '', to: '', quick: 'all' };
 export const ORDER_PAGE_SIZE = 100;
+export const orderDatePresets = [
+  { value: 'today', label: '오늘' },
+  { value: 'yesterday', label: '어제' },
+  { value: 'week', label: '최근 7일' },
+  { value: 'month', label: '이번 달' },
+  { value: 'threeMonths', label: '최근 3개월' },
+  { value: 'all', label: '전체 기간' },
+] as const;
+export function orderDateRange(preset: typeof orderDatePresets[number]['value'], now = new Date()) {
+  if (preset === 'all') return { from: '', to: '' };
+  // Shift to the Korean calendar first, independent of the browser's timezone.
+  const today = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const end = new Date(today + 'T00:00:00Z');
+  const start = new Date(end);
+  if (preset === 'yesterday') start.setUTCDate(start.getUTCDate() - 1);
+  if (preset === 'week') start.setUTCDate(start.getUTCDate() - 6);
+  if (preset === 'month') start.setUTCDate(1);
+  if (preset === 'threeMonths') {
+    const day = start.getUTCDate();
+    start.setUTCDate(1);
+    start.setUTCMonth(start.getUTCMonth() - 3);
+    const lastDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+    start.setUTCDate(Math.min(day, lastDay));
+  }
+  const from = start.toISOString().slice(0, 10);
+  return { from, to: preset === 'yesterday' ? from : today };
+}
 const statuses = ['paid', 'pending', 'payment_failed', 'partially_refunded', 'refunded', 'cancelled'];
 const quickStates = ['all', 'failed', 'refund', 'access'];
 
@@ -55,4 +82,41 @@ export function orderExclusionLabel(order: Record<string, unknown>, member?: Rec
   if (member.is_internal === true || ['admin', 'staff'].includes(String(member.role))) return '내부 계정 · 집계 제외';
   if (Number(order.total_amount) === 0) return '무료 주문 · 집계 제외';
   return '';
+}
+
+// Date scope follows order creation in KST, just like the order list.
+// The private view retains the existing analytics exclusions in one place.
+export async function readOrderPeriodSummary(db: SupabaseClient, scope: Pick<OrderListScope, 'from' | 'to'>) {
+  const end = scope.to ? new Date(Date.parse(scope.to + 'T00:00:00+09:00') + 86400000).toISOString() : '';
+  let approvedRevenue = 0;
+  let refundedRevenue = 0;
+  let cursor = '';
+  const batchSize = 500;
+  while (true) {
+    let query = db.from('payments')
+      .select('id,approved_amount,cancelled_amount,period_order:edu_analytics_orders!inner(created_at,status)')
+      .in('status', ['done', 'partial_cancelled', 'cancelled'])
+      .in('period_order.status', ['paid', 'partially_refunded', 'refunded'])
+      .order('id').limit(batchSize);
+    if (scope.from) query = query.gte('period_order.created_at', scope.from + 'T00:00:00+09:00');
+    if (end) query = query.lt('period_order.created_at', end);
+    if (cursor) query = query.gt('id', cursor);
+    const result = await query;
+    if (result.error) throw result.error;
+    const payments = result.data || [];
+    for (const payment of payments) {
+      approvedRevenue += Number(payment.approved_amount || 0);
+      refundedRevenue += Number(payment.cancelled_amount || 0);
+    }
+    if (payments.length < batchSize) break;
+    cursor = payments[payments.length - 1].id;
+  }
+  let processing = db.from('edu_refund_requests')
+    .select('id,period_payment:payments!inner(period_order:orders!inner(created_at))', { count: 'exact', head: true })
+    .eq('status', 'processing');
+  if (scope.from) processing = processing.gte('period_payment.period_order.created_at', scope.from + 'T00:00:00+09:00');
+  if (end) processing = processing.lt('period_payment.period_order.created_at', end);
+  const result = await processing;
+  if (result.error) throw result.error;
+  return { approvedRevenue, refundedRevenue, netRevenue: approvedRevenue - refundedRevenue, processingRefunds: result.count || 0 };
 }

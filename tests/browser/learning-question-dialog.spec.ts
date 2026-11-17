@@ -17,39 +17,48 @@ async function backend(page: Page, {fail = false, forbidden = false, contextFail
   });
   return {bodies,reads:()=>({platformReads,questionReads})};
 }
-async function open(page: Page) { await page.goto('/learning-question-test'); await page.getByRole('button',{name:'질문·답변',exact:true}).click(); return page.getByRole('dialog',{name:'이 수업에 질문하기'}); }
-test('real learning header opens a focused quick composer without leaving or remounting the lesson',async({page},info)=>{
+async function open(page: Page) { await page.goto('/learning-question-test'); await page.getByRole('button',{name:'질문하기',exact:true}).click(); return page.getByRole('dialog',{name:'질문하기'}); }
+test('real lesson opens a focused floating composer without leaving or remounting the lesson',async({page},info)=>{
   const h=await backend(page);const dialog=await open(page);const start=page.url(),reads=h.reads().platformReads;
-  await expect(dialog).toBeVisible();await expect(dialog.locator('.learning-question-context')).toContainText(context.label);
-  await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toBeFocused();await expect(dialog.getByRole('textbox',{name:'질문 제목 (선택)',exact:true})).toBeHidden();
+  await expect(dialog).toBeVisible();await expect(dialog.locator('.floating-question-context')).toContainText(context.label);
+  await expect(dialog.getByRole('button',{name:'닫기'})).toBeFocused();await expect(dialog.getByRole('textbox',{name:'질문 제목 (선택)',exact:true})).toBeHidden();
   await expect(dialog.getByRole('button',{name:'질문 등록',exact:true})).toBeDisabled();
   await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('막힌 부분입니다');await dialog.getByRole('radio',{name:'비밀 질문',exact:true}).check();
   await dialog.getByRole('button',{name:'질문 등록',exact:true}).scrollIntoViewIfNeeded();
   await expect(dialog.getByRole('button',{name:'질문 등록',exact:true})).toBeInViewport();
   await page.screenshot({path:info.outputPath('learning-question-popup.png')});
-  await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toBeVisible();
+  await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByText('멘토 질문을 등록했어요.',{exact:false})).toBeVisible();
   expect(h.bodies[0]).toMatchObject({enrollmentId:id(1),lessonId:id(4),content:'막힌 부분입니다',title:'',visibility:'private'});
-  await dialog.getByRole('button',{name:'학습 계속하기'}).click();await expect(dialog).toHaveCount(0);expect(page.url()).toBe(start);expect(h.reads().platformReads).toBe(reads);
-  await expect(page.getByRole('button',{name:'질문·답변',exact:true})).toBeFocused();await expect(page.getByRole('heading',{name:'등록한 질문'})).toBeVisible();
+  await expect(dialog.getByRole('link',{name:'내 질문에서 확인하기'})).toHaveAttribute('href','/my/questions?view=mine');
+  await dialog.getByRole('button',{name:'닫기'}).click();await expect(dialog).toBeHidden();expect(page.url()).toBe(start);expect(h.reads().platformReads).toBe(reads);
+  await expect(page.getByRole('button',{name:'질문하기',exact:true})).toBeFocused();await expect(page.getByRole('heading',{name:'등록한 질문'})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-test('Escape and close preserve an unsent question when discard is cancelled',async({page})=>{
+test('Escape and close preserve an unsent question',async({page})=>{
   await backend(page);const dialog=await open(page);await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('아직 작성 중입니다');
-  page.once('dialog',d=>d.dismiss());await page.keyboard.press('Escape');await expect(dialog).toBeVisible();await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('아직 작성 중입니다');
-  page.once('dialog',d=>d.accept());await dialog.getByRole('button',{name:'닫기',exact:true}).click();await expect(dialog).toHaveCount(0);await expect(page.getByRole('button',{name:'질문·답변',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
+  const trigger=page.getByRole('button',{name:'질문하기',exact:true});
+  await expect(trigger).toBeFocused();await trigger.click();
+  await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('아직 작성 중입니다');
+  await dialog.getByRole('button',{name:'닫기',exact:true}).click();await expect(dialog).toBeHidden();await expect(trigger).toBeFocused();
 });
-test('uncertain registration stays open and retries the same request without duplicates',async({page})=>{
+test('uncertain registration survives closing and retries the same request without duplicates',async({page})=>{
   const h=await backend(page,{fail:true});const dialog=await open(page);await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('등록 결과가 궁금합니다');await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('등록 결과 확인 실패');
-  await page.keyboard.press('Escape');await expect(dialog).toBeVisible();await expect(dialog.getByText('질문 등록·첨부가 끝날 때까지', {exact:false})).toBeVisible();
-  await dialog.getByRole('button',{name:'등록 결과 다시 확인'}).click();expect(h.bodies).toHaveLength(2);expect(h.bodies[1]).toEqual(h.bodies[0]);await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toBeVisible();
+  await dialog.getByRole('button',{name:'닫기'}).click();await expect(dialog).toBeHidden();
+  await page.getByRole('button',{name:'질문하기',exact:true}).click();await expect(dialog.getByText('같은 요청으로 다시 확인하면 중복 등록되지 않습니다.',{exact:false})).toBeVisible();
+  await dialog.getByRole('button',{name:'등록 결과 다시 확인'}).click();expect(h.bodies).toHaveLength(2);expect(h.bodies[1]).toEqual(h.bodies[0]);await expect(dialog.getByText('멘토 질문을 등록했어요.',{exact:false})).toBeVisible();
 });
 test('context lookup or permission failure does not erase the draft or announce success',async({page})=>{
-  await backend(page,{forbidden:true,contextFails:true});const dialog=await open(page);await expect(dialog.getByText('학습 목록을 불러오지 못했습니다.', {exact:false})).toBeVisible();await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('질문 작성 내용');await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('질문 작성 권한');await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('질문 작성 내용');await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toHaveCount(0);
+  await backend(page,{forbidden:true,contextFails:true});const dialog=await open(page);await expect(dialog.getByText('학습 목록을 불러오지 못했습니다.', {exact:false})).toBeVisible();await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('질문 작성 내용');await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('질문 작성 권한');await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('질문 작성 내용');await expect(dialog.getByText('멘토 질문을 등록했어요.',{exact:false})).toHaveCount(0);
 });
-test('keyboard focus stays inside the popup and background scroll is restored',async({page})=>{
-  await backend(page);const dialog=await open(page);const before=await page.evaluate(()=>window.scrollY);await expect(page.locator('body')).toHaveCSS('overflow','hidden');
-  const close=dialog.getByRole('button',{name:'닫기',exact:true});await close.focus();await page.keyboard.press('Shift+Tab');await expect(dialog.getByRole('radio',{name:'비밀 질문',exact:true})).toBeFocused();await page.keyboard.press('Tab');await expect(close).toBeFocused();
-  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(page.locator('body')).not.toHaveCSS('overflow','hidden');expect(await page.evaluate(()=>window.scrollY)).toBe(before);
+test('floating composer keeps the lesson scroll available and returns focus to its trigger',async({page})=>{
+  await backend(page);const dialog=await open(page);
+  await expect(page.locator('body')).not.toHaveCSS('overflow','hidden');
+  const close=dialog.getByRole('button',{name:'닫기',exact:true});await expect(close).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button',{name:'질문하기',exact:true})).toBeFocused();
 });
 test('screenshot attachment opens the file picker and registers an image-only question in the current lesson',async({page})=>{
   const h=await backend(page);let image='';
@@ -59,6 +68,6 @@ test('screenshot attachment opens the file picker and registers an image-only qu
   await dialog.getByRole('button',{name:'사진·화면 캡처 첨부',exact:true}).click();
   await (await chooser).setFiles({name:'화면.png',mimeType:'image/png',buffer:readFileSync('public/brandy-action-logo.png')});
   await expect(dialog.getByText('이미지 준비 완료. 질문을 등록하면 함께 저장됩니다.')).toBeVisible();
-  await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toBeVisible();
+  await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByText('멘토 질문을 등록했어요.',{exact:false})).toBeVisible();
   expect(h.bodies[0]).toMatchObject({enrollmentId:id(1),lessonId:id(4),content:'',imageId:image});
 });

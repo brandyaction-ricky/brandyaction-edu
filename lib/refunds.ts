@@ -61,6 +61,10 @@ export async function processRefund(actor: string, body: Body) {
       await db.from('edu_refund_requests').update({ status: 'failed' }).eq('id', body.requestId);
       return reply({ error: '환불 요청을 보내지 않았습니다. 결제 상태·잔액을 확인해 주세요. 가상계좌 환불은 결제사에서 처리해 주세요.' }, 409);
     }
+    if (!Number.isSafeInteger(current.balanceAmount) || Number(body.amount) > Number(current.balanceAmount) || (current.isPartialCancelable === false && Number(body.amount) < Number(current.balanceAmount))) {
+      await db.from('edu_refund_requests').update({ status: 'failed' }).eq('id', body.requestId);
+      return reply({ error: '부분 환불을 지원하지 않는 결제이거나 환불 가능액을 초과했습니다. 결제사 상태를 확인해 주세요.' }, 409);
+    }
     const response = await fetch(endpoint + '/cancel', { method: 'POST', headers, body: JSON.stringify({ cancelReason: marker, cancelAmount: body.amount }), signal: AbortSignal.timeout(15000) });
     const result = await response.json();
     if (response.ok && await reconcile(result)) return reply({ ok: true, message: '환불을 완료했습니다. 전액 환불 시 수강권도 회수됩니다.' });

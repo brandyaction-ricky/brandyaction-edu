@@ -49,7 +49,7 @@ export function EncouragementEditor() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : '응원 메시지를 저장하지 못했습니다.'); } finally { inFlight.current = false; setBusy(false); }
   }
   return <section className="panel pad encouragement-editor" id="encouragement" aria-label="내 응원 메시지">
-    <h2>내 응원 메시지</h2><p className="meta">공개 별명과 응원 메시지는 사이트의 다른 방문자도 볼 수 있습니다. 이름·이메일·전화번호 대신 사용할 별명을 직접 정해 주세요. 메시지를 비우고 저장하면 공개가 해제됩니다.</p>
+    <h2>내 응원 메시지</h2><p className="meta">응원 메시지 저장 버튼으로 저장됩니다.</p><p className="meta">공개 별명과 응원 메시지는 사이트의 다른 방문자도 볼 수 있습니다. 이름·이메일·전화번호 대신 사용할 별명을 직접 정해 주세요. 메시지를 비우고 저장하면 공개가 해제됩니다.</p>
     <label className="field"><span>공개 별명</span><input maxLength={40} value={publicName} disabled={!stored || busy} onChange={event => { setPublicName(event.target.value); setStatus(''); }}/></label>
     <label className="field"><span>응원 메시지</span><textarea rows={3} maxLength={80} value={message} disabled={!stored || busy} onChange={event => { setMessage(event.target.value); setStatus(''); }}/></label>
     <p className="meta">{message.length}/80자 · 저장하면 공개됩니다.</p>

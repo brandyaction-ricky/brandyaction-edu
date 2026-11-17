@@ -1,0 +1,109 @@
+{
+  "updatedAt": "2026-11-03",
+  "scope": "Local implementation and verification; no DEV or production writes",
+  "source": "Private Moonshot Campus feature requirements and local coverage review (not included in the public repository).",
+  "features": [
+    {
+      "number": 9,
+      "status": "local_implemented",
+      "added": "Explicit cohort-shared portfolio exhibition metadata endpoint, same-cohort active access/report/block/current RLS recheck, durable exact-post navigation and synthetic demo-only cache for 3D host integration",
+      "remaining": [
+        "Real authenticated DEV cohort exhibition QA",
+        "No remote website embedding or arbitrary image fetching"
+      ]
+    },
+    {
+      "number": 34,
+      "status": "local_implemented",
+      "added": "Version-bound owner-private screenshot/PDF upload, validated completion and protected download",
+      "remaining": [
+        "Real DEV Storage/CORS/signed upload verification",
+        "Retention/orphan cleanup and deletion UI",
+        "Other document/archive formats"
+      ]
+    },
+    {
+      "number": 35,
+      "status": "local_implemented",
+      "added": "Capture paste/drop, private-by-default binary upload, separately confirmed per-file cohort share with CAS, membership/report/block checks and 30-second signed download; post privacy revokes file shares",
+      "remaining": [
+        "Real DEV two-account Storage/CORS roundtrip",
+        "Already-issued links expire within 30 seconds; downloaded copies are not recallable"
+      ]
+    },
+    {
+      "number": 36,
+      "status": "local_implemented",
+      "remaining": [
+        "Real DEV multi-user useful-feedback concurrency check"
+      ]
+    },
+    {
+      "number": 37,
+      "status": "local_implemented",
+      "remaining": [
+        "Real DEV revision/application evidence check"
+      ]
+    },
+    {
+      "number": 38,
+      "status": "local_implemented",
+      "remaining": [
+        "Optional actual image-to-image comparison display"
+      ]
+    },
+    {
+      "number": 39,
+      "status": "local_implemented",
+      "remaining": [
+        "Real DEV privacy/block/moderation roundtrip"
+      ]
+    },
+    {
+      "number": 40,
+      "status": "local_implemented",
+      "added": "Proposal, recipient acceptance/decline, proposer result, recipient completion, private history; no self approval",
+      "remaining": [
+        "Real cross-account DEV QA",
+        "Dispute/cancellation after acceptance and automatic matchmaking are outside this minimum flow"
+      ]
+    },
+    {
+      "number": 41,
+      "status": "local_implemented",
+      "remaining": [
+        "Selected business-experiment fields to shared post shortcut"
+      ]
+    },
+    {
+      "number": 43,
+      "status": "partial",
+      "added": "Cohort-conflict-checked slots, operator start/end, audience questions/answers, history, current-session endpoint and durable space-to-demo-day host navigation",
+      "remaining": [
+        "Animated 3D presenter staging",
+        "Actual streaming/voice and external invitations are not implemented",
+        "Real operator and presenter DEV roundtrip"
+      ]
+    },
+    {
+      "number": 69,
+      "status": "local_implemented",
+      "added": "Existing report/hide/block evidence retained; demo-day controls in moderation panel",
+      "remaining": [
+        "Lounge chat moderation is owned by space module",
+        "Real operator permission regression"
+      ]
+    }
+  ],
+  "verification": {
+    "unitApiPGlite": 29,
+    "desktopMobileBrowser": 20,
+    "eslint": "passed",
+    "typescript": "passed",
+    "realStorageUpload": false,
+    "remoteSqlApplied": false,
+    "productionChanged": false,
+    "spaceToDemoDayBrowser": 2,
+    "officeBrowserRegression": 4
+  }
+}

@@ -54,8 +54,14 @@ test('upload a question image, register without body and retry an uncertain save
  await open(page);await page.getByLabel('질문 이미지 (선택)').setInputFiles({name:'질문.png',mimeType:'image/png',buffer:png});await expect(page.getByText('이미지 준비 완료. 질문을 등록하면 함께 저장됩니다.')).toBeVisible();
  await page.getByRole('button',{name:'작성 접기',exact:true}).click();await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();await expect(page.getByAltText('첨부할 질문 이미지')).toBeVisible();
  await page.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(page.getByRole('alert')).toContainText('등록 결과 확인 실패');await expect(page.getByRole('button',{name:'이미지 빼기'})).toBeDisabled();
- await page.getByRole('button',{name:'등록 결과 다시 확인'}).click();expect(posts).toHaveLength(2);expect(posts[0]).toEqual(posts[1]);expect(posts[0]).toMatchObject({content:'',imageId:image});await expect(page.getByAltText('질문 첨부 이미지')).toBeVisible();
- expect(await page.getByAltText('질문 첨부 이미지').evaluate((img:HTMLImageElement)=>img.naturalWidth)).toBeGreaterThan(0);await page.screenshot({path:testInfo.outputPath('question-image-student.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByRole('button',{name:'등록 결과 다시 확인'}).click();expect(posts).toHaveLength(2);expect(posts[0]).toEqual(posts[1]);expect(posts[0]).toMatchObject({content:'',imageId:image});
+ const attachment=page.getByAltText('질문 첨부 이미지');
+ const disclosure=page.getByText('질문 첨부 이미지 보기',{exact:true});
+ await expect(disclosure).toBeVisible();
+ await expect(attachment).toBeHidden();
+ await disclosure.click();
+ await expect(attachment).toBeVisible();
+ await expect.poll(() => attachment.evaluate((img:HTMLImageElement)=>img.naturalWidth)).toBeGreaterThan(0);await page.screenshot({path:testInfo.outputPath('question-image-student.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('failed uploads keep the file and block incomplete questions; same-file retry completes an upload whose response was lost',async({page})=>{
  let image='',complete=0;const requests:string[]=[];

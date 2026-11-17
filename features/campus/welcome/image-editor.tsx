@@ -1,0 +1,8 @@
+'use client';
+import {useRef,useState} from 'react';
+import styles from './welcome.module.css';
+export function CampusImageEditor({value='',alt='',disabled=false,onChange,onBusy}:{value?:string;alt?:string;disabled?:boolean;onChange:(url:string,alt:string)=>void;onBusy?:(busy:boolean)=>void}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),locked=useRef(false);
+ async function upload(file:File){if(locked.current)return;locked.current=true;setBusy(true);onBusy?.(true);setError('');try{if(file.size>3*1024*1024)throw Error('이미지는 3MB 이하로 올려 주세요.');const body=new FormData();body.set('image',file);const r=await fetch('/api/admin/campus/images',{method:'POST',body}),data=await r.json();if(!r.ok)throw Error(data.error||'이미지 업로드에 실패했어요.');onChange(data.url,alt||file.name.replace(/\.[^.]+$/,''));}catch(e){setError((e as Error).message);}finally{locked.current=false;setBusy(false);onBusy?.(false);}}
+ return <div className={styles.imageEditor}>{value&&<img src={value} alt={alt||'첨부 이미지 미리보기'}/>}<label>이미지 첨부·교체<input type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled||busy} onChange={e=>{const file=e.target.files?.[0];if(file)void upload(file);e.target.value='';}}/></label><small>3MB 이하 · 공개 가능한 이미지만 올려 주세요. 화면에서 제거해도 이미 공유된 이미지 주소는 유지됩니다.</small>{value&&<><label>이미지 설명<input maxLength={200} value={alt} disabled={disabled||busy} onChange={e=>onChange(value,e.target.value)}/></label><button type="button" disabled={disabled||busy} onClick={()=>onChange('','')}>이미지 제거</button></>}{busy&&<p role="status">이미지를 올리고 있어요…</p>}{error&&<p role="alert">{error}</p>}</div>;
+}

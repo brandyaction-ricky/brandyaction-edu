@@ -92,3 +92,19 @@ test('widget refund resolves its secret by read-only lookup and sends one cancel
   assert.equal(h.calls.filter(r => r.method === 'POST').length, 1);
   assert.equal(h.calls.at(-1).headers.Authorization, 'Basic ' + Buffer.from('test_widget_key:').toString('base64'));
 });
+
+test('provider partial-cancellation restriction blocks partial but permits the remaining balance', async () => {
+  const h = handler({provider:async()=>Response.json({...current,isPartialCancelable:false})});
+  assert.equal((await h.run()).status,409);
+  assert.equal(h.calls.some(r=>r.method==='POST'),false);
+  const full = handler({provider:async(_,options)=>Response.json(options.method==='POST'
+    ? {...current,balanceAmount:0,status:'CANCELED',cancels:[{...cancellation,cancelAmount:1000}]}
+    : {...current,isPartialCancelable:false})});
+  assert.equal((await full.run({...request,amount:1000})).status,200);
+  assert.equal(full.calls.filter(r=>r.method==='POST').length,1);
+});
+test('provider balance above the claim is never over-refunded', async () => {
+  const h = handler({provider:async()=>Response.json(current)});
+  assert.equal((await h.run({...request,amount:1001})).status,409);
+  assert.equal(h.calls.some(r=>r.method==='POST'),false);
+});

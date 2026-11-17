@@ -9,7 +9,7 @@ export function LessonPrivateMedia({ assetId, kind, alt, caption, context, submi
   const url = lessonMediaUrl(assetId, context, submissionId) + '&attempt=' + attempt;
   return <figure>
     {kind === 'image' ? <LessonImage key={url} src={url} alt={alt} onError={() => setFailed(true)} />
-      : kind === 'audio' ? <LessonAudio key={url} floating={floatingAudio} src={url} aria-label={alt || '학습 음성'} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => { event.currentTarget.currentTime = position.current; }} onError={() => setFailed(true)} />
+      : kind === 'audio' ? <LessonAudio key={url} floating={floatingAudio} refreshOnError src={url} aria-label={alt || '학습 음성'} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => { event.currentTarget.currentTime = position.current; }} onError={() => setFailed(true)} />
         : <video key={url} controls playsInline preload="metadata" src={url} aria-label={alt || '학습 영상'} style={{ aspectRatio: 'auto 16 / 9', objectFit: 'contain' }} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => {
           const video = event.currentTarget;
           // Request the opening frame even when the browser only preloads metadata.

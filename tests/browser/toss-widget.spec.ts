@@ -127,3 +127,15 @@ test('floating amount follows coupons including zero and remains below the coupo
   await page.locator('#checkout-agreement').check();
   await expect(page.getByRole('button',{name:'동의하고 무료 신청하기',exact:true})).toBeEnabled();
 });
+
+test('card installment notice follows the amount after the coupon', async ({page}) => {
+  await page.route('**/api/coupons**', route => route.fulfill({json:{couponCode:'NORMAL_QA',couponName:'할인',couponDiscount:30001,totalAmount:49999}}));
+  await page.goto('/coupon-checkout-test?cohort='+cohort);
+  const notice = page.getByText('신용카드 2~12개월 무이자 할부',{exact:true});
+  await expect(notice).toBeVisible();
+  await expect(page.getByText(/우리카드와 비씨\(BC\)카드를 제외/)).toBeVisible();
+  await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();
+  await page.getByLabel('쿠폰 코드',{exact:true}).fill('normal_qa');
+  await page.getByRole('button',{name:'등록',exact:true}).click();
+  await expect(notice).toHaveCount(0);
+});

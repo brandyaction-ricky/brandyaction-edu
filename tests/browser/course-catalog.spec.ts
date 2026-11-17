@@ -77,7 +77,7 @@ test('mobile header keeps two actions and all existing destinations in the discl
   const menu = header.getByRole('button', { name: '메뉴 열기', exact: true });
   await menu.click();
   const nav = page.getByRole('navigation', { name: '모바일 메뉴' });
-  await expect(nav.getByRole('link', { name: '질문·답변', exact: true })).toHaveAttribute('href', '/my/questions');
+  await expect(nav.getByRole('link', { name: '질문·답변', exact: true })).toHaveAttribute('href', '/my/questions?view=mine');
   await expect(nav.getByRole('button', { name: '새로고침', exact: true })).toBeVisible();
   await expect(nav.getByRole('link', { name: '내 정보 수정' })).toHaveAttribute('href', '/my/profile');
   await page.keyboard.press('Escape');

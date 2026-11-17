@@ -1,5 +1,6 @@
 "use client";
 import './classroom-surface.css';
+import { legacyLessonUnlocked } from '@/lib/lesson-completion';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';
@@ -22,7 +23,7 @@ import {
   Play,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   LiveSchedule,
   MissionForm,
@@ -36,6 +37,7 @@ import { LessonBlockSession } from './lesson-block-session';
 import { useLessonProgression, type LessonGate } from './use-lesson-progression';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 import { LessonTag } from './lesson-tag';
+import { CourseReviewButton } from './product-reviews';
 
 export function Classroom({
   path,
@@ -44,6 +46,7 @@ export function Classroom({
   send,
   loading,
   missionId,
+  progression: sharedProgression,
   blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   path: string[];
@@ -53,10 +56,28 @@ export function Classroom({
   loading: boolean;
   missionId: string | null;
   blockLearningEnabled?: boolean;
+  progression?: ReturnType<typeof useLessonProgression>;
 }) {
   const [navOpen, setNavOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const enrollmentPathId = path[1], lessonPathId = path[2];
+  const ownProgression = useLessonProgression(path[1], blockLearningEnabled && !sharedProgression);
+  const progression = sharedProgression ?? ownProgression;
+  const navigationKey = progression.lessons?.map(item => `${item.lessonId}:${item.track}:${item.ongoing}`).join("|");
+  // Scroll only the lesson list; opening a lesson must not move the page itself.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const nav = navRef.current;
+      const active = nav?.querySelector<HTMLElement>('.lesson-nav.active');
+      if (!nav || !active || !nav.clientHeight) return;
+      const list = nav.getBoundingClientRect(), item = active.getBoundingClientRect();
+      if (item.top < list.top || item.bottom > list.bottom) {
+        nav.scrollTop += item.top - list.top - Math.max(0, (nav.clientHeight - item.height) / 2);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [enrollmentPathId, lessonPathId, navOpen, loading, data, navigationKey]);
   const [completedHere, setCompletedHere] = useState<string[]>([]);
-  const progression = useLessonProgression(path[1], blockLearningEnabled);
   const enrollment = (data.enrollments || []).find(
     (e) => e.id === path[1] && hasLearningAccess(e),
   );
@@ -105,7 +126,8 @@ export function Classroom({
   ]);
   const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
-  const canOpen = (id: string) => graduate || (blockLearningEnabled ? progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true : completedIds.has(id) || allLessons.slice(0, allLessons.findIndex(item => item.id === id)).every(item => completedIds.has(item.id)));
+  const preservedIds = new Set((data.preserved_lesson_access || []).map(row => String(row.lesson_id)));
+  const canOpen = (id: string) => graduate || (blockLearningEnabled ? progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true : legacyLessonUnlocked(allLessons, completedIds, id, preservedIds));
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
@@ -243,7 +265,7 @@ export function Classroom({
   return (
     <div className="learning-bg">
       <div className="wrap">
-        {graduate && <p className="meta mb16">졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다. {blockLearningEnabled && '개인 실습 입력·저장과 프롬프트 생성도 계속 이용할 수 있습니다. '}공식 미션 제출과 멘토 검수는 종료되었습니다.</p>}
+        {graduate && <details className="graduate-learning-notice"><summary>졸업생 모드 · 학습·질문 이용 안내</summary><p>최신 공개 커리큘럼을 보고 질문할 수 있습니다. {blockLearningEnabled && '개인 실습 입력·저장과 프롬프트 생성도 계속 이용할 수 있습니다. '}공식 미션 제출과 멘토 검수는 종료되었습니다.</p></details>}
         <div className="learning-top">
           <div>
             <h1>{t(course, "title")}</h1>
@@ -260,6 +282,7 @@ export function Classroom({
         <button
           className="btn learning-mobile-toggle"
           aria-expanded={navOpen}
+          aria-controls="classroom-lesson-list"
           onClick={() => setNavOpen(!navOpen)}
         >
           학습 목록
@@ -267,6 +290,8 @@ export function Classroom({
         </button>
         <div className="learning-layout">
           <aside
+            ref={navRef}
+            id="classroom-lesson-list"
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >
@@ -328,7 +353,7 @@ export function Classroom({
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
-                <section className="reading">
+                <section id="lesson-reading-start" className="reading">
                   {safeUrl(content?.external_url) && (
                     <a
                       className="btn primary mb24"
@@ -390,6 +415,7 @@ export function Classroom({
                   ))}
                 </section>}
                 <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
+                <section className="lesson-review-invite" aria-label="수강 후기 작성"><div><b>이번 수업은 어떠셨나요?</b><p>수강 경험을 다른 분들과 나눠 주세요.</p></div><CourseReviewButton courseId={String(enrollment.course_id)} courseTitle={t(course, 'title')}/></section>
                 <div className="lesson-bottom">
                   {current > 0 ? (
                     <Link

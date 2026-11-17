@@ -65,7 +65,9 @@ test('history is read-only and returning to this period restores its independent
 });
 test('actual classroom routes ongoing lessons separately and has no single-completion fallback',async({page},info)=>{
  await backend(page);await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'학생 화면 보기'}).click();await expect(page.getByRole('region',{name:'지속 챌린지'})).toBeVisible();await expect(page.getByRole('button',{name:'학습 완료하기',exact:true})).toHaveCount(0);await expect(page.locator('.lesson-header')).toContainText('지속 챌린지');
- if(info.project.name!=='desktop')await page.getByRole('button',{name:'학습 목록',exact:true}).click();await expect(page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'지속 챌린지',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'기타 학습',exact:true})).toHaveCount(0);
+ if(info.project.name==='mobile') await page.getByRole('button',{name:'학습 목록',exact:true}).click();
+ await expect(page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'지속 챌린지',exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'기타 학습',exact:true})).toHaveCount(0);
 });
 test('author settings recover a lost acknowledgment with the same cadence and request',async({page})=>{
  const server=await backend(page,{settings:true,lost:true});await page.goto('/lesson-block-author-test');await page.getByText('지속 챌린지 반복 설정',{exact:true}).click();await page.getByRole('combobox',{name:'반복 주기'}).selectOption('weekly');await page.getByRole('button',{name:'지속 챌린지로 설정',exact:true}).click();await expect(page.getByRole('alert')).toContainText('응답 확인 실패');await expect(page.getByRole('combobox',{name:'반복 주기'})).toBeDisabled();

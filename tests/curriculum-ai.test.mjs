@@ -1,8 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadTs} from './helpers/question-ai.mjs';
-const {retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback,studentCapabilityAnswer,studentImageHandoff}=loadTs('lib/curriculum-ai.ts');
+const {curriculumText,retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback,studentCapabilityAnswer,studentImageHandoff}=loadTs('lib/curriculum-ai.ts');
 const {measuredUsage}=loadTs('lib/curriculum-ai-server.ts',{'./supabase/admin':{},'./curriculum-ai-image':{}});
+test('quoted day-27 review criterion survives many generic matching sections',()=>{
+ const question='27일차에서 “실제 고객 질문과 예상 질문이 구분돼 있는지도 봅니다”라고 하는데 제가 받은 답변에는 없어요. 어떻게 확인하고 수정하나요?';
+ const blocks=Array.from({length:8},(_,i)=>[
+  {id:'h'+i,type:'heading',content:'영상 답변 확인하고 수정하기 '+i},
+  {id:'p'+i,type:'text',content:'27일차에서 받은 답변을 확인하고 수정하나요? 영상 만들기 순서를 확인합니다. 예상 질문을 확인합니다.'},
+ ]).flat();
+ blocks.push({id:'review',type:'heading',content:'검토 기준'},{id:'rule',type:'text',content:'실제 고객 질문과 예상 질문이 구분돼 있는지도 봅니다. 실제 질문은 고객 문의 원문으로 확인하고, 추정한 질문은 예상으로 표시합니다.'});
+ const lessons=[{id:'day27',title:'유입형 영상 기획',revision:'published-v2',document:{schemaVersion:1,blocks,checklist:[]}}];
+ const r=retrieveCurriculum(lessons,question,'day27');
+ assert.equal(r.sources[0].blockId,'review');
+ assert.match(r.sources[0].excerpt,/고객 문의 원문/);
+ assert.equal(r.sources[0].revision,'published-v2');
+ assert.ok(r.sources.length<=6);
+});
+test('a quotation across a long-paragraph boundary stays whole and grounded',()=>{
+ const phrase='실제 고객 질문과 예상 질문이 구분돼 있는지도 봅니다';
+ const body='가'.repeat(1480)+' '+phrase+' 고객 문의 원문을 확인하세요.'+' 나'.repeat(900);
+ const r=retrieveCurriculum([{id:'current',title:'영상 검토',body_text:body}],`“${phrase}”의 뜻은?`,'current',false);
+ assert.ok(r.sources.some(s=>s.excerpt.includes(phrase)));
+ assert.ok(r.sources.every(s=>s.excerpt.length<=1500&&curriculumText({title:'영상 검토',body_text:body},false).includes(s.excerpt)));
+});
+test('previous conversation quotes do not override the latest quoted criterion',()=>{
+ const lessons=[{id:'current',title:'수업',body_text:'새로운 공개 문장을 먼저 확인합니다.'},{id:'old',title:'이전 수업',body_text:'이전에 물었던 긴 문장을 확인합니다.'}];
+ const latest='“새로운 공개 문장을 먼저 확인합니다”가 무슨 뜻인가요?';
+ const r=retrieveCurriculum(lessons,'“이전에 물었던 긴 문장을 확인합니다”\n'+latest,'current',false,latest);
+ assert.match(r.sources[0].excerpt,/새로운 공개 문장/);
+});
 test('retrieval searches beyond the old 12000-character prefix and finds related lessons, preserving authoritative revision',()=>{
  const lessons=[{id:'current',title:'첫 수업',body_text:'기본 소개'},{id:'related',title:'고객 인터뷰',revision:'version-2',body_text:'소개\n'.repeat(6000)+'고객 질문은 열린 질문으로 작성하고 고객의 실제 경험을 확인합니다.'}];
  const r=retrieveCurriculum(lessons,'고객 인터뷰에서 열린 질문 작성 방법','current',false);
@@ -42,6 +69,17 @@ test('student image-upload promises become an honest mentor handoff without unre
   const original={...answer,answer:text};assert.equal(studentCapabilityAnswer(original),original);
  }
 });
+test('image-capable students continue troubleshooting in the same AI conversation instead of an automatic mentor handoff',()=>{
+ const original={answer:'캡처를 보내 주시면 확인해 드릴게요.',needsMentor:true,sources:[{id:'S1'}],searchedLessons:21};
+ const result=studentCapabilityAnswer(original,true);
+ assert.equal(result.needsMentor,false);assert.deepEqual(result.sources,[]);assert.match(result.answer,/오류 문구와 막힌 단계/);assert.doesNotMatch(result.answer,/멘토/);
+});
+test('English browser/folder errors retrieve corresponding Korean curriculum while keeping current lesson evidence',()=>{
+ const lessons=[{id:'current',title:'진행 중 수업',body_text:'실행 결과를 확인하세요.'},{id:'aside',title:'어사이드 크롬 가져오기',body_text:'크롬 브라우저 방문 기록을 가져옵니다.'},{id:'folder',title:'클로드 작업 준비',body_text:'작업 폴더 파일 연결을 확인합니다.'}];
+ const imported=retrieveCurriculum(lessons,'Aside: Close Chrome and try the import again','current',false);
+ assert.ok(imported.sources.some(s=>s.lessonId==='aside'));
+ assert.ok(retrieveCurriculum(lessons,'Claude cannot read files in the folder','current',false).sources.some(s=>s.lessonId==='folder'));
+});
 test('retrieval reserves current lesson evidence and cites the section containing the explanation',()=>{
  const document={schemaVersion:1,blocks:[
   {id:'h',type:'heading',content:'2-1 직과 업'},
@@ -51,6 +89,7 @@ test('retrieval reserves current lesson evidence and cites the section containin
  const {sources}=retrieveCurriculum(lessons,'직이랑 업이 뭐가 달라요?', 'current');
  assert.equal(sources[0].lessonId,'current');
  assert.equal(sources[0].title,'2-1 직과 업');
+ assert.equal(sources[0].blockId,'h');
  assert.match(sources[0].excerpt,/^2-1 직과 업\n직은 명함/);
 });
 test('AARRR retrieval covers all five phases across eligible lessons and keeps the displayed day',()=>{
@@ -68,4 +107,63 @@ test('English questions and explicit English requests use a localized fallback',
  assert.ok(requestsEnglish('이걸 in English 부탁해요'));
  assert.equal(requestsEnglish('AARRR 순서를 알려주세요'),false);
  assert.equal(parseCurriculumAnswer({answer:'No evidence',needsMentor:true,sourceIds:[]},[],true).answer,aiFallbackEnglish);
+});
+test('explicit answer language overrides the language of a pasted browser error',()=>{
+ const {requestsEnglish}=loadTs('lib/curriculum-ai.ts');
+ assert.equal(requestsEnglish('Chrome import says Close Chrome and try the import again in Aside. Please explain in Korean what I can safely check before asking a mentor.'),false);
+ assert.equal(requestsEnglish('Close Chrome and try the import again 오류를 한국어로 설명해 주세요.'),false);
+ assert.equal(requestsEnglish('Please explain in English. Actually, answer in Korean.'),false);
+ assert.equal(requestsEnglish('한국어로 설명해 주세요. 대신 in English 부탁해요.'),true);
+ assert.equal(requestsEnglish('Translate the browser message from English into Korean.'),false);
+});
+
+test('common questions reserve a relevant first-day source without dropping current lesson',()=>{
+ const lessons=[
+  {id:'current',title:'13일차',day_number:13,body_text:'광고 집행'},
+  ...Array.from({length:6},(_,i)=>({id:'other'+i,title:'환불 일정',day_number:2+i,body_text:'환불 일정 예시'})),
+  {id:'welcome',title:'첫 수업',day_number:1,body_text:'환불은 운영팀에 문의해 주세요.'},
+ ];
+ const {sources}=retrieveCurriculum(lessons,'환불 일정이 궁금해요','current',false);
+ assert.ok(sources.some(source=>source.lessonId==='welcome'));
+ assert.ok(sources.some(source=>source.lessonId==='current'));
+});
+
+test('detects credential and payment patterns without blocking ordinary questions',()=>{
+ const {hasSensitiveQuestionText}=loadTs('lib/curriculum-ai-sensitive.ts');
+ for(const text of ['비밀번호: sample-test-value','비번은 fake1234 이에요','pw: Test!2345',
+  '패스워드 samplefake','password is Test!2345','tester@example.test / Test!2345',
+  '카드 4111 1111 1111 1111','카드 1234-5678-9012-3456','１２３４－５６７８－９０１２－３４５６',
+  '주민등록번호 900101-1234567','9001011234567','sk-proj-'+'x'.repeat(30),'ghp_'+'x'.repeat(30)]){
+  assert.equal(hasSensitiveQuestionText(text),true,text);
+ }
+ for(const text of ['비밀번호를 잊었는데 어디에서 바꾸나요?','비밀번호는 어떻게 바꿔요?', 'How do I reset my password?',
+  'Where is the password reset page?', '연락처 010-0000-0000', 'tester@example.test / 문의 내용', 'API 키는 어디에서 만들어요?']){
+  assert.equal(hasSensitiveQuestionText(text),false,text);
+ }
+});
+
+test('a refund question reserves the first-day refund policy over unrelated schedule history',()=>{
+ const lessons=[
+  {id:'current',title:'2일차',day_number:2,body_text:'클로드 설치'},
+  {id:'common',title:'공통 안내',day_number:1,body_text:'환불 및 일정은 공지에서 확인해 주세요.\n'+'안내 내용입니다.\n'.repeat(180)+'환불 규정\n결제 후 7일 이내는 전액 환불 조건을 확인합니다. 환불 신청은 담당자에게 문의합니다.'},
+ ];
+ const {sources}=retrieveCurriculum(lessons,'일정 공지 오리엔테이션 OT 환불 문의','current',false,'환불은 어떻게 하나요?');
+ assert.ok(sources.some(source=>source.lessonId==='common'&&source.excerpt.includes('전액 환불')));
+});
+
+test('English Projects navigation finds the Korean lesson section',()=>{
+ const lessons=[
+  {id:'current',title:'기본 사용법',day_number:2,document:{schemaVersion:1,checklist:[],blocks:[
+   {id:'definition-heading',type:'heading',content:'클로드 프로젝트 (Claude Projects)'},
+   {id:'definition',type:'text',content:'Claude Projects는 클로드 프로젝트의 대화와 자료를 묶는 기능입니다.'},
+   {id:'troubleshoot-heading',type:'heading',content:'Claude 프로젝트 연결 문제'},
+   {id:'troubleshoot',type:'text',content:'Claude 프로젝트 (Projects) 연결이 안 되면 파일을 확인합니다.'},
+   {id:'projects-heading',type:'heading',content:'볼트 폴더 연결하기'},
+   {id:'projects-nav',type:'text',content:'1. 클로드 > 왼쪽 사이드바에서 [프로젝트]를 누릅니다.\n2. [새 프로젝트]를 누릅니다.'},
+  ]}},
+  ...Array.from({length:6},(_,i)=>({id:'other'+i,title:'어사이드 Projects 설정',day_number:i+3,body_text:'어사이드의 Settings → Projects → Create에서 프로젝트를 추가합니다.'})),
+ ];
+ const {sources}=retrieveCurriculum(lessons,'Where do I open Projects in Claude?', 'current');
+ assert.equal(sources[0].blockId,'projects-heading');
+ assert.match(sources[0].excerpt,/클로드 > 왼쪽 사이드바에서 \[프로젝트\]/);
 });

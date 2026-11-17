@@ -1,0 +1,22 @@
+.card{position:absolute;z-index:6;right:16px;bottom:84px;width:min(340px,calc(100% - 32px));box-sizing:border-box;padding:16px;border-radius:14px;background:#fff;color:#161719;border:1px solid #dbe3ec;box-shadow:0 18px 44px rgba(6,14,28,.35);font-size:13px;line-height:1.55;word-break:keep-all;overflow-wrap:anywhere}
+.card *{box-sizing:border-box}
+.card header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.card header strong{display:block;font-size:16px;line-height:1.35}
+.card header small{display:block;margin-top:2px;color:#55667c;font-size:12px}
+.card header button{flex:none;display:grid;place-items:center;width:40px;height:40px;margin:-6px -6px 0 0;border:0;border-radius:10px;background:transparent;color:#42536b;cursor:pointer}
+.card header button:hover{background:#eef2f7}
+.card dl{margin:12px 0 0}
+.card dt{margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.02em;color:#55667c}
+.card dd{margin:4px 0 0;color:#2c3848}
+.card ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.card dd button{display:block;width:100%;padding:8px 10px;border:1px solid #dbe3ec;border-radius:9px;background:#f7f9fc;color:inherit;font:inherit;text-align:left;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card dd button:hover{border-color:#a9bdf6}
+.card dd button span{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:5px;background:#eaeff7;color:#42536b;font-size:10px;font-weight:700;vertical-align:1px}
+.card dd button span[data-status=review]{background:#fff3d9;color:#875d13}
+.card dd button span[data-status=approved]{background:#e4f5eb;color:#256a48}
+.card dd button span[data-status=running],.card dd button span[data-status=queued]{background:#e3f5ea;color:#17693d}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.actions button,.actions a{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 12px;border-radius:9px;border:1px solid #cfd8e3;background:#fff;color:#161719;font:inherit;font-weight:700;font-size:13px;text-decoration:none;cursor:pointer;white-space:nowrap}
+.actions button{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.card :is(button,a):focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
+@media(max-width:560px){.card{right:12px;left:12px;bottom:12px;width:auto}}

@@ -1,8 +1,9 @@
 "use client";
+import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
 import { kstInput, kstToIso, kstLabel, overlappingAutomations } from "@/lib/marketing-qa";
-import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
+import { emptyOrderListScope, orderDatePresets, orderDateRange, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
 const AdControlSettings = dynamic(() => import("./ad-control-settings").then(m => m.AdControlSettings));
@@ -28,8 +29,10 @@ import { MvpEditor } from './final/member-mvp';
 import { LearningNoticeEditor } from './final/learning-notice';
 import { AnalyticsExclusion } from './final/analytics-exclusion';
 import { AppBrandingEditor } from './final/app-branding-editor';
+import { ShortLinks } from './short-links';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
+import { seoText } from "@/lib/edu-seo";
 import {
   AdminButton,
   AdminCheckbox,
@@ -201,6 +204,7 @@ export function AdminWorkflows(props: Props) {
       </>
     );
   if (props.section === "landing" || props.section === "metrics") return <LandingAdmin />;
+  if (props.section === "links") return <ShortLinks />;
   if (props.section === "analytics") return <Analytics />;
   if (props.section === "orders") return <OrdersPanel {...p} />;
   return null;
@@ -336,9 +340,7 @@ function StaffPermissions({ data, send, pending }: Props) {
               </label>
             ))}
           </div>
-          <AdminButton variant="primary" type="submit" className="mt24" loading={pending}>
-            권한 저장
-          </AdminButton>
+          <div className="admin-permission-save mt24"><div><strong>{named(selected) || "선택 회원"} · {t(selected, "email")}</strong><p className="meta">저장할 권한: {Object.entries(permissionLabels).filter(([scope]) => permissions[scope]).map(([, label]) => label).join(" · ") || "없음 · 저장하면 일반 회원으로 전환됩니다."}</p></div><AdminButton variant="primary" type="submit" loading={pending}>권한 저장</AdminButton></div>
         </>
       ) : null}
       <Status message={message} />
@@ -1331,7 +1333,7 @@ function Participants() {
             <label>정렬 <select aria-label="회원 정렬" value={sortKey} onChange={(event) => setSortKey(event.target.value as typeof sortKey)}><option value="priority">처리 우선순</option><option value="name">이름순</option><option value="progress">학습진도순</option><option value="missions">미션 제출순</option></select></label>
           </div>
           {loading ? <div className="participant-table-skeleton" role="status" aria-label="회원 현황 불러오는 중">{Array.from({ length: 6 }, (_, index) => <div key={index}><span /><span /><span /><span /><span /></div>)}</div> : (
-          <><AdminDataTable label="회원별 미션 현황 표" density="standard">
+          <><AdminDataTable label="회원별 미션 현황 표" density="standard" tableClassName="admin-mobile-cards">
             <thead><tr>
               <th aria-sort={sortKey === "name" ? "ascending" : undefined}><button type="button" onClick={() => setSortKey("name")}>회원</button></th>
               <th aria-sort={sortKey === "progress" ? "descending" : undefined}><button type="button" onClick={() => setSortKey("progress")}>학습진도</button></th>
@@ -1347,14 +1349,14 @@ function Participants() {
             const manageLabel = statsForMember.state === "review" ? "검토하기" : statsForMember.state === "followup" ? "재제출 확인" : statsForMember.state === "missing" || statsForMember.state === "unconfigured" ? "미션 설정하기" : statsForMember.state === "submitted" || statsForMember.state === "done" ? "제출물 보기" : "상세보기";
             return (
               <tr key={memberId} className={`participant-table-row ${statsForMember.state === "review" ? "needs-review" : ""}`} tabIndex={0} aria-label={`${t(r, "full_name") || "회원"}, ${stateLabels[statsForMember.state]}`} onClick={(event) => openMember(memberId, event.currentTarget)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); openMember(memberId, event.currentTarget); } }}>
-                <td><button type="button" className="participant-member-link" onClick={(event) => openMember(memberId, event.currentTarget.closest("tr") as HTMLElement)}><strong>{t(r, "full_name") || "회원"}</strong><span>{t(r, "email") || "이메일 정보 없음"}</span></button></td>
-                <td><span className="participant-table-progress">{Number(t(r, "learning_percent") || 0)}%</span></td>
-                <td>{statsForMember.total ? `${statsForMember.approved}/${statsForMember.total}` : "—"}</td>
-                <td>{statsForMember.submitted}</td>
-                <td>{statsForMember.review ? <span className="participant-review-count">{statsForMember.review}</span> : "—"}</td>
-                <td className="participant-last-activity" title={r.last_activity ? timeLabel(r.last_activity) : "활동 기록 없음"}>{r.last_activity ? timeLabel(r.last_activity) : "활동 없음"}</td>
-                <td><AdminStatusBadge status={statsForMember.state} label={stateLabels[statsForMember.state]} tone={statsForMember.state === "review" || statsForMember.state === "unconfigured" || statsForMember.state === "followup" ? "warning" : statsForMember.state === "done" ? "success" : statsForMember.state === "progress" || statsForMember.state === "submitted" ? "info" : "neutral"} /></td>
-                <td>{manageHref ? <Link className={`participant-row-action ${statsForMember.state === "review" ? "primary" : ""}`} href={manageHref} onClick={(event) => event.stopPropagation()}>{manageLabel}</Link> : <button type="button" className="participant-row-action" onClick={(event) => { event.stopPropagation(); openMember(memberId, event.currentTarget); }}>{manageLabel}</button>}</td>
+                <td data-label="회원"><button type="button" className="participant-member-link" onClick={(event) => openMember(memberId, event.currentTarget.closest("tr") as HTMLElement)}><strong>{t(r, "full_name") || "회원"}</strong><span>{t(r, "email") || "이메일 정보 없음"}</span></button></td>
+                <td data-label="학습진도"><span className="participant-table-progress">{Number(t(r, "learning_percent") || 0)}%</span></td>
+                <td data-label="미션 진행">{statsForMember.total ? `${statsForMember.approved}/${statsForMember.total}` : "—"}</td>
+                <td data-label="제출">{statsForMember.submitted}</td>
+                <td data-label="검토 필요">{statsForMember.review ? <span className="participant-review-count">{statsForMember.review}</span> : "—"}</td>
+                <td data-label="최근 활동" className="participant-last-activity" title={r.last_activity ? timeLabel(r.last_activity) : "활동 기록 없음"}>{r.last_activity ? timeLabel(r.last_activity) : "활동 없음"}</td>
+                <td data-label="상태"><AdminStatusBadge status={statsForMember.state} label={stateLabels[statsForMember.state]} tone={statsForMember.state === "review" || statsForMember.state === "unconfigured" || statsForMember.state === "followup" ? "warning" : statsForMember.state === "done" ? "success" : statsForMember.state === "progress" || statsForMember.state === "submitted" ? "info" : "neutral"} /></td>
+                <td data-label="관리">{manageHref ? <Link className={`participant-row-action ${statsForMember.state === "review" ? "primary" : ""}`} href={manageHref} onClick={(event) => event.stopPropagation()}>{manageLabel}</Link> : <button type="button" className="participant-row-action" onClick={(event) => { event.stopPropagation(); openMember(memberId, event.currentTarget); }}>{manageLabel}</button>}</td>
               </tr>
             );
           })}
@@ -1492,8 +1494,8 @@ function SettingsForm({ section, data, send, pending }: Props) {
   const [seoTab, setSeoTab] = useState<'search' | 'verification' | 'measurement'>('search');
   const [codeOpen, setCodeOpen] = useState(false);
   const [seoDraft, setSeoDraft] = useState(() => ({
-    title: String(initial.title || 'BrandyAction EDU | 배운 것을, 내 일의 성과로.'),
-    description: String(initial.description || 'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.'),
+    title: seoText(initial, 'title'),
+    description: seoText(initial, 'description'),
     googleVerification: String(initial.googleVerification || ''),
     naverVerification: String(initial.naverVerification || ''),
   }));
@@ -1848,6 +1850,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
 }
 function Analytics() {
+  const [analysisView,setAnalysisView]=useState<'site'|'campus'>('site');
   const [today, setToday] = useState(() => new Date(Date.now()+9*3600000).toISOString().slice(0,10));
   const [from, setFrom] = useState(() =>
     new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
@@ -1859,7 +1862,7 @@ function Analytics() {
   const dateError = !from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) ? '시작일과 종료일을 선택해 주세요.' : from > to ? '종료일은 시작일 이후로 선택해 주세요.' : Date.parse(to) - Date.parse(from) >= 366 * 86400000 ? '조회 기간은 1년 이내로 선택해 주세요.' : '';
   const [pathSearch, setPathSearch] = useState('');
   const { result, error, loading, retry } = useReport(
-    dateError ? null : "/api/platform/workflows?" +
+    dateError || analysisView==='campus' ? null : "/api/platform/workflows?" +
       new URLSearchParams({
         kind: "analytics",
         from: from ? from + "T00:00:00+09:00" : "",
@@ -1869,8 +1872,11 @@ function Analytics() {
   const stages = (result.stages || {}) as Record<string, number>;
   const paths = (result.paths || []) as Row[];
   const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
+  const analysisTabs=<div className="analytics-period-presets" role="group" aria-label="분석 화면 선택"><AdminButton variant={analysisView==='site'?'primary':'outline'} aria-pressed={analysisView==='site'} onClick={()=>setAnalysisView('site')}>사이트 유입·결제</AdminButton><AdminButton variant={analysisView==='campus'?'primary':'outline'} aria-pressed={analysisView==='campus'} onClick={()=>setAnalysisView('campus')}>문샷 캠퍼스 행동</AdminButton></div>;
+  if(analysisView==='campus')return <>{analysisTabs}<CampusAnalyticsPanel/></>;
   return (
     <>
+      {analysisTabs}
       <div className="analytics-period-presets" role="group" aria-label="빠른 조회 기간">{[7,30,90].map(days => <AdminButton key={days} size="sm" aria-pressed={!dateError && to === today && Math.round((Date.parse(to)-Date.parse(from))/86400000)+1 === days} onClick={() => { const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10); setToday(today); setTo(today); setFrom(new Date(Date.parse(today)-(days-1)*86400000).toISOString().slice(0,10)); }}>{days}일</AdminButton>)}</div>
       <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading || !!dateError}>새로고침</AdminButton>} />
           <label className="marketing-list-search"><input type="search" className="admin-input" placeholder="페이지 주소 검색" aria-label="페이지 주소 검색" value={pathSearch} onChange={event => setPathSearch(event.target.value)}/></label>
@@ -1992,33 +1998,44 @@ function OrdersPanel({
   const selectedRemaining = Math.max(0, selectedApproved - selectedCancelled);
   return (
     <>
-      <section className={usability.scopeSection} aria-label="전체 기간 결제 요약">
-      <div className={usability.scopeHeading}><h2>전체 기간 결제 요약</h2><p>상품·결제 상태·기간·검색 조건은 아래 주문 목록에만 적용됩니다.</p></div>
+      <section className={usability.scopeSection} aria-label="기간별 결제 요약">
+      <div className={usability.scopeHeading}><h2>{orderScope.from || orderScope.to ? "선택 기간 결제 요약" : "전체 기간 결제 요약"}</h2><p>주문일 기간은 요약과 목록에 함께 적용됩니다. 상품·상태·검색 조건은 목록에만 적용됩니다.</p></div>
+      <div className={usability.datePresets} role="group" aria-label="기간 빠른 선택">
+        {orderDatePresets.map(preset => {
+          const range = orderDateRange(preset.value);
+          const selected = range.from === orderScope.from && range.to === orderScope.to;
+          return <AdminButton key={preset.value} size="sm" variant={selected ? "primary" : "outline"} aria-pressed={selected} disabled={loading} onClick={() => {
+            const dates = orderDateRange(preset.value);
+            setFrom(dates.from); setTo(dates.to); setDateError("");
+            changeScope(dates);
+          }}>{preset.label}</AdminButton>;
+        })}
+      </div>
       <div className="admin-pilot-summary" aria-busy={loading}>
         {[
           ["결제 완료액", money(paid), "고객 주문의 승인 결제 합계"],
           ["환불 완료액", money(refunded), "고객 주문의 취소 완료액"],
           ["순결제액", money(paid - refunded), "고객 결제 완료 − 고객 환불 완료"],
-          ["환불 처리 확인", Number(orderSummary?.processingRefunds || 0) + "건", "전체 주문의 결과 확인 중인 환불"],
+          ["환불 처리 확인", Number(orderSummary?.processingRefunds || 0) + "건", "조회 기간 주문의 결과 확인 중인 환불"],
         ].map(([label, value, note], index) => (
           <AdminSummaryCard key={label} label={label} value={loading || !orderSummary ? "—" : value} scope={note} compact className={index === 2 ? "admin-pilot-summary-highlight" : undefined} />
         ))}
       </div>
       <p className="meta mt8 mb16">매출·유입 통계는 시험·내부·무료 주문과 탈퇴·미연결 회원을 제외합니다. 아래 주문 목록에는 모두 표시됩니다.</p>
       </section>
-      <div className={usability.scopeHeading}><h2>주문 목록 검색</h2><p>조회 조건을 바꾸어도 위 결제 요약은 유지됩니다.</p></div>
+      <div className={usability.scopeHeading}><h2>주문 목록 검색</h2><p>기간 조회를 누르면 결제 요약과 주문 목록을 함께 갱신합니다.</p></div>
       <AdminFilterBar
         className="admin-pilot-filter admin-orders-filter"
-        filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { changeScope({ course: event.target.value }); }}><option value="">전체 상품</option>{course && !registeredCourses.some(item => item.id === course) && <option value={course}>선택한 상품</option>}{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { changeScope({ status: event.target.value }); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
+        filters={<><AdminSelect label="상품" value={course} onChange={event => { changeScope({ course: event.target.value }); }}><option value="">전체 상품</option>{course && !registeredCourses.some(item => item.id === course) && <option value={course}>선택한 상품</option>}{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" value={status} onChange={event => { changeScope({ status: event.target.value }); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
         date={<><AdminDatePicker label="주문일 시작 · KST" value={from} error={dateError || undefined} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="주문일 종료 · KST" value={to} onChange={event => setTo(event.target.value)} /></>}
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
         onReset={resetFilters}
         action={<AdminButton variant="primary" disabled={loading} onClick={applyDates}>기간 조회</AdminButton>}
-        appliedSummary={`목록 적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건`}
+        appliedSummary={`요약·목록 적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건`}
       />
       <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
         <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { changeScope({ quick: value }); }} items={[{ value: "all", label: "전체", count: Number(quickCounts?.all || 0) }, { value: "failed", label: "결제 실패", count: Number(quickCounts?.failed || 0) }, { value: "refund", label: "환불 확인", count: Number(quickCounts?.refund || 0) }, { value: "access", label: "수강권 확인", count: Number(quickCounts?.access || 0) }]} />
-        <AdminDataTable label="주문·결제·환불·수강권 연결 목록" density="standard" loading={loading}>
+        <AdminDataTable label="주문·결제·환불·수강권 연결 목록" tableClassName="admin-mobile-cards" density="standard" loading={loading}>
             <thead>
               <tr>
                 {[

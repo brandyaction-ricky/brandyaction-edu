@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const user = await operator();
     if (!user) return reply({ error: '상품과 주문 관리 권한이 필요합니다.' }, 403);
     const raw = await request.text();
-    if (raw.length > 4000) return reply({ error: '입력 내용이 너무 큽니다.' }, 413);
+    if (raw.length > 6000) return reply({ error: '입력 내용이 너무 큽니다.' }, 413);
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { return reply({ error: '입력 형식을 확인해 주세요.' }, 400); }
     if (!body || typeof body !== 'object' || Array.isArray(body) || !uuid(body.cohort)) return reply({ error: '기수를 확인해 주세요.' }, 400);
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const saved = await db.from('site_settings').upsert({ key, value: settings, is_public: false, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'key' });
     if (saved.error) throw saved.error;
     const audit = await db.from('audit_logs').insert({ actor_user_id: user.id, action: 'purchase_onboarding.settings_saved', entity_type: 'cohort', entity_id: body.cohort,
-      after_data: { enabled: Boolean(settings.url), guideConfigured: Boolean(settings.url) } });
+      after_data: { enabled: Boolean(settings.url || settings.message), guideConfigured: Boolean(settings.url), messageConfigured: Boolean(settings.message) } });
     if (audit.error) throw audit.error;
     return reply({ ok: true, settings });
   } catch { return reply({ error: '결제 후 안내 설정을 저장하지 못했습니다.' }, 503); }

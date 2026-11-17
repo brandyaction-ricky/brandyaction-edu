@@ -1,3 +1,4 @@
+import { questionContexts } from './helpers/question-learning-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,7 +10,7 @@ function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
-    if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
+    if (name === '@/lib/question-learning-context-server') return questionContexts; if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
     if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true };
     if (name === '@/lib/member-directory') return load('lib/member-directory.ts');
     if (name === '@/lib/submission-review') return submissionReview;
@@ -47,6 +48,19 @@ function authHarness({ authError = null, profileError = null, profile = admin, a
   return { ...auth, calls: () => calls };
 }
 
+test('purchase guidance can show verified account login methods without exposing them elsewhere', async () => {
+  const authUser = { id: admin.id, email: admin.email };
+  for (const [provider, label] of [['kakao', '카카오'], ['google', '구글'], ['email', '이메일']]) {
+    const auth = authHarness({ authUser: { ...authUser, app_metadata: { provider } } });
+    assert.equal((await auth.getAuthenticatedUser(true)).loginMethod, label);
+    assert.equal((await auth.getAuthenticatedUser()).loginMethod, undefined);
+  }
+  const linked = authHarness({ authUser: { ...authUser, identities: ['kakao', 'google', 'google', 'unknown'].map(provider => ({ provider })) } });
+  assert.equal((await linked.getAuthenticatedUser(true)).loginMethod, '카카오 · 구글');
+  const unknown = authHarness({ authUser: { ...authUser, user_metadata: { provider: 'kakao' } } });
+  assert.equal((await unknown.getAuthenticatedUser(true)).loginMethod, undefined);
+});
+
 test('missing/invalid sessions are unauthenticated, transient Auth and profile failures remain retryable', async () => {
   for (const authError of [{ name: 'AuthSessionMissingError' }, { status: 401 }]) assert.equal(await authHarness({ authError }).getAuthenticatedUser(), null);
   for (const options of [{ authError: { status: 503 } }, { authError: { status: 429 } }, { profileError: { code: 'PGRST000' } }]) {
@@ -57,6 +71,17 @@ test('missing/invalid sessions are unauthenticated, transient Auth and profile f
 test('account status and database role remain authoritative over user-editable metadata', async () => {
   assert.equal(await authHarness({ profile: { ...admin, status: 'suspended' } }).getAuthenticatedUser(), null);
   assert.equal((await authHarness({ profile: { ...admin, role: 'member' } }).getAuthenticatedUser()).role, 'member');
+});
+
+test('withdrawn-account Data API guard rejects an otherwise valid session without treating it as an outage', async () => {
+  const auth = authHarness({ profileError: { code: 'PT401', message: 'ACCOUNT_WITHDRAWN' } });
+  assert.equal(await auth.getAuthenticatedUser(), null);
+  assert.equal(await auth.getAdminUser(), null);
+  for (const profileError of [
+    { code: 'PT401', message: 'OTHER_AUTH_FAILURE' },
+    { code: 'PGRST000', message: 'ACCOUNT_WITHDRAWN' },
+    { code: '42501', message: 'permission denied' },
+  ]) await assert.rejects(authHarness({ profileError }).getAuthenticatedUser(), error => error.status === 503);
 });
 
 test('operator checks reuse the already verified request user and preserve denied scopes', async () => {
@@ -158,6 +183,19 @@ test('order revenue summary covers every order page and keeps the navigation bad
   assert.equal(third.data.admin_summary[0].pendingReviews, 3);
   assert.equal(third.data.admin_summary[0].openQuestions, 3);
   assert.equal(api.calls.summaries, 2);
+});
+
+test('dated order API replaces global revenue with period summary and retains authorization', async () => {
+  const api = apiHarness(admin);
+  const response = await api.read('orders&from=2026-11-05&to=2026-11-05');
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.order_summary[0], { id: 'order-summary', approvedRevenue: 0, refundedRevenue: 0, netRevenue: 0, processingRefunds: 3 });
+  assert.ok(api.calls.selects.some(([table, columns]) => table === 'payments' && columns.includes('period_order:edu_analytics_orders!inner')));
+  for (const user of [null, { ...admin, role: 'member' }]) {
+    const denied = apiHarness(user);
+    assert.notEqual((await denied.read('orders&from=2026-11-05')).status, 200);
+    assert.ok(!denied.calls.tables.includes('payments'));
+  }
 });
 
 test('order payment reads select only the nested card approval number within the visible order scope', async () => {

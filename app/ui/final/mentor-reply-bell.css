@@ -1,0 +1,14 @@
+.mentor-reply-bell { position: relative; flex: 0 0 auto; }
+.mentor-reply-bell .mentor-reply-trigger { position: relative; min-height: 44px; border-color: transparent; }
+.mentor-reply-count { position: absolute; top: 1px; right: -2px; min-width: 17px; padding: 0 4px; border-radius: 10px; background: var(--red, #bd192a); color: white; font-size: 10px; font-weight: 700; line-height: 17px; text-align: center; }
+.mentor-reply-panel { position: absolute; z-index: 2; top: calc(100% + 6px); right: 0; width: min(310px, calc(100vw - 28px)); border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised, white); box-shadow: 0 8px 24px #17233120; }
+.mentor-reply-panel h2 { margin: 0; padding: 14px 16px 10px; font-size: 16px; }
+.mentor-reply-panel p { margin: 0; padding: 4px 16px 14px; color: var(--muted); font-size: 13px; }
+.mentor-reply-panel ul { margin: 0; padding: 0; max-height: min(52vh, 320px); overflow: auto; list-style: none; }
+.mentor-reply-panel li a { display: grid; gap: 3px; min-height: 44px; padding: 8px 16px; overflow-wrap: anywhere; font-size: 14px; }
+.mentor-reply-panel li small { color: var(--red, #bd192a); font-size: 12px; }
+.mentor-reply-panel a:hover { background: var(--ba-neutral-100, #f6f6f6); }
+.mentor-reply-panel .mentor-reply-all { display: block; padding: 11px 16px; border-top: 1px solid var(--line); font-size: 13px; }
+@media (max-width: 680px) {
+  .mentor-reply-panel { position: fixed; top: var(--header-height, 64px); right: 14px; }
+}

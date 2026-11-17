@@ -43,7 +43,7 @@ export async function eligiblePurchase(userId: string, requestedOrder: string | 
       if (byKey.has(guideKey)) {
         try {
           const completionGuide = completionGuideSettings(byKey.get(guideKey));
-          if (completionGuide.url) return { orderId: order.id, orderNumber: order.order_number, itemName: item.item_name, completionGuide };
+          if (completionGuide.url || completionGuide.message) return { orderId: order.id, orderNumber: order.order_number, itemName: item.item_name, completionGuide };
         } catch { /* An invalid guide must never expose a destination. */ }
         continue;
       }

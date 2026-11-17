@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { pixel } from '@/lib/landing-browser';
-import { ctaTextColor, PRODUCT_CTA_EVENT, productCtaPosition, type productConversion } from '@/lib/product-conversion';
+import { PRODUCT_CTA_EVENT, productCtaPosition, type productConversion } from '@/lib/product-conversion';
 
 type Conversion = ReturnType<typeof productConversion>;
 // DEV, previews, and local QA must never send events to an advertiser's live pixel.
@@ -45,5 +45,5 @@ export function ProductCtaLink({ conversion, courseId, position, className = 'bt
   const onClick = delegated ? undefined : () => {
     if (conversion.pixelId && livePixel()) pixel({ pixel_enabled: true, pixel_id: conversion.pixelId }, conversionEvent, { content_ids: [courseId], content_name: position.replace('_cta', '') }, crypto.randomUUID());
   };
-  return <a href={conversion.url} className={className} style={{ backgroundColor: conversion.color, borderColor: conversion.color, color: ctaTextColor(conversion.color) }} data-product-cta={position} data-landing-cta={tracked ? position : undefined} onClick={onClick}>{conversion.label}<ArrowRight /></a>;
+  return <a href={conversion.url} className={className} data-product-cta={position} data-landing-cta={tracked ? position : undefined} onClick={onClick}>{conversion.label}<ArrowRight /></a>;
 }
