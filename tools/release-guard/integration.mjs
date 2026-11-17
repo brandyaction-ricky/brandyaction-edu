@@ -11,6 +11,7 @@ import {createServer as createTcpServer} from 'node:net';
 import {once} from 'node:events';
 import {execFileSync,spawn} from 'node:child_process';
 import EmbeddedPostgres from 'embedded-postgres';
+import {Client} from 'pg';
 import {digest,REQUIRED} from './gate.mjs';
 const here=dirname(fileURLToPath(import.meta.url));
 const root=await mkdtemp(join(tmpdir(),'release-integration-'));
@@ -18,13 +19,15 @@ const checkout=join(root,'checkout');await mkdir(checkout);
 const socket=createTcpServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');const port=socket.address().port;await new Promise(r=>socket.close(r));
 const password=randomBytes(24).toString('hex');
 const pg=new EmbeddedPostgres({databaseDir:join(root,'pg'),user:'postgres',password,port,persistent:true,autoRehydrateSymlinks:true,createPostgresUser:false,postgresFlags:['-h','127.0.0.1','-k',root],onLog:()=>{},onError:()=>{}});
-let db,server,base,candidate;const calls=[];let live='dpl_base',promotionFails=false,staleHealthResponses=0;
+let db,metadata,server,base,candidate;const calls=[];let live='dpl_base',promotionFails=false,staleHealthResponses=0;
 const git=(...args)=>execFileSync('git',args,{cwd:checkout,encoding:'utf8'}).trim();
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const results=[];
 try{
  await pg.initialise();await pg.start();db=pg.getPgClient();await db.connect();
  await db.query('create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text primary key,name text,statements text[]); create table public.example(id int primary key)');
+ await db.query(`create role guard_metadata login password '${password}'; grant usage on schema supabase_migrations to guard_metadata; grant select on supabase_migrations.schema_migrations to guard_metadata`);
+ metadata=new Client({connectionString:`postgres://guard_metadata:${password}@127.0.0.1:${port}/postgres`,options:'-c default_transaction_read_only=on'});await metadata.connect();
  await mkdir(join(checkout,'supabase/migrations'),{recursive:true});
  git('init','-b','main');git('config','user.name','Isolated QA');git('config','user.email','qa@example.invalid');
  await writeFile(join(checkout,'baseline.txt'),'baseline');git('add','baseline.txt');git('commit','-m','baseline');base=git('rev-parse','HEAD');
@@ -33,11 +36,19 @@ try{
  const schemaSql=await readFile(join(here,'schema-fingerprint.sql'),'utf8');
  const fingerprint=async()=>hash(JSON.stringify((await db.query(schemaSql)).rows));
  const dbBefore=await fingerprint();
+ const limitedFingerprint=async()=>hash(JSON.stringify((await metadata.query(schemaSql)).rows));
+ assert.equal(await limitedFingerprint(),dbBefore);
+ await assert.rejects(metadata.query('select * from public.example'),error=>error.code==='42501');
+ await db.query('alter table public.example add column private_change text');
+ assert.notEqual(await limitedFingerprint(),dbBefore);assert.equal(await limitedFingerprint(),await fingerprint());
+ await db.query('alter table public.example drop column private_change');assert.equal(await limitedFingerprint(),dbBefore);
+ results.push('metadata-only role detects column drift while customer SELECT is denied');
  await db.query('begin');await db.query(sql);await db.query('insert into supabase_migrations.schema_migrations values($1,$2,$3)',['20261117010000','fixture',[sql]]);const dbAfter=await fingerprint();await db.query('rollback');
  const {publicKey,privateKey}=generateKeyPairSync('ed25519');
  await writeFile(join(root,'key.pem'),publicKey.export({type:'spki',format:'pem'}),{mode:0o600});
  await writeFile(join(root,'token'),'local-rehearsal-only',{mode:0o600});
- await writeFile(join(root,'db'),`postgres://postgres:${password}@127.0.0.1:${port}/postgres`,{mode:0o600});
+ await writeFile(join(root,'db'),`postgres://guard_metadata:${password}@127.0.0.1:${port}/postgres`,{mode:0o600});
+ await writeFile(join(root,'migration-db'),`postgres://postgres:${password}@127.0.0.1:${port}/postgres`,{mode:0o600});
  const deployment=id=>({id,projectId:'prj_fixture',target:'production',readyState:'READY',gitSource:{sha:id==='dpl_base'?base:candidate}});
  server=createServer((req,res)=>{calls.push(req.method+' '+req.url);res.setHeader('Content-Type','application/json');
   const path=new URL(req.url,'http://localhost').pathname;
@@ -49,7 +60,7 @@ try{
   if(req.method==='POST'&&path==='/v10/projects/prj_fixture/promote/dpl_candidate'){live='dpl_candidate';res.writeHead(promotionFails?503:201);res.end(promotionFails?'{}':'');return;}
   res.writeHead(404);res.end('{}');
  });server.listen(0,'127.0.0.1');await once(server,'listening');const origin=`http://127.0.0.1:${server.address().port}`;
- const config={mode:'rehearsal',executionEnabled:true,repository:'qa/repo',project:'prj_fixture',team:'team_fixture',branch:'main',productionHost:'fixture.invalid',vercelOrigin:origin,githubOrigin:origin,smokeUrl:origin+'/health',actionsAppId:1,requiredChecks:['required-ci'],checkout,dbConnectionFile:join(root,'db'),migrationConnectionFile:join(root,'db'),vercelTokenFile:join(root,'token'),githubTokenFile:join(root,'token'),approvalPublicKeyFile:join(root,'key.pem'),requestRoot:join(root,'requests'),journalRoot:join(root,'journal'),lockRoot:join(root,'locks')};
+ const config={mode:'rehearsal',executionEnabled:true,repository:'qa/repo',project:'prj_fixture',team:'team_fixture',branch:'main',productionHost:'fixture.invalid',vercelOrigin:origin,githubOrigin:origin,smokeUrl:origin+'/health',actionsAppId:1,requiredChecks:['required-ci'],checkout,dbConnectionFile:join(root,'db'),migrationConnectionFile:join(root,'migration-db'),vercelTokenFile:join(root,'token'),githubTokenFile:join(root,'token'),approvalPublicKeyFile:join(root,'key.pem'),requestRoot:join(root,'requests'),journalRoot:join(root,'journal'),lockRoot:join(root,'locks')};
  await mkdir(config.requestRoot,{mode:0o700});
  const configPath=join(root,'config.json');
  const run=async(id,mode='--execute')=>new Promise((resolve,reject)=>{const child=spawn(process.execPath,[join(here,'run-request.mjs'),configPath,id,mode],{env:{PATH:process.env.PATH},stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>output+=x);child.on('error',reject);child.on('close',code=>resolve({code,output}));});
@@ -71,5 +82,5 @@ try{
  await prepare('uncertain');promotionFails=true;result=await run('uncertain');assert.notEqual(result.code,0);await access(join(config.lockRoot,'production.lock'));assert.equal(JSON.parse(await readFile(join(config.journalRoot,'uncertain.json'),'utf8')).state,'started');const before=calls.filter(c=>c.startsWith('POST')).length;assert.notEqual((await run('uncertain')).code,0);assert.equal(calls.filter(c=>c.startsWith('POST')).length,before);results.push('provider applied then errored: persistent lock, no retry write');
  console.log(JSON.stringify({passed:true,checks:results,provider:'loopback HTTP simulator',database:'real isolated PostgreSQL',hostedWrites:0}));
 }finally{
- if(server)await new Promise(r=>server.close(r));if(db)await db.end();await pg.stop();await rm(root,{recursive:true,force:true});
+ if(server)await new Promise(r=>server.close(r));if(metadata)await metadata.end();if(db)await db.end();await pg.stop();await rm(root,{recursive:true,force:true});
 }

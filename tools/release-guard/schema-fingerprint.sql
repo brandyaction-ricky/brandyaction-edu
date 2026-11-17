@@ -1,8 +1,12 @@
 -- Read-only structural contract; data rows are never included.
 with objects as (
- select 'column' as kind, table_schema||'.'||table_name||'.'||column_name as name,
- jsonb_build_object('type',udt_name,'nullable',is_nullable,'default',column_default) as definition
- from information_schema.columns where table_schema in ('public','edu_private')
+ -- information_schema.columns hides tables without data privileges. The
+ -- preflight role must see structural drift without receiving customer SELECT.
+ select 'column' as kind, n.nspname||'.'||c.relname||'.'||a.attname as name,
+ jsonb_build_object('type',format_type(a.atttypid,a.atttypmod),'notNull',a.attnotnull,'default',pg_get_expr(d.adbin,d.adrelid),'identity',a.attidentity,'generated',a.attgenerated) as definition
+ from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace
+ left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+ where n.nspname in ('public','edu_private') and c.relkind in ('r','p','v','m','f') and a.attnum>0 and not a.attisdropped
  union all
  select 'constraint', n.nspname||'.'||c.relname||'.'||x.conname, to_jsonb(pg_get_constraintdef(x.oid))
  from pg_constraint x join pg_class c on c.oid=x.conrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','edu_private')
