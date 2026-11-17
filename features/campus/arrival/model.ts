@@ -10,11 +10,12 @@ export type ArrivalState = {
   answers: Record<Audience, Answers>;
   mode: 'personal' | 'example';
   experience: 'none' | 'self-reported' | 'example-viewed';
+  handoff: 'ready' | 'copied';
   revision: Revision;
   extra: string;
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, audience: 'business', answers: {business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', revision: 'short', extra: ''};
+  return {version: 1, step: 0, audience: 'business', answers: {business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: ''};
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -29,7 +30,10 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
   try {
     const value: unknown = JSON.parse(raw);
     if (!object(value) || value.version !== ARRIVAL_VERSION) return state;
-    if (typeof value.step === 'number' && Number.isInteger(value.step) && value.step >= 0 && value.step <= 7) state.step = value.step as ArrivalStep;
+    if (typeof value.step === 'number' && Number.isInteger(value.step) && value.step >= 0 && value.step <= 7) {
+      // Existing drafts return to the merged handoff and outcome screens.
+      state.step = value.step === 4 ? 3 : value.step === 6 ? 5 : value.step as ArrivalStep;
+    }
     if (isAudience(value.audience)) state.audience = value.audience;
     if (object(value.answers)) {
       for (const audience of audiences) {
@@ -41,6 +45,8 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     state.experience = state.mode === 'example'
       ? value.experience === 'example-viewed' ? 'example-viewed' : 'none'
       : value.experience === 'self-reported' ? 'self-reported' : 'none';
+    // Copying a request never means the external AI has received it or replied.
+    state.handoff = value.handoff === 'copied' ? 'copied' : 'ready';
     if (isRevision(value.revision)) state.revision = value.revision;
     state.extra = answer(value.extra).slice(0, REVISION_LIMIT);
     return state;
@@ -50,6 +56,20 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
 }
 export function serializeArrivalState(state: ArrivalState): string {
   return JSON.stringify(parseArrivalState(JSON.stringify(state)));
+}
+
+/** Back follows the visitor's chosen path, including the optional example route. */
+export function arrivalBackStep(state: ArrivalState): ArrivalStep {
+  switch (state.step) {
+    case 1: return 0;
+    case 2: return 1;
+    case 3:
+    case 4: return 2;
+    case 5:
+    case 6: return state.mode === 'example' ? 1 : 3;
+    case 7: return state.experience === 'none' ? 0 : 5;
+    default: return 0;
+  }
 }
 
 export type LiveEvent = {

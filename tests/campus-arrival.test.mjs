@@ -73,7 +73,8 @@ test('the reusable criteria preserve a personal correction and follow the demons
 
 test('leaving for a personal AI and returning restores all three draft paths', () => {
   const state = model.initialArrivalState();
-  state.step = 4;
+  state.step = 3;
+  state.handoff = 'copied';
   state.audience = 'preparing';
   state.answers.business = {a: '내 상품', b: '내 장점'};
   state.answers.preparing = {a: '준비 중인 서비스', b: '고객에게 궁금한 점'};
@@ -83,6 +84,44 @@ test('leaving for a personal AI and returning restores all three draft paths', (
   const restored = model.parseArrivalState(model.serializeArrivalState(state));
   assert.deepEqual(restored, state);
   assert.equal(restored.experience, 'none', 'leaving and reopening never pretends the AI has replied');
+});
+
+test('previous handoff and criteria drafts resume in the consolidated flow without losing their content', () => {
+  const legacy = {...model.initialArrivalState(), audience: 'preparing', step: 4};
+  delete legacy.handoff;
+  legacy.answers.preparing = {a: '기존에 입력한 상품', b: '고객에게 궁금한 점'};
+  const handoff = model.parseArrivalState(JSON.stringify(legacy));
+  assert.equal(handoff.step, 3);
+  assert.equal(handoff.handoff, 'ready');
+  assert.equal(handoff.experience, 'none');
+  assert.deepEqual(handoff.answers.preparing, legacy.answers.preparing);
+  const outcome = model.parseArrivalState(JSON.stringify({...legacy, step: 6, experience: 'self-reported'}));
+  assert.equal(outcome.step, 5);
+  assert.equal(outcome.experience, 'self-reported');
+  assert.deepEqual(outcome.answers, handoff.answers);
+});
+
+test('copy status persists independently of AI completion and rejects unrecognized statuses', () => {
+  const state = {...model.initialArrivalState(), step: 3, handoff: 'copied'};
+  const restored = model.parseArrivalState(model.serializeArrivalState(state));
+  assert.equal(restored.handoff, 'copied');
+  assert.equal(restored.step, 3);
+  assert.equal(restored.experience, 'none');
+  for (const handoff of ['opened', 'answered', true, null]) {
+    const invalid = model.parseArrivalState(JSON.stringify({...state, handoff}));
+    assert.equal(invalid.handoff, 'ready');
+    assert.equal(invalid.experience, 'none');
+  }
+});
+
+test('back navigation follows the personal, example and direct-calendar paths', () => {
+  const state = model.initialArrivalState();
+  for (const [step, expected] of [[0, 0], [1, 0], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 0]]) {
+    assert.equal(model.arrivalBackStep({...state, step}), expected);
+  }
+  assert.equal(model.arrivalBackStep({...state, step: 5, mode: 'example', experience: 'example-viewed'}), 1);
+  assert.equal(model.arrivalBackStep({...state, step: 7, experience: 'self-reported'}), 5);
+  assert.equal(model.arrivalBackStep({...state, step: 7, mode: 'example', experience: 'example-viewed'}), 5);
 });
 
 test('example viewing and self-reported AI completion stay separate on restoration', () => {

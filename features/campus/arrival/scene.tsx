@@ -6,6 +6,8 @@ export type ArrivalRoom = 'welcome' | 'office' | 'live';
 
 type SceneProps = {
   room: ArrivalRoom;
+  demoPhase?: 'brief' | 'result';
+  demoTitle?: string;
   onAction?: (id: string) => void;
   className?: string;
   onReady?: (ready: boolean) => void;
@@ -24,10 +26,10 @@ const actions: Record<ArrivalRoom, readonly string[]> = {
 };
 
 /** A local presentation bridge. It never mounts the member host, presence or reporting APIs. */
-export function Scene({ room, onAction, className, onReady }: SceneProps) {
+export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 맡길 첫 업무', onAction, className, onReady }: SceneProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const token = useRef('');
-  const active = useRef({ room, onAction, onReady });
+  const active = useRef({ room, demoPhase, demoTitle, onAction, onReady });
   const ready = useRef(false);
   const [bridge, setBridge] = useState('');
 
@@ -37,8 +39,8 @@ export function Scene({ room, onAction, className, onReady }: SceneProps) {
   }, []);
 
   useEffect(() => {
-    active.current = { room, onAction, onReady };
-  }, [room, onAction, onReady]);
+    active.current = { room, demoPhase, demoTitle, onAction, onReady };
+  }, [room, demoPhase, demoTitle, onAction, onReady]);
 
   useEffect(() => {
     // Keep the capability tied to the iframe document, including effect reconnects.
@@ -56,6 +58,7 @@ export function Scene({ room, onAction, className, onReady }: SceneProps) {
         post('role', { role: 'student' });
         post('content-config', { tasks });
         post('appearance', { nickname: '문샷 방문자', gender: 'female', model: 2, coat: '#e49a64', hairColor: '#3c2c27', skinColor: '#e8b68b', pantsColor: '#344657' });
+        post('guided-demo', { phase: active.current.demoPhase, title: active.current.demoTitle.slice(0, 160) });
         // Read the most recent room: the visitor may advance while models are still loading.
         post('room', { id: active.current.room });
         post('camera', { mode: 'overall' });
@@ -72,7 +75,7 @@ export function Scene({ room, onAction, className, onReady }: SceneProps) {
     window.addEventListener('message', receive);
     // Fast Refresh or an effect reconnect can retain an already loaded iframe.
     // Repeating init requests its ready acknowledgement without reloading the scene.
-    if (frame.current) post('init', { guidedPreview: true, initialRoom: active.current.room, visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
+    if (frame.current) post('init', { guidedPreview: true, initialRoom: active.current.room, demoPhase: active.current.demoPhase, demoTitle: active.current.demoTitle.slice(0, 160), visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
     return () => {
       ready.current = false;
       window.removeEventListener('message', receive);
@@ -82,6 +85,10 @@ export function Scene({ room, onAction, className, onReady }: SceneProps) {
   useEffect(() => {
     if (ready.current) post('room', { id: room });
   }, [room, post]);
+
+  useEffect(() => {
+    if (ready.current) post('guided-demo', { phase: demoPhase, title: demoTitle.slice(0, 160) });
+  }, [demoPhase, demoTitle, post]);
 
   return bridge ? <iframe
     key={bridge}
@@ -95,7 +102,7 @@ export function Scene({ room, onAction, className, onReady }: SceneProps) {
     onLoad={() => {
       ready.current = false;
       active.current.onReady?.(false);
-      post('init', { guidedPreview: true, initialRoom: active.current.room, visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
+      post('init', { guidedPreview: true, initialRoom: active.current.room, demoPhase: active.current.demoPhase, demoTitle: active.current.demoTitle.slice(0, 160), visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
     }}
   /> : null;
 }

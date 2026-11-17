@@ -105,5 +105,5 @@ body[data-guided-preview="true"] .tour-hotspot:after{border-color:#c8ddd4}
 body[data-guided-preview="true"] .office-desk-job[data-status="review"]{background:#e9f4ebf5;color:#244d3b;border-color:#a8c7af}
 @media(max-width:600px){body[data-guided-preview="true"] .tour-hotspot{padding:10px 12px}body[data-guided-preview="true"] .office-desk-job[data-compact="true"]{height:48px;min-height:48px;padding:6px 7px}body[data-guided-preview="true"] .office-desk-job[data-compact="true"] small{display:block;font-size:10px}}
 
-/* One result marker is enough inside the compact office; instructions stay in the host. */
-body[data-guided-preview="true"][data-room="office"] .tour-hotspot:not(.office-desk-job){display:none}
+/* The guided host owns the next action; only the revealed example has a world marker. */
+body[data-guided-preview="true"] .tour-hotspot:not(.office-desk-job){display:none}
