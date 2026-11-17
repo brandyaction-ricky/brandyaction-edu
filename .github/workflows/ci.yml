@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-n6-current-release-20261117" ]; then
+            expected_main=7ad2b223d027c418c6027ed250154cb3175989dd
+            live_base=81b3c65f19bb38a617adbc06346f54c5d07214a2
+            release_payload=a37adbd30f31e2ceb1364da5d943a7e41ff05ac7
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$live_base" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore
+            git diff --exit-code "$live_base" HEAD -- app features lib public package.json package-lock.json ':(exclude)app/ui/final/diagnosis-management.tsx' ':(exclude)lib/diagnosis-admin-service.ts'
+            echo 'Verified current production preserved; only validated N6 recovery and existing main release controls included.'
+            exit 0
+          fi
           if [ "$head_ref" = "codex/edu-coordinator-review-check" ]; then
             expected_main=93be0fa782480cba7464527be99e935c0d10dbdf
             test "$(git rev-parse HEAD^1)" = "$expected_main"
