@@ -1,5 +1,6 @@
 import { kstDate } from './landing';
 import type { LandingInsights } from './landing-insights';
+import type { AdTrend } from './landing-ad-trends';
 
 export const PERFORMANCE_PRESETS = ['today', 'yesterday', '7d', '14d', 'campaign'] as const;
 export type PerformancePreset = typeof PERFORMANCE_PRESETS[number] | 'custom';
@@ -37,6 +38,7 @@ export type ActualRow = {
 export type DashboardReport = {
   financial_mode?: 'orders';
   ui?: {
+    ad_trend?: AdTrend;
     insights?: LandingInsights | null;
     daily_a: DashboardReport['daily'] | null;
     last_collected_at: string | null;

@@ -4,6 +4,7 @@ import { kstDate } from './landing';
 import { periodActuals } from './landing-operations-phase1';
 import type { LandingInsights } from './landing-insights';
 import { metaCampaignIds } from './meta-campaign-settings';
+import { readAdTrend } from './landing-ad-trends-server';
 
 type Db = ReturnType<typeof createAdminClient>;
 type Session = { session_id: string; visitor_id?: string; created_at: string; last_seen_at: string; clicks?: number; attribution: Record<string, string> | null };
@@ -132,9 +133,9 @@ export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign
     } catch { errors.collection_ranges = 'EDU·Meta 수집 범위를 확인하지 못했습니다. 두 지표의 기간을 확인해 주세요.'; return null; }
   };
   if (baseUi) {
-    const [analysis, current_kakao, collection_ranges] = await Promise.all([insights(), currentKakao(), collectionRanges()]);
-    return { ...baseUi, current_kakao, collection_ranges, ...(actorId ? { insights: analysis } : {}), errors: { ...baseUi.errors, ...errors } };
+    const [analysis, current_kakao, collection_ranges, ad_trend] = await Promise.all([insights(), currentKakao(), collectionRanges(), readAdTrend(db, campaign, params, limitedSignal)]);
+    return { ...baseUi, current_kakao, collection_ranges, ad_trend, ...(actorId ? { insights: analysis } : {}), errors: { ...baseUi.errors, ...errors } };
   }
-  const [daily_a, last_collected_at, actual, analysis, current_kakao, collection_ranges] = await Promise.all([trend(), collection(), actuals(), insights(), currentKakao(), collectionRanges()]);
-  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, current_kakao, collection_ranges, ...(actorId ? { insights: analysis } : {}), errors };
+  const [daily_a, last_collected_at, actual, analysis, current_kakao, collection_ranges, ad_trend] = await Promise.all([trend(), collection(), actuals(), insights(), currentKakao(), collectionRanges(), readAdTrend(db, campaign, params, limitedSignal)]);
+  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, current_kakao, collection_ranges, ad_trend, ...(actorId ? { insights: analysis } : {}), errors };
 }
