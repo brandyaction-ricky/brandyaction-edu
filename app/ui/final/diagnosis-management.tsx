@@ -34,16 +34,18 @@ function DiagnosisManagementScope({member}:{member?:string}){
   const [filter,setFilter]=useState<DiagnosisFilter>('all'),[publicationOpen,setPublicationOpen]=useState(false);
   const sequence=useRef(0),busy=useRef(false),controller=useRef<AbortController|null>(null);
   const before=cursors.at(-1)??null;
+  const scopeKey=JSON.stringify([member??null,cohort,query,before]);
+  const [loadedScope,setLoadedScope]=useState<string|null>(null);
   const load=useCallback(async()=>{
     const version=++sequence.current;controller.current?.abort();const c=new AbortController();controller.current=c;setLoading(true);
     try{
       const qs=new URLSearchParams({query});if(member)qs.set('member',member);else if(cohort)qs.set('cohort',cohort);if(before)qs.set('before',before);
       const response=await fetch('/api/admin/diagnosis?'+qs,{cache:'no-store',signal:AbortSignal.any([c.signal,AbortSignal.timeout(25_000)])});const result=await response.json();
       if(!response.ok)throw Error(result.error||'진단 정보를 확인하지 못했습니다.');
-      if(version!==sequence.current)return;setData(result);setError('');
+      if(version!==sequence.current)return;setData(result);setLoadedScope(scopeKey);setError('');
     }catch(e){if(!c.signal.aborted&&version===sequence.current)setError(e instanceof Error?e.message:'진단 정보를 확인하지 못했습니다.');}
     finally{if(version===sequence.current)setLoading(false);}
-  },[query,before,member,cohort]);
+  },[query,before,member,cohort,scopeKey]);
   useEffect(()=>{let mounted=true;const requests=sequence,activeController=controller;queueMicrotask(()=>{if(mounted)void load();});return()=>{mounted=false;++requests.current;activeController.current?.abort();};},[load]);
   useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible'&&!busy.current&&!change)void load();},30_000);return()=>clearInterval(timer);},[load,change]);
   const ask=(next:Change)=>{setNotice('');setWriteError('');setChange(next);};
@@ -59,7 +61,7 @@ function DiagnosisManagementScope({member}:{member?:string}){
   const publication=(enabled:boolean,row?:DiagnosisAdminRow)=>ask({title:row?`${row.name}님 진단 ${enabled?'공개':'닫기'}`:`전체 진단 ${enabled?'공개':'닫기'}`,
     description:row?`${row.name}님에게 진단 시작 메뉴를 ${enabled?'공개합니다.':'닫습니다. 이미 시작한 검사는 이어서 진행할 수 있습니다.'} 개인별 설정은 이 회원의 모든 기수에 우선 적용됩니다.`:`전체 기수의 현재 이용 가능한 수강생 ${data?.eligibleCount??0}명에게 적용합니다. 기수별·개별 설정도 모두 ${enabled?'공개':'닫기'}로 바뀌고, 이후 등록되는 수강생도 이 설정을 따릅니다.${enabled?'':' 이미 시작한 검사는 이어서 진행할 수 있습니다.'}`,
     label:enabled?'공개하기':'닫기',body:{action:row?'publish_member':'publish_all',requestId:crypto.randomUUID(),...(row?{userId:row.id}:{}),enabled,revision:data?.revision}});
-  const scopeReady=!cohort||data?.cohort?.id===cohort;
+  const scopeReady=loadedScope===scopeKey&&(!cohort||data?.cohort?.id===cohort);
   const publicationDisabled=!data||!data.enabled||!!error||loading||saving||!scopeReady;
   const cohortPublication=(enabled:boolean)=>{
     if(!data?.cohort||data.cohort.id!==cohort)return;
@@ -103,8 +105,9 @@ function DiagnosisManagementScope({member}:{member?:string}){
     {member&&<AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>}
     {error&&<AdminInlineError onRetry={()=>void load()}>{error} 현재 상태를 다시 확인한 후 변경해 주세요.</AdminInlineError>}
     {notice&&<p className="diagnosis-management-notice" role="status">{notice}</p>}
-    {data&&!data.remoteAvailable&&<p className="diagnosis-management-warning" role="status">보고서 서버의 최신 상태를 확인하지 못했습니다. 아래는 마지막 확인 기록이며 재발급은 잠시 사용할 수 없습니다.</p>}
-    {!data&&loading&&<p role="status">진단 정보를 불러오고 있습니다.</p>}
+    {data&&scopeReady&&!data.remoteAvailable&&<p className="diagnosis-management-warning" role="status">보고서 서버의 최신 상태를 확인하지 못했습니다. 아래는 마지막 확인 기록이며 재발급은 잠시 사용할 수 없습니다.</p>}
+    {(!data||!scopeReady)&&loading&&<p role="status">진단 정보를 불러오고 있습니다.</p>}
+    {!scopeReady&&!loading&&error&&<p>선택한 목록을 불러오지 못했습니다. 다시 시도하거나 이전 페이지로 돌아가 주세요.</p>}
     {data&&!member&&scopeReady&&<div className="diagnosis-management-filter-area"><div className="diagnosis-management-filters" role="group" aria-label="현재 페이지 진단 상태 필터">{filters.map(item=><button key={item.key} type="button" aria-pressed={filter===item.key} onClick={()=>setFilter(item.key)}>{item.label} <span>{!reportsKnown&&['ready','needs_review','processing'].includes(item.key)?'—':pageCount(item.key)}</span></button>)}</div><p>상태 필터와 숫자는 현재 페이지 기준입니다. 다른 페이지의 수강생도 확인해 주세요.</p></div>}
     {data&&scopeReady&&<div className="diagnosis-management-table" role="region" aria-label="수강생 진단 현황" tabIndex={0}>
       <table><thead><tr><th>수강생</th><th>공개 설정</th><th>검사 진행</th><th>보고서 발급</th><th>기록·재발급</th></tr></thead>
@@ -123,7 +126,7 @@ function DiagnosisManagementScope({member}:{member?:string}){
           </td></tr>;})}</tbody></table>
       {!visibleRows.length&&<AdminEmptyState title="해당 수강생이 없습니다.">{data.rows.length?'현재 페이지에서 다른 상태를 선택하거나 다른 페이지를 확인해 주세요.':'검사가 연결된 상품의 구매·수강 권한과 검색어를 확인해 주세요.'}</AdminEmptyState>}
     </div>}
-    {!member&&<nav className="diagnosis-management-pages" aria-label="수강생 목록 페이지"><AdminButton disabled={cursors.length===1||loading||saving} onClick={()=>setCursors(c=>c.slice(0,-1))}>이전</AdminButton><span>{cursors.length}페이지</span><AdminButton disabled={!data?.nextCursor||loading||saving} onClick={()=>setCursors(c=>[...c,data!.nextCursor])}>다음</AdminButton></nav>}
+    {!member&&<nav className="diagnosis-management-pages" aria-label="수강생 목록 페이지"><AdminButton disabled={cursors.length===1||loading||saving} onClick={()=>setCursors(c=>c.slice(0,-1))}>이전</AdminButton><span>{cursors.length}페이지</span><AdminButton disabled={!data?.nextCursor||!scopeReady||!!error||loading||saving} onClick={()=>setCursors(c=>[...c,data!.nextCursor])}>다음</AdminButton></nav>}
     <p className="diagnosis-management-footnote">보고서는 보통 약 30분~1일 안에 준비됩니다. 동일한 검사의 재발급 요청은 중복 접수되지 않습니다.</p>
     {change&&<AdminModal title={change.title} onClose={()=>{if(!busy.current)setChange(null);}}><div className="admin-dialog-body"><p>{change.description}</p>{writeError&&<AdminInlineError>{writeError}</AdminInlineError>}</div><footer className="admin-dialog-footer"><AdminButton disabled={saving} onClick={()=>setChange(null)}>취소</AdminButton><AdminButton tone="primary" loading={saving} onClick={()=>void save()}>{change.label}</AdminButton></footer></AdminModal>}
     <Link href="/admin" className="diagnosis-management-back">관리자 홈으로</Link>

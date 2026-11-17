@@ -6,6 +6,41 @@ test.beforeEach(async({page})=>{
  await page.route('**/api/platform?**',route=>route.fulfill({json:{user:{id:id(99),full_name:'합성 관리자',role:'admin'},data:{admin_summary:[{pendingReviews:0,openQuestions:0}]}}}));
 });
 async function openRowActions(page:import('@playwright/test').Page,name:string){await page.getByLabel(`${name} 관리 메뉴`).click();}
+test('failed next page hides earlier records and cursor, then retries the same page without writes',async({page},info)=>{
+ let failNext=true;const reads:URL[]=[],writes:string[]=[];
+ await page.route('**/api/admin/diagnosis**',async route=>{
+  if(route.request().method()!=='GET')writes.push(route.request().method());
+  const url=new URL(route.request().url());reads.push(url);
+  await route.fulfill(url.searchParams.has('before')?(failNext?{status:403,json:{error:'관리자 권한이나 수강 정보를 다시 확인해 주세요.'}}:{json:{...data,nextCursor:null,rows:[{...data.rows[1],name:'두 번째 페이지 학생'}]}}):{json:data});
+ });
+ await page.goto('/diagnosis-test?manage');await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();
+ await page.getByRole('button',{name:'다음',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('관리자 권한');
+ await expect(page.getByRole('region',{name:'수강생 진단 현황'})).toHaveCount(0);
+ await expect(page.getByRole('group',{name:'현재 페이지 진단 상태 필터'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'다음',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'이전',exact:true})).toBeEnabled();
+ await expect(page.getByRole('region',{name:'현재 페이지 상태 요약'})).not.toContainText('1명');
+ await page.screenshot({path:info.outputPath('n6-failed-page.png'),fullPage:true});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ failNext=false;await page.getByRole('button',{name:'다시 시도',exact:true}).click();
+ await expect(page.getByRole('row',{name:/두 번째 페이지 학생/})).toBeVisible();
+ expect(reads.at(-1)?.searchParams.get('before')).toBe(id(90));
+ await expect(page.getByRole('row',{name:/학생 A/})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'다음',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'이전',exact:true}).click();await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();
+ expect(writes).toEqual([]);
+});
+test('failed search hides the previous query results and permits search recovery',async({page})=>{
+ await page.route('**/api/admin/diagnosis**',route=>route.fulfill(new URL(route.request().url()).searchParams.get('query')?{status:503,json:{error:'조회할 수 없습니다.'}}:{json:data}));
+ await page.goto('/diagnosis-test?manage');await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();
+ await page.getByLabel('수강생 검색').fill('찾을 학생');await page.getByRole('button',{name:'검색',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('조회할 수 없습니다.');
+ await expect(page.getByRole('region',{name:'수강생 진단 현황'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'다음',exact:true})).toBeDisabled();
+ await page.getByLabel('수강생 검색').fill('');await page.getByRole('button',{name:'검색',exact:true}).click();
+ await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();
+});
 test('switching from a cohort to a member clears the previous cohort scope without a remount from the router',async({page})=>{
  const cohort=id(104),reads:URL[]=[];
  await page.route('**/api/admin/diagnosis**',r=>{const url=new URL(r.request().url());reads.push(url);const member=url.searchParams.has('member'),scoped=url.searchParams.has('cohort');return r.fulfill({json:{...data,cohorts:[{id:cohort,name:'4기',code:'MOONSHOT_004',courseTitle:'AI 문샷',enabled:false,inherited:true}],cohort:scoped?{id:cohort,name:'4기',enabled:false,inherited:true,individualCount:0}:null,rows:member?[data.rows[0]]:data.rows}});});
