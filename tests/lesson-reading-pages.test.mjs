@@ -3,7 +3,7 @@ import test from 'node:test';
 import { build } from 'esbuild';
 
 const { outputFiles } = await build({ entryPoints: ['lib/lesson-reading-pages.ts'], bundle:true, platform:'node', format:'esm', write:false });
-const { lessonReadingPages } = await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].contents).toString('base64'));
+const { lessonReadingPages, withoutBlankPages } = await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].contents).toString('base64'));
 
 test('pages preserve paragraphs, rich formatting, embedded exercises and side-by-side images', () => {
   const nodes = [
@@ -56,4 +56,13 @@ test('a rich-text heading belongs to the paragraph it introduces', () => {
   const nodes=[node('paragraph','가'.repeat(950)),node('heading','실행 방법을 확인하고 다음 단계를 진행하세요.'.repeat(5)),node('paragraph','나'.repeat(1000))];
   const pages=lessonReadingPages([{id:'body',type:'text',content:prefix+JSON.stringify({type:'doc',content:nodes})}]);
   assert.deepEqual(pages.map(page=>JSON.parse(page[0].content.slice(prefix.length)).content.map(n=>n.type)),[['paragraph'],['heading','paragraph']]);
+});
+
+test('a step left empty after an edit folds into the previous page instead of showing blank', () => {
+  const t = (id, content) => ({id,type:'text',content});
+  const pages = [[t('a','하나')],[t('emptied','')],[{id:'img',type:'image',assetId:'x'}],[{id:'h',type:'heading',content:''}]];
+  const out = withoutBlankPages(pages, ['1','2','3','4']);
+  assert.deepEqual(out.map(p=>p.label), ['1','3']);
+  assert.deepEqual(out.flatMap(p=>p.blocks.map(b=>b.id)), ['a','emptied','img','h']);
+  assert.deepEqual(withoutBlankPages([[t('e','')],[t('b','둘')]], ['x','y']).map(p=>[p.label,p.blocks.map(b=>b.id)]), [['y',['e','b']]]);
 });

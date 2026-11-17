@@ -107,3 +107,17 @@ export function lessonReadingPages(blocks: PublicLessonBlock[]): PublicLessonBlo
   if (page.length) pages.push(page);
   return pages;
 }
+
+// A page whose blocks show nothing (an emptied title, spacer text) is folded into
+// the previous page so readers never land on a blank step after an edit.
+export function withoutBlankPages<L>(pages: PublicLessonBlock[][], labels: L[]) {
+  const blank = (b: PublicLessonBlock) => ['text', 'heading', 'subheading', 'divider'].includes(b.type) && !lessonBodyPlainText(b.content || '').trim()
+    && !(parseLessonDocument(b.content || '') && lessonImageReferences(parseLessonDocument(b.content || '')!).length);
+  const out: { blocks: PublicLessonBlock[]; label: L }[] = [];
+  pages.forEach((blocks, i) => {
+    if (blocks.every(blank) && (out.length || i < pages.length - 1)) {
+      if (out.length) out[out.length - 1].blocks.push(...blocks); else pages[i + 1] = [...blocks, ...pages[i + 1]];
+    } else out.push({ blocks: [...blocks], label: labels[i] });
+  });
+  return out;
+}
