@@ -94,3 +94,16 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 @media(max-width:650px) and (pointer:coarse){body:not([data-visitor=true]) #environment-open{bottom:calc(258px + env(safe-area-inset-bottom))}}
 /* Touch tablets: the three-line touch help is taller than the one-line desktop status, so the lighting button sits above it. */
 @media(min-width:651px) and (pointer:coarse){#environment-open{bottom:calc(160px + env(safe-area-inset-bottom))}}
+
+/* Recruitment preview only: the host provides the journey controls. */
+body[data-guided-preview="true"] :is(#status,.tour-pad,#environment-open){display:none!important}
+body[data-guided-preview="true"] .tour-hotspot{min-height:44px;background:#fbf8f1f5;border-color:#ddd5c5;color:#233a37;box-shadow:0 8px 26px #081b2633;border-radius:12px;padding:11px 14px}
+body[data-guided-preview="true"] .tour-hotspot small{color:#59716b}
+body[data-guided-preview="true"] .tour-hotspot:hover{background:#fff}
+body[data-guided-preview="true"] .tour-hotspot:focus-visible{outline-color:#88c3ac}
+body[data-guided-preview="true"] .tour-hotspot:after{border-color:#c8ddd4}
+body[data-guided-preview="true"] .office-desk-job[data-status="review"]{background:#e9f4ebf5;color:#244d3b;border-color:#a8c7af}
+@media(max-width:600px){body[data-guided-preview="true"] .tour-hotspot{padding:10px 12px}body[data-guided-preview="true"] .office-desk-job[data-compact="true"]{height:48px;min-height:48px;padding:6px 7px}body[data-guided-preview="true"] .office-desk-job[data-compact="true"] small{display:block;font-size:10px}}
+
+/* One result marker is enough inside the compact office; instructions stay in the host. */
+body[data-guided-preview="true"][data-room="office"] .tour-hotspot:not(.office-desk-job){display:none}
