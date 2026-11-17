@@ -3,6 +3,7 @@ import {useEffect, useRef, useState} from 'react';
 import {FloatingLearningQuestion} from '@/app/ui/final/floating-learning-question';
 import {LessonQuestions} from '@/app/ui/final/lesson-questions';
 import {NextLessonAction} from '@/app/ui/final/lesson-pages';
+import {DiagnosisEntry} from '@/app/ui/final/diagnosis-entry';
 import dynamic from 'next/dynamic';
 import {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
 const GuidedSession = dynamic(() => import('@/app/ui/final/lesson-block-session').then(module => module.LessonBlockSession), {
@@ -34,7 +35,10 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const next = lesson && snapshot.lessons[snapshot.lessons.indexOf(lesson) + 1];
  const nextGate = next && gates.lessons?.find(row => row.lessonId === next.id);
  const graduate = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.graduate;
+ // Same N6 card as the top of the classroom curriculum; lessons (day 2) point learners to it.
+ const courseId = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.courseId;
  if (enabled && lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
+   <DiagnosisEntry key={'n6'+enrollment} courseId={courseId}/>
    <div className={styles.readerTools}><button type="button" className="btn small" onClick={() => {
      if (!mayLeave || mayLeave()) { setReading(''); gates.reload(); }
    }}>수업 목록으로</button>
@@ -62,6 +66,7 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const primaryMission=priority&&(lesson.completed||priority.status!=='not_started')?priority:null;
  const action=primaryMission?(primaryMission.status==='not_started'?'과제 시작하기':'보완 의견 확인하기'):lesson.completed?'수업 다시 보기':'수업 이어보기';
  return <section className={styles.panel} aria-label={lesson.missions.length?'지금 할 수업과 과제':'지금 할 수업'}>
+  <DiagnosisEntry key={'n6list'+enrollment} courseId={courseId}/>
   {enabled && gates.error && <p role="alert">{gates.error} <button type="button" onClick={gates.reload}>실습 목록 다시 불러오기</button></p>}
   <div className={styles.top}><label>수업 선택<select value={lesson.id} onChange={e=>setChosen(e.target.value)}>{snapshot.lessons.map(l=><option key={l.id} value={l.id} disabled={l.locked}>{l.week !== undefined ? l.week === 0 ? '준비 주차 · ' : l.week + '주차 · ' : ''}{l.day}일차 · {l.title}{l.completed?' · 완료':l.locked?' · 잠김':''}</option>)}</select></label></div>
   <article className={styles.next}><span className={styles.day}>{lesson.day}일차</span><h2>{lesson.title}</h2><p>{primaryMission?'과제의 안내와 검토 의견을 확인해 주세요.':!lesson.missions.length?(lesson.completed?'필요한 부분을 다시 볼 수 있어요.':'공부하던 수업을 이어서 보세요.'):lesson.completed?'필요한 부분을 다시 보거나 아래에서 과제를 확인하세요.':'공부하던 수업을 이어서 보고, 배운 내용을 과제로 적용해 보세요.'}</p>{enabled ? <>
