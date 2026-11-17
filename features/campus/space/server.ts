@@ -1,6 +1,6 @@
 import type { createClient } from '@/lib/supabase/server';
 import { campusError } from '../snapshot';
-import { ID, profile, avatarAppearance, type SpaceState, type SpaceProfile } from './domain';
+import { ID, profile, avatarAppearance, SPACE_REPLACED, SPACE_ENDED, type SpaceState, type SpaceProfile } from './domain';
 type DB = Awaited<ReturnType<typeof createClient>>;
 const appearanceRow=(p:SpaceProfile)=>({avatar_model:p.model,hair_color:p.hairColor,skin_color:p.skinColor,pants_color:p.pantsColor,held_item:p.heldItem});
 const appearanceFromRow=(p:{avatar_model?:unknown;hair_color?:unknown;skin_color?:unknown;pants_color?:unknown;held_item?:unknown;gender?:unknown})=>avatarAppearance({model:p.avatar_model,hairColor:p.hair_color,skinColor:p.skin_color,pantsColor:p.pants_color,heldItem:p.held_item,gender:p.gender});
@@ -40,7 +40,13 @@ export async function saveSpace(db:DB,viewer:Viewer,cmd:SpaceCommand):Promise<Sp
   if(!ID.test(cmd.cohortId)||!ID.test(cmd.sessionId||''))fail(400);
   const p=profile(cmd.profile,viewer.full_name||'문샷 동료');const focusUntil=typeof cmd.focusUntil==='string'&&Number.isFinite(Date.parse(cmd.focusUntil))?cmd.focusUntil:null;
   const row={...appearanceRow(p),nickname:p.nickname,gender:p.gender,coat:p.coat,status:p.status,photo_opt_in:p.photoOptIn,accessory:p.accessory,focus_until:focusUntil,focus_mode:[0,3,5,25,50].includes(Number(cmd.focusMode))?Number(cmd.focusMode):0};
-  return toState(check(await db.rpc('edu_campus_space_beat',{p_cohort:cmd.cohortId,p_session:cmd.sessionId,p_row:row})),viewer);
+  const beat=await db.rpc('edu_campus_space_beat',{p_cohort:cmd.cohortId,p_session:cmd.sessionId,p_row:row});
+  if((beat.error as {code?:string}|null)?.code==='P0002'){
+   // Another window took this seat, or this session simply expired: the client re-enters only in the second case.
+   const own=await db.from('edu_campus_space_presence').select('session_id,expires_at').eq('cohort_id',cmd.cohortId).eq('user_id',viewer.id).maybeSingle();
+   fail(409,own.data&&own.data.session_id!==cmd.sessionId&&Date.parse(String(own.data.expires_at))>Date.now()?SPACE_REPLACED:SPACE_ENDED);
+  }
+  return toState(check(beat),viewer);
  }
  // Membership and room controls are independent reads: one round trip instead of two.
  const needsControls=!['profile','stand','delete-chat'].includes(cmd.kind);
