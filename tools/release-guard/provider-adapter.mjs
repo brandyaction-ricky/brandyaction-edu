@@ -32,7 +32,8 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
   const connectionString=await privateFile(config.dbConnectionFile);
   if((rehearsal||providerQa) && new URL(connectionString.trim()).hostname!=='127.0.0.1')throw Error('QA DB must be loopback');
   const client=new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
-  const tokens=cli?{}:{vercel:await privateFile(config.vercelTokenFile),github:await privateFile(config.githubTokenFile)};
+  const publicGithub=config.mode==='production'&&config.githubPublicRead===true&&config.repository==='brandyaction-ricky/brandyaction-edu';
+  const tokens=cli?{}:{vercel:await privateFile(config.vercelTokenFile),github:publicGithub?null:await privateFile(config.githubTokenFile)};
   await client.connect();
   const git=(...args)=>execFileSync('git',args,{cwd:config.checkout,maxBuffer:20_000_000,encoding:'utf8'});
   async function api(provider,path,method='GET') {
@@ -45,7 +46,8 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
       const {stdout}=await execute(executable,args,{encoding:'utf8',timeout:30000,maxBuffer:20_000_000});
       return stdout.trim()?JSON.parse(stdout):{};
     }
-    const response=await fetcher(url,{method,headers:{Authorization:`Bearer ${tokens[provider].trim()}`,Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:'{}'}:{}),redirect:'error',signal:AbortSignal.timeout(15000)});
+    if(provider==='github'&&publicGithub&&method!=='GET')throw Error('Public GitHub transport is read-only');
+    const response=await fetcher(url,{method,headers:{...(tokens[provider]?{Authorization:`Bearer ${tokens[provider].trim()}`}:{'User-Agent':'brandyaction-release-coordinator'}),Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:'{}'}:{}),redirect:'error',signal:AbortSignal.timeout(15000)});
     if(!response.ok)throw Error(`${provider} ${method} failed (${response.status}); reconcile before retry`);
     // Promotion can acknowledge with an empty 201/202 body. Its final result is
     // independently checked through the live alias, never inferred from a body.

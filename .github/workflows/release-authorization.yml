@@ -1,0 +1,34 @@
+# Records an exact request approval. No deployment credentials or SQL.
+name: Central release authorization
+run-name: Release ${{ inputs.request_id }} ${{ inputs.request_sha256 }}
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: true
+        type: string
+      request_sha256:
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: brandyaction-shared-production
+  cancel-in-progress: false
+jobs:
+  authorize:
+    if: github.ref == 'refs/heads/main'
+    environment: production-release-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate immutable request identity
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          REQUEST_SHA256: ${{ inputs.request_sha256 }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          assert re.fullmatch(r'[A-Za-z0-9_-]{1,80}', os.environ['REQUEST_ID'])
+          assert re.fullmatch(r'[a-f0-9]{64}', os.environ['REQUEST_SHA256'])
+          print('Exact request authorized; no SQL or deployment executed here.')
+          PY
