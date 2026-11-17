@@ -3,7 +3,7 @@ import {atriumFinish} from './atrium-finish.mjs';
 import {atriumHeightAt} from './atrium-layout.mjs';
 export {atriumHeightAt} from './atrium-layout.mjs';
 /** Arrival hall: real geometry, transparent envelope and a walkable upper gallery. */
-export function buildLunarAtrium(office,group,box){
+export function buildLunarAtrium(office,group,box,{guidedPreview=false}={}){
  const a=atriumFinish(office,group),cream=0xd8d2c6,ink=0x555a5d,blue=0x315bea,warm=0xffd6a0;
  const collision=(x,y,w,d)=>{const m=box(group,x,y,-.2,w,d,.02,ink,true);m.visible=false;};
  a.rounded(-22,-10,-.75,44,44,.7,3,0x303944);
@@ -39,8 +39,8 @@ export function buildLunarAtrium(office,group,box){
  for(const z of[3.35,6.7]){a.beam([-18.2,z,15.02],[-9.8,z,15.02],.014,0x414649);a.beam([-6.98,z,-4.2],[-6.98,z,12.2],.014,0x414649);}
  for(const x of[-18,-14,-10])a.beam([x,.3,15.025],[x,9.65,15.025],.012,0x414649);
  a.label('MOONSHOT',-14,15.1,8.2,10,1.15);
- a.label('AI',-14,15.11,6.25,8,1.1);a.label('MARKETING',-14,15.12,4.95,10,1.1);
- a.label('10×',-13.8,15.13,2.45,6,2.7,{color:'#4267ed'});
+ a.label(guidedPreview?'LIVE':'AI',-14,15.11,6.25,8,1.1);a.label(guidedPreview?'12.07':'MARKETING',-14,15.12,4.95,10,1.1);
+ a.label(guidedPreview?'NEXT':'10×',-13.8,15.13,2.45,6,2.7,{color:'#4267ed'});
  a.glowPool(-14,16,.022,13,3);
  // Central staircase rises to the actual upper gallery, with fine metal/glass balustrades.
  const steps=24,run=14.3/steps;
@@ -83,13 +83,13 @@ export function buildLunarAtrium(office,group,box){
   a.plant(x+.75,y+7.2,0,.85);
  }
  pavilion(10,-6,'MOONSHOT STUDIO','배운 것을 나의 결과로');
- pavilion(10,12,'내 AI 사무실','내 AI 동료들과 일하는 곳');
+ pavilion(10,12,guidedPreview?'체험용 AI 사무실':'내 AI 사무실',guidedPreview?'작은 결과를 만드는 첫 연습':'내 AI 동료들과 일하는 곳');
  a.label('문샷 공부방',14.5,4.36,5.7,7,.65,{color:'#f2ede0'});
  a.sofa(-19,18,6);collision(-19,18,6,1.65);
  a.cylinder(-15.8,21,.03,2.1,.02,0x7d858a,'fabric');a.cylinder(-15.8,21,.05,.92,.55,0x777f87,'metal');a.cylinder(-15.8,21,.6,.97,.06,0xb0b4b4,'metal');
  for(const [x,y]of[[-20,16],[-7,17],[20,25],[7,-6],[-20,29]])a.plant(x,y,0,1.25);
  // Low display islands retain existing experiential entry points without obstructing the entrance.
- for(const [x,y,title,sub]of[[-18,25,'01  고객 발견','AI로 고객의 문제를 찾아요'],[8,27,'02  콘텐츠와 실험','만들고, 반응을 확인해요']]){
+ for(const [x,y,title,sub]of(guidedPreview?[[-18,25,'오늘 만든 작은 결과','라이브에서 다음으로 이어가요'],[8,27,'12월 7일 · 문샷 라이브','AI와 일하는 기준을 배워요']]:[[-18,25,'01  고객 발견','AI로 고객의 문제를 찾아요'],[8,27,'02  콘텐츠와 실험','만들고, 반응을 확인해요']])){
   a.rounded(x,y,0,6,1.4,.9,.25,cream);collision(x,y,6,1.4);
   a.rounded(x+.2,y+.15,.9,5.6,.15,1.4,.1,0x253c52,'metal');
   a.label(title,x+3,y+.32,1.9,5,.4);a.label(sub,x+3,y+.33,1.3,5,.28,{color:'#b9ccdf'});

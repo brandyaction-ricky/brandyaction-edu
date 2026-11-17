@@ -94,3 +94,17 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 @media(max-width:650px) and (pointer:coarse){body:not([data-visitor=true]) #environment-open{bottom:calc(258px + env(safe-area-inset-bottom))}}
 /* Touch tablets: the three-line touch help is taller than the one-line desktop status, so the lighting button sits above it. */
 @media(min-width:651px) and (pointer:coarse){#environment-open{bottom:calc(160px + env(safe-area-inset-bottom))}}
+
+/* Recruitment preview: one explicit example action, without member status labels. */
+body[data-guided-preview="true"] :is(#status,.tour-pad,#environment-open){display:none!important}
+body[data-guided-preview="true"] .tour-hotspot:not(.office-desk-job){display:none}
+body[data-guided-preview="true"] .guided-example-action:not([hidden]){
+ display:flex;align-items:center;justify-content:center;
+ box-sizing:border-box;width:144px;height:44px;min-height:44px;padding:10px 14px;
+ border:1px solid #e2e5e9;border-radius:8px;background:#fff;color:#161719;
+ font:600 14px/1.5 LocalKR,system-ui,sans-serif;white-space:nowrap;
+ box-shadow:0 6px 20px #06132126;text-align:center;
+}
+body[data-guided-preview="true"] .guided-example-action:hover{background:#f7f8f9;border-color:#a9aeb6}
+body[data-guided-preview="true"] .guided-example-action:focus-visible{outline:3px solid #315e8b;outline-offset:3px}
+body[data-guided-preview="true"] .guided-example-action:after{display:none}
