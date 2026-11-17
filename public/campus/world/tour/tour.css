@@ -94,3 +94,4 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 @media(max-width:650px) and (pointer:coarse){body:not([data-visitor=true]) #environment-open{bottom:calc(258px + env(safe-area-inset-bottom))}}
 /* Touch tablets: the three-line touch help is taller than the one-line desktop status, so the lighting button sits above it. */
 @media(min-width:651px) and (pointer:coarse){#environment-open{bottom:calc(160px + env(safe-area-inset-bottom))}}
+#status{transition:opacity .5s}#status.faded{opacity:0;pointer-events:none}

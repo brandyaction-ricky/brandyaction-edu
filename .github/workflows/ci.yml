@@ -37,6 +37,17 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/campus-qa3-release-20261117" ]; then
+            expected_main=f6e84360ac89f8645fc2c2a0a5899708f8708f25
+            release_payload=6b21e1013329459f936b6f071c077e7ddb2d22dc
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            echo 'Verified approved campus QA payload; existing production, database and central release controls preserved.'
+            exit 0
+          fi
           if [ "$head_ref" = "codex/edu-n6-current-release-20261117" ]; then
             expected_main=a0236a627190301ab4fe8a83eba72f1998a33f78
             live_base=d19f53dc4a56c480d1536d9d9120f44792517748

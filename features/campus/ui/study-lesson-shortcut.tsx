@@ -27,8 +27,8 @@ export function StudyLessonShortcut({snapshot,onOpen}: {
   const lesson = unlocked.find(l => !l.completed || (!scope?.graduate && pendingPractice(l))) ?? unlocked.at(-1);
   const mission = lesson && !scope?.graduate ? pendingPractice(lesson) : undefined;
 
-  return <section className={styles.card} aria-label="오늘의 수업·실습">
-    <h2>오늘의 수업·실습</h2>
+  return <section className={styles.card} aria-label="이어서 할 수업·실습">
+    <h2>이어서 할 수업·실습</h2>
     {lesson ? <>
       <p>{lesson.week !== undefined && (lesson.week === 0 ? '준비 주차' : lesson.week+'주차')}{lesson.week !== undefined && ' · '}{lesson.day}일차 · {lesson.title}</p>
       <div className={styles.actions}>
