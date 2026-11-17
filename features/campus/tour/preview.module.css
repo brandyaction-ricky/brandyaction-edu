@@ -148,3 +148,4 @@ p.loading{pointer-events:none}
 .flatRoom li{border:0;padding:0;background:transparent}
 /* Wider screens: the study room keeps its cards on the left, so the simple screen sits to their right. */
 @media(min-width:651px){.root[data-room=study] .flatRoom{left:auto;right:24px;transform:translateY(-50%);width:min(820px,calc(100% - 372px))}}
+.inlineLink{display:inline!important;width:auto!important;min-height:0!important;padding:0!important;color:#9fd0ff!important;text-decoration:underline;background:none!important}

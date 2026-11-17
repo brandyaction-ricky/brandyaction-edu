@@ -233,7 +233,7 @@ export function SpacePanel({snapshot,demo,journal=false,studyEntry,onOpenLesson,
    ? <p className={styles.demo}>브라우저 안의 체험입니다. 실제 수강생·서버 기록과 연결되지 않습니다.</p>
    : <p className={styles.caption}>{scope.cohortName} 공부방 · 같은 기수 동료와 함께하는 공간이에요.</p>}
   {['focus','lounge','profile'].includes(toolsPane)&&<div className={styles.controls}>
-   <span className={styles.presenceNote}>{active?(demo?'이 브라우저의 체험 동료와 연결됨':'지금 동료와 함께 있어요. 내 별명이 동료에게 보여요.'):'지금은 혼자 있어요.'}</span>
+   <span className={styles.presenceNote}>{active?(demo?'이 브라우저의 체험 동료와 연결됨':Math.max(peers.length,state?.peerCount??0)>1?`공부방에 연결됐어요. 나 외에 동료 ${Math.max(peers.length,state?.peerCount??0)-1}명이 함께 있어요.`:'공부방에 연결됐어요. 지금은 혼자 공부 중이에요. 동료가 들어오면 여기에 보여요.'):'아직 공부방에 참여하지 않았어요.'}</span>
    <button disabled={busy||!sessionId||(!active&&!!state?.controls?.paused)} onClick={()=>void(active?leave():join())}>{active?'동료 연결 끊기':'동료와 함께하기'}</button>
   </div>}</div>
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}{tools}

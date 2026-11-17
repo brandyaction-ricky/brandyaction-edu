@@ -43,7 +43,10 @@ export const tourTasks:TourTask[]=[
 export type TourModules={focus:boolean;support:boolean;community:boolean;business?:boolean};
 export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')&&id!=='support:library'||id==='admin:support'?'support':id==='archive'||id==='admin:cases'||id.startsWith('business:')&&id!=='business:resources'?'business':undefined;
 // Left out after the CEO's utility review (2026-11-11): they need staff to answer or run them, or repeat another task. Code and tables stay; remove an id here to bring it back.
-export const retiredTasks=new Set(['support:request','support:history','support:sessions','support:settings','admin:support','community:mine','community:talent','community:demo_day','desk','legacy-space']);
+export const retiredTasks=new Set(['focus','support:request','support:history','support:sessions','support:settings','admin:support','community:mine','community:talent','community:demo_day','desk','legacy-space']);
 export const taskOpen=(id:string,modules?:TourModules)=>{if(retiredTasks.has(id))return false;const m=taskModule(id);return !modules||!m||modules[m];};
 export function roomTasks(room:TourRoom,role:TourRole){return tourTasks.filter(t=>t.room===room&&(!t.admin||role==='admin'));}
 export const taskById=(id:string)=>tourTasks.find(t=>t.id===id);
+// Words learners use for a menu that is named differently on screen.
+const taskWords:Record<string,string>={learning:'과제 실습 커리큘럼 강의 미션 일차 진도',feedback:'과제 결과물 랜딩 광고 공유 업로드',ai:'질문 문의 멘토 선생님',journal:'기록 메모 회고 할 일',lounge:'채팅 대화 동료'};
+export const taskMatches=(t:TourTask,q:string)=>!q.trim()||(t.title+' '+t.description+' '+(taskWords[t.id]||'')).includes(q.trim());
