@@ -1,0 +1,59 @@
+name: Production coordinator approval check
+
+# No checkout, production credentials, SQL, deployment, or self-hosted runner.
+# This proves the environment wait and repository queue only, not activation.
+on:
+  workflow_dispatch:
+    inputs:
+      probe_id:
+        description: Verification identifier (letters, digits, underscore, hyphen)
+        required: true
+        type: string
+      hold_seconds:
+        description: Hold the verification slot for 1-90 seconds
+        required: true
+        default: '45'
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: brandyaction-shared-production
+  cancel-in-progress: false
+
+jobs:
+  approval-verification:
+    if: github.ref == 'refs/heads/main'
+    environment: production-release-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify approval environment entry without production operations
+        shell: bash
+        env:
+          PROBE_ID: ${{ inputs.probe_id }}
+          HOLD_SECONDS: ${{ inputs.hold_seconds }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, time
+          probe = os.environ.get('PROBE_ID', '')
+          hold = os.environ.get('HOLD_SECONDS', '')
+          if not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', probe):
+              raise SystemExit('Invalid verification identifier')
+          if not re.fullmatch(r'[0-9]{1,2}', hold) or not 1 <= int(hold) <= 90:
+              raise SystemExit('Invalid verification hold time')
+          if os.environ.get('GITHUB_REF') != 'refs/heads/main':
+              raise SystemExit('Only main is allowed')
+          receipt = {
+              'probeId': probe,
+              'runId': os.environ.get('GITHUB_RUN_ID'),
+              'runAttempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'workflowSha': os.environ.get('GITHUB_SHA'),
+              'verificationOnly': True,
+              'productionWrites': 0,
+              'sqlStatements': 0,
+          }
+          print(json.dumps({**receipt, 'event': 'environment-entered', 'at': time.time()}), flush=True)
+          time.sleep(int(hold))
+          print(json.dumps({**receipt, 'event': 'verification-completed', 'at': time.time()}), flush=True)
+          PY
