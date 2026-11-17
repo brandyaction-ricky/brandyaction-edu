@@ -20,7 +20,7 @@ test('immersive space keeps return controls and section history',async({page})=>
 });
 test('lesson opens with a safe explicit campus return and restores the selected section',async({page})=>{
  await page.goto('/workspace?navigationQA=1&view=immersive');
- await page.getByRole('button',{name:/DAY 01/}).click();
+ await page.getByRole('button',{name:/· 1일차/}).click();
  await expect(page.getByRole('heading',{name:'예시 수업 · 한 장 지도 작성'})).toBeVisible();
  const back=page.getByRole('link',{name:'← 캠퍼스로 돌아가기'});
  await expect(back).toHaveAttribute('href',/\/campus\/workspace\?enrollmentId=.*section=learning.*view=immersive/);

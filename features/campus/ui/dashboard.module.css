@@ -3,3 +3,4 @@
 
 .immersive>.header,.immersive>.footer,.immersive>.demo{display:none}.immersive>.main{max-width:none;padding:0}.immersive{background:#071421}
 .lesson:disabled{opacity:.6;cursor:default}.lesson:disabled:hover{transform:none;box-shadow:none}
+.nextLesson{border-color:#2d6fd6!important;box-shadow:0 0 0 2px #2d6fd633}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LessonBlockAutosave, type AutosaveState } from '@/lib/lesson-block-autosave';
-import { defaultBlockCompletion, missingBlockRequirements, type LessonBlockAnswers, type PublicBlockDocument } from '@/lib/lesson-blocks';
+import { defaultBlockCompletion, missingBlockRequirements, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { canRenderLessonBlocks, LessonBlockView, type BlockGrade } from './lesson-block-view';
 import { blockSubmissionState, canEditBlockSubmission, type BlockSubmission as Submission } from '@/lib/lesson-block-review';
 import { OngoingLessonSession } from './ongoing-lesson-session';
@@ -152,7 +152,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     {campusGuided && <CampusLessonGuard dirty={status.phase !== 'saved'} busy={uploading || submitting || reopening || status.phase === 'saving'} />}
     <LessonPages lessonId={lessonId} continuation={!historical && renderContinuation?.(Boolean((locked || readOnly || completed) && !uploading && !submitting && !reopening && status.phase === 'saved'))} positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
     {snapshot.document && <LessonBlockView pageBlocks={pageBlocks} showChecklist={last} floatingAudio={!campusGuided} showOutline={!campusGuided} document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} filesReadOnly={practice} readOnly={(readOnly && !canPractice) || historical || submitting || submitUncertain || locked} grade={(readOnly && !canPractice) || historical || locked ? undefined : grade} />}
-    {(!readOnly || canPractice) && !historical && !locked && <LessonSaveStatus status={status} hasDraft={Boolean(draft)} practice={practice} onSave={() => void saver.current?.flush()} />}
+    {(!readOnly || canPractice) && !historical && !locked && (status.phase !== 'saved' || pageHasInputs(pageBlocks, last)) && <LessonSaveStatus status={status} hasDraft={Boolean(draft)} practice={practice} onSave={() => void saver.current?.flush()} />}
     {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
     {last && !practice && !readOnly && !historical && <section className="lb-session-notice" aria-label="학습 제출">
       {locked ? <>
@@ -233,4 +233,9 @@ export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly,
     {last && !readOnly && <button className="btn primary" type="button" disabled={saving || done} onClick={() => void complete()}>{done ? '학습 완료' : saving ? '저장 중…' : '학습 완료하기'}</button>}
     {error && <p role="alert">{error}</p>}
   </>}</LessonPages>;
+}
+
+// A task with nothing to answer should not say "답변 저장됨" (staff QA 11-17, N9). Unsaved/error states always show.
+function pageHasInputs(blocks: PublicLessonBlock[] | undefined, last: boolean) {
+  return !blocks || last || blocks.some(b => b.question || b.quiz || (b.fields?.length ?? 0) > 0 || (b.type === 'text' && (b.content || '').includes('lessonEmbed')));
 }
