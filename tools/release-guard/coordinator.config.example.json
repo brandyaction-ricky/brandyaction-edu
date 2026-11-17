@@ -19,6 +19,7 @@
   ],
   "checkout": "/opt/brandyaction-release/readonly/edu",
   "dbConnectionFile": "/var/lib/brandyaction-release/secrets/edu-db",
+  "migrationConnectionFile": "/var/lib/brandyaction-release/secrets/edu-migration-authority",
   "vercelTokenFile": "/var/lib/brandyaction-release/secrets/vercel",
   "githubTokenFile": "/var/lib/brandyaction-release/secrets/github-read",
   "approvalPublicKeyFile": "/var/lib/brandyaction-release/approval-public.pem",

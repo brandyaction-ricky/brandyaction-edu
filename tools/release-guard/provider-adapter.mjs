@@ -13,7 +13,7 @@ export function sourceFingerprint(tree) {
   const files=[];
   const walk=(entries,prefix='')=>{for(const entry of entries){const path=prefix+entry.name;if(entry.type==='directory')walk(entry.children||[],path+'/');else if(path.startsWith('src/'))files.push([path,entry.uid]);}};
   walk(tree); if (!files.length) throw Error('Deployment source unavailable');
-  return hash(JSON.stringify(files.sort((a,b)=>a[0].localeCompare(b[0]))));
+  return hash(JSON.stringify(files.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0)));
 }
 export async function createAdapter(config, envelope, {requestId, publicKey, fetcher=fetch}={}) {
   const payload=verifyEnvelope(envelope,publicKey), plan=payload.plan;
@@ -27,7 +27,7 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
   }
   const connectionString=await privateFile(config.dbConnectionFile);
   if(rehearsal && new URL(connectionString.trim()).hostname!=='127.0.0.1')throw Error('Rehearsal DB must be loopback');
-  const client=new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000});
+  const client=new Client({connectionString:connectionString.trim(),connectionTimeoutMillis:5000,statement_timeout:15000,options:'-c default_transaction_read_only=on'});
   const tokens={vercel:await privateFile(config.vercelTokenFile),github:await privateFile(config.githubTokenFile)};
   await client.connect();
   const git=(...args)=>execFileSync('git',args,{cwd:config.checkout,maxBuffer:20_000_000,encoding:'utf8'});
@@ -97,23 +97,34 @@ export async function createAdapter(config, envelope, {requestId, publicKey, fet
     },
     async verifyApprovals(){verifyEnvelope(envelope,publicKey);await ci();await verifyCandidate();},
     async applyMigrations(migrations){
-      writeAllowed();await atomicRecord(config.journalRoot,requestId,{state:'started',plan});
-      await client.query('begin');
+      writeAllowed();
+      const migrationConnection=(await privateFile(config.migrationConnectionFile)).trim();
+      const migrationUrl=new URL(migrationConnection),readUrl=new URL(connectionString.trim());
+      if(rehearsal?migrationUrl.hostname!=='127.0.0.1':migrationUrl.username===readUrl.username)throw Error('Separate migration authority required');
+      if(migrationUrl.host!==readUrl.host||migrationUrl.pathname!==readUrl.pathname)throw Error('Migration targets another database');
+      const writer=new Client({connectionString:migrationConnection,connectionTimeoutMillis:5000,statement_timeout:15000});
+      await atomicRecord(config.journalRoot,requestId,{state:'started',phase:'sql',plan});
       try{
+        await writer.connect();await writer.query('begin');
         for(const m of migrations){
           let sql=git('show',`${plan.candidate}:${m.path}`);
           if(hash(sql)!==m.sha256)throw Error('SQL blob changed');
           sql=sql.replace(/^\s*begin;\s*/i,'').replace(/\s*commit;\s*$/i,'');
           if(/\b(?:begin|commit|rollback)\s*;/i.test(sql))throw Error('Migration transaction control requires separate review');
-          await client.query(sql);
+          await writer.query(sql);
           const filename=m.path.split('/').at(-1);
-          await client.query('insert into supabase_migrations.schema_migrations(version,name,statements) values($1,$2,$3)',[filename.slice(0,14),filename.slice(15,-4),[git('show',`${plan.candidate}:${m.path}`)]]);
+          await writer.query('insert into supabase_migrations.schema_migrations(version,name,statements) values($1,$2,$3)',[filename.slice(0,14),filename.slice(15,-4),[git('show',`${plan.candidate}:${m.path}`)]]);
         }
-        await client.query('commit');
-      }catch(error){await client.query('rollback').catch(()=>{});throw error;}
+        await writer.query('commit');
+      }catch(error){await writer.query('rollback').catch(()=>{});throw error;}finally{await writer.end();}
     },
     async promote(){
-      writeAllowed();await verifyCandidate();await atomicRecord(config.journalRoot,requestId,{state:'started',plan});
+      writeAllowed();await verifyCandidate();
+      const current=await live(),head=await api('github',`/repos/${config.repository}/git/ref/heads/${config.branch}`);
+      if(current.id!==plan.baseDeployment||await shaOf(current,true)!==plan.base||head.object.sha!==plan.candidate)throw Error('Production or release head changed before promotion');
+      if(await fingerprint()!==plan.dbAfter)throw Error('Database changed before promotion');
+      verifyEnvelope(envelope,publicKey);
+      await atomicRecord(config.journalRoot,requestId,{state:'started',phase:'promotion',plan});
       await api('vercel',`/v10/projects/${config.project}/promote/${plan.candidateDeployment}`,'POST');
     },
     async verifyLive(){
