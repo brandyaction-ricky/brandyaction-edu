@@ -32,7 +32,7 @@ function ArrivalDraftPreview({config, onClose}: {config: ArrivalConfig; onClose:
     </header>
     <div className={styles.previewBody}>
       <Suspense fallback={<p className={styles.previewLoading} role="status">체험 미리보기를 준비하고 있어요…</p>}>
-        <Experience config={config} persistenceKey={null} preview/>
+        <Experience config={config} persistenceKey={null} preview embedded/>
       </Suspense>
     </div>
   </dialog>, document.body);

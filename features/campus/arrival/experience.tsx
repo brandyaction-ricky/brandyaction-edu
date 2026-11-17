@@ -13,7 +13,7 @@ const icons = {business: BriefcaseBusiness, preparing: Compass, exploring: Light
 const chapters = ['웰컴존', '체험 사무실', '라이브 홀'];
 const rooms = ['welcome', 'office', 'live'] as const;
 
-export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false}: {config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean}) {
+export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false}: {config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean}) {
   const [state, setState] = useState<ArrivalState>(initialArrivalState);
   const [hydrated, setHydrated] = useState(false);
   const [storageBlocked, setStorageBlocked] = useState(false);
@@ -111,7 +111,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function personalStart() {update({mode: 'personal', experience: 'none', step: 2}); setNotice('');}
   const title = (text: React.ReactNode, description?: string) => <div className={s.intro}><h1 ref={heading} tabIndex={-1}>{text}</h1>{description && <p>{description}</p>}</div>;
 
-  return <main className={`${theme.surface} ${s.root} ${preview ? s.embedded : ''}`} data-room={rooms[chapter]}>
+  return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={rooms[chapter]}>
     <a href="#arrival-content" className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label={`${chapters[chapter]} 공간`}>
       <ArrivalScene room={rooms[chapter]} demoTitle={config.audiences[state.audience].goal} demoPhase={step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={() => {setExplore(false); go(1);}} className={s.scene}/>
