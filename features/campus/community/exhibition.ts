@@ -41,6 +41,7 @@ export async function handleCommunityExhibition(req: Request, deps: {
     return reply(await deps.load(viewer.id, enrollmentId));
   } catch (error) {
     const status = error instanceof Error && 'status' in error && Number(error.status) === 403 ? 403 : 503;
+    if (status === 503) console.error('exhibition failed', error);
     return reply({ error: status === 403 ? '현재 기수의 이용 권한을 확인해 주세요.' : '전시 목록을 불러오지 못했습니다.' }, status);
   }
 }
