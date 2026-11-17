@@ -58,6 +58,9 @@ export function FocusPanel({snapshot,demo,onOpen,onSaved}:{snapshot:CampusSnapsh
     finally{if(token===generation.current){inFlight.current=false;setBusy(false);}}
   }
   const seconds=session?remainingSeconds(session,serverClock):900;
+  // A run whose time is up should not keep blocking the screen as '진행 중': ask for the two lines right away.
+  const expired=!!active&&seconds===0;
+  useEffect(()=>{if(expired)setFinishing(true);},[expired]);
   const clock=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
   if(!snapshot.selectedEnrollmentId)return null;
   return <section className={styles.panel} aria-labelledby="focus-heading"><div className={styles.top}><div><span className={styles.eyebrow}>실행 기록</span><h2 id="focus-heading">오늘 한 일, 다음 할 일.</h2><p>두 줄만 남겨 두면 다음에 들어왔을 때 바로 이어갈 수 있어요.</p></div><span className={styles.icon}><Timer size={23}/></span></div>

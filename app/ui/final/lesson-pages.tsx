@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicBlockDocument, PublicLessonBlock } from '@/lib/lesson-blocks';
 import { practiceSteps } from '@/lib/lesson-practice-steps';
 import { lessonSections, withoutBlankPages } from '@/lib/lesson-reading-pages';
@@ -46,6 +46,9 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
     catch { return 0; }
   });
   const position = useRef<HTMLParagraphElement>(null);
+  const toc = useRef<HTMLElement>(null), start = useRef<HTMLProgressElement>(null);
+  // Keep the current task visible inside the short, scrollable task list.
+  useEffect(() => { const list = toc.current, item = list?.querySelector<HTMLElement>('[aria-current=step]'); if (list && item) list.scrollTop = item.offsetTop - list.offsetTop - 8; }, [index, pages.length]);
   if (!pages.length) return <>{children(undefined, true)}{enabled && continuation}</>;
   const page = Math.min(index, pages.length - 1);
   const last = page === pages.length - 1;
@@ -53,14 +56,15 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
     setIndex(next);
     try { if (positionKey) localStorage.setItem(positionKey, String(next)); } catch { /* Storage is optional. */ }
     position.current?.focus({ preventScroll: true });
-    position.current?.scrollIntoView({ block: 'start' });
+    // Land on the task itself, not on top of the task list.
+    (start.current ?? position.current)?.scrollIntoView({ block: 'start' });
   }
   return <div className="lb-pages">
     <p ref={position} tabIndex={-1} aria-live="polite" className="lb-page-position">오늘의 작업 {page + 1} / {pages.length} · {labels[page]}</p>
-    {pages.length > 1 && <nav aria-label="오늘의 작업 목차" className="lb-page-toc"><ol>
+    {pages.length > 1 && <nav ref={toc} aria-label="오늘의 작업 목차" className="lb-page-toc"><ol>
       {pages.map((_, n) => <li key={n}><button type="button" aria-current={n === page ? 'step' : undefined} disabled={busy} onClick={() => move(n)}><span>{n + 1}</span>{labels[n]}</button></li>)}
     </ol></nav>}
-    <progress aria-label="오늘의 작업 진행" value={page + 1} max={pages.length} />
+    <progress ref={start} aria-label="오늘의 작업 진행" value={page + 1} max={pages.length} />
     {children(pages[page], last)}
     {(pages.length > 1 || continuation) && <nav aria-label="작업 이동">
       {pages.length > 1 && <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 작업</button>}
