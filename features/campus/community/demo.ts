@@ -48,6 +48,15 @@ export function mutateCommunityDemo(original: CommunityState, input: CommunityCo
   } else if (c.action === 'launch') {
     if (!state.rewards.eligible) campusError(400, '발사 조건을 먼저 충족해 주세요.');
     if (!state.rewards.claimedAt) { state.rewards.claimedAt = now; state.rewards.cohortLaunches++; }
+  } else if (c.action === 'withdraw' || c.action === 'share' || c.action === 'remove') {
+    if (!post || post.owner_id !== actor) campusError(403, '내 작업물만 바꿀 수 있어요.');
+    if (c.action === 'share' && post.hidden) campusError(400, '운영자가 숨긴 작업물이에요.');
+    post.visibility = c.action === 'share' ? 'cohort' : 'private';
+    if (c.action === 'remove') state.posts = state.posts.filter(p => p.id !== post!.id);
+  } else if (c.action === 'edit_comment' || c.action === 'remove_comment') {
+    const co = state.comments.find(v => v.id === c.commentId);
+    if (!co || co.author_id !== actor) campusError(403, '내 의견만 바꿀 수 있어요.');
+    if (c.action === 'edit_comment') { co.body = c.body!; co.edited_at = now; } else state.comments = state.comments.filter(v => v.id !== co.id);
   } else campusError(403, '운영자 권한이 필요합니다.');
   const viewer = snapshot.viewer.id;
   const usefulOwners = new Set(state.acknowledgments.filter(a => a.useful).flatMap(a => {
