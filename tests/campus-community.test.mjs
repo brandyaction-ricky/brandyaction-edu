@@ -106,3 +106,12 @@ test('work brief and three-part review survive the round trip through body text;
  const comments=[{post_id:'a',author_id:'u2',hidden:false},{post_id:'b',author_id:'u2',hidden:false},{post_id:'c',author_id:'u1',hidden:true},{post_id:'e',author_id:'u1',hidden:false}];
  assert.deepEqual(unreviewedFirst(posts,comments).map(p=>p.id),['d','c','b','a','e']);
 });
+
+test('author controls pass the request check with only their target; a comment edit keeps its length rule',()=>{
+ const base={requestId:uid(500),enrollmentId:uid(31)};
+ assert.deepEqual(validateCommunityCommand({...base,action:'withdraw',postId:uid(100),title:'무시됨'}),{...base,action:'withdraw',postId:uid(100)});
+ assert.deepEqual(validateCommunityCommand({...base,action:'remove_comment',commentId:uid(101)}),{...base,action:'remove_comment',commentId:uid(101)});
+ assert.equal(validateCommunityCommand({...base,action:'edit_comment',commentId:uid(101),body:'첫 문장이 바로 읽혀요. 좋아요.'}).body,'첫 문장이 바로 읽혀요. 좋아요.');
+ assert.throws(()=>validateCommunityCommand({...base,action:'edit_comment',commentId:uid(101),body:'짧음'}));
+ assert.throws(()=>validateCommunityCommand({...base,action:'remove'}));
+});

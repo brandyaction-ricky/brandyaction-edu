@@ -36,6 +36,12 @@ function string(value: unknown, min: number, max: number) {
 export function validateCommunityCommand(input: unknown): CommunityCommand {
   if (!input || typeof input !== 'object' || Array.isArray(input)) campusError(400, '요청 형식을 확인해 주세요.');
   const c = input as CommunityCommand;
+  // Author-only controls carry just the target (and the new text for a comment edit).
+  if (isCampusId(c.requestId) && isCampusId(c.enrollmentId) && ['withdraw', 'share', 'remove', 'edit_comment', 'remove_comment'].includes(c.action)) {
+    const comment = c.action === 'edit_comment' || c.action === 'remove_comment';
+    if (comment ? !isCampusId(c.commentId ?? '') : !isCampusId(c.postId ?? '')) campusError(400, '대상을 선택해 주세요.');
+    return { requestId: c.requestId, enrollmentId: c.enrollmentId, action: c.action, ...(comment ? { commentId: c.commentId } : { postId: c.postId }), ...(c.action === 'edit_comment' ? { body: string(c.body, 10, 2000) } : {}) };
+  }
   if (!isCampusId(c.requestId) || !isCampusId(c.enrollmentId) || !['create', 'revise', 'comment', 'acknowledge', 'block', 'unblock', 'report', 'moderate', 'launch'].includes(c.action)) campusError(400, '요청 형식을 확인해 주세요.');
   const out: CommunityCommand = { requestId: c.requestId, enrollmentId: c.enrollmentId, action: c.action };
   for (const name of ['postId', 'commentId', 'targetId', 'reportId'] as const) if (c[name] !== undefined) { if (!isCampusId(c[name])) campusError(400, '대상을 확인해 주세요.'); out[name] = c[name]; }
