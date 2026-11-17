@@ -1,5 +1,5 @@
 /** Public, editorial examples only. No learner records or AI responses are read here. */
-export const audiences = ['business', 'preparing', 'exploring'] as const;
+export const audiences = ['work', 'business', 'preparing', 'exploring'] as const;
 export type Audience = (typeof audiences)[number];
 export type Answers = {a: string; b: string};
 export const ANSWER_LIMIT = 500;
@@ -20,6 +20,28 @@ type AudienceContent = {
 };
 
 export const audienceContent: Record<Audience, AudienceContent> = {
+  work: {
+    label: '회사 업무에 AI를 써보고 싶어요',
+    shortLabel: '회사 업무',
+    greeting: '흩어진 업무 메모를 보고할 수 있는 초안으로 정리합니다.',
+    goal: '업무 메모를 보고용 초안으로 정리하기',
+    staff: '업무 보고를 정리하는 직원',
+    intro: '읽는 사람이 무엇을 판단해야 하는지 알려주고, 진행 상황과 확인할 일, 다음 행동을 나눠 정리합니다.',
+    q1: '어떤 업무를 정리하고 싶나요? 참고할 메모도 함께 적어주세요.',
+    q2: '누가 읽고, 무엇을 판단하거나 확인해야 하나요?',
+    hint1: '실명이나 회사 기밀 대신 가상의 메모를 적어도 괜찮아요. 완료한 일과 아직 진행 중인 일을 구분해 주세요.',
+    hint2: '예: 팀장이 현재 진행 상황을 보고, 추가로 결정할 일이 있는지 확인해야 해요.',
+    example: {
+      a: '신입 동료 안내자료를 만드는 중이에요. 목차는 정리했고, 계정 신청 안내는 담당 부서 확인을 기다리고 있어요. 기존 자료의 연락처가 맞는지도 확인해야 해요. 전체 완료일은 아직 정하지 않았어요.',
+      b: '팀장에게 이번 주 진행 상황을 보고하려고 해요. 무엇이 끝났고, 무엇을 기다리는지, 다음에 무엇을 할지 빠르게 볼 수 있어야 해요.',
+      before: '[진행 상황]\n신입 동료 안내자료의 목차 정리를 완료했습니다. 계정 신청 안내는 담당 부서의 확인을 기다리고 있습니다.\n\n[확인할 사항]\n기존 자료의 연락처가 현재도 유효한지 확인이 필요합니다. 전체 완료일은 아직 정해지지 않았습니다.\n\n[다음 행동]\n계정 신청 안내에 대한 회신을 확인하고, 기존 연락처를 점검한 뒤 안내자료에 반영합니다.\n\n[보고 전 확인]\n연락처 점검 담당자와 완료일은 메모에 없습니다. 실제 담당자와 일정을 확인한 뒤 추가하세요.',
+      revision: '팀장이 빠르게 읽을 수 있게 완료·대기·다음 행동 세 항목으로 줄여줘. 전체 완료일이 미정인 점은 남기고, 내가 쓰지 않은 담당자나 날짜는 추가하지 마.',
+      after: '[완료]\n신입 동료 안내자료의 목차 정리.\n\n[대기]\n계정 신청 안내에 대한 담당 부서 확인. 전체 완료일은 미정.\n\n[다음 행동]\n회신 확인과 기존 연락처 점검 후 자료에 반영. 점검 담당자와 일정은 확인 필요.',
+    },
+    checks: ['원래 메모의 완료·진행 상태를 정확하게 구분했나요?', '읽는 사람이 확인할 일과 다음 행동이 보이나요?', '메모에 없는 수치·담당자·일정을 만들어내지는 않았나요?'],
+    bridge: '내 업무와 보고 형식을 매번 설명하지 않고, 정해둔 기준으로 반복 업무를 맡기려면?',
+    question: '내 업무 자료와 보고 기준을 AI 직원에게 어떻게 알려주면 좋을까요?',
+  },
   "business": {
     "label": "이미 사업을 하고 있어요",
     "shortLabel": "사업 중",
@@ -116,18 +138,21 @@ export function requestReady(answers: Answers): boolean {
 export function buildRequest(audience: Audience, answers: Answers): string {
   const a = cleanAnswer(answers.a), b = cleanAnswer(answers.b);
   if (!a || !b) return '';
+  if (audience === 'work') return `아래 업무 메모를 읽는 사람의 목적에 맞는 보고용 초안으로 정리해줘.\n\n맡길 업무와 원자료·메모:\n${a}\n\n읽는 사람과 확인할 목적:\n${b}\n\n아래 네 항목으로 정리해줘.\n1. 진행 상황: 메모에 있는 완료·진행·대기 상태를 구분해줘.\n2. 확인할 사항: 결정이 필요한 문제와 정보가 없는 부분을 나눠줘.\n3. 다음 행동: 메모에서 이어지는 행동만 적어줘. 확정되지 않은 행동은 제안이라고 표시해줘.\n4. 보고 전 확인: 메모에 없는 수치·담당자·일정은 '확인 필요'로 표시해줘.\n\n내가 쓰지 않은 성과, KPI, 마감일, 담당자를 만들지 마. 계획을 완료한 사실로 바꾸지 마. 메모가 부족하면 추측으로 채우지 말고 꼭 필요한 질문을 남겨줘. 바로 검토할 수 있는 간결한 문장으로 작성해줘.`;
   if (audience === 'business') return `내 상품의 특징을 바탕으로 고객이 선택할 이유를 정리하고, 그 이유를 담은 소개 문구를 작성해줘.\n\n상품·고객:\n${a}\n\n실제로 제공하는 특징:\n${b}\n\n아래 네 항목으로 정리해줘.\n1. 고객이 이 상품을 선택할 이유 한 가지. 고객 반응으로 확인하기 전의 가설임을 밝혀줘.\n2. 그 이유를 뒷받침하는 상품의 특징. 내가 알려준 사실만 사용해줘.\n3. 고객에게 보여줄 소개 문구. 제목 한 줄과 설명 두 문장으로 작성해줘.\n4. 실제 사용 전에 고객에게 확인할 점 한 가지.\n\n처음 읽는 사람도 이해하는 쉬운 말로 써줘. 내가 알려주지 않은 가격, 일정, 후기, 효과는 만들지 마. 특징만으로 비용 절약이나 매출 상승을 단정하지 마.`;
   if (audience === 'preparing') return `내 사업 아이디어를 만들기 전에 실제 고객에게 무엇을 확인해야 할지 정리해줘.\n\n준비 중인 상품·서비스와 고객:\n${a}\n\n고객이 겪을 거라고 생각하는 불편:\n${b}\n\n아래 네 항목으로 정리해줘.\n1. 먼저 확인할 가설. 내가 예상한 것과 고객에게 확인한 사실을 구분해줘.\n2. 그 가설을 확인하려면 어떤 사람을 만나야 하는지.\n3. 고객의 최근 경험과 현재 처리 방법을 알아볼 질문 세 개.\n4. 답을 들은 뒤 무엇을 기록하고 어떤 점을 판단해야 하는지.\n\n“이 서비스가 있으면 쓰시겠어요?”처럼 답을 유도하지 말고, 한 질문에는 한 가지 내용만 담아줘. 시장 규모나 수요가 있다고 추측해서 결론 내리지 마.`;
   return `내가 실제로 다른 사람을 도운 경험에서, 사업 아이디어로 확인해볼 일을 정리해줘.\n\n자주 도움을 요청받은 일:\n${a}\n\n상대가 어려워한 점과 내가 도운 방법:\n${b}\n\n아래 다섯 항목으로 정리해줘.\n1. 내 경험에서 발견한 가치. 내가 실제로 한 행동에 근거해줘.\n2. 비슷한 도움이 필요할 수 있는 사람.\n3. 처음 제공해볼 결과물이나 도움 한 가지.\n4. 이번 주에 주변 한 사람에게 직접 확인할 행동과 질문.\n5. 아직 확인하지 못한 점. 기존 무료 대안으로 해결되는지도 확인해줘.\n\n탐색용 가설로 작성해줘. 사업성이 검증됐다거나 수익이 날 것이라고 판단하지 마. 내가 말하지 않은 경력이나 능력도 추가하지 마.`;
 }
 export function buildRevision(audience: Audience, revision: Revision, extra = ''): string {
   if (revision === 'short') return {
+    work: '완료·대기·다음 행동 세 항목으로 줄여줘. 결정이나 확인이 필요한 내용은 남기고, 원자료에 없는 수치·담당자·일정은 추가하지 마.',
     business: '구매 이유와 상품 특징이 드러나도록 소개 문구를 두 문장으로 줄여줘. 내가 알려주지 않은 정보는 추가하지 마.',
     preparing: '가장 먼저 물어볼 질문 하나만 골라줘. 고객이 최근에 한 일을 묻는 쉬운 문장으로 써줘.',
     exploring: '이번 주에 주변 사람 한 명에게 확인해볼 수 있는 행동 하나와 질문 하나로 줄여줘.',
   }[audience];
   if (revision === 'easy') return '처음 읽는 사람도 이해하도록 어려운 말과 추상적인 표현을 풀어줘. 내가 알려준 사실과 목적은 유지해줘.';
   if (revision === 'vague') return {
+    work: '원자료에서 확인한 사실과 제안하는 행동을 구분해줘. 누가 무엇을 판단해야 하는지 드러내고, 없는 담당자나 일정은 확인 필요로 표시해줘.',
     business: '내가 알려준 고객과 장점이 구체적으로 드러나게 고쳐줘. 부족한 정보가 있다면 추측하지 말고 꼭 필요한 질문 하나만 해줘.',
     preparing: '고객이 가장 최근에 겪은 한 가지 상황을 떠올리며 답할 수 있게 질문을 구체화해줘.',
     exploring: '내가 제공한 경험 중 한 가지 장면으로 범위를 좁혀줘. 확인된 사실과 더 알아볼 점을 구분해줘.',
@@ -146,8 +171,8 @@ export function buildCriteria(audience: Audience, answers: Answers, revision: Re
       : revisionOptions.find(option => option.id === revision)!.label;
   return [
     {label: '맡길 일', value: content.goal},
-    {label: audience === 'exploring' ? '출발한 경험' : '상품과 고객', value: cleanAnswer(answers.a)},
-    {label: audience === 'business' ? '꼭 전달할 장점' : audience === 'preparing' ? '확인할 것' : '사람과 상황', value: cleanAnswer(answers.b)},
+    {label: audience === 'work' ? '업무와 메모' : audience === 'exploring' ? '출발한 경험' : '상품과 고객', value: cleanAnswer(answers.a)},
+    {label: audience === 'work' ? '읽는 사람과 목적' : audience === 'business' ? '꼭 전달할 장점' : audience === 'preparing' ? '확인할 것' : '사람과 상황', value: cleanAnswer(answers.b)},
     {label: '결과를 다듬는 기준', value: revisionCriterion},
   ].filter(item => Boolean(item.value));
 }

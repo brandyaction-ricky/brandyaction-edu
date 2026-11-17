@@ -10,7 +10,7 @@ import {ARRIVAL_CONFIG_LIMITS as limits, DEFAULT_ARRIVAL, validateArrivalConfig,
 import styles from './editor.module.css';
 
 const Experience = lazy(() => import('./experience').then(module => ({default: module.ArrivalExperience})));
-const audienceNames: Record<Audience, string> = {business: '사업 중인 사람', preparing: '창업 준비 중인 사람', exploring: '아직 아이템이 없는 사람'};
+const audienceNames: Record<Audience, string> = {work: '회사 업무에 활용할 사람', business: '사업 중인 사람', preparing: '창업 준비 중인 사람', exploring: '아직 아이템이 없는 사람'};
 
 function koreanDateTime(value: string | null): string {
   const date = value ? Date.parse(value) : NaN;
@@ -39,12 +39,18 @@ function ArrivalDraftPreview({config, onClose}: {config: ArrivalConfig; onClose:
 }
 
 /** The parent webinar form owns persistence and its existing revision check. */
-export function ArrivalEditor({value, onChange, disabled = false, savedSlug}: {
+export function ArrivalEditor({value: storedValue, onChange, disabled = false, savedSlug}: {
   value?: ArrivalConfig;
   onChange: (value: ArrivalConfig) => void;
   disabled?: boolean;
   savedSlug?: string;
 }) {
+  // Old browser-only demo drafts may bypass the server's validation boundary.
+  // Add only missing fields; keep every existing editorial value intact.
+  const value = storedValue ? {...storedValue,
+    welcomeBenefits: storedValue.welcomeBenefits ?? DEFAULT_ARRIVAL.welcomeBenefits,
+    audiences: {...DEFAULT_ARRIVAL.audiences, ...storedValue.audiences},
+  } : undefined;
   const [preview, setPreview] = useState<ArrivalConfig | null>(null);
   const [error, setError] = useState('');
   const errorBox = useRef<HTMLParagraphElement>(null);
@@ -87,6 +93,7 @@ export function ArrivalEditor({value, onChange, disabled = false, savedSlug}: {
       <fieldset disabled={disabled} className={styles.fields}>
         <AdminTextarea label="첫 화면 제목" required maxLength={limits.title} rows={2} value={value.title} onChange={event => patch('title', event.target.value)}/>
         <AdminTextarea label="첫 화면 안내" required maxLength={limits.description} rows={3} value={value.description} onChange={event => patch('description', event.target.value)}/>
+        {value.welcomeBenefits.map((benefit, index) => <AdminInput key={index} label={`첫 화면 체험 안내 ${index + 1}`} helper={index === 0 ? '상황을 선택하기 전 모든 방문자가 보는 문구입니다. 사업자에게만 해당하는 설명은 대상별 체험에 적어주세요.' : undefined} required maxLength={limits.goal} value={benefit} onChange={event => patch('welcomeBenefits', value.welcomeBenefits.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}/>)}
         <AdminInput label="강사 이름" required maxLength={limits.instructorName} value={value.instructorName} onChange={event => patch('instructorName', event.target.value)}/>
         <AdminTextarea label="강사·팀 소개" required maxLength={limits.instructorIntro} rows={3} value={value.instructorIntro} onChange={event => patch('instructorIntro', event.target.value)}/>
         <AdminInput label="소개 영상 주소 · 선택" type="url" maxLength={limits.url} placeholder="https://www.youtube.com/watch?v=…" helper="영상이 없으면 비워두세요. 방문자가 직접 눌러서 시청합니다." value={value.videoUrl} onChange={event => patch('videoUrl', event.target.value)}/>
@@ -120,7 +127,7 @@ export function ArrivalEditor({value, onChange, disabled = false, savedSlug}: {
       </EditorDisclosure>;
     })}
 
-    <EditorDisclosure title="5. 라이브 안내 · 일정 저장">
+    <EditorDisclosure title={`${audiences.length + 2}. 라이브 안내 · 일정 저장`}>
       <fieldset disabled={disabled} className={styles.fields}>
         <AdminInput label="라이브 제목" required maxLength={limits.liveTitle} value={value.liveTitle} onChange={event => patch('liveTitle', event.target.value)}/>
         <div className={styles.grid}>

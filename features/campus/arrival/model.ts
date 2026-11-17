@@ -15,7 +15,7 @@ export type ArrivalState = {
   extra: string;
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, audience: 'business', answers: {business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: ''};
+  return {version: 1, step: 0, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: ''};
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

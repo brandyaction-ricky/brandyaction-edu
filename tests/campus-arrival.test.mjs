@@ -12,18 +12,34 @@ const model = await moduleFrom('../features/campus/arrival/model.ts');
 
 test('each visitor gets an immediately usable request based on their own two answers', () => {
   const answers = {a: '임시 입력 A — 나의 상품·고객·경험', b: '임시 입력 B — 나의 장점·질문·상황'};
-  const requests = content.audiences.map(audience => content.buildRequest(audience, answers));
-  assert.equal(new Set(requests).size, 3);
-  for (const request of requests) {
+  const requests = Object.fromEntries(content.audiences.map(audience => [audience, content.buildRequest(audience, answers)]));
+  assert.equal(new Set(Object.values(requests)).size, 4);
+  for (const request of Object.values(requests)) {
     assert.ok(request.includes(answers.a));
     assert.ok(request.includes(answers.b));
     assert.ok(!request.includes(content.audienceContent.business.example.a));
   }
-  assert.match(requests[0], /가격, 일정, 후기, 효과는 만들지 마/);
-  assert.match(requests[1], /고객의 최근 경험/);
-  assert.match(requests[1], /답을 유도하지 말고/);
-  assert.match(requests[2], /탐색용 가설/);
-  assert.match(requests[2], /수익이 날 것이라고 판단하지 마/);
+  assert.match(requests.work, /보고용 초안/);
+  assert.match(requests.work, /수치·담당자·일정은 '확인 필요'/);
+  assert.match(requests.business, /가격, 일정, 후기, 효과는 만들지 마/);
+  assert.match(requests.preparing, /고객의 최근 경험/);
+  assert.match(requests.preparing, /답을 유도하지 말고/);
+  assert.match(requests.exploring, /탐색용 가설/);
+  assert.match(requests.exploring, /수익이 날 것이라고 판단하지 마/);
+});
+
+test('work visitors get a reporting task and criteria without being redirected into business planning', () => {
+  const input = {a: '자료 목차는 완료, 신청 안내는 회신 대기, 완료일은 미정', b: '팀장이 진행 상황과 결정할 일을 확인'};
+  const request = content.buildRequest('work', input);
+  assert.ok(request.includes(input.a)); assert.ok(request.includes(input.b));
+  assert.match(request, /계획을 완료한 사실로 바꾸지 마/);
+  assert.match(request, /성과, KPI, 마감일, 담당자를 만들지 마/);
+  assert.doesNotMatch(request, /사업|상품|창업|고객/);
+  const criteria = content.buildCriteria('work', input, 'short');
+  assert.equal(criteria.find(item => item.label === '업무와 메모').value, input.a);
+  assert.equal(criteria.find(item => item.label === '읽는 사람과 목적').value, input.b);
+  assert.match(content.buildRevision('work', 'short'), /완료·대기·다음 행동/);
+  assert.match(content.buildRevision('work', 'vague'), /사실과 제안하는 행동을 구분/);
 });
 
 test('empty personal input cannot silently turn into an example or request', () => {
@@ -71,11 +87,12 @@ test('the reusable criteria preserve a personal correction and follow the demons
   }
 });
 
-test('leaving for a personal AI and returning restores all three draft paths', () => {
+test('leaving for a personal AI and returning restores all four draft paths', () => {
   const state = model.initialArrivalState();
   state.step = 3;
   state.handoff = 'copied';
   state.audience = 'preparing';
+  state.answers.work = {a: '업무 메모', b: '읽는 사람과 목적'};
   state.answers.business = {a: '내 상품', b: '내 장점'};
   state.answers.preparing = {a: '준비 중인 서비스', b: '고객에게 궁금한 점'};
   state.answers.exploring = {a: '도와준 경험', b: '그때의 상황'};
@@ -84,6 +101,27 @@ test('leaving for a personal AI and returning restores all three draft paths', (
   const restored = model.parseArrivalState(model.serializeArrivalState(state));
   assert.deepEqual(restored, state);
   assert.equal(restored.experience, 'none', 'leaving and reopening never pretends the AI has replied');
+});
+
+test('legacy three-route drafts retain their selected route and answers when work is added', () => {
+  assert.equal(model.initialArrivalState().audience, 'work');
+  assert.equal(content.audiences[0], 'work');
+  for (const audience of ['business', 'preparing', 'exploring']) {
+    const legacy = {...model.initialArrivalState(), audience, step: 3, handoff: 'copied'};
+    delete legacy.answers.work;
+    legacy.answers[audience] = {a: '원래 저장한 첫 답', b: '원래 저장한 두 번째 답'};
+    const restored = model.parseArrivalState(JSON.stringify(legacy));
+    assert.equal(restored.audience, audience);
+    assert.equal(restored.step, 3);
+    assert.equal(restored.handoff, 'copied');
+    assert.deepEqual(restored.answers[audience], legacy.answers[audience]);
+    assert.deepEqual(restored.answers.work, {a: '', b: ''});
+    assert.equal(restored.experience, 'none');
+  }
+  const work = model.initialArrivalState();
+  work.step = 3;
+  work.answers.work = {a: '보고할 메모', b: '팀장에게 진행 상황 공유'};
+  assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(work)), work);
 });
 
 test('previous handoff and criteria drafts resume in the consolidated flow without losing their content', () => {
@@ -155,7 +193,7 @@ test('old, malformed and oversized browser state has a safe fresh start', () => 
   }
   const restored = model.parseArrivalState(JSON.stringify({version: 1, step: 999, audience: '__proto__', answers: {business: {a: 123, b: 'b'.repeat(600)}}, experience: 'complete', revision: 'score'}));
   assert.equal(restored.step, 0);
-  assert.equal(restored.audience, 'business');
+  assert.equal(restored.audience, 'work');
   assert.equal(restored.answers.business.a, '');
   assert.equal(restored.answers.business.b.length, content.ANSWER_LIMIT);
   assert.equal(restored.experience, 'none');

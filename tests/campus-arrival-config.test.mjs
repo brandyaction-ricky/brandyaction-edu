@@ -13,7 +13,7 @@ const model = await moduleFrom('../features/campus/arrival/model.ts');
 const draft = () => structuredClone(config.DEFAULT_ARRIVAL);
 const rejects = (value) => assert.throws(() => config.validateArrivalConfig(value), error => error instanceof Error && error.status === 400 && Boolean(error.message));
 
-test('editable defaults preserve the existing examples and all three working requests', () => {
+test('editable defaults preserve the examples and all four working requests', () => {
   const validated = config.validateArrivalConfig(config.DEFAULT_ARRIVAL);
   assert.deepEqual(validated, config.DEFAULT_ARRIVAL);
   assert.notEqual(validated.audiences.business.example, config.DEFAULT_ARRIVAL.audiences.business.example);
@@ -25,6 +25,41 @@ test('editable defaults preserve the existing examples and all three working req
   for (const id of content.audiences) {
     assert.deepEqual(validated.audiences[id].example, content.audienceContent[id].example);
     assert.equal(config.buildManagedRequest(validated, id, {a: '내 첫 답변', b: '내 두 번째 답변'}), content.buildRequest(id, {a: '내 첫 답변', b: '내 두 번째 답변'}));
+  }
+});
+
+test('legacy settings add work and shared welcome benefits without replacing administrator edits', () => {
+  const legacy = draft();
+  delete legacy.audiences.work;
+  delete legacy.welcomeBenefits;
+  legacy.title = '운영자가 수정한 첫 제목';
+  legacy.audiences.business.goal = '기존 사업 체험 제목';
+  legacy.audiences.preparing.example.before = '기존 창업 준비 예시';
+  legacy.audiences.exploring.requestTemplate = '{{answer1}}에서 {{answer2}}를 확인하기';
+  const before = structuredClone(legacy);
+  const normalized = config.validateArrivalConfig(legacy);
+  assert.equal(normalized.title, legacy.title);
+  for (const audience of ['business', 'preparing', 'exploring']) assert.deepEqual(normalized.audiences[audience], legacy.audiences[audience]);
+  assert.deepEqual(normalized.audiences.work, config.DEFAULT_ARRIVAL.audiences.work);
+  assert.deepEqual(normalized.welcomeBenefits, config.DEFAULT_ARRIVAL.welcomeBenefits);
+  assert.notEqual(normalized.welcomeBenefits, config.DEFAULT_ARRIVAL.welcomeBenefits);
+  assert.deepEqual(legacy, before, 'reading older settings does not mutate saved content');
+  assert.deepEqual(config.validateArrivalConfig(JSON.parse(JSON.stringify(normalized))), normalized);
+});
+
+test('explicit work content and three shared welcome benefits are validated and retain edits', () => {
+  const edited = draft();
+  edited.audiences.work.label = '팀 업무 초안 만들기';
+  edited.audiences.work.requestTemplate = '업무: {{answer1}}\n목적: {{answer2}}\n보고 초안을 작성해줘.';
+  edited.welcomeBenefits = ['업무 초안 만들기', '아이디어 정리하기', '내 기준으로 다듬기'];
+  const parsed = config.validateArrivalConfig(edited);
+  assert.deepEqual(parsed, edited);
+  assert.equal(config.buildManagedRequest(parsed, 'work', {a: '내 메모', b: '팀 공유'}), '업무: 내 메모\n목적: 팀 공유\n보고 초안을 작성해줘.');
+  for (const work of [null, undefined, {}, [], {...edited.audiences.work, extra: true}]) {
+    const invalid = draft(); invalid.audiences.work = work; rejects(invalid);
+  }
+  for (const welcomeBenefits of [null, undefined, [], ['하나'], ['하나', '둘'], ['하나', '둘', '셋', '넷'], ['하나', '둘', ' '], ['하나', '둘', 3], ['하나', '둘', '가'.repeat(161)]]) {
+    const invalid = draft(); invalid.welcomeBenefits = welcomeBenefits; rejects(invalid);
   }
 });
 

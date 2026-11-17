@@ -16,6 +16,7 @@ export type ArrivalConfig = {
   version: 1;
   title: string;
   description: string;
+  welcomeBenefits: string[];
   instructorName: string;
   instructorIntro: string;
   videoUrl: string;
@@ -27,13 +28,14 @@ export type ArrivalConfig = {
 };
 
 export const ARRIVAL_CONFIG_LIMITS = {
-  title: 80, description: 400, instructorName: 80, instructorIntro: 1200,
+  title: 80, description: 400, welcomeBenefit: 160, instructorName: 80, instructorIntro: 1200,
   liveTitle: 160, url: 1200, label: 80, goal: 160, question: 240,
   hint: 320, exampleAnswer: ANSWER_LIMIT, exampleResult: 2000,
   exampleRevision: REVISION_LIMIT, requestTemplate: 6000,
 } as const;
 
 const choiceLabels: Record<Audience, string> = {
+  work: '회사 업무에 AI를 써보고 싶어요',
   business: '이미 사업을 하고 있어요',
   preparing: '창업을 준비하고 있어요',
   exploring: '아직 아이템이 없어요',
@@ -51,20 +53,21 @@ function defaultAudience(id: Audience): ArrivalAudienceConfig {
 export const DEFAULT_ARRIVAL: ArrivalConfig = {
   version: 1,
   title: '혼자 하던 일,\nAI에게 맡길 수 있을까요?',
-  description: '문샷 무료 라이브를 앞두고, AI가 내 일에 어떤 도움이 되는지 미리 체험하는 공간입니다.',
+  description: '회사 업무를 더 수월하게 하고 싶을 때도, 새로운 일을 준비할 때도. 문샷 무료 라이브 전에 AI를 내 상황에 맞게 써보는 공간입니다.',
+  welcomeBenefits: ['흩어진 업무 메모를 보고할 초안으로 정리하기', '막연한 아이디어에서 다음에 할 일 찾기', '내가 원하는 형식과 기준으로 AI 답변 다듬기'],
   instructorName: '윤익 · 브랜디액션 팀',
-  instructorIntro: '상품을 설명하고, 고객을 이해하고, 다음 할 일을 정리하는 과정까지. 윤익님과 브랜디액션 팀이 내가 하는 일과 원하는 결과를 알려주고, 반복해서 업무를 맡길 AI 직원을 만드는 방법을 알려드립니다.',
+  instructorIntro: '업무를 정리하고, 고객을 이해하고, 아이디어의 다음 단계를 구체화하는 과정까지. 윤익님과 브랜디액션 팀이 내가 하는 일과 원하는 결과를 알려주고, 반복해서 업무를 맡길 AI 직원을 만드는 방법을 알려드립니다.',
   videoUrl: '',
   liveTitle: '매번 설명해야 했던 AI, 이제 내 일을 아는 직원으로',
   startsAt: liveEvent.startsAt!, endsAt: liveEvent.endsAt, liveUrl: liveEvent.infoUrl ?? '',
-  audiences: {business: defaultAudience('business'), preparing: defaultAudience('preparing'), exploring: defaultAudience('exploring')},
+  audiences: {work: defaultAudience('work'), business: defaultAudience('business'), preparing: defaultAudience('preparing'), exploring: defaultAudience('exploring')},
 };
 
 function fail(message: string): never { throw Object.assign(Error(message), {status: 400}); }
-function record(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
+function record(value: unknown, keys: readonly string[], label: string, optional: readonly string[] = []): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} 설정을 확인해 주세요.`);
   const data = value as Record<string, unknown>;
-  if (Object.keys(data).some(key => !keys.includes(key)) || keys.some(key => !Object.hasOwn(data, key))) fail(`${label} 설정 항목을 확인해 주세요.`);
+  if (Object.keys(data).some(key => !keys.includes(key)) || keys.some(key => !optional.includes(key) && !Object.hasOwn(data, key))) fail(`${label} 설정 항목을 확인해 주세요.`);
   return data;
 }
 function text(value: unknown, limit: number, label: string, required = true): string {
@@ -106,12 +109,15 @@ function requestTemplate(value: unknown, label: string): string {
 
 /** Strict input boundary used by both the administrator editor and the public reader. */
 export function validateArrivalConfig(value: unknown): ArrivalConfig {
-  const v = record(value, ['version', 'title', 'description', 'instructorName', 'instructorIntro', 'videoUrl', 'liveTitle', 'startsAt', 'endsAt', 'liveUrl', 'audiences'], '무료 체험');
+  const v = record(value, ['version', 'title', 'description', 'welcomeBenefits', 'instructorName', 'instructorIntro', 'videoUrl', 'liveTitle', 'startsAt', 'endsAt', 'liveUrl', 'audiences'], '무료 체험', ['welcomeBenefits']);
   if (v.version !== 1) fail('무료 체험 설정 버전을 확인해 주세요.');
-  const groups = record(v.audiences, audiences, '체험 대상');
+  const groups = record(v.audiences, audiences, '체험 대상', ['work']);
   const parsedAudiences = {} as Record<Audience, ArrivalAudienceConfig>;
   for (const id of audiences) {
-    const source = record(groups[id], ['label', 'goal', 'q1', 'q2', 'hint1', 'hint2', 'example', 'requestTemplate'], `${audienceContent[id].shortLabel} 체험`);
+    // Earlier saved campaigns have three routes. Add only the new work route;
+    // never overwrite an administrator's existing text or a malformed explicit route.
+    const group = id === 'work' && !Object.hasOwn(groups, id) ? defaultAudience(id) : groups[id];
+    const source = record(group, ['label', 'goal', 'q1', 'q2', 'hint1', 'hint2', 'example', 'requestTemplate'], `${audienceContent[id].shortLabel} 체험`);
     const example = record(source.example, ['a', 'b', 'before', 'after', 'revision'], '체험 예시');
     parsedAudiences[id] = {
       label: text(source.label, ARRIVAL_CONFIG_LIMITS.label, '선택지 이름'),
@@ -132,10 +138,14 @@ export function validateArrivalConfig(value: unknown): ArrivalConfig {
   }
   const videoUrl = publicLink(v.videoUrl, '소개 영상 주소');
   if (videoUrl && !youtubeVideoId(videoUrl)) fail('소개 영상은 유튜브 영상의 전체 주소를 넣어 주세요.');
+  const benefitValues = Object.hasOwn(v, 'welcomeBenefits') ? v.welcomeBenefits : DEFAULT_ARRIVAL.welcomeBenefits;
+  if (!Array.isArray(benefitValues) || benefitValues.length !== 3) fail('첫 화면 체험 안내는 세 항목을 입력해 주세요.');
+  const welcomeBenefits = benefitValues.map(item => text(item, ARRIVAL_CONFIG_LIMITS.welcomeBenefit, '첫 화면 체험 안내'));
   const config: ArrivalConfig = {
     version: 1,
     title: text(v.title, ARRIVAL_CONFIG_LIMITS.title, '무료 체험 제목'),
     description: text(v.description, ARRIVAL_CONFIG_LIMITS.description, '무료 체험 소개'),
+    welcomeBenefits,
     instructorName: text(v.instructorName, ARRIVAL_CONFIG_LIMITS.instructorName, '강사 이름'),
     instructorIntro: text(v.instructorIntro, ARRIVAL_CONFIG_LIMITS.instructorIntro, '강사·팀 소개'),
     videoUrl,

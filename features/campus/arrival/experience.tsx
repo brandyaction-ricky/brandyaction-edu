@@ -9,7 +9,7 @@ import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
 import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
 
-const icons = {business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
+const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
 const chapters = ['웰컴존', '체험 사무실', '라이브 홀'];
 const rooms = ['welcome', 'office', 'live'] as const;
 
@@ -145,7 +145,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 0 && <>
           <p className={s.welcomeEyebrow}>문샷 캠퍼스 · 무료 라이브 사전 체험</p>
           {title(config.title, config.description)}
-          <div className={s.welcomeOverview}><h2>내 상황에 맞춰, 이런 일을 해볼 수 있어요</h2><ul>{audiences.map(id => <li key={id}><Check size={16}/><span>{config.audiences[id].goal}</span></li>)}</ul></div>
+          <div className={s.welcomeOverview}><h2>내가 하던 일에, 이렇게 AI를 써보세요</h2><ul>{config.welcomeBenefits.map((benefit, index) => <li key={index}><Check size={16}/><span>{benefit}</span></li>)}</ul></div>
           <p className={s.welcomeHow}>결과 예시를 본 뒤, 내 상황에 맞는 요청문을 만들어 평소 쓰는 ChatGPT나 Claude에 보내보세요.</p>
         </>}
         {step === 8 && <>
@@ -156,7 +156,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 1 && <>
           {title(config.audiences[state.audience].goal)}
           <article className={s.resultPaper}><div className={s.paperTop}><FileText size={16}/><span>이렇게 정리할 수 있습니다</span><small>체험용 예시</small></div><ResultExample text={content.example.before}/></article>
-          <details className={s.disclosure}><summary>AI에게 알려준 내용 보기<ChevronDown size={16}/></summary><div><p><strong>{state.audience === 'exploring' ? '겪은 일' : '상품과 고객'}</strong>{content.example.a}</p><p><strong>{state.audience === 'business' ? '알려줄 장점' : state.audience === 'preparing' ? '궁금한 점' : '사람과 상황'}</strong>{content.example.b}</p></div></details>
+          <details className={s.disclosure}><summary>AI에게 알려준 내용 보기<ChevronDown size={16}/></summary><div><p><strong>{state.audience === 'work' ? '정리할 업무 메모' : state.audience === 'exploring' ? '겪은 일' : '상품과 고객'}</strong>{content.example.a}</p><p><strong>{state.audience === 'work' ? '읽을 사람과 보고 목적' : state.audience === 'business' ? '알려줄 장점' : state.audience === 'preparing' ? '궁금한 점' : '사람과 상황'}</strong>{content.example.b}</p></div></details>
           <p className={s.insight}><strong>누구를 위한 결과인지, 무엇을 담아야 하는지.</strong> 내 상황을 알려주면 AI가 답변을 만들 때 참고할 수 있습니다.</p>
           <button className={s.textButton} type="button" onClick={exampleFinish}>입력 없이 예시로 계속하기</button>
         </>}
