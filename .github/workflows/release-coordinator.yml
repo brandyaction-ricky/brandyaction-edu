@@ -1,0 +1,15 @@
+name: Production coordinator approval check
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  approval-check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production-release-review
+    timeout-minutes: 1
+    steps:
+      - name: Confirm the environment review has completed
+        run: echo "GitHub released the job after environment review."
