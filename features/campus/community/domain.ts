@@ -7,13 +7,13 @@ export const openKinds: CommunityKind[] = ['landing', 'ad'];
 export const kindLabels: Record<CommunityKind, string> = { landing: '랜딩 페이지', ad: '광고 소재', portfolio: '내 결과물 모음', feedback: '의견 요청', process: '작업 과정', failure: '실패에서 배운 점', talent_offer: '도움 드려요', talent_request: '도움 구해요', demo_day: '문샷 결과물 발표회' };
 export type CommunityPost = { id: string; owner_id: string; enrollment_id: string; cohort_id: string; alias: string; kind: CommunityKind; title: string; body: string; url: string; image_urls: string[]; lesson_id: string | null; visibility: 'private' | 'cohort'; revision: number; hidden: boolean; created_at: string; updated_at: string };
 export type CommunityRevision = Pick<CommunityPost, 'id' | 'title' | 'body' | 'url' | 'image_urls' | 'visibility' | 'revision' | 'created_at'> & { post_id: string; change_note: string };
-export type CommunityComment = { id: string; post_id: string; author_id: string; alias: string; body: string; post_revision: number; hidden: boolean; created_at: string };
+export type CommunityComment = { id: string; post_id: string; author_id: string; alias: string; body: string; post_revision: number; hidden: boolean; created_at: string; edited_at?: string | null };
 export type CommunityAcknowledgment = { comment_id: string; owner_id: string; useful: boolean; decision: 'pending' | 'apply' | 'keep'; reason: string; applied_revision: number | null; revision: number; updated_at: string };
 export type CommunityReport = { id: string; reporter_id: string; post_id: string; comment_id: string | null; reason: string; status: 'open' | 'resolved'; created_at: string };
 export type CommunityRewards = { ruleVersion: string; approvedMissions: number; requiredMissions: number; usefulFeedback: number; appliedRevisions: number; xp: number; level: number; badges: string[]; eligible: boolean; claimedAt: string | null; cohortLaunches: number; cohortGoal: number; reasons: string[] };
 export type CommunityState = { posts: CommunityPost[]; revisions: CommunityRevision[]; comments: CommunityComment[]; acknowledgments: CommunityAcknowledgment[]; reports: CommunityReport[]; blockedIds: string[]; rewards: CommunityRewards; operator: boolean; demo: boolean; pageInfo?: { page: number; hasNext: boolean } };
 export type CommunityCommand = {
-  requestId: string; enrollmentId: string; action: 'create' | 'revise' | 'comment' | 'acknowledge' | 'block' | 'unblock' | 'report' | 'moderate' | 'launch';
+  requestId: string; enrollmentId: string; action: 'create' | 'revise' | 'comment' | 'acknowledge' | 'block' | 'unblock' | 'report' | 'moderate' | 'launch' | 'withdraw' | 'share' | 'remove' | 'edit_comment' | 'remove_comment';
   postId?: string; commentId?: string; targetId?: string; reportId?: string; expectedRevision?: number;
   kind?: CommunityKind; title?: string; body?: string; url?: string; imageUrls?: string[]; lessonId?: string | null; alias?: string;
   visibility?: 'private' | 'cohort'; changeNote?: string; useful?: boolean; decision?: 'pending' | 'apply' | 'keep'; reason?: string; appliedRevision?: number;
