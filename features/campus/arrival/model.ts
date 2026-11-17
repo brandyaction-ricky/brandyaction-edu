@@ -1,7 +1,9 @@
 import {audiences, isAudience, isRevision, cleanAnswer, REVISION_LIMIT, type Audience, type Answers, type Revision} from './content';
+import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from './work-trial';
 
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
+export const ARRIVAL_STORAGE_LIMIT = 32_000;
 export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type ArrivalState = {
   version: 1;
@@ -13,9 +15,10 @@ export type ArrivalState = {
   handoff: 'ready' | 'copied';
   revision: Revision;
   extra: string;
+  workTrial: WorkTrialState;
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: ''};
+  return {version: 1, step: 0, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState()};
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -26,7 +29,7 @@ function answer(value: unknown): string {
 /** Malformed, old or oversized browser data cannot manufacture completion or crash entry. */
 export function parseArrivalState(raw: string | null | undefined): ArrivalState {
   const state = initialArrivalState();
-  if (!raw || raw.length > 16_000) return state;
+  if (!raw || raw.length > ARRIVAL_STORAGE_LIMIT) return state;
   try {
     const value: unknown = JSON.parse(raw);
     if (!object(value) || value.version !== ARRIVAL_VERSION) return state;
@@ -49,6 +52,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     state.handoff = value.handoff === 'copied' ? 'copied' : 'ready';
     if (isRevision(value.revision)) state.revision = value.revision;
     state.extra = answer(value.extra).slice(0, REVISION_LIMIT);
+    state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
   } catch {
     return state;

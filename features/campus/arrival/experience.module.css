@@ -531,3 +531,14 @@
 @media (prefers-reduced-motion: reduce) {
   .root * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* The employee exercise has its own compact, scrollable four-step panel. */
+.workDock { overflow: hidden; }
+@media (min-width: 1001px) {
+  .workDock { width: min(600px, 48vw); }
+}
+@media (max-width: 700px) {
+  .root:has(.workDock) { --scene-height: 132px; }
+  .root:has(.workDock) .place { display: none; }
+  .root:has(.workDock) .exploreButton { top: 112px; }
+}

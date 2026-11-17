@@ -14,6 +14,10 @@
 .groupHeading { border-top: 1px solid var(--adm-border, #e2e5e9); padding-top: 20px; margin: 4px 0 16px; }
 .groupHeading h4 { margin: 0 0 6px; font-size: 16px; line-height: 1.5; }
 .groupHeading p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--adm-text-sub, #626770); }
+.workEditor { min-width: 0; }
+.workEditor > :first-child { border-top: 0; padding-top: 4px; }
+.workEditor > details { margin: 14px 0; }
+.workEditor details > summary { overflow-wrap: anywhere; }
 .error { border-left: 3px solid var(--adm-error, #b42318); padding: 10px 14px; color: var(--adm-error, #b42318); background: #fff5f5; line-height: 1.6; }
 .previewDialog { inset: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-radius: 0; background: #f7f8f9; color: #161719; font-family: var(--font-sans, Pretendard, system-ui, sans-serif); overflow: hidden; }
 .previewDialog[open] { display: flex; flex-direction: column; }

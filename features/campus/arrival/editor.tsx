@@ -7,6 +7,8 @@ import {AdminButton, AdminInput, AdminTextarea, useAdminDialog} from '@/features
 import {EditorDisclosure} from '../content/disclosure';
 import {audiences, type Audience} from './content';
 import {ARRIVAL_CONFIG_LIMITS as limits, DEFAULT_ARRIVAL, validateArrivalConfig, type ArrivalConfig} from './config';
+import {DEFAULT_WORK_TRIAL} from './work-trial';
+import {WorkTrialEditor} from './work-trial-editor';
 import styles from './editor.module.css';
 
 const Experience = lazy(() => import('./experience').then(module => ({default: module.ArrivalExperience})));
@@ -50,6 +52,7 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
   const value = storedValue ? {...storedValue,
     welcomeBenefits: storedValue.welcomeBenefits ?? DEFAULT_ARRIVAL.welcomeBenefits,
     audiences: {...DEFAULT_ARRIVAL.audiences, ...storedValue.audiences},
+    workTrial: storedValue.workTrial ?? DEFAULT_WORK_TRIAL,
   } : undefined;
   const [preview, setPreview] = useState<ArrivalConfig | null>(null);
   const [error, setError] = useState('');
@@ -105,9 +108,10 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
       return <EditorDisclosure key={id} title={`${index + 2}. ${audienceNames[id]} · 체험 내용`}>
         <fieldset disabled={disabled} className={styles.fields}>
           <div className={styles.grid}>
-            <AdminInput label="대상 안내 · 버튼의 큰 제목" helper="예: 이미 사업을 하고 있어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요." required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
+            <AdminInput label="대상 안내 · 버튼의 큰 제목" helper={id === 'work' ? '예: 회사 업무에 AI를 써보고 싶어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.' : '예: 이미 사업을 하고 있어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.'} required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
             <AdminInput label="체험 후 얻는 결과" required maxLength={limits.goal} value={item.goal} onChange={event => updateAudience(id, {goal: event.target.value})}/>
           </div>
+          {id === 'work' ? <WorkTrialEditor value={value.workTrial} onChange={next => patch('workTrial', next)} disabled={disabled}/> : <>
           <div className={styles.grid}>
             <AdminTextarea label="첫 번째 질문" required maxLength={limits.question} rows={2} value={item.q1} onChange={event => updateAudience(id, {q1: event.target.value})}/>
             <AdminTextarea label="두 번째 질문" required maxLength={limits.question} rows={2} value={item.q2} onChange={event => updateAudience(id, {q2: event.target.value})}/>
@@ -123,6 +127,7 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
           </div>
           <AdminTextarea label="예시를 더 다듬는 요청" required maxLength={limits.exampleRevision} rows={3} value={item.example.revision} onChange={event => updateAudience(id, {example: {...item.example, revision: event.target.value}})}/>
           <AdminTextarea label="내 AI에게 보낼 요청문 틀" required maxLength={limits.requestTemplate} rows={8} helper="{{answer1}}에는 첫 번째 답변, {{answer2}}에는 두 번째 답변이 들어갑니다. 두 표시를 모두 남겨주세요." value={item.requestTemplate} onChange={event => updateAudience(id, {requestTemplate: event.target.value})}/>
+          </>}
         </fieldset>
       </EditorDisclosure>;
     })}

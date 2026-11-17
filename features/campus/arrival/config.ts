@@ -1,6 +1,7 @@
 import {audiences, audienceContent, buildRequest, cleanAnswer, requestReady, ANSWER_LIMIT, REVISION_LIMIT, type Audience, type Answers} from './content';
 import {calendarReady, liveEvent, type LiveEvent} from './model';
 import {youtubeVideoId} from '../webinar/resources';
+import {DEFAULT_WORK_TRIAL, validateWorkTrialConfig, type WorkTrialConfig} from './work-trial';
 
 export type ArrivalAudienceConfig = {
   label: string;
@@ -17,6 +18,7 @@ export type ArrivalConfig = {
   title: string;
   description: string;
   welcomeBenefits: string[];
+  workTrial: WorkTrialConfig;
   instructorName: string;
   instructorIntro: string;
   videoUrl: string;
@@ -43,7 +45,7 @@ const choiceLabels: Record<Audience, string> = {
 function defaultAudience(id: Audience): ArrivalAudienceConfig {
   const source = audienceContent[id];
   return {
-    label: choiceLabels[id], goal: source.goal, q1: source.q1, q2: source.q2,
+    label: choiceLabels[id], goal: id === 'work' ? '내 업무 기준을 만들고, 다음 업무에도 재사용하기' : source.goal, q1: source.q1, q2: source.q2,
     hint1: source.hint1, hint2: source.hint2, example: {...source.example},
     requestTemplate: buildRequest(id, {a: '{{answer1}}', b: '{{answer2}}'}),
   };
@@ -55,6 +57,7 @@ export const DEFAULT_ARRIVAL: ArrivalConfig = {
   title: '혼자 하던 일,\nAI에게 맡길 수 있을까요?',
   description: '회사 업무를 더 수월하게 하고 싶을 때도, 새로운 일을 준비할 때도. 문샷 무료 라이브 전에 AI를 내 상황에 맞게 써보는 공간입니다.',
   welcomeBenefits: ['흩어진 업무 메모를 보고할 초안으로 정리하기', '막연한 아이디어에서 다음에 할 일 찾기', '내가 원하는 형식과 기준으로 AI 답변 다듬기'],
+  workTrial: DEFAULT_WORK_TRIAL,
   instructorName: '윤익 · 브랜디액션 팀',
   instructorIntro: '업무를 정리하고, 고객을 이해하고, 아이디어의 다음 단계를 구체화하는 과정까지. 윤익님과 브랜디액션 팀이 내가 하는 일과 원하는 결과를 알려주고, 반복해서 업무를 맡길 AI 직원을 만드는 방법을 알려드립니다.',
   videoUrl: '',
@@ -109,7 +112,7 @@ function requestTemplate(value: unknown, label: string): string {
 
 /** Strict input boundary used by both the administrator editor and the public reader. */
 export function validateArrivalConfig(value: unknown): ArrivalConfig {
-  const v = record(value, ['version', 'title', 'description', 'welcomeBenefits', 'instructorName', 'instructorIntro', 'videoUrl', 'liveTitle', 'startsAt', 'endsAt', 'liveUrl', 'audiences'], '무료 체험', ['welcomeBenefits']);
+  const v = record(value, ['version', 'title', 'description', 'welcomeBenefits', 'workTrial', 'instructorName', 'instructorIntro', 'videoUrl', 'liveTitle', 'startsAt', 'endsAt', 'liveUrl', 'audiences'], '무료 체험', ['welcomeBenefits', 'workTrial']);
   if (v.version !== 1) fail('무료 체험 설정 버전을 확인해 주세요.');
   const groups = record(v.audiences, audiences, '체험 대상', ['work']);
   const parsedAudiences = {} as Record<Audience, ArrivalAudienceConfig>;
@@ -146,6 +149,7 @@ export function validateArrivalConfig(value: unknown): ArrivalConfig {
     title: text(v.title, ARRIVAL_CONFIG_LIMITS.title, '무료 체험 제목'),
     description: text(v.description, ARRIVAL_CONFIG_LIMITS.description, '무료 체험 소개'),
     welcomeBenefits,
+    workTrial: validateWorkTrialConfig(Object.hasOwn(v, 'workTrial') ? v.workTrial : DEFAULT_WORK_TRIAL),
     instructorName: text(v.instructorName, ARRIVAL_CONFIG_LIMITS.instructorName, '강사 이름'),
     instructorIntro: text(v.instructorIntro, ARRIVAL_CONFIG_LIMITS.instructorIntro, '강사·팀 소개'),
     videoUrl,

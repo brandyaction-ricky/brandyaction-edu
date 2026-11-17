@@ -5,6 +5,8 @@ import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, Briefcas
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, googleCalendarUrl, calendarIcs, arrivalBackStep, type ArrivalState, type ArrivalStep} from './model';
 import {Scene as ArrivalScene} from './scene';
+import {WorkTrialPanel} from './work-trial-panel';
+import {DEFAULT_WORK_TRIAL} from './work-trial';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
 import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
@@ -39,6 +41,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
   const visited = useRef(false);
   const step = state.step;
+  const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
+  const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
   const chapter = step === 0 || step === 8 ? 0 : step === 7 ? 2 : 1;
   const content = {...audienceContent[state.audience], ...config.audiences[state.audience]};
   const answers = state.answers[state.audience];
@@ -128,7 +132,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={rooms[chapter]}>
     <a href="#arrival-content" className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label={`${chapters[chapter]} 공간`}>
-      <ArrivalScene room={rooms[chapter]} demoTitle={config.audiences[state.audience].goal} demoPhase={step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={() => setShowExample(true)} className={s.scene}/>
+      <ArrivalScene room={rooms[chapter]} demoTitle={state.audience === 'work' ? workConfig.title : config.audiences[state.audience].goal} demoPhase={state.audience === 'work' ? 'brief' : step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={() => setShowExample(true)} className={s.scene}/>
       <div className={s.worldShade}/>
     </div>
     <header className={s.header}>
@@ -139,8 +143,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     </header>
     <div className={s.place}><span className={s.placeDot}/>{chapters[chapter]}<small>{!sceneReady ? '공간을 준비하는 동안에도 시작할 수 있어요' : chapter === 0 ? 'AI에게 맡길 일 선택하기' : chapter === 1 ? '내 상황으로 AI 체험하기' : `${dateLabel} ${timeLabel} · 무료 라이브`}</small></div>
 
-    <section className={`${s.dock} ${step === 0 ? s.welcomeDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
-      <div className={s.dockTop}><span>{step === 0 ? '문샷 캠퍼스에 오신 것을 환영합니다' : step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span>{step > 0 && <button type="button" className={s.back} onClick={() => go(arrivalBackStep(state))}><ArrowLeft size={14}/>이전</button>}</div>
+    <section className={`${s.dock} ${step === 0 ? s.welcomeDock : ''} ${workActive ? s.workDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
+      {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
+        onChange={workTrial => update({workTrial, experience: workTrial.secondConfirmed ? 'self-reported' : 'none'})}
+        onExit={() => go(8)} onLive={() => go(7)}/> : <>
+      <div className={s.dockTop}><span>{step === 0 ? '문샷 캠퍼스에 오신 것을 환영합니다' : step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span>{step > 0 && <button type="button" className={s.back} onClick={() => go(step === 7 && state.audience === 'work' && state.workTrial.role ? 1 : arrivalBackStep(state))}><ArrowLeft size={14}/>이전</button>}</div>
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
         {step === 0 && <>
           <p className={s.welcomeEyebrow}>문샷 캠퍼스 · 무료 라이브 사전 체험</p>
@@ -191,7 +198,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           {title(config.liveTitle)}
           <div className={s.ticket}><div className={s.ticketHead}><span>MOONSHOT LIVE</span><span>무료 라이브</span></div><div className={s.ticketDate}><strong>{dateNumber}</strong><div>{weekday}<b>{timeLabel}</b><small>한국 시간</small></div></div><div className={s.ticketFoot}>{config.instructorName}</div></div>
           <p className={s.calendarIntro}>라이브 일정을 캘린더에 저장하세요.<br/><strong>{config.liveUrl ? '저장한 일정에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 링크는 카톡방에서 안내해드려요.'}</strong></p>
-          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{content.bridge}</p><p>{config.instructorIntro}</p>{config.videoUrl && <a className={s.textButton} href={config.videoUrl} target="_blank" rel="noreferrer">강사·강의 소개 영상 보기<ArrowUpRight size={16}/></a>}</div></details>
+          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p><p>{config.instructorIntro}</p>{config.videoUrl && <a className={s.textButton} href={config.videoUrl} target="_blank" rel="noreferrer">강사·강의 소개 영상 보기<ArrowUpRight size={16}/></a>}</div></details>
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}<p className={s.fine}>{!config.endsAt && '종료 시각은 안내 예정이에요. 지금은 시작 시각을 저장합니다. '}캘린더 화면에서 마지막 ‘저장’ 또는 ‘추가’를 눌러주세요.</p>
         </>}
         {copyFallback && <div className={s.copyFallback}><label>직접 복사할 요청문<textarea ref={fallbackRef} readOnly value={copyFallback}/></label>{step === 3 && <button type="button" className={s.secondary} onClick={() => {update({handoff: 'copied'}); setCopyFallback(''); setNotice('이제 평소 쓰는 AI에 붙여넣어 주세요.');}}>직접 복사했어요<Check size={15}/></button>}</div>}
@@ -206,6 +213,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 5 && <button type="button" className={s.primary} onClick={() => go(7)}>무료 라이브 일정 보기<ArrowRight size={18}/></button>}
         {step === 7 && <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer"><CalendarDays size={18}/>Google 캘린더<ArrowUpRight size={14}/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={18}/>아이폰·기타 캘린더<ArrowRight size={14}/></button></div>}
       </footer>}
+      </>}
     </section>
     <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>
     <dialog ref={exampleDialog} className={s.exampleDialog} onCancel={() => setShowExample(false)} aria-labelledby="arrival-example-title">
