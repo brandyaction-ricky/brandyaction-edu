@@ -12,6 +12,7 @@ import { registrationCost } from '@/lib/landing-campaign-management';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';
 import { AdTypeControl, type Classify } from './ad-type-control';
 import { PerformanceInsights, RevenueSummary } from './performance-insights';
+import { AdDailyTrend } from './ad-daily-trend';
 const autoRevenue = (report: DashboardReport) => report.financial_mode === 'orders' || !!report.ui && 'insights' in report.ui;
 export { sortPerformance } from '@/lib/landing-operations-phase1';
 
@@ -135,6 +136,7 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
       <AdminMetric label="Meta 링크 클릭" value={metaValue(b.meta_link_clicks)} note="광고에서 링크를 누른 횟수"/>
       <AdminMetric label="방문 → 클릭" value={percentage(funnelRate(clicks, visits))} note="신청 버튼을 누른 세션 비율"/>
     </AdminMetricGrid>
+    <AdDailyTrend report={report} compare={compare} onRetry={onRetry}/>
     <details className="tracking-metric-details"><summary>상세 지표 · Meta 성과 · 누적 성과</summary>
     <AdminMetricGrid columns={8} className="tracking-kpis">
       <AdminMetric label="고유 방문자" value={count(hasVisits ? b.visitors : null)} note="중복 제외" change={compare && <Compare current={b.visitors} previous={a?.visitors} hasData={previousHasVisits}/>}/>
