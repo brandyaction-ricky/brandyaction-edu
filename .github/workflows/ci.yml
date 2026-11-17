@@ -38,14 +38,14 @@ jobs:
         run: |
           head_ref="$HEAD_REF"
           if [ "$head_ref" = "codex/edu-n6-current-release-20261117" ]; then
-            expected_main=7ad2b223d027c418c6027ed250154cb3175989dd
+            expected_main=a0236a627190301ab4fe8a83eba72f1998a33f78
             live_base=d19f53dc4a56c480d1536d9d9120f44792517748
-            release_payload=501399998fcd30a06d76a73b498ddea275f8282d
+            release_payload=cb70aa2b1ad412efa67bcffe50e3ff0188e4c2c0
             test "$(git rev-parse HEAD^1)" = "$expected_main"
             git merge-base --is-ancestor "$expected_main" HEAD
             git merge-base --is-ancestor "$live_base" HEAD
             git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
-            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore ':(exclude)supabase/migrations/20261117200000_campus_community_owner_controls.sql'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-coordinator.yml .github/workflows/release-authorization.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore ':(exclude)supabase/migrations/20261117200000_campus_community_owner_controls.sql'
             git diff --exit-code "$live_base" HEAD -- supabase/migrations/20261117200000_campus_community_owner_controls.sql
             git diff --exit-code "$live_base" HEAD -- app features lib public package.json package-lock.json ':(exclude)app/ui/final/diagnosis-management.tsx' ':(exclude)lib/diagnosis-admin-service.ts'
             echo 'Verified current production preserved; only validated N6 recovery and existing main release controls included.'
