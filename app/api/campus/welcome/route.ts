@@ -10,7 +10,7 @@ import {tourAvatar} from '@/features/campus/tour/appearance';
 async function access(enrollmentId:unknown){
  if(process.env.EDU_CAMPUS_ENABLED!=='true')fail('공간이 준비 중입니다.',404);
  const user=await getAuthenticatedUser();if(!user||user.status!=='active')fail('로그인이 필요합니다.',401);if(!uuid(enrollmentId))fail('수강권을 확인해 주세요.');
- const db=await createClient(),r=await db.from('enrollments').select('id,user_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at,courses(status,archived_at),cohorts(archived_at)').eq('id',enrollmentId).eq('user_id',user.id).maybeSingle();
+ const db=await createClient(),r=await db.from('enrollments').select('id,user_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at,courses(status,archived_at),cohorts!enrollments_cohort_id_fkey(archived_at)').eq('id',enrollmentId).eq('user_id',user.id).maybeSingle();
  if(r.error)throw r.error;const e=r.data,c=e&&(Array.isArray(e.courses)?e.courses[0]:e.courses),h=e&&(Array.isArray(e.cohorts)?e.cohorts[0]:e.cohorts);
  if(!e||!campusEntry(e,user.id,e.cohort_id)||c?.status!=='published'||c.archived_at||!h||h.archived_at)fail('이용 가능한 수강권이 필요합니다.',403);
  return {user,db};
