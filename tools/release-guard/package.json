@@ -1,0 +1,12 @@
+{
+  "name": "brandyaction-release-guard-qa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "test:database": "node db-compatibility.mjs"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.11.0-beta.19"
+  }
+}

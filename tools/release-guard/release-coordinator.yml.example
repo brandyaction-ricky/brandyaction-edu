@@ -1,0 +1,44 @@
+# Preparation only. NOT installed under .github/workflows, no credentials supplied.
+# Activate in ONE designated coordinator repository after configuration approval.
+# Do NOT copy this into every product repository: GitHub concurrency is repo-scoped.
+name: Production coordinator validation
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Protected release request identifier (not an arbitrary shell command)
+        required: true
+        type: string
+concurrency:
+  group: brandyaction-shared-production
+  cancel-in-progress: false
+  queue: max
+permissions:
+  contents: read
+jobs:
+  validate:
+    environment: production-release-review
+    # One dedicated persistent runner: file locks survive job crashes and cover
+    # product repositories that share a DB. An ephemeral runner is insufficient.
+    runs-on: [self-hosted, brandyaction-release-coordinator]
+    timeout-minutes: 30
+    steps:
+      - name: Confirm reviewed activation
+        env:
+          ENABLED: ${{ vars.RELEASE_COORDINATOR_ENABLED }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          test "$ENABLED" = true
+          [[ "$REQUEST_ID" =~ ^[a-zA-Z0-9_-]{1,80}$ ]]
+      # Read plans/evidence from the protected coordinator registry, never the PR
+      # working tree. The reviewed installed entry point must acquire the same
+      # persistent lock around validation, SQL, promotion AND post-deploy checks.
+      - name: Validate protected request without production writes
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          /opt/brandyaction-release/bin/validate-request "$REQUEST_ID"
+      - name: Keep production activation closed
+        run: |
+          echo 'Validation scaffold only: reviewed production adapter, protected evidence registry, credentials and baseline alignment are not installed.'
+          exit 1
