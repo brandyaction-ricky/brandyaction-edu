@@ -37,6 +37,22 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/release-guard-20261117" ]; then
+            expected_main=7c79ec8a3321a018c714108d3ffb4f01819f1ae7
+            live_base=0db98905cf4caab945e0c2c5a321af906063eb5e
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$live_base" HEAD
+            git diff --exit-code "$live_base" HEAD -- app features lib public package.json package-lock.json
+            while IFS= read -r path; do
+              case "$path" in
+                tools/release-guard/*|tests/release-guard.test.mjs|tests/diagnosis-partial-refund-database.test.mjs|supabase/migrations/20261110101544_n6_partial_refund_access.sql|.github/workflows/ci.yml|.github/workflows/release-db-contract.yml|vercel.json|.vercelignore) ;;
+                *) echo "Unexpected production alignment change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$live_base" HEAD)
+            echo 'Verified current production source preserved; activation remains disabled.'
+            exit 0
+          fi
           if [ "$head_ref" = "develop" ]; then
             exit 0
           fi

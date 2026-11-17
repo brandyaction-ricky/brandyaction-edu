@@ -37,8 +37,13 @@ jobs:
         env:
           REQUEST_ID: ${{ inputs.request_id }}
         run: |
-          /opt/brandyaction-release/bin/validate-request "$REQUEST_ID"
-      - name: Keep production activation closed
+          node /opt/brandyaction-release/tools/release-guard/run-request.mjs \
+            /var/lib/brandyaction-release/config.json "$REQUEST_ID" --preflight
+      # Installing this step and enabling the protected config requires approval.
+      # No checkout of PR code occurs on the credential-bearing runner.
+      - name: Execute signed request through persistent coordinator
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
         run: |
-          echo 'Validation scaffold only: reviewed production adapter, protected evidence registry, credentials and baseline alignment are not installed.'
-          exit 1
+          node /opt/brandyaction-release/tools/release-guard/run-request.mjs \
+            /var/lib/brandyaction-release/config.json "$REQUEST_ID" --execute

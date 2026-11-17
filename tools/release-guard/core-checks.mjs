@@ -10,7 +10,7 @@ const git=(cwd,...args)=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
 const n6=(await readdir(join(myin,'tests'))).filter(f=>/^n30-edu-.*\.test\.mjs$/.test(f)).sort().map(f=>'tests/'+f);
 if(!n6.includes('tests/n30-edu-legacy-vocabulary.test.mjs'))throw Error('N6 legacy report regression test missing');
 const groups=[
-  {id:'release-guard',cwd:edu,files:['tools/release-guard/gate.test.mjs','tools/release-guard/migrations.test.mjs']},
+  {id:'release-guard',cwd:edu,files:['tests/release-guard.test.mjs']},
   {id:'enrollment-welcome',cwd:edu,files:['tests/campus-entry.test.mjs','tests/campus-welcome-account.test.mjs']},
   {id:'lesson-access',cwd:edu,files:['tests/preserved-lesson-access.test.mjs']},
   {id:'partial-refund-n6',cwd:edu,files:['tests/diagnosis-partial-refund-database.test.mjs']},

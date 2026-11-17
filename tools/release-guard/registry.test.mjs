@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {generateKeyPairSync,sign} from 'node:crypto';
+import {mkdtemp,writeFile,symlink,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {verifyEnvelope,privateFile} from './registry.mjs';
+import {digest} from './gate.mjs';
+const {publicKey,privateKey}=generateKeyPairSync('ed25519');
+const envelope=(change=()=>{})=>{const plan={migrations:[]};const payload={plan,expiresAt:Date.now()+60000,approvals:{code:digest(plan)}};change(payload);return {payload,signature:sign(null,Buffer.from(JSON.stringify(payload)),privateKey).toString('base64')};};
+test('signed exact request is accepted',()=>assert.ok(verifyEnvelope(envelope(),publicKey)));
+test('request edits invalidate approval',()=>{const e=envelope();e.payload.plan.candidate='other';assert.throws(()=>verifyEnvelope(e,publicKey),/signature/);});
+test('expired approval is rejected',()=>assert.throws(()=>verifyEnvelope(envelope(p=>p.expiresAt=0),publicKey),/expired/));
+test('SQL needs a separate exact approval',()=>assert.throws(()=>verifyEnvelope(envelope(p=>{p.plan.migrations=[{}];p.approvals.code=digest(p.plan);}),publicKey),/SQL approval/));
+test('registry refuses public files and symlinks',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'registry-test-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ await writeFile(join(root,'public'),'value',{mode:0o644});await assert.rejects(privateFile(join(root,'public')),/owner-only/);
+ await writeFile(join(root,'private'),'value',{mode:0o600});await symlink(join(root,'private'),join(root,'link'));await assert.rejects(privateFile(join(root,'link')));
+ assert.equal(await privateFile(join(root,'private')),'value');
+});

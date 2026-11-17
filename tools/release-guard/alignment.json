@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-11-17T01:39:06.258Z",
+  "project": "prj_sZrdpSZEC9IxKLLzEDGlAK17WWPx",
+  "deployment": "dpl_FSFWsxjvbFCSwrMCCPus9jBmF1xP",
+  "liveSource": "0db98905cf4caab945e0c2c5a321af906063eb5e",
+  "formalBranch": "main",
+  "formalBase": "7c79ec8a3321a018c714108d3ffb4f01819f1ae7",
+  "matchedUploadedSources": 2267,
+  "sourceMismatches": 0,
+  "sourceFingerprint": "16e33b02c10547e2f926fb6a5113def3cd225d02e41bfa91ad51952821d933d9",
+  "runtimePreserved": true,
+  "productionChanged": false
+}

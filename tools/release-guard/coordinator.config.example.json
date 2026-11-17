@@ -1,0 +1,28 @@
+{
+  "mode": "production",
+  "executionEnabled": false,
+  "repository": "brandyaction-ricky/brandyaction-edu",
+  "project": "prj_sZrdpSZEC9IxKLLzEDGlAK17WWPx",
+  "team": "team_zbCoFaVz6r16s0XektcCTJea",
+  "branch": "main",
+  "productionHost": "brandyaction-edu.com",
+  "vercelOrigin": "https://api.vercel.com",
+  "githubOrigin": "https://api.github.com",
+  "smokeUrl": "https://brandyaction-edu.com/api/health",
+  "actionsAppId": 15368,
+  "requiredChecks": [
+    "code-checks", "Browser shard 1/3", "Browser shard 2/3", "Browser shard 3/3",
+    "payment-widget", "Campus browser shard 1/8", "Campus browser shard 2/8",
+    "Campus browser shard 3/8", "Campus browser shard 4/8", "Campus browser shard 5/8",
+    "Campus browser shard 6/8", "Campus browser shard 7/8", "Campus browser shard 8/8",
+    "verify", "database-contract"
+  ],
+  "checkout": "/opt/brandyaction-release/readonly/edu",
+  "dbConnectionFile": "/var/lib/brandyaction-release/secrets/edu-db",
+  "vercelTokenFile": "/var/lib/brandyaction-release/secrets/vercel",
+  "githubTokenFile": "/var/lib/brandyaction-release/secrets/github-read",
+  "approvalPublicKeyFile": "/var/lib/brandyaction-release/approval-public.pem",
+  "requestRoot": "/var/lib/brandyaction-release/requests",
+  "journalRoot": "/var/lib/brandyaction-release/journal",
+  "lockRoot": "/var/lib/brandyaction-release/shared-lock"
+}

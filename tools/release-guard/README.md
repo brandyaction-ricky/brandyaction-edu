@@ -4,9 +4,9 @@ Company policy is in [the OS canonical document](https://brandyaction-os.vercel.
 
 ## State
 
-**Preparation / isolated QA only. No production adapter, runner, protected credential registry, GitHub environment protection or Vercel bypass restriction is installed.** Nothing in this branch intercepts existing Codex/Claude/CLI/dashboard deployments. Do not call it an active deployment lock.
+**Implementation / isolated integration QA only. Production execution remains disabled.** The provider adapter and signed-request runner are implemented and exercised against a real local PostgreSQL database and a loopback provider simulator. Production credentials, dedicated runner installation, GitHub environment protection and Vercel bypass restrictions are not activated. Nothing in this branch intercepts existing Codex/Claude/CLI/dashboard deployments.
 
-`gate.mjs` provides the shared validation + transaction coordinator interface. `verify-plan.mjs` is offline validation only, and accepts no `--apply` mode. `release-coordinator.yml.example` deliberately lives outside `.github/workflows` and ends closed. The persistent coordinator installation and provider-specific mutation adapters need review with the actual activation configuration. Synthetic adapters in tests are not production integrations.
+`run-request.mjs` connects the signed registry, persistent lock, journal and fixed GitHub/Vercel/PostgreSQL operations. `verify-plan.mjs` remains offline validation only. `release-coordinator.yml.example` lives outside `.github/workflows`; the production config example has `executionEnabled: false`. Installing the entry point and binding production credentials require later approval. Provider writes in integration QA are simulated HTTP, not hosted deployment tests.
 
 ## Run preparation checks
 
@@ -16,6 +16,7 @@ Requires Node 22+, the root EDU dependencies, a MYIN checkout with its dependenc
 npm ci --prefix tools/release-guard
 node --test tools/release-guard/gate.test.mjs tools/release-guard/migrations.test.mjs
 node tools/release-guard/core-checks.mjs /absolute/path/to/myin-checkout
+node tools/release-guard/integration.mjs
 ```
 
 The pinned embedded PostgreSQL package rehydrates its required local symlinks. It does not create OS users. PostgREST 16.6 must be installed at `tools/release-guard/.bin/postgrest` (or an explicitly supplied `POSTGREST_BIN`), from the official [release](https://github.com/PostgREST/postgrest/releases/tag/v16.6). On macOS the harness uses the bundled PostgreSQL libpq directory. The processes listen on random loopback ports and the temporary DB is removed after stopping them. The generated `.artifacts` evidence is ignored and contains counts, not customer data.
@@ -39,11 +40,19 @@ The source baseline `0db98905cf4caab945e0c2c5a321af906063eb5e` did not contain t
 
 ## Activation review checklist (not executed)
 
-1. Resolve EDU production's missing Git metadata and align a formal release branch with the actual deployed source. Never use stale `main` to overwrite the live campus changes. `targets.json` intentionally leaves its release branch unset.
+1. Review the alignment PR before merging main: all 2,267 uploaded sources from the live CLI deployment match `0db98905`; see `alignment.json`. The merge candidate preserves the entire runtime tree while adding main ancestry. Actual main is unchanged. The first transition may use a signed baseline source attestation bound to deployment ID and freshly checked source-tree fingerprint; subsequent Git deployments must carry their exact SHA.
 2. Select ONE coordinator repository/runner for all participating product repos and shared DB resources. Review a dedicated persistent runner and protected evidence/approval registry. Repository-level GitHub concurrency alone does not lock other repos or CLI calls. The file lock works only when all writes run through that one persistent coordinator; it is not a distributed lease.
-3. Install a reviewed, least-privileged production adapter using `coordinate()`. It must obtain independent provider observations, applied SQL checksums, trusted check results and approvals bound to `digest(plan)`, never user-supplied JSON booleans. Candidate code must not run in the credential-bearing coordinator. Only fixed reviewed deployment/SQL actions may run.
+3. Install the reviewed runner with owner-only config, credential files, public approval key, request registry and journal outside every product checkout. The approval signing key must remain outside the credential-bearing runner. Production origins are fixed; rehearsal permits loopback only. The adapter reads live Git head, deployment identity, structural DB fingerprint and migration history. It verifies exact GitHub Actions app/check/SHA results plus a signed evidence bundle. Candidate scripts are never executed on the privileged runner; Git is used only to inspect ancestry and read approved SQL blobs.
 4. Review provider-specific code/SQL/settings approval scopes and migration transaction/rollback behavior. Enforce old-code/new-DB compatibility before any SQL change. Keep credentials out of plans and artifacts.
 5. Configure protected environment/reviewer and restrict production credentials, CLI/dashboard promotion and Git automatic deployments to this path. Existing MYIN main automatic deployment must not be switched off until the replacement is verified and approved. Inventory unavoidable admin bypass rights as residual risk.
 6. Run the actual coordinator with a non-production disposable target, test interrupted operations and recovery, then request the exact production activation settings approval. Until then the guard is an executable preparation, not an operational guarantee.
+
+## Provider and DB boundaries
+
+The adapter promotes an already-built, READY production-target deployment with the exact approved SHA. It refuses to promote a preview-target build that could contain DEV configuration. Build creation, main merge, production configuration changes and automatic rollback are not runner operations. SQL is read from the approved immutable commit, content-hashed, applied in one transaction with the Supabase migration ledger, and never replayed if its version is already present. Transaction-controlling migrations outside simple outer BEGIN/COMMIT require separate review. Structural fingerprints include public/edu_private columns, constraints, RLS, grants, functions, indexes, views and migration history; they are not a backup and do not cover external services/extensions/configuration. Those need separate checks when touched.
+
+The production signing workflow, DB role grants and credential restriction remain installation decisions, not inferred approvals. Signed test evidence is required even when GitHub reports green. A complete prior migration checksum reconciliation and the exact old/new schema matrix must be supplied per release; the new integration fixture does not replace that work. Post-deploy checking currently proves deployment identity and `/api/health`; authenticated customer-path checks remain a separate release requirement.
+
+Production settings proposed for review: one persistent coordinator; a protected approval environment; 15 required EDU check jobs and pinned cross-product evidence; read-only GitHub metadata credentials; a Vercel credential scoped as narrowly as the account supports; separate read-only/preflight and explicitly approved migration authority; owner-only secret/registry paths; direct Git/CLI/dashboard deployment bypass restrictions. No setting or credential has been changed by this branch. Reverting runner activation does not revert SQL or deployment effects; preserve the journal and lock until an interrupted run is reconciled.
 
 References: [GitHub concurrency (repository scope, pending queue)](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), [PostgREST relationship disambiguation](https://docs.postgrest.org/en/stable/references/api/resource_embedding.html#foreign-key-joins-on-multiple-foreign-key-relationships).

@@ -42,3 +42,5 @@ jobs:
           tests/diagnosis-partial-refund-database.test.mjs
       - name: Reproduce schema compatibility through real REST
         run: node tools/release-guard/db-compatibility.mjs
+      - name: Run isolated coordinator integration
+        run: node tools/release-guard/integration.mjs
