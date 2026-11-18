@@ -9,6 +9,8 @@ async function moduleFrom(relative) {
 }
 const content = await moduleFrom('../features/campus/arrival/content.ts');
 const model = await moduleFrom('../features/campus/arrival/model.ts');
+const office = await moduleFrom('../features/campus/arrival/office-demo.ts');
+const officeCase = await moduleFrom('../features/campus/arrival/office-demo-case.ts');
 
 test('each visitor gets an immediately usable request based on their own two answers', () => {
   const answers = {a: '임시 입력 A — 나의 상품·고객·경험', b: '임시 입력 B — 나의 장점·질문·상황'};
@@ -313,4 +315,92 @@ test('a personal request reuses only the exact, explicitly selected company rule
   assert.ok(withRule.startsWith(request));
   assert.equal(withRule.split(rule).length - 1, 1);
   assert.equal(model.addPersonalRequestRule(withRule, rule), withRule);
+});
+
+test('case revisions follow the displayed review copy while cosmetic edits preserve an approval', () => {
+  const demo = office.DEFAULT_OFFICE_DEMO;
+  const revision = officeCase.officeCaseRevision(demo);
+  const displayed = officeCase.officeCaseContent(demo);
+  assert.equal(officeCase.officeCaseRevision(displayed), revision, 'effective legacy defaults and their displayed replacement are the same case');
+  for (const field of ['greeting', 'deskLabel', 'teamNote']) {
+    assert.equal(officeCase.officeCaseRevision({...demo, [field]: '주변 안내만 바꿈'}), revision);
+  }
+  for (const field of ['brief', 'material', 'draft']) {
+    assert.notEqual(officeCase.officeCaseRevision({...demo, [field]: '검토할 본문을 바꿈'}), revision);
+  }
+  for (const field of ['feedback', 'revised', 'rule', 'approvedAnswer']) {
+    const edited = structuredClone(demo);
+    edited.choices[1][field] = '두 번째 선택의 내용을 바꿈';
+    assert.notEqual(officeCase.officeCaseRevision(edited), revision);
+  }
+  const approved = {...model.initialArrivalState(), deskReviewRevision: revision, deskReview: {phase: 'approved', choice: 1}};
+  assert.strictEqual(model.reconcileArrivalOfficeCase(approved, revision), approved);
+  assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(approved)), {...approved, station: 1});
+});
+
+test('an edited case resets only its review and dependent corridor stop, preserving personal drafts', () => {
+  const before = officeCase.officeCaseRevision(office.DEFAULT_OFFICE_DEMO);
+  const after = officeCase.officeCaseRevision({...office.DEFAULT_OFFICE_DEMO, draft: '관리자가 바꾼 새 초안'});
+  for (const station of [4, 5]) {
+    const state = {...model.initialArrivalState(), station, visitorAvatar: 'male-d', proposalSent: true,
+      deskReviewRevision: before, deskReview: {phase: 'approved', choice: 1}, companyRule: 1};
+    state.answers.business = {a: '내 상품 설명', b: '내가 직접 쓴 장점'};
+    state.workTrial.role = '내가 만든 개인 AI 직원';
+    state.workTrial.firstTask = '내 첫 업무 메모';
+    const changed = model.reconcileArrivalOfficeCase(model.parseArrivalState(model.serializeArrivalState(state)), after);
+    assert.equal(changed.station, 3);
+    assert.deepEqual(changed.deskReview, {phase: 'draft', choice: 0});
+    assert.equal(changed.companyRule, null);
+    assert.equal(changed.deskReviewRevision, after);
+    assert.equal(changed.visitorAvatar, state.visitorAvatar);
+    assert.equal(changed.proposalSent, true, 'the separate support exercise stays completed');
+    assert.deepEqual(changed.answers, state.answers);
+    assert.deepEqual(changed.workTrial, state.workTrial);
+    assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(changed)), changed);
+  }
+});
+
+test('legacy case approvals are rechecked once without changing unrelated navigation or copied requests', () => {
+  const revision = officeCase.officeCaseRevision(office.DEFAULT_OFFICE_DEMO);
+  for (const [step, station] of [[0, 1], [0, 2], [0, 3], [0, 6], [0, 7], [3, 6], [5, 6], [7, 7]]) {
+    const legacy = {...model.initialArrivalState(), step, station, audience: 'business', handoff: 'copied',
+      experience: 'self-reported', deskReview: {phase: 'approved', choice: 1}, companyRule: 1};
+    delete legacy.deskReviewRevision;
+    legacy.answers.business = {a: '원래 상품', b: '원래 장점'};
+    const changed = model.reconcileArrivalOfficeCase(model.parseArrivalState(JSON.stringify(legacy)), revision);
+    assert.equal(changed.step, step);
+    assert.equal(changed.station, station);
+    assert.equal(changed.handoff, 'copied');
+    assert.equal(changed.experience, 'self-reported');
+    assert.deepEqual(changed.answers.business, legacy.answers.business);
+    assert.deepEqual(changed.deskReview, {phase: 'draft', choice: 0});
+    assert.strictEqual(model.reconcileArrivalOfficeCase(changed, revision), changed, 'the migration happens only once');
+  }
+  for (const station of [4, 5]) {
+    const legacy = {...model.initialArrivalState(), station, deskReview: {phase: 'approved', choice: 1}};
+    delete legacy.deskReviewRevision;
+    assert.equal(model.reconcileArrivalOfficeCase(model.parseArrivalState(JSON.stringify(legacy)), revision).station, 3);
+  }
+});
+
+test('removing a selected case rule rechecks only the personal prompt that used it', () => {
+  const revision = officeCase.officeCaseRevision(office.DEFAULT_OFFICE_DEMO);
+  const before = {...model.initialArrivalState(), step: 3, station: 6, audience: 'business', companyRule: 0,
+    consentedCompanyRule: '직원이 완성한 결과물을 먼저 보여준다.', handoff: 'copied', experience: 'self-reported'};
+  before.answers.business = {a: '내 상품', b: '내 장점'};
+  const changed = model.reconcileArrivalOfficeCase(before, revision);
+  assert.equal(changed.companyRule, null);
+  assert.equal(changed.consentedCompanyRule, '');
+  assert.equal(changed.handoff, 'ready');
+  assert.equal(changed.experience, 'none');
+  assert.equal(changed.step, 3);
+  assert.deepEqual(changed.answers, before.answers);
+  for (const unrelated of [{...before, audience: 'work'}, {...before, mode: 'example', experience: 'example-viewed'}]) {
+    const next = model.reconcileArrivalOfficeCase(unrelated, revision);
+    assert.equal(next.handoff, unrelated.handoff);
+    assert.equal(next.experience, unrelated.experience);
+  }
+  for (const invalid of [42, 'unrecognized', 'office-case-v1-' + 'a'.repeat(100)]) {
+    assert.equal(model.parseArrivalState(JSON.stringify({...before, deskReviewRevision: invalid})).deskReviewRevision, '');
+  }
 });

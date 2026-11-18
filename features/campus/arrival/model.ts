@@ -26,10 +26,11 @@ export type ArrivalState = {
   revision: Revision;
   extra: string;
   workTrial: WorkTrialState;
+  deskReviewRevision: string;
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -66,6 +67,9 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     state.handoff = value.handoff === 'copied' ? 'copied' : 'ready';
     if (isRevision(value.revision)) state.revision = value.revision;
     state.extra = answer(value.extra).slice(0, REVISION_LIMIT);
+    if (typeof value.deskReviewRevision === 'string' && /^office-case-v1-[a-z0-9]{1,7}$/.test(value.deskReviewRevision)) {
+      state.deskReviewRevision = value.deskReviewRevision;
+    }
     const desk = value.deskReview;
     if (object(desk) && (desk.phase === 'feedback' || desk.phase === 'approved') && (desk.choice === 0 || desk.choice === 1)) {
       state.deskReview = {phase: desk.phase, choice: desk.choice};
@@ -92,6 +96,22 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
 }
 export function serializeArrivalState(state: ArrivalState): string {
   return JSON.stringify(parseArrivalState(JSON.stringify(state)));
+}
+
+/** Revising the example invalidates its approval, never the visitor's independent drafts. */
+export function reconcileArrivalOfficeCase(state: ArrivalState, revision: string): ArrivalState {
+  if (state.deskReviewRevision === revision) return state;
+  const promptChanged = state.mode === 'personal' && state.audience !== 'work'
+    && state.companyRule !== null && state.consentedCompanyRule !== '';
+  return {
+    ...state,
+    deskReviewRevision: revision,
+    deskReview: {phase: 'draft', choice: 0},
+    companyRule: null,
+    consentedCompanyRule: '',
+    station: state.step === 0 && (state.station === 4 || state.station === 5) ? 3 : state.station,
+    ...(promptChanged ? {handoff: 'ready', experience: 'none'} as const : {}),
+  };
 }
 
 /** Opt-in applies to the exact rule the visitor saw, even if an administrator edits the event later. */

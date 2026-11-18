@@ -25,3 +25,13 @@ export function officeCaseContent(demo: OfficeDemoConfig) {
     choices,
   };
 }
+
+/** A local change detector for the text being reviewed, not an authorization token. */
+export function officeCaseRevision(demo: OfficeDemoConfig): string {
+  const {brief, material, draft, choices} = officeCaseContent(demo);
+  const copy = JSON.stringify([brief, material, draft, choices.map(({feedback, revised, rule, approvedAnswer}) =>
+    [feedback, revised, rule, approvedAnswer])]);
+  let hash = 2166136261;
+  for (let index = 0; index < copy.length; index++) hash = Math.imul(hash ^ copy.charCodeAt(index), 16777619);
+  return `office-case-v1-${(hash >>> 0).toString(36)}`;
+}

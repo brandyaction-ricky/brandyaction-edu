@@ -1,9 +1,9 @@
 'use client';
 
-import {useEffect, useEffectEvent, useRef, useState} from 'react';
+import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
+import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
 import {CorridorScene} from './corridor-scene';
 import {HallProgram} from './hall-program';
 import {CorridorPanel} from './corridor-panel';
@@ -11,7 +11,7 @@ import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
 import {VisitorAvatar} from './visitor-avatar';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
-import {officeCaseContent} from './office-demo-case';
+import {officeCaseContent, officeCaseRevision} from './office-demo-case';
 import {DEFAULT_OFFICE_DEMO} from './office-demo';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
@@ -30,7 +30,9 @@ function ResultExample({text}: {text: string}) {
 }
 
 export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false}: {config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean}) {
-  const [state, setState] = useState<ArrivalState>(initialArrivalState);
+  const [savedState, setState] = useState<ArrivalState>(initialArrivalState);
+  const caseRevision = officeCaseRevision(config.officeDemo ?? DEFAULT_OFFICE_DEMO);
+  const state = useMemo(() => reconcileArrivalOfficeCase(savedState, caseRevision), [savedState, caseRevision]);
   const [hydrated, setHydrated] = useState(false);
   const [storageBlocked, setStorageBlocked] = useState(false);
   const [notice, setNotice] = useState('');
@@ -174,7 +176,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     deskButton.current?.focus();
   }
 
-  function update(patch: Partial<ArrivalState>) {setState(value => ({...value, ...patch}));}
+  function update(patch: Partial<ArrivalState>) {setState(value => ({...reconcileArrivalOfficeCase(value, caseRevision), ...patch}));}
   function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station' | 'hallReturnStep'> = {}) {
     resetWalkAssist();
     setDeskOpen(false);
@@ -191,7 +193,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setNotice(''); setCopyFallback('');
   }
   function answer(field: keyof Answers, value: string) {
-    setState(previous => ({...previous, experience: 'none', handoff: 'ready', answers: {...previous.answers, [previous.audience]: {...previous.answers[previous.audience], [field]: value}}}));
+    setState(previous => ({...reconcileArrivalOfficeCase(previous, caseRevision), experience: 'none', handoff: 'ready', answers: {...previous.answers, [previous.audience]: {...previous.answers[previous.audience], [field]: value}}}));
   }
   async function copy(text: string, handoff = false) {
     if (!text) return;
