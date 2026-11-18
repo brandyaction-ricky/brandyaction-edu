@@ -30,4 +30,4 @@ export function matchesAnswerFile(bytes: Uint8Array, spec: AnswerFileSpec): bool
     default: return false;
   }
 }
-export type AnswerFileContext = { ongoingReview?: OngoingReviewSelection; lessonId: string; enrollmentId: string; revision: string };
+export type AnswerFileContext = { reviewCohortId?: string; reviewStudent?: boolean; ongoingReview?: OngoingReviewSelection; lessonId: string; enrollmentId: string; revision: string };

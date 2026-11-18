@@ -37,6 +37,22 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-ad-daily-release-20261118" ]; then
+            expected_main=c9f8776b43aa56be14ec92dfe8fe801b7c953bb9
+            release_payload=0d7b11f0d3cca2b1e66105abf9bf66f05fca1851
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/ui/landing/ad-daily-trend.tsx|app/ui/landing/performance-dashboard.tsx|app/ui/landing/tracking-admin.css|lib/landing-ad-trends.ts|lib/landing-ad-trends-server.ts|lib/landing-performance.ts|lib/landing-performance-ui-server.ts|tests/landing-ad-trends.test.mjs|tests/browser/landing-ad-trends.spec.ts) ;;
+                *) echo "Unexpected daily advertising release change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified daily advertising metrics payload; current campus, database, environment and central release controls preserved.'
+            exit 0
+          fi
           if [ "$head_ref" = "codex/campus-qa3-release-20261117" ]; then
             expected_main=f6e84360ac89f8645fc2c2a0a5899708f8708f25
             release_payload=6b21e1013329459f936b6f071c077e7ddb2d22dc
@@ -107,6 +123,17 @@ jobs:
             exit 0
           fi
           if [ "$head_ref" = "develop" ]; then
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/staff-curriculum-review-20261118" ]; then
+            expected_main=295b6f13ce768d04c160ee5524b33d0c6b1fe57f
+            release_payload=7c009ed66ac225f43bdce466239d07a41a771d50
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            echo 'Verified the pinned read-only curriculum review payload.'
             exit 0
           fi
 

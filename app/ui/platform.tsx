@@ -1,4 +1,5 @@
 "use client";
+import { StaffCurriculumReview } from './final/staff-curriculum-review';
 import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
 import { rememberAccountHint } from '@/lib/recent-account-hint';
 import { readJson } from '@/lib/read-json';
@@ -304,10 +305,11 @@ export function Platform({
   const publicReadKey = JSON.stringify([routeKey, publicParamsString]);
   const data = admin ? (hasCurrentAdminRead ? loadedData : {}) : (loadedReadKey === publicReadKey ? loadedData : {});
   const catalogNow = useCatalogClock(data.cohorts || [], classList || path.length === 0 || path[0] === 'stories');
+  const staffCurriculumReview = learning && !!user && ['admin', 'staff'].includes(user.role) && path.length <= 3;
   const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
-  const questionProgression = useLessonProgression(learning ? path[1] || '' : '', learning && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
+  const questionProgression = useLessonProgression(learning ? path[1] || '' : '', learning && !staffCurriculumReview && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
   const questionGate = questionProgression.lessons?.find(item => item.lessonId === questionLesson?.id);
   const questionDayLabel = questionGate?.ongoing ? '지속 챌린지' : `${questionGate?.dayNumber ?? curriculumDay(data, questionLesson)}일차`;
   const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionDayLabel, t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
@@ -906,6 +908,8 @@ export function Platform({
         ongoingLesson={searchParams.get("ongoing") || ""}
       />
     );
+  else if (staffCurriculumReview)
+    body = <StaffCurriculumReview key={user!.id + ':' + path.join('/')} enrollmentId={path[1]} initialLesson={path[2] || ''}/>;
   else if (learning)
     body = (
       <Classroom
@@ -1172,7 +1176,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
-      {user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext} resumeLessons={resumeQuestionLessons}/>}
+      {!staffCurriculumReview && user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext} resumeLessons={resumeQuestionLessons}/>}
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
