@@ -21,7 +21,7 @@ function load(file) {
   });
   return exports;
 }
-const { parseSampleMin, periodActuals, funnelRate, sortPerformance } = load('lib/landing-operations-phase1.ts');
+const { parseSampleMin, periodActuals, funnelRate, sortPerformance, hasUnresolvedAdParameter, suggestAdType, summarizeAdSets } = load('lib/landing-operations-phase1.ts');
 test('sample threshold accepts inclusive bounds and rejects missing, fractional and abusive values', () => {
   assert.equal(parseSampleMin(null), 30);
   for (const value of ['1', '30', '10000']) assert.equal(parseSampleMin(value), Number(value));
@@ -61,6 +61,49 @@ test('funnel rates distinguish measured zero, no data, zero denominator and snap
   assert.equal(funnelRate(80, 20), 400);
 });
 const row = { campaign: 'qa', adset: '광고세트', creative: '소재', ad_type: 'unclassified', sessions: 2, visitors: 1, cta_click_sessions: 1, cta_clicks: 100, avg_dwell_ms: null, avg_scroll_depth: null, impressions: 0, link_clicks: 0, spend: 0, registrations: 7, registration_cost: 1758, registration_available: true };
+test('ad set subtotals keep campaign boundaries and distinguish missing, legacy and measured-zero registrations', () => {
+  const paid = { ...row, impressions: 100, link_clicks: 20, spend: 1000, registrations: 2 };
+  const results = summarizeAdSets([
+    paid,
+    { ...paid, impressions: 900, link_clicks: 30, spend: 2000, registrations: 0 },
+    { ...row, registrations: 0, registration_available: null, sessions: 100 },
+    { ...paid, campaign: '다른 캠페인', registrations: 0 },
+    { ...paid, adset: '미수집 세트', registration_available: null },
+    { ...paid, adset: '미수집 세트', registration_available: false },
+    { ...paid, adset: '과거 세트', registration_available: null },
+    { ...paid, adset: '{{adset.name}}' },
+  ]);
+  assert.equal(results.length, 4);
+  assert.deepEqual(results[0], {
+    campaign: 'qa', adset: '광고세트', spend: 3000, impressions: 1000, link_clicks: 50, registrations: 2, registration_state: 'ready',
+  });
+  const { adMetric } = load('lib/landing-ad-trends.ts');
+  assert.equal(adMetric(results[0], 'ctr'), 5);
+  assert.equal(adMetric(results[0], 'cpm'), 3000);
+  assert.equal(adMetric(results[0], 'cpa'), 1500);
+  assert.equal(results.find(result => result.campaign === '다른 캠페인').registrations, 0);
+  for (const [adset, status] of [['미수집 세트', 'missing'], ['과거 세트', 'unknown']]) {
+    const result = results.find(value => value.adset === adset);
+    assert.equal(result.registration_state, status);
+    assert.equal(result.registrations, null);
+    assert.equal(adMetric(result, 'cpa'), null);
+  }
+});
+test('creative sort keeps unavailable values last and name hints honor a saved or conflicting classification', () => {
+  const rows = [
+    { ...row, creative: 'COLD_a', spend: 2000, impressions: 1000, registrations: 0 },
+    { ...row, creative: 'rt_b', spend: 500, impressions: 1000, registrations: 1 },
+    { ...row, creative: '{{ad.name}}', registration_available: false },
+  ];
+  assert.deepEqual(sortPerformance(rows, 'cpm', 'asc').map(item => item.creative), ['rt_b', 'COLD_a', '{{ad.name}}']);
+  assert.deepEqual(sortPerformance(rows, 'registrations', 'asc').map(item => item.creative), ['COLD_a', 'rt_b', '{{ad.name}}']);
+  assert.equal(suggestAdType(rows[0]), '콜드');
+  assert.equal(suggestAdType(rows[1]), '리타겟');
+  assert.equal(suggestAdType({ ...rows[0], ad_type: 'retarget' }), null);
+  assert.equal(suggestAdType({ ...rows[0], adset: 'RT_other' }), null);
+  assert.equal(hasUnresolvedAdParameter(rows[2].creative), true);
+  assert.equal(hasUnresolvedAdParameter('literal {name}'), false);
+});
 const summary = { has_data: true, sessions: 100, visitors: 80, cta_click_sessions: 20, cta_clicks: 200, converted_visitors: 16, spend: 0, meta_impressions: 0, meta_link_clicks: 0 };
 const report = {
   campaign: { meta_campaign_ids: [], meta_ad_account_id: null, uses_ads: true }, summary_b: summary, summary_a: null,

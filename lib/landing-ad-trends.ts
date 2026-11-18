@@ -18,7 +18,7 @@ export const AD_METRICS = [
   { key: 'cpm', label: 'CPM', unit: '원' },
 ] as const;
 export type AdMetric = typeof AD_METRICS[number]['key'];
-export function adMetric(row: AdDay, metric: AdMetric): number | null {
+export function adMetric(row: Omit<AdDay, 'day' | 'registration_state'>, metric: AdMetric): number | null {
   if (metric === 'cpa') return row.registrations != null && row.registrations > 0 ? row.spend / row.registrations : null;
   if (metric === 'ctr') return row.impressions > 0 ? row.link_clicks / row.impressions * 100 : null;
   if (metric === 'cpm') return row.impressions > 0 ? row.spend / row.impressions * 1000 : null;
