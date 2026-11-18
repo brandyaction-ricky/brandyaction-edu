@@ -72,7 +72,10 @@ export async function GET(request: Request) {
       if (!file.ready_at || !file.sha256) fail('파일 확인이 끝난 뒤 다시 시도해 주세요.', 409);
       return reply({ formatVersion: 1, assetId: file.id, courseId: file.course_id, kind: file.kind, sha256: file.sha256, bytes: file.size, mimeType: file.content_type, readyAt: file.ready_at });
     }
-    const { data: file, error } = await db.rpc('edu_read_lesson_media', { p_actor: actor.id, p_asset: id(params.get('asset')), p_lesson: params.has('lesson') ? id(params.get('lesson')) : null, p_enrollment: params.has('enrollment') ? id(params.get('enrollment')) : null, p_revision: params.has('revision') ? id(params.get('revision')) : null, p_submission: params.has('submission') ? id(params.get('submission')) : null });
+    const read = (enrollment: string | null) => db.rpc('edu_read_lesson_media', { p_actor: actor.id, p_asset: id(params.get('asset')), p_lesson: params.has('lesson') ? id(params.get('lesson')) : null, p_enrollment: enrollment, p_revision: params.has('revision') ? id(params.get('revision')) : null, p_submission: params.has('submission') ? id(params.get('submission')) : null });
+    let { data: file, error } = await read(params.has('enrollment') ? id(params.get('enrollment')) : null);
+    // Staff/admin preview of a lesson their enrollment has not unlocked (CEO 11-18): media follows the lesson text.
+    if (error?.message === 'BLOCK_LESSON_LOCKED' && params.has('enrollment') && !params.has('submission') && ['admin', 'staff'].includes(String((actor as { role?: string }).role))) ({ data: file, error } = await read(null));
     if (error) throw error;
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
     const signed = await db.storage.from(bucket).createSignedUrl(file.path, 300, { download: file.kind === 'file' || params.get('download') === '1' ? file.name : false });
