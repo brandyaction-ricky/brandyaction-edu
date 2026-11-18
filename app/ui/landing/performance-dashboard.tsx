@@ -8,7 +8,7 @@ import { count, money, signed, kstTime } from '@/lib/landing-admin-state';
 import { AdminButton, AdminDataTable, AdminMetric, AdminMetricGrid, AdminSection, AdminStatusBadge } from '@/features/admin-ui';
 import { CompactEmpty, InlineError } from './tracking-controls';
 import { DEFAULT_SAMPLE_MIN, funnelRate, hasUnresolvedAdParameter, parseSampleMin, sortPerformance, suggestAdType, summarizeAdSets, type SortKey } from '@/lib/landing-operations-phase1';
-import { adMetric } from '@/lib/landing-ad-trends';
+import { adMetric, formatAdMetric, summarizeAdDays } from '@/lib/landing-ad-trends';
 import { registrationCost } from '@/lib/landing-campaign-management';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';
 import { AdTypeControl, type Classify } from './ad-type-control';
@@ -160,6 +160,35 @@ export function PerformanceTable({ report, onClassify, pending = false, sampleMi
     })}</tbody></AdminDataTable> : <CompactEmpty title={report.data_state.sessions_exist ? '조건에 맞는 데이터가 없습니다.' : '선택 기간에 수집된 소재 데이터가 없습니다.'}>{report.data_state.sessions_exist ? '상세 필터를 초기화하거나 조회 기간을 변경해 주세요.' : 'UTM 또는 캠페인 설정의 Meta 연결 상태를 확인해 주세요.'}</CompactEmpty>}</AdminSection>;
 }
 const percentage = (value: number | null) => value === null ? '계산 불가' : `${value.toFixed(1)}%`;
+
+const unavailableAdTrend = {
+  unlinked: '연동 전',
+  filtered: '필터 해제 필요',
+  error: '조회 실패',
+} as const;
+
+function MetaRecruitmentSummary({ report, linked }: { report: DashboardReport; linked: boolean }) {
+  const trend = report.ui?.ad_trend;
+  const ready = trend?.state === 'ready';
+  const summary = ready ? summarizeAdDays(trend.current) : null;
+  const fallback = linked ? '확인 필요' : '연동 전';
+  const unavailable = trend && trend.state !== 'ready' ? unavailableAdTrend[trend.state] : fallback;
+  const filtered = trend?.state === 'filtered';
+  const spend = report.data_state.meta_exists ? money(report.summary_b.spend) : linked ? '수집 전' : '연동 전';
+  const clicks = report.data_state.meta_exists ? count(report.summary_b.meta_link_clicks) : linked ? '—' : '연동 전';
+  const registrations = summary?.registrations;
+  const sampleNote = registrations == null
+    ? '등록 표본 확인 필요'
+    : registrations < 30 ? '등록 표본 30건 미만 · 판단 보류' : '등록 표본 30건 이상';
+
+  return <AdminMetricGrid columns={4} className="tracking-priority-metrics" role="group" aria-label="Meta 모집 지표">
+    <AdminMetric label="기간 광고비" value={ready ? formatAdMetric(summary, 'spend') : spend} note="Meta에서 수집한 금액"/>
+    <AdminMetric label="Meta 링크 클릭" value={ready ? (summary ? count(summary.link_clicks) : '기록 없음') : clicks} note="광고에서 링크를 누른 횟수"/>
+    <AdminMetric label="Meta 등록완료" value={ready ? formatAdMetric(summary, 'registrations') : unavailable} note={filtered ? '상세 필터 해제 시 캠페인 전체 표시' : sampleNote}/>
+    <AdminMetric label="등록당 비용" value={ready ? formatAdMetric(summary, 'cpa') : unavailable} note="기간 광고비 ÷ Meta 등록완료"/>
+  </AdminMetricGrid>;
+}
+
 export function PerformanceDashboard({ report, compare, onClassify, pending, onRetry, filtered = false, sampleMin, onSampleMin, filterSummary }: { report: DashboardReport; compare: boolean; onClassify: Classify; pending?: boolean; onRetry?: () => void; filtered?: boolean; sampleMin?: string; onSampleMin?: (value: string) => void; filterSummary?: string }) {
   const [details, setDetails] = useState(false);
   const b = report.summary_b, a = report.summary_a, summary = report.campaign_summary;
@@ -176,6 +205,7 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
     <CollectionRangeNotice report={report}/>
     <section aria-label="선택 기간 전환 퍼널" className="tracking-funnel">
       <div className="tracking-subsection-head"><h2>한눈에 보는 모집 성과</h2><span className="tracking-help">{report.range.startDay} — {report.range.endDay} · KST</span></div>
+      <MetaRecruitmentSummary report={report} linked={linked}/>
       <AdminMetricGrid columns={4}>
         <AdminMetric label="1. 방문" value={count(visits)} note="세션 수 · 재방문 포함" change={compare && <Compare current={b.sessions} previous={a?.sessions} hasData={previousHasVisits}/>}/>
         <AdminMetric label="2. CTA 클릭" value={count(clicks)} note={`방문 → CTA ${percentage(funnelRate(clicks, visits))}`} change={compare && <><Compare current={b.cta_click_sessions} previous={a?.cta_click_sessions} hasData={previousHasVisits} unit="세션"/><Compare current={sessionRate} previous={a ? rate(a.cta_click_sessions, a.sessions) : undefined} hasData={previousHasVisits} unit="%"/></>}/>
@@ -186,11 +216,6 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
       {filtered && <p className="tracking-help" role="status">실측값은 소재·기기 필터가 적용되지 않습니다. 필터 적용 중에는 CTA 이후 실측 전환율을 표시하지 않습니다.</p>}
       {report.ui?.errors.actuals && <InlineError onRetry={onRetry}>{report.ui.errors.actuals}</InlineError>}
     </section>
-    <AdminMetricGrid columns={4} className="tracking-priority-metrics">
-      <AdminMetric label="기간 광고비" value={report.data_state.meta_exists ? money(b.spend) : linked ? '수집 전' : '연동 전'} note="Meta에서 수집한 금액"/>
-      <AdminMetric label="Meta 링크 클릭" value={metaValue(b.meta_link_clicks)} note="광고에서 링크를 누른 횟수"/>
-      <AdminMetric label="방문 → 클릭" value={percentage(funnelRate(clicks, visits))} note="신청 버튼을 누른 세션 비율"/>
-    </AdminMetricGrid>
     <AdDailyTrend report={report} compare={compare} onRetry={onRetry}/>
     <details className="tracking-metric-details"><summary>상세 지표 · Meta 성과 · 누적 성과</summary>
     <AdminMetricGrid columns={8} className="tracking-kpis">

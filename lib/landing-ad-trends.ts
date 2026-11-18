@@ -24,6 +24,15 @@ export function adMetric(row: Omit<AdDay, 'day' | 'registration_state'>, metric:
   if (metric === 'cpm') return row.impressions > 0 ? row.spend / row.impressions * 1000 : null;
   return row[metric];
 }
+export function formatAdMetric(row: AdDay | null, metric: AdMetric): string {
+  if (!row) return '기록 없음';
+  if ((metric === 'registrations' || metric === 'cpa') && row.registration_state !== 'ready') {
+    return row.registration_state === 'missing' ? '미수집' : '확인 필요';
+  }
+  const value = adMetric(row, metric);
+  const unit = AD_METRICS.find(item => item.key === metric)!.unit;
+  return value === null ? '계산 불가' : value.toLocaleString('ko-KR', { maximumFractionDigits: metric === 'ctr' ? 2 : 0 }) + unit;
+}
 export function aggregateAdDays(rows: StoredAdDay[]): AdDay[] {
   const days = new Map<string, AdDay>();
   for (const row of rows) {
