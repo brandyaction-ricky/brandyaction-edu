@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from '@/lib/server-auth';
+import { assertCampusName } from '@/lib/campus-staff-name';
 import { createClient } from '@/lib/supabase/server';
 import { handleCommunity } from '@/features/campus/community/handler';
 import { loadCommunityState, saveCommunityCommand } from '@/features/campus/community/repository';
@@ -8,7 +9,7 @@ function handle(request: Request) {
     enabled: process.env.EDU_CAMPUS_ENABLED === 'true' && process.env.EDU_CAMPUS_COMMUNITY_ENABLED === 'true',
     authenticate: getAuthenticatedUser,
     load: async (viewer, enrollmentId, page, view,postId) => loadCommunityState(await createClient(), viewer, enrollmentId, false, page, view,postId),
-    save: async (_viewer, command) => saveCommunityCommand(await createClient(), command),
+    save: async (viewer, command) => saveCommunityCommand(await createClient(), command.alias === undefined ? command : { ...command, alias: assertCampusName(command.alias, (viewer as { role?: string | null }).role) }),
   });
 }
 export const GET = handle;

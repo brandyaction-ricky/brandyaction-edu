@@ -29,8 +29,8 @@ export function hasPhoneNumber(text: string): boolean {
  return /(?<!\d)(?:01[016789]|0[2-6]\d?)[ -.]?\d{3,4}[ -.]?\d{4}(?!\d)/u.test(text.normalize('NFKC'));
 }
 /** Shared spaces: block secrets outright, ask before posting a phone number. */
-export function sharedTextAllowed(text: string, confirm: (message: string) => boolean): string | null {
+export async function sharedTextAllowed(text: string, confirm: (message: string) => boolean | Promise<boolean>): Promise<string | null> {
  if (hasSensitiveQuestionText(text)) return sensitiveQuestionMessage;
- if (hasPhoneNumber(text) && !confirm('전화번호처럼 보이는 내용이 있어요. 같은 기수 동료 모두가 볼 수 있어요. 그대로 올릴까요?')) return '전화번호를 지운 뒤 다시 올려 주세요.';
+ if (hasPhoneNumber(text) && !await confirm('전화번호처럼 보이는 내용이 있어요. 같은 기수 동료 모두가 볼 수 있어요. 그대로 올릴까요?')) return '전화번호를 지운 뒤 다시 올려 주세요.';
  return null;
 }

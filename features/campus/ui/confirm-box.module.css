@@ -1,0 +1,6 @@
+.box{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1000;width:min(440px,calc(100vw - 32px));padding:18px;border-radius:14px;background:#fff;color:#191f28;border:1px solid #d9dde3;box-shadow:0 12px 40px rgba(0,0,0,.22)}
+.box p{margin:0 0 14px;line-height:1.55;white-space:pre-line;word-break:keep-all}
+.box div{display:flex;justify-content:flex-end;gap:8px}
+.box button{min-height:40px;padding:0 16px;border-radius:10px;font-weight:700;cursor:pointer}
+.no{background:#fff;border:1px solid #c9ced6;color:#333d4b}
+.yes{background:#191f28;border:1px solid #191f28;color:#fff}
