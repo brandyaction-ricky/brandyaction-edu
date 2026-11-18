@@ -260,7 +260,7 @@ try {
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
       await expect(marker).toBeVisible({timeout:60000});
-      await expect(marker).toContainText('AI 직원에게 일을 맡기면');
+      await expect(marker).toContainText('첫 업무 보고를 준비했어요.');
       await expect(teamLeaderGuide(page)).toHaveCount(0);
       await expect(page.locator('video')).toHaveCount(0);
       await page.evaluate(()=>document.fonts.ready);

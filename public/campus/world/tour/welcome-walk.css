@@ -21,4 +21,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 @media (max-height: 330px) { #destination { min-height: 40px; } }
 @media (max-width: 360px), (max-height: 400px) {
   #destination[data-greeting] { padding: 7px 10px; font-size: 13px; }
+  #walk[data-station='1'] #destination[data-greeting] { font-size: 14px; }
 }

@@ -30,13 +30,29 @@ export function CorridorPanel({station, spyPhase, onSpyAdvance, contentDraft, on
     return () => cancelAnimationFrame(frame);
   }, [station]);
 
-  return <section className={monitor.monitor} aria-labelledby={labelId}>
-    <header className={monitor.header}>
-      <span id={labelId} ref={label} tabIndex={-1}>{locations[station]}</span>
-      <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>{revisit ? '자료 목록으로 돌아가기' : '복도로 돌아가기'}</button>
-    </header>
-    {station === 2 && <SpyStation phase={spyPhase} onAdvance={onSpyAdvance} onComplete={onComplete}/>}
-    {station === 3 && <div className={monitor.body}><ContentStation draft={contentDraft} onDraftChange={onContentDraftChange} onComplete={onComplete} revisit={revisit}/></div>}
-    {station === 4 && <CanonStation phase={canonPhase} onAdvance={onCanonAdvance} onHall={onComplete}/>}
-  </section>;
+  return <div className={monitor.deskLayer}>
+    <section className={`${monitor.monitor} ${monitor.deskWindow}`} data-canon={station === 4 || undefined} role="dialog" aria-modal="true"
+      aria-label={revisit ? '콘텐츠 제작 다시 보기' : undefined} aria-labelledby={revisit ? undefined : labelId} onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+        if (event.key !== 'Tab') return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, summary, video[controls], [tabindex]'))
+          .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+        const boundary = event.shiftKey ? controls[0] : controls.at(-1);
+        if (document.activeElement !== boundary && !(event.shiftKey && document.activeElement === label.current)) return;
+        event.preventDefault();
+        (event.shiftKey ? controls.at(-1) : controls[0])?.focus();
+      }}>
+      <header className={monitor.header}>
+        <span id={labelId} ref={label} tabIndex={-1}>{locations[station]}</span>
+        <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>{revisit ? '자료 목록으로 돌아가기' : '복도로 돌아가기'}</button>
+      </header>
+      {station === 2 && <SpyStation phase={spyPhase} onAdvance={onSpyAdvance} onComplete={onComplete}/>}
+      {station === 3 && <div className={monitor.body}><ContentStation draft={contentDraft} onDraftChange={onContentDraftChange} onComplete={onComplete} revisit={revisit}/></div>}
+      {station === 4 && <CanonStation phase={canonPhase} onAdvance={onCanonAdvance} onHall={onComplete}/>}
+    </section>
+  </div>;
 }

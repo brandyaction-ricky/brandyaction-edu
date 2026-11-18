@@ -69,7 +69,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [revisitContent, setRevisitContent] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
-  const deskDialog = useRef<HTMLDialogElement>(null);
   const lobbyDialog = useRef<HTMLDialogElement>(null);
   const lobbyGuideTrigger = useRef<HTMLButtonElement | null>(null);
   const sceneFrame = useRef<HTMLIFrameElement>(null);
@@ -94,6 +93,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const firstStop = station === 1;
   const openDeskStation = revisitContent ? 3 : deskOpen && (station === 2 || station === 3 || station === 4) ? station : null;
   const teamLeaderOpen = officeIntro && firstStop && deskOpen;
+  const backgroundInert = teamLeaderOpen || openDeskStation !== null;
   const exploringHall = step === 7 && explore;
   const destination = destinations[station - 1];
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
@@ -167,10 +167,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     heading.current?.focus({preventScroll: true});
   }, [step, state.handoff, copyFallback]);
 
-  useEffect(() => {
-    if ((deskOpen && !firstStop) || revisitContent) deskDialog.current?.showModal();
-    else deskDialog.current?.close();
-  }, [deskOpen, firstStop, revisitContent]);
   useEffect(() => {
     const dialog = lobbyDialog.current;
     if (lobbyGuide && !revisitContent && dialog) {
@@ -260,7 +256,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     go(arrivalBackStep(state), {station: 6});
   }
   function closeContentReplay() {
-    deskDialog.current?.close();
     setRevisitContent(false);
   }
   function openContentReplay() {
@@ -300,13 +295,14 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setWalkAssist('idle');
   }
   function closeDesk(returnToTrigger = true) {
-    deskDialog.current?.close();
     setDeskOpen(false);
     if (teamLeaderOpen) {
       if (!returnToTrigger) leaderTrigger.current = null;
       restoreLeaderFocus.current = true;
-    } else if (sceneStatus === 'ready') restoreFloorFocus();
-    else deskButton.current?.focus();
+    } else requestAnimationFrame(() => {
+      if (sceneStatus === 'ready') restoreFloorFocus();
+      else deskButton.current?.focus({preventScroll: true});
+    });
   }
   function restoreFloorFocus() {
     sceneFrame.current?.contentDocument?.getElementById('floor')?.focus({preventScroll: true});
@@ -383,15 +379,15 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const title = (text: React.ReactNode, description?: string) => <div className={s.intro}><h1 ref={heading} tabIndex={-1}>{text}</h1>{description && <p>{description}</p>}</div>;
 
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined} data-scene-status={sceneStatus}>
-    <a href={officeIntro ? '#arrival-desk-button' : exploringHall ? '#arrival-hall-schedule' : '#arrival-content'} className={s.skip} inert={teamLeaderOpen}>체험 안내로 바로가기</a>
-    <div className={s.world} aria-label="웰컴존에서 웰컴 라운지까지 이어지는 통로" inert={teamLeaderOpen}>
+    <a href={officeIntro ? '#arrival-desk-button' : exploringHall ? '#arrival-hall-schedule' : '#arrival-content'} className={s.skip} inert={backgroundInert}>체험 안내로 바로가기</a>
+    <div className={s.world} aria-label="웰컴존에서 웰컴 라운지까지 이어지는 통로" inert={backgroundInert}>
       {hydrated && <CorridorScene key={sceneVisit} frame={sceneFrame} station={station} label={destination}
         avatar={state.visitorAvatar}
         paused={deskOpen || Boolean(lobbyGuide) || revisitContent || introOpen || avatarOpen || showReset || (!officeIntro && !explore)}
         freeRoam={exploringHall} onOpenGuide={openLobbyGuide}
         walkRequest={walkRequest} focusRequest={focusRequest} onProximity={updateProximity} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
     </div>
-    <header className={s.header} inert={teamLeaderOpen} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
+    <header className={s.header} inert={backgroundInert} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <div className={s.wordmark}>{/* eslint-disable-next-line @next/next/no-img-element -- Reuse the existing EDU brand asset. */}
       <img src="/brandy-action-logo.png" alt="브랜디액션"/><small>EDU</small></div>
       <div className={entryStyle.progress} aria-live="polite" aria-atomic="true">
@@ -403,12 +399,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     {officeIntro && firstStop && sceneStatus === 'ready' && !teamLeaderOpen && <div className={entryStyle.avatarControl}>
       <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
     </div>}
-    {officeIntro ? <section className={`${entryStyle.wayfinding} ${firstStop ? entryStyle.firstStop : ''}`} aria-label={firstStop ? '문샷 웰컴존 소개' : '현재 목적지'} data-walk-station={station} inert={teamLeaderOpen} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
+    {officeIntro ? <section className={`${entryStyle.wayfinding} ${firstStop ? entryStyle.firstStop : ''}`} aria-label={firstStop ? '문샷 웰컴존 소개' : '현재 목적지'} data-walk-station={station} inert={backgroundInert} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <div className={entryStyle.stopCopy}>
         {firstStop ? <>
           <h1>{config.title}</h1>
-          <p>고객 후기에서 찾은 힌트가 광고 영상으로 완성되기까지, AI 직원들이 어떻게 일하는지 따라가 보세요.</p>
-          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>웰컴 라운지에서 <strong>AI팀 설계도와 회사 업무 기준표</strong>를 무료로 받을 수 있어요.</span></p>
+          <p>고객 후기 분석부터 광고 영상 제작까지, AI 직원들의 업무를 차례로 확인해보세요.</p>
+          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>라운지에서 받는 무료 자료<strong>AI팀 설계도와 회사 업무 기준표</strong></span></p>
         </> : <>
           <span>{nearStation === station ? '도착했어요' : '다음 목적지'}</span>
           <h1>{destination}</h1>
@@ -425,7 +421,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <p className={entryStyle.touchHint}>화살표 쪽 바닥을 눌러도 이동해요.</p>
         </div>}
       </div>
-    </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${step === 3 && !workActive ? s.handoffDock : ''} ${step === 7 ? s.hallDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
+    </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${step === 3 && !workActive ? s.handoffDock : ''} ${step === 7 ? s.hallDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내" inert={backgroundInert}>
       {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
         onChange={workTrial => update({workTrial, experience: workTrial.secondConfirmed ? 'self-reported' : 'none'})}
         onExit={() => go(8)} onLive={headToHall}/> : <>
@@ -517,8 +513,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </footer>}
       </>}
     </section>}
-    {!officeIntro && !exploringHall && (step === 7 || explore || sceneStatus === 'ready') && <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
-    {exploringHall && <section className={entryStyle.hallControls} aria-label="웰컴 라운지에서 할 수 있는 일">
+    {!officeIntro && !exploringHall && (step === 7 || explore || sceneStatus === 'ready') && <button className={s.exploreButton} type="button" inert={backgroundInert} onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
+    {exploringHall && <section className={entryStyle.hallControls} aria-label="웰컴 라운지에서 할 수 있는 일" inert={backgroundInert}>
       <div className={entryStyle.hallStatus}>
         {event.startsAt && <LiveCountdown date={event.date} className={entryStyle.hallCountdown}/>}
         {sceneStatus === 'ready' && <>
@@ -540,14 +536,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </div>}
     </section>}
     {teamLeaderOpen && <TeamLeader greeting={officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting} onClose={closeDesk} onComplete={finishStation}/>}
-    <dialog ref={deskDialog} className={entryStyle.monitor} data-canon={openDeskStation === 4 || undefined} data-scroll-panel={openDeskStation === 2 || undefined} aria-label={revisitContent ? '콘텐츠 제작 다시 보기' : destination}
-      onCancel={event => {event.preventDefault(); event.stopPropagation(); if (revisitContent) closeContentReplay(); else closeDesk();}}>
-      {openDeskStation && <CorridorPanel station={openDeskStation}
-        spyPhase={state.spyPhase} onSpyAdvance={advanceSpy} canonPhase={state.canonPhase} onCanonAdvance={advanceCanon}
-        contentDraft={state.contentDraft} onContentDraftChange={contentDraft => update({contentDraft})}
-        revisit={revisitContent} onClose={revisitContent ? closeContentReplay : closeDesk}
-        onComplete={revisitContent ? closeContentReplay : finishStation}/>}
-    </dialog>
+    {openDeskStation && <CorridorPanel station={openDeskStation}
+      spyPhase={state.spyPhase} onSpyAdvance={advanceSpy} canonPhase={state.canonPhase} onCanonAdvance={advanceCanon}
+      contentDraft={state.contentDraft} onContentDraftChange={contentDraft => update({contentDraft})}
+      revisit={revisitContent} onClose={revisitContent ? closeContentReplay : closeDesk}
+      onComplete={revisitContent ? closeContentReplay : finishStation}/>}
     <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? guideTitles[lobbyGuide] : undefined}
       onCancel={event => {event.preventDefault(); closeLobbyGuide();}}>
       {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} onContentReplay={openContentReplay}
