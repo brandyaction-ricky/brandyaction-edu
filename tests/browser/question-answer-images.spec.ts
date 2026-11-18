@@ -1,17 +1,17 @@
 import {test,expect,type BrowserContext,type Page} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 const q='22222222-2222-4222-8222-222222222222',png=readFileSync('public/brandy-action-logo.png');
-async function backend(context:BrowserContext,{lost=false,uploadFails=false,conflict=false}={}){
+async function backend(context:BrowserContext,{lost=false,uploadFails=false,conflict=false,purpose='answer',visibility='private'}={}){
  const answers:Record<string,unknown>[]=[];const posts:Record<string,unknown>[]=[];const uploads:Record<string,unknown>[]=[];let file='';
  await context.route('**/api/platform/question-thread?**',async r=>{
-  if(r.request().method()==='GET')return r.fulfill({json:{question:{id:q,title:'지난 강의를 보려면 어디를 누르나요?',content:'지난 강의 찾는 방법을 알려 주세요.',status:answers.length?'answered':'open',headId:answers.at(-1)?.id||null,resolved:false,archived:false,visibility:'private'},answers,canAnswer:true,canFollowUp:true,nextCursor:null}});
+  if(r.request().method()==='GET')return r.fulfill({json:{question:{id:q,title:'지난 강의를 보려면 어디를 누르나요?',content:'지난 강의 찾는 방법을 알려 주세요.',status:answers.length?'answered':'open',headId:answers.at(-1)?.id||null,resolved:false,archived:false,visibility},answers,canAnswer:true,canFollowUp:true,nextCursor:null}});
   const b=r.request().postDataJSON();posts.push(b);
   if(conflict){conflict=false;answers.push({id:'33333333-3333-4333-8333-333333333333',content:'먼저 남긴 답변',authorName:'운영자',createdAt:new Date().toISOString()});return r.fulfill({status:409,json:{error:'다른 답변이 등록됐습니다.'}});}
-  if(!answers.some(a=>a.id===b.requestId))answers.push({id:b.requestId,content:b.content,imageId:b.imageId,authorName:'운영자',createdAt:new Date().toISOString()});
+  if(!answers.some(a=>a.id===b.requestId))answers.push({id:b.requestId,content:b.content,imageId:b.imageId,authorName:b.action==='followup'?'수강생':'운영자',source:b.action==='followup'?'learner':'operator',createdAt:new Date().toISOString()});
   if(lost){lost=false;return r.fulfill({status:503,json:{error:'등록 결과를 확인하지 못했습니다.'}});}
   return r.fulfill({json:{id:b.requestId,questionId:q}});
  });
- await context.route('**/api/platform/question-images',r=>{const b=r.request().postDataJSON();uploads.push(b);expect(b.purpose).toBe('answer');expect(b.questionId).toBe(q);
+ await context.route('**/api/platform/question-images',r=>{const b=r.request().postDataJSON();uploads.push(b);expect(b.purpose).toBe(purpose);expect(b.questionId).toBe(q);
   if(b.action==='prepare'){file=b.requestId;return r.fulfill({json:{id:file,signedUrl:'https://storage.test/answer-image',contentType:'image/png'}});}
   if(uploadFails){uploadFails=false;return r.fulfill({status:503,json:{error:'이미지 연결 확인 실패'}});}return r.fulfill({json:{id:file}});
  });
@@ -47,4 +47,61 @@ test('failed upload blocks send, retries same file and removal preserves text; u
 });
 test('concurrent answer keeps attachment until current head is refreshed',async({page,context})=>{
  const b=await backend(context,{conflict:true});await page.goto('/question-thread-test');await choose(page);await expect(page.getByText('이미지 준비 완료. 답변을 등록하면 함께 저장됩니다.')).toBeVisible();await page.getByRole('button',{name:'답변 추가하기'}).click();await expect(page.getByText(/다른 답변이 등록됐습니다/)).toBeVisible();await expect(page.getByAltText('첨부할 답변 이미지')).toBeVisible();await page.getByRole('button',{name:'최신 답변 확인',exact:true}).click();await expect(page.getByText('먼저 남긴 답변')).toBeVisible();await page.getByRole('button',{name:'답변 추가하기'}).click();await expect(page.getByAltText('답변 첨부 이미지')).toBeVisible();expect(b.posts[1].imageId).toBe(b.posts[0].imageId);expect(b.posts[1].requestId).not.toBe(b.posts[0].requestId);
+});
+
+test('learner attaches an image to a followup and both roles see it in the original history',async({page,context},info)=>{
+ const backendState=await backend(context,{purpose:'followup',visibility:'cohort',lost:true});
+ await page.goto('/question-thread-test?student=1');
+ await page.getByRole('button',{name:'후속 질문하기',exact:true}).click();
+ await expect(page.getByText('이 후속 질문과 첨부 이미지는 같은 기수 수강생에게 공개됩니다.')).toBeVisible();
+ await page.getByLabel('후속 질문 이미지 (선택)').setInputFiles({name:'후속 질문 화면.png',mimeType:'image/png',buffer:png});
+ await expect(page.getByText('이미지 준비 완료. 후속 질문을 등록하면 함께 저장됩니다.')).toBeVisible();
+ await page.getByRole('button',{name:'답변 이력 접기'}).click();
+ await page.getByRole('button',{name:'후속 질문하기',exact:true}).click();
+ await expect(page.getByAltText('첨부할 후속 질문 이미지')).toBeVisible();
+ await page.getByRole('button',{name:'후속 질문 등록'}).click();
+ await expect(page.getByRole('button',{name:'이미지 빼기'})).toBeDisabled();
+ await page.getByRole('button',{name:'같은 요청 결과 확인'}).click();
+ const image=page.getByAltText('후속 질문 첨부 이미지');
+ await expect(image).toBeVisible();
+ await expect.poll(()=>image.evaluate((element:HTMLImageElement)=>element.naturalWidth)).toBeGreaterThan(0);
+ expect(backendState.posts).toHaveLength(2);
+ expect(backendState.posts[1]).toEqual(backendState.posts[0]);
+ expect(backendState.posts[0]).toMatchObject({action:'followup',questionId:q,imageId:backendState.uploads[0].requestId});
+ expect(backendState.answers).toHaveLength(1);
+ await page.screenshot({path:info.outputPath('followup-image-student.png'),fullPage:true});
+ await page.getByRole('button',{name:'답변 이력 접기'}).click();
+ await expect(page.getByText('답변 첨부 이미지 보기')).toHaveCount(0);
+ const admin=await context.newPage();
+ await admin.goto('/question-thread-test');
+ const adminImage=admin.getByAltText('후속 질문 첨부 이미지');
+ await expect(admin.getByText('후속 질문 · 수강생',{exact:true})).toBeVisible();
+ await expect(adminImage).toBeVisible();
+ await expect.poll(()=>adminImage.evaluate((element:HTMLImageElement)=>element.naturalWidth)).toBeGreaterThan(0);
+ await admin.screenshot({path:info.outputPath('followup-image-admin.png'),fullPage:true});
+});
+
+test('the learner keeps the selected followup image when refreshing after a concurrent reply',async({page,context})=>{
+ const backendState=await backend(context,{purpose:'followup',conflict:true});
+ await page.goto('/question-thread-test?student=1');
+ await page.getByRole('button',{name:'후속 질문하기',exact:true}).click();
+ const input=page.getByRole('textbox',{name:'후속 질문',exact:true});
+ await input.fill('아래 화면도 확인해 주세요.');
+ await input.evaluate((element,bytes)=>{
+  const clipboardData=new DataTransfer();
+  clipboardData.items.add(new File([new Uint8Array(bytes)],'followup.png',{type:'image/png'}));
+  element.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}));
+ },[...png]);
+ await expect(page.getByText('이미지 준비 완료. 후속 질문을 등록하면 함께 저장됩니다.')).toBeVisible();
+ await page.getByRole('button',{name:'후속 질문 등록'}).click();
+ await expect(page.getByText('다른 답변이 등록됐습니다.')).toBeVisible();
+ await page.getByRole('button',{name:'최신 답변 확인'}).click();
+ await expect(page.getByText('먼저 남긴 답변')).toBeVisible();
+ await expect(page.getByAltText('첨부할 후속 질문 이미지')).toBeVisible();
+ await expect(input).toHaveValue('아래 화면도 확인해 주세요.');
+ await page.getByRole('button',{name:'후속 질문 등록'}).click();
+ await expect(page.getByAltText('후속 질문 첨부 이미지')).toBeVisible();
+ expect(backendState.posts[1].imageId).toBe(backendState.posts[0].imageId);
+ expect(backendState.posts[1].requestId).not.toBe(backendState.posts[0].requestId);
+ expect(backendState.uploads).toHaveLength(2);
 });

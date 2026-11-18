@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID as id} from 'node:crypto';
 import {communityFixture,read} from './helpers/question-community.mjs';
 const spec={kind:'image',name:'curriculum.png',size:8,extension:'png',contentType:'image/png'};
-async function fixture(t){const h=await communityFixture(t);await h.owner(read('20261003054513_admin_sent_message_delete.sql'));await h.owner(read('20261008004234_question_answer_images.sql'));return h;}
+async function fixture(t){const h=await communityFixture(t);await h.owner(read('20261003054513_admin_sent_message_delete.sql'));await h.owner(read('20261008004234_question_answer_images.sql'));await h.owner(read('20261118025908_question_followup_images.sql'));return h;}
 async function image(h,q,actor=h.admin){const file=id();await h.rpc('edu_prepare_answer_image',[actor,q,file,spec]);await h.rpc('edu_complete_answer_image',[actor,file,'a'.repeat(64)]);return file;}
 const add=(h,q,file,request=id(),head=null,content='좌측 상단을 눌러 주세요.',job=null)=>h.rpc('edu_add_question_answer_with_image',[h.admin,q,head,request,content,file,job]);
 test('answer and image commit atomically; identical retry creates one answer and notice, preserving older text replies',async t=>{
@@ -63,4 +63,67 @@ test('public answer image follows cohort access; withdrawn access and private vi
  await h.owner('update enrollments set revoked_at=now() where id=$1',[peer]);await assert.rejects(()=>h.rpc('edu_read_answer_image',[h.other,q.id,request]),/QUESTION_NOT_FOUND/);
  await h.owner('update enrollments set revoked_at=null where id=$1',[peer]);await h.owner("update edu_questions set visibility='private' where id=$1",[q.id]);await assert.rejects(()=>h.rpc('edu_read_answer_image',[h.other,q.id,request]),/QUESTION_NOT_FOUND/);
  assert.equal((await h.rpc('edu_read_answer_image',[h.student,q.id,request])).id,file);
+});
+
+test('followup image shares the original question visibility and stays on the same thread for learner and operator',async t=>{
+ const h=await fixture(t),peer=id();
+ await h.owner("insert into enrollments values($1,$2,$3,'active',null,now()-interval '1 day',null,$4)",[peer,h.other,h.course,h.cohort]);
+ const question=await h.create({visibility:'private'}),file=id(),request=id(),content='추가 화면을 확인해 주세요.';
+ const prepare=(actor=h.student,q=question.id,upload=file)=>h.rpc('edu_prepare_followup_image',[actor,q,upload,spec]);
+ const write=(upload=file,head=null,reply=request)=>h.rpc('edu_add_question_followup_with_image',[h.student,question.id,head,reply,content,upload]);
+ const fetchImage=(actor,q=question.id)=>h.rpc('edu_read_answer_image',[actor,q,request]);
+ await assert.rejects(()=>prepare(h.other),/QUESTION_NOT_FOUND/);
+ await assert.rejects(()=>prepare(h.admin),/QUESTION_NOT_FOUND/);
+ assert.equal((await prepare()).id,file);
+ await assert.rejects(()=>write(),/QUESTION_INVALID/);
+ await assert.rejects(()=>h.rpc('edu_complete_followup_image',[h.other,file,'a'.repeat(64)]),/QUESTION_FORBIDDEN/);
+ await h.rpc('edu_complete_followup_image',[h.student,file,'a'.repeat(64)]);
+ await assert.rejects(()=>write(file,id()),/QUESTION_CHANGED/);
+ const before=await h.count('edu_member_messages');
+ const posted=await write();
+ assert.deepEqual(await write(),posted);
+ assert.equal(await h.count('edu_member_messages'),before+1);
+ assert.equal(await h.count('edu_question_answers'),1);
+ await assert.rejects(()=>write(file,request,id()),/QUESTION_REQUEST_REUSED/);
+ await assert.rejects(()=>write(id()),/QUESTION_REQUEST_REUSED/);
+ await assert.rejects(()=>h.rpc('edu_add_question_followup',[h.student,question.id,null,request,content]),/QUESTION_REQUEST_REUSED/);
+ for(const actor of [h.student,h.admin]){
+  const thread=await h.rpc('edu_read_question_thread_with_images',[actor,question.id,null]);
+  assert.equal(thread.question.visibility,'private');
+  assert.deepEqual([thread.answers[0].id,thread.answers[0].source,thread.answers[0].imageId],[request,'learner',file]);
+  assert.equal((await fetchImage(actor)).id,file);
+ }
+ await assert.rejects(()=>fetchImage(h.other),/QUESTION_NOT_FOUND/);
+ await assert.rejects(()=>h.rpc('edu_read_question_thread_with_images',[h.other,question.id,null]),/QUESTION_NOT_FOUND/);
+ const another=await h.create({visibility:'private'});
+ await assert.rejects(()=>fetchImage(h.student,another.id),/QUESTION_NOT_FOUND/);
+ await assert.rejects(()=>h.rpc('edu_add_question_followup_with_image',[h.student,another.id,null,id(),content,file]),/QUESTION_INVALID/);
+ const publicQuestion=await h.create(),publicFile=id(),publicReply=id();
+ await prepare(h.student,publicQuestion.id,publicFile);
+ await h.rpc('edu_complete_followup_image',[h.student,publicFile,'b'.repeat(64)]);
+ await h.rpc('edu_add_question_followup_with_image',[h.student,publicQuestion.id,null,publicReply,content,publicFile]);
+ assert.equal((await h.rpc('edu_read_answer_image',[h.other,publicQuestion.id,publicReply])).id,publicFile);
+ assert.equal((await h.rpc('edu_read_question_thread_with_images',[h.other,publicQuestion.id,null])).answers[0].imageId,publicFile);
+ await h.owner('update enrollments set revoked_at=now() where id=$1',[peer]);
+ await assert.rejects(()=>h.rpc('edu_read_answer_image',[h.other,publicQuestion.id,publicReply]),/QUESTION_NOT_FOUND/);
+});
+
+test('operator and learner upload purposes remain separate even for a question owner with operator rights',async t=>{
+ const h=await fixture(t),q=await h.create(),followup=id(),answer=id(),hash='a'.repeat(64);
+ await h.owner("update profiles set role='admin' where id=$1",[h.student]);
+ await h.rpc('edu_prepare_followup_image',[h.student,q.id,followup,spec]);
+ await h.rpc('edu_complete_followup_image',[h.student,followup,hash]);
+ await h.rpc('edu_prepare_answer_image',[h.student,q.id,answer,spec]);
+ await h.rpc('edu_complete_answer_image',[h.student,answer,hash]);
+ await assert.rejects(()=>h.rpc('edu_prepare_answer_image',[h.student,q.id,followup,spec]),/QUESTION_REQUEST_REUSED/);
+ await assert.rejects(()=>h.rpc('edu_owned_answer_image',[h.student,followup]),/QUESTION_FORBIDDEN/);
+ await assert.rejects(()=>h.rpc('edu_owned_followup_image',[h.student,answer]),/QUESTION_FORBIDDEN/);
+ await assert.rejects(()=>h.rpc('edu_add_question_answer_with_image',[h.student,q.id,null,id(),'답변',followup,null]),/QUESTION_INVALID/);
+ await assert.rejects(()=>h.rpc('edu_add_question_followup_with_image',[h.student,q.id,null,id(),'후속 질문',answer]),/QUESTION_INVALID/);
+ assert.equal(await h.count('edu_question_answers'),0);
+ for(const role of ['anon','authenticated']){
+  await h.db.exec('reset role;set role '+role);
+  await assert.rejects(()=>h.db.query('select edu_prepare_followup_image($1,$2,$3,$4)',[h.student,q.id,id(),spec]),/permission denied/);
+  await assert.rejects(()=>h.db.query('select edu_add_question_followup_with_image($1,$2,null,$3,$4,$5)',[h.student,q.id,id(),'후속 질문',followup]),/permission denied/);
+ }
 });

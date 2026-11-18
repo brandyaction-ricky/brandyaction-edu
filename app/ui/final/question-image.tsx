@@ -8,10 +8,9 @@ async function post(body: unknown) {
 }
 export type ReadyQuestionImage = { id: string; name: string; preview: string };
 export type QuestionImagePickerHandle = { paste: (files: File[]) => void; clearValidation: () => void };
-export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, dragAndDrop = false, answerQuestionId, initialImage, initialFile, ai = false, showHint = true, showReadyHint = true, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; dragAndDrop?: boolean; answerQuestionId?: string; initialImage?: ReadyQuestionImage; initialFile?: File; ai?: boolean; showHint?: boolean; showReadyHint?: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean, image?: ReadyQuestionImage) => void; ref?: Ref<QuestionImagePickerHandle> }) {
- const noun = answerQuestionId ? '답변' : '질문';
+export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, dragAndDrop = false, threadImage, initialImage, initialFile, ai = false, showHint = true, showReadyHint = true, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; dragAndDrop?: boolean; threadImage?: { questionId: string; purpose: 'answer' | 'followup' }; initialImage?: ReadyQuestionImage; initialFile?: File; ai?: boolean; showHint?: boolean; showReadyHint?: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean, image?: ReadyQuestionImage) => void; ref?: Ref<QuestionImagePickerHandle> }) {
+ const noun = threadImage?.purpose === 'followup' ? '후속 질문' : threadImage ? '답변' : '질문';
  const [inherited, setInherited] = useState(initialImage || null);
- const scope = answerQuestionId ? { purpose: 'answer', questionId: answerQuestionId } : {};
  const [selection, setSelection] = useState<{ file: File; request: string; preview: string } | null>(null), [busy, setBusy] = useState(false), [ready, setReady] = useState(false), [error, setError] = useState(''), [validation, setValidation] = useState('');
  const gate = useRef(false), mounted = useRef(false), notify = useRef(changed);
  const input = useRef<HTMLInputElement>(null);
@@ -22,12 +21,12 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
   if (gate.current || locked) return; gate.current = true; setBusy(true); setReady(false); setError(''); notify.current(null, true, true);
   try {
    const spec = answerFileSpec(next.file.name, next.file.size, 'image');
-   const prepared = await post({ ...scope, action: 'prepare', enrollmentId, lessonId, requestId: next.request, name: spec.name, size: spec.size });
+   const prepared = await post({ ...threadImage, action: 'prepare', enrollmentId, lessonId, requestId: next.request, name: spec.name, size: spec.size });
    if (!prepared.ready) {
     // The upload may have succeeded even when its response was lost. Completion
     // verifies the immutable object; retries never overwrite a prior upload.
     try { await fetch(prepared.signedUrl, { method: 'PUT', headers: { 'Content-Type': spec.contentType }, body: next.file, signal: AbortSignal.timeout(60000) }); } catch { /* verify below */ }
-    const done = await post({ ...scope, action: 'complete', fileId: prepared.id });
+    const done = await post({ ...threadImage, action: 'complete', fileId: prepared.id });
     if (done.id !== next.request) throw new Error('이미지 등록 결과를 확인하지 못했습니다.');
    } else if (prepared.id !== next.request) throw new Error('이미지 등록 결과를 확인하지 못했습니다.');
    if (mounted.current) { setReady(true); notify.current(next.request, false, true, {id:next.request,name:next.file.name,preview:next.preview}); }
@@ -62,8 +61,8 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
   {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. {ai ? showReadyHint && 'AI 답변 받기를 누르면 이 캡처도 전달됩니다.' : `${noun}을 등록하면 함께 저장됩니다.`}</p>}{(validation || error) && <p role="alert" className="form-error">{validation || error}</p>}
  </div>;
 }
-export function QuestionImage({ questionId, imageId, answerId, aiRequestId }: { questionId: string; imageId?: unknown; answerId?: string; aiRequestId?: string }) {
- const noun = answerId ? '답변' : '질문';
+export function QuestionImage({ questionId, imageId, answerId, aiRequestId, followup = false }: { questionId: string; imageId?: unknown; answerId?: string; aiRequestId?: string; followup?: boolean }) {
+ const noun = followup ? '후속 질문' : answerId ? '답변' : '질문';
  const [attempt, setAttempt] = useState(0), [failed, setFailed] = useState(false);
  if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true' || !imageId) return null;
  const src = '/api/platform/question-images?' + new URLSearchParams({ ...(aiRequestId ? { ai:aiRequestId } : { question: questionId, ...(answerId ? { answer: answerId } : {}) }), attempt: String(attempt) });
