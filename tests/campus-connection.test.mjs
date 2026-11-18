@@ -70,6 +70,10 @@ test('locked marks come from the server-only progression read for this viewer',a
  assert.ok(!student.calls.some(c=>c.rpc));
  const denied=await loadCampusSnapshot(student,user,uid(2),now,()=>database(data));
  assert.equal(denied.lessons[0].locked,undefined);
+ // Staff/admins keep the mark but can open it as a read-only preview (CEO 11-18).
+ const staff=await loadCampusSnapshot(student,{...user,role:'staff'},uid(2),now,()=>server);
+ assert.deepEqual([staff.lessons[0].locked,staff.lessons[0].staffPreview],[false,true]);
+ assert.equal('role' in staff.viewer,false);
 });
 
 test('server-only publication lookup follows owner authorization and never reads content with elevated access',async()=>{

@@ -30,6 +30,8 @@ export type CampusSnapshot = {
     completed: boolean;
     /** Not open yet for this enrollment (classroom progression rule); absent when unknown. */
     locked?: boolean;
+    /** Locked for this enrollment, but the viewer is staff/admin and may open it as a read-only preview. */
+    staffPreview?: boolean;
     href: string;
     missions: CampusMission[];
   }[];
