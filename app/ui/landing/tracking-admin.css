@@ -72,3 +72,6 @@
 /* Collection windows describe campaign-wide availability, not filtered totals. */
 .tracking-range-notice{padding:14px 16px;border:1px solid #e8d4a8;border-radius:10px;background:#fffbef;color:#654b19;font-size:13px;line-height:1.65}
 .tracking-range-notice p{margin:4px 0 0;overflow-wrap:anywhere}
+
+.edu-admin .tracking-ad-trend{grid-template-columns:minmax(0,1fr)}
+.edu-admin .tracking-ad-trend>*{min-width:0}
