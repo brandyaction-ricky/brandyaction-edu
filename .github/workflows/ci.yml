@@ -37,6 +37,24 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/campus-staff-preview-panel-release-20261118" ]; then
+            expected_main=6993e04ed57fa15ff0b1acc8b50078971184e9df
+            release_payload=6caae00a25445367e609eb5ef30df3d3fab4bf5e
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|features/campus/ui/lesson-task-panel.tsx|tests/campus-staff-preview-panel.test.mjs) ;;
+                *) echo "Unexpected staff preview panel release change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified staff preview panel payload (code-only); current production, database and central release controls preserved.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-staff-preview-release-20261118" ]; then
             expected_main=788d8c709e0cbb15205a9ca2849eb0afa3f56e8e
             release_payload=4607f222b7e72d48978f7fd1d99d5fe464efa49c
