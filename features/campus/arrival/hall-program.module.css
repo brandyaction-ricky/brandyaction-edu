@@ -1,0 +1,9 @@
+.program { display: grid; gap: 0; margin-top: 24px; }
+.program section { border-top: 1px solid #dbe1e9; padding: 18px 0; }
+.program h3 { font-size: 18px; line-height: 1.5; margin: 0 0 5px; }
+.program p { line-height: 1.7; color: #465368; font-size: 15px; margin: 4px 0 8px; }
+.program .pending { font-size: 13px; }
+.program summary,.program a { width: fit-content; font-size: 15px; font-weight: 650; cursor: pointer; padding: 10px 0; }
+.program a { display: inline-flex; gap: 6px; align-items: center; color: #214d83; }
+.program video,.program iframe { display: block; width: 100%; background: #14263c; max-height: 300px; border: 0; border-radius: 8px; }
+.program iframe { aspect-ratio: 16 / 9; }

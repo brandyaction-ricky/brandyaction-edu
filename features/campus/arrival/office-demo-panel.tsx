@@ -2,7 +2,8 @@
 
 import {useEffect, useId, useRef} from 'react';
 import {ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, CornerDownRight, Monitor} from 'lucide-react';
-import {DEFAULT_OFFICE_DEMO, type OfficeDemoChoice, type OfficeDemoConfig, type OfficeDemoPhase} from './office-demo';
+import {type OfficeDemoChoice, type OfficeDemoConfig, type OfficeDemoPhase} from './office-demo';
+import {AdMaterial, CopyComparison, FeedbackChoices} from './office-demo-parts';
 import styles from './office-demo.module.css';
 
 type Props = {
@@ -42,30 +43,14 @@ export function OfficeDemo({config, phase, choice, onPhaseChange, onPersonal, on
         <div className={styles.paper}>
           <p className={styles.caption}>첫 문장</p>
           <p className={styles.headline}>{config.draft}</p>
-          <details className={styles.material}>
-            <summary>참고한 광고 자료<ChevronDown size={16} aria-hidden="true"/></summary>
-            {config.material === DEFAULT_OFFICE_DEMO.material &&
-              /* eslint-disable-next-line @next/next/no-img-element -- The local artwork is a single preview cut from the campaign storyboard. */
-              <img src="/campus/arrival/moonshot-ad-scene.webp" alt="문샷 모집 광고에 등장하는 AI 직원들" loading="lazy"/>}
-            <p>{config.material}</p>
-          </details>
+          <AdMaterial material={config.material}/>
         </div>
-        <fieldset className={styles.choices}>
-          <legend>어떤 방향으로 고쳐볼까요?</legend>
-          {config.choices.map((item, index) => <button
-            key={index}
-            type="button"
-            onClick={() => onPhaseChange('feedback', index === 0 ? 0 : 1)}
-          ><span>{item.feedback}</span><ArrowRight size={18} aria-hidden="true"/></button>)}
-        </fieldset>
+        <FeedbackChoices choices={config.choices} onSelect={index => onPhaseChange('feedback', index)}/>
         <p className={styles.note}>피드백을 누르면 체험용 수정안을 볼 수 있어요.</p>
       </>}
       {phase === 'feedback' && <>
         <p className={styles.request}><CornerDownRight size={17} aria-hidden="true"/><span>내 피드백<strong>{result.feedback}</strong></span></p>
-        <div className={styles.comparison}>
-          <div className={styles.previous}><p className={styles.caption}>첫 문장</p><p>{config.draft}</p></div>
-          <div className={styles.revision}><p className={styles.caption}>수정한 문장 · 체험 예시</p><p className={styles.headline}>{result.revised}</p></div>
-        </div>
+        <CopyComparison draft={config.draft} revised={result.revised}/>
         <button className={styles.revisit} type="button" onClick={() => onPhaseChange('draft', choice)}><ArrowLeft size={16} aria-hidden="true"/>다른 피드백으로 비교하기</button>
       </>}
       {phase === 'approved' && <>

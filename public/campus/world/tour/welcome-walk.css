@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+html, body, #walk { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #e3e2db; }
+#walk { position: relative; isolation: isolate; }
+#floor { display: block; width: 100%; height: 100%; touch-action: none; }
+#floor:focus-visible { outline: 2px solid #5d7f94; outline-offset: -3px; }
+#destination { position: absolute; left: 0; top: 0; min-height: 44px; padding: 8px 14px; border: 1px solid rgb(94 67 34 / 20%); border-radius: 13px; background: #fffdf7; color: #25231f; font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 9px #2c1c152e; cursor: pointer; touch-action: manipulation; }
+#destination[hidden] { display: none; }
+#destination:focus-visible { outline: 3px solid #b72b37; outline-offset: 3px; }
+.pointer { position: absolute; left: 50%; bottom: -5px; width: 8px; height: 8px; background: #fffdf7; transform: translateX(-50%) rotate(45deg); border-right: 1px solid #ded6c8; border-bottom: 1px solid #ded6c8; }
+#destination[data-edge="right"] .pointer { left: auto; right: -5px; bottom: calc(50% - 4px); transform: rotate(-45deg); }
+#destination[data-edge="left"] .pointer { left: -5px; bottom: calc(50% - 4px); transform: rotate(135deg); }
+@media (max-height: 330px) { #destination { min-height: 40px; } }

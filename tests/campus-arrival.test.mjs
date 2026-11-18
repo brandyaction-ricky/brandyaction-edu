@@ -89,7 +89,7 @@ test('the reusable criteria preserve a personal correction and follow the demons
 
 test('leaving for a personal AI and returning restores all four draft paths', () => {
   const state = model.initialArrivalState();
-  state.step = 3;
+  state.step = 3; state.station = 6;
   state.handoff = 'copied';
   state.audience = 'preparing';
   state.answers.work = {a: '업무 메모', b: '읽는 사람과 목적'};
@@ -108,18 +108,19 @@ test('legacy three-route drafts retain their selected route and answers when wor
   assert.equal(content.audiences[0], 'work');
   for (const audience of ['business', 'preparing', 'exploring']) {
     const legacy = {...model.initialArrivalState(), audience, step: 3, handoff: 'copied'};
-    delete legacy.answers.work;
+    delete legacy.answers.work; delete legacy.station; delete legacy.companyRule;
     legacy.answers[audience] = {a: '원래 저장한 첫 답', b: '원래 저장한 두 번째 답'};
     const restored = model.parseArrivalState(JSON.stringify(legacy));
     assert.equal(restored.audience, audience);
     assert.equal(restored.step, 3);
+    assert.equal(restored.station, 6);
     assert.equal(restored.handoff, 'copied');
     assert.deepEqual(restored.answers[audience], legacy.answers[audience]);
     assert.deepEqual(restored.answers.work, {a: '', b: ''});
     assert.equal(restored.experience, 'none');
   }
   const work = model.initialArrivalState();
-  work.step = 3;
+  work.step = 3; work.station = 6;
   work.answers.work = {a: '보고할 메모', b: '팀장에게 진행 상황 공유'};
   assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(work)), work);
 });
@@ -165,7 +166,7 @@ test('back navigation follows the personal, example and direct-calendar paths', 
 test('the audience selection resumes separately from the welcome introduction without losing drafts', () => {
   const state = model.initialArrivalState();
   assert.equal(state.step, 0, 'new visitors start with the welcome introduction');
-  state.step = 8;
+  state.step = 8; state.station = 6;
   state.audience = 'exploring';
   state.answers.exploring = {a: '동료에게 엑셀 정리를 설명했어요.', b: '엑셀을 처음 쓰는 동료예요.'};
   const restored = model.parseArrivalState(model.serializeArrivalState(state));

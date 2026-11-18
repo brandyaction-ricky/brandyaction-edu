@@ -95,7 +95,7 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
     <p className={styles.scope}>편집 후 하단 ‘설정 저장’을 눌러야 보관됩니다. 저장해도 모집 체험이 자동 공개되지 않습니다.</p>
     {error && <p ref={errorBox} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
 
-    <EditorDisclosure title="사무실 입장 · 광고 직원 시연" initialOpen>
+    <EditorDisclosure title="사무실 직원 체험 · 회사 기준" initialOpen>
       <OfficeDemoEditor disabled={disabled} value={value.officeDemo} onChange={next => patch('officeDemo', next)}/>
     </EditorDisclosure>
 
@@ -146,6 +146,7 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
           <AdminInput label="시작 일시 · 한국시간" type="datetime-local" required value={koreanDateTime(value.startsAt)} onChange={event => patch('startsAt', fromKoreanDateTime(event.target.value))}/>
           <AdminInput label="종료 일시 · 한국시간 · 선택" type="datetime-local" helper="미정이면 비워두세요. 임의 종료 시각을 일정에 넣지 않습니다." value={koreanDateTime(value.endsAt)} onChange={event => patch('endsAt', event.target.value ? fromKoreanDateTime(event.target.value) : null)}/>
         </div>
+        <AdminTextarea label="강의 후 공개 특전 · 공개할 미리보기 문구" maxLength={500} rows={2} value={value.bonusPreview ?? ''} onChange={event => patch('bonusPreview', event.target.value)}/>
         <AdminInput label="유튜브 라이브 주소 · 선택" type="url" maxLength={limits.url} helper="아직 없으면 비워두세요. 화면에는 링크 안내 예정으로 표시합니다." placeholder="https://www.youtube.com/watch?v=…" value={value.liveUrl} onChange={event => patch('liveUrl', event.target.value)}/>
         <p className={styles.scope}>무료 체험의 일정 안내에 사용합니다. 기존 행사 설정의 시작·종료 시간은 자동으로 바뀌지 않습니다.</p>
       </fieldset>

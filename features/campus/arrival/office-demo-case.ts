@@ -1,0 +1,27 @@
+import {welcomeCase} from './case-data';
+import {DEFAULT_OFFICE_DEMO, type OfficeDemoChoice, type OfficeDemoConfig} from './office-demo';
+
+type CaseChoice = OfficeDemoConfig['choices'][number] & {approvedAnswer: string};
+
+// Earlier event records can contain the previous campaign defaults alongside edited fields.
+export function officeCaseContent(demo: OfficeDemoConfig) {
+  const original = DEFAULT_OFFICE_DEMO;
+  function choice(index: OfficeDemoChoice): CaseChoice {
+    const saved = demo.choices[index], previous = original.choices[index], example = welcomeCase.rules[index];
+    return {
+      feedback: saved.feedback === previous.feedback ? example.label : saved.feedback,
+      revised: saved.revised === previous.revised ? example.approvedIntro : saved.revised,
+      rule: saved.rule === previous.rule ? example.label : saved.rule,
+      approvedAnswer: saved.approvedAnswer || example.approvedAnswer,
+    };
+  }
+  const choices: [CaseChoice, CaseChoice] = [choice(0), choice(1)];
+  return {
+    ...demo,
+    greeting: demo.greeting === original.greeting ? '우리 팀이 만든 광고부터 보실래요?' : demo.greeting,
+    brief: demo.brief === original.brief ? welcomeCase.positioning : demo.brief,
+    material: demo.material === original.material ? welcomeCase.sources.map(source => source.label).join(' · ') : demo.material,
+    draft: demo.draft === original.draft ? welcomeCase.intro : demo.draft,
+    choices,
+  };
+}

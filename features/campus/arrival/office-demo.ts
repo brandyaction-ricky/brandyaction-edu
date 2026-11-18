@@ -1,7 +1,7 @@
 export type OfficeDemoPhase = 'draft' | 'feedback' | 'approved';
 export type OfficeDemoChoice = 0 | 1;
 
-type Revision = { feedback: string; revised: string; rule: string };
+type Revision = { feedback: string; revised: string; rule: string; approvedAnswer?: string };
 
 export type OfficeDemoConfig = {
   greeting: string;
@@ -15,7 +15,7 @@ export type OfficeDemoConfig = {
 
 export const OFFICE_DEMO_LIMITS = {
   greeting: 160, deskLabel: 42, brief: 300, material: 500, draft: 180, teamNote: 400,
-  feedback: 100, revised: 180, rule: 240,
+  feedback: 100, revised: 180, rule: 240, approvedAnswer: 600,
 } as const;
 
 export const DEFAULT_OFFICE_DEMO: OfficeDemoConfig = {
@@ -46,10 +46,10 @@ function invalid(message: string): never {
 const plainFields = ['greeting', 'deskLabel', 'brief', 'material', 'draft', 'teamNote'] as const;
 const revisionFields = ['feedback', 'revised', 'rule'] as const;
 
-function exactRecord(value: unknown, fields: readonly string[]): Record<string, unknown> {
+function exactRecord(value: unknown, fields: readonly string[], optional: readonly string[] = []): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('광고 직원 시연 설정을 확인해 주세요.');
   const result = value as Record<string, unknown>;
-  if (Object.keys(result).length !== fields.length || fields.some(key => !Object.hasOwn(result, key))) {
+  if (Object.keys(result).some(key => !fields.includes(key) && !optional.includes(key)) || fields.some(key => !Object.hasOwn(result, key))) {
     invalid('광고 직원 시연의 설정 항목을 확인해 주세요.');
   }
   return result;
@@ -74,7 +74,12 @@ export function validateOfficeDemoConfig(input: unknown): OfficeDemoConfig {
   const record = exactRecord(input, [...plainFields, 'choices']);
   const choices = record.choices;
   if (!Array.isArray(choices) || choices.length !== 2) invalid('광고 직원이 반영할 피드백을 두 가지 입력해 주세요.');
-  const revision = (value: unknown) => editorialText(exactRecord(value, revisionFields), revisionFields);
+  function revision(value: unknown): Revision {
+    const record = exactRecord(value, revisionFields, ['approvedAnswer']);
+    const fields = editorialText(record, revisionFields);
+    if (!Object.hasOwn(record, 'approvedAnswer') || record.approvedAnswer === '') return fields;
+    return {...fields, ...editorialText(record, ['approvedAnswer'])};
+  }
   return {
     ...editorialText(record, plainFields),
     choices: [revision(choices[0]), revision(choices[1])],

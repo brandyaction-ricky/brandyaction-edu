@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>문샷 웰컴존 · AI 직원의 사무실</title>
+  <link rel="stylesheet" href="./welcome-walk.css">
+  <link rel="modulepreload" href="../office/vendor/office.js">
+  <link rel="modulepreload" href="../office/vendor/office3d.js">
+</head>
+<body>
+  <main id="walk" data-ready="false">
+    <canvas id="floor" tabindex="0" aria-label="문샷 사무실 복도. 방향키나 WASD로 걷고, 목적지를 눌러 다가가세요."></canvas>
+    <button id="destination" hidden><span id="destination-label"></span><span class="pointer" aria-hidden="true"></span></button>
+  </main>
+  <script type="module" src="./welcome-walk.mjs"></script>
+</body>
+</html>

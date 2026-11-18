@@ -6,7 +6,10 @@ export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
 export const ARRIVAL_STORAGE_LIMIT = 32_000;
 export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type ArrivalState = {
+  station: CorridorStation;
+  companyRule: OfficeDemoChoice | null;
   version: 1;
   step: ArrivalStep;
   audience: Audience;
@@ -20,7 +23,7 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, companyRule: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -58,6 +61,15 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     if (object(desk) && (desk.phase === 'feedback' || desk.phase === 'approved') && (desk.choice === 0 || desk.choice === 1)) {
       state.deskReview = {phase: desk.phase, choice: desk.choice};
     }
+    state.companyRule = value.companyRule === 0 || value.companyRule === 1 ? value.companyRule : null;
+    // Existing personal exercises and calendar drafts reopen at their own destination.
+    if (state.step === 7) state.station = 7;
+    else if (state.step !== 0) state.station = 6;
+    else if (typeof value.station === 'number' && Number.isInteger(value.station) && value.station >= 1 && value.station <= 7) {
+      state.station = value.station as CorridorStation;
+      if (state.station > 3 && state.deskReview.phase !== 'approved') state.station = 3;
+    } else if (state.deskReview.phase === 'approved') state.station = 4;
+    else if (state.deskReview.phase === 'feedback') state.station = 3;
     state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
   } catch {

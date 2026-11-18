@@ -7,6 +7,8 @@ async function bundle(path) {
   return import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64'));
 }
 const {DEFAULT_ARRIVAL} = await bundle('features/campus/arrival/config.ts');
+const {officeCaseContent} = await bundle('features/campus/arrival/office-demo-case.ts');
+const {welcomeCase} = await bundle('features/campus/arrival/case-data.ts');
 const {DEFAULT_WELCOME, validateWelcome, visibleWelcome} = await bundle('features/campus/welcome/content.ts');
 const {validateWebinar, projectWebinar} = await bundle('features/campus/webinar/domain.ts');
 const event = {
@@ -28,6 +30,7 @@ test('webinar save validation preserves edited recruitment settings and existing
   arrival.title = '운영자가 수정한 첫 안내';
   arrival.officeDemo.greeting = '새 광고의 첫 문장을 함께 골라주세요.';
   arrival.officeDemo.choices[1].rule = '회의 중 결정된 내용부터 소개한다.';
+  arrival.officeDemo.choices[1].approvedAnswer = '이번 회의에서 정한 내용부터 알려드릴게요.';
   arrival.audiences.preparing.example.after = '운영자가 수정한 창업 질문 세 개';
   arrival.endsAt = null;
   const input = {...event, welcome: DEFAULT_WELCOME, arrival};
@@ -38,6 +41,39 @@ test('webinar save validation preserves edited recruitment settings and existing
   assert.equal(saved.arrival.endsAt, null);
   assert.equal(Date.parse(saved.endsAt), Date.parse(event.endsAt));
   assert.deepEqual(saved.welcome, validateWelcome(DEFAULT_WELCOME));
+});
+
+test('office answer examples are optional per rule, can be cleared, and use the same validation as editorial text', () => {
+  const arrival = structuredClone(DEFAULT_ARRIVAL);
+  const choice = arrival.officeDemo.choices[0];
+  assert.deepEqual(validateWebinar({...event, arrival}).arrival.officeDemo.choices, arrival.officeDemo.choices);
+  choice.approvedAnswer = '';
+  assert.equal(Object.hasOwn(validateWebinar({...event, arrival}).arrival.officeDemo.choices[0], 'approvedAnswer'), false);
+  choice.approvedAnswer = '  답변 첫 줄\r\n둘째 줄  ';
+  assert.equal(validateWebinar({...event, arrival}).arrival.officeDemo.choices[0].approvedAnswer, '답변 첫 줄\n둘째 줄');
+  for (const bad of [null, 4, '가'.repeat(601), '문\u0007장']) {
+    choice.approvedAnswer = bad;
+    assert.throws(() => validateWebinar({...event, arrival}), {status: 400});
+  }
+  delete choice.approvedAnswer;
+  choice.unknown = '저장하면 안 되는 필드';
+  assert.throws(() => validateWebinar({...event, arrival}), {status: 400});
+});
+
+test('the demo and editor resolve the current example while preserving individually edited legacy fields', () => {
+  const arrival = structuredClone(DEFAULT_ARRIVAL);
+  const saved = arrival.officeDemo;
+  saved.greeting = '담당자의 자료를 함께 살펴볼까요?';
+  saved.choices[1].rule = '다음 단계에서 정할 일을 먼저 설명한다.';
+  saved.choices[1].approvedAnswer = '오늘 결정할 일을 먼저 볼까요?';
+  const shown = officeCaseContent(validateWebinar({...event, arrival}).arrival.officeDemo);
+  assert.equal(shown.greeting, saved.greeting);
+  assert.equal(shown.draft, welcomeCase.intro);
+  assert.equal(shown.choices[0].approvedAnswer, welcomeCase.rules[0].approvedAnswer);
+  assert.equal(shown.choices[1].revised, welcomeCase.rules[1].approvedIntro);
+  assert.equal(shown.choices[1].rule, saved.choices[1].rule);
+  assert.equal(shown.choices[1].approvedAnswer, saved.choices[1].approvedAnswer);
+  assert.equal(Object.hasOwn(saved.choices[0], 'approvedAnswer'), false);
 });
 
 test('previously saved recruitment welcome adds the office demo without mutating campaign edits', () => {

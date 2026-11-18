@@ -57,3 +57,21 @@
   color: var(--ink);
   font-size: 14px;
 }
+
+.progress { display: flex; align-items: center; gap: 12px; color: #162d48; white-space: nowrap; }
+.progress span { font-size: 14px; font-weight: 650; }
+.progress i { width: 1px; height: 14px; background: #ccd3df; }
+.progress b { font-size: 12px; letter-spacing: .06em; color: #45659a; }
+.progress strong { font-size: 15px; }
+.wayfinding { position: absolute; left: clamp(14px, 3vw, 40px); bottom: max(18px, env(safe-area-inset-bottom)); z-index: 2; display: flex; align-items: center; gap: 20px; width: fit-content; max-width: calc(100% - 28px); background: #fffffff5; border: 1px solid #d4dfed; color: #142b48; border-radius: 14px; box-shadow: 0 4px 24px #17304b24; padding: 13px 16px; }
+.wayfinding h1 { margin: 0; font-size: clamp(17px, 2vw, 22px); line-height: 1.45; }
+.wayfinding span { font-size: 12px; color: #516375; }
+.wayfinding p { margin: 3px 0 0; font-size: 13px; color: #41556a; }
+.wayfinding button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; background: #173b69; color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 650; white-space: nowrap; }
+@media (max-width: 700px) {
+  .progress { margin-left: auto; margin-right: 10px; gap: 4px; }
+  .progress span, .progress i, .progress strong { display: none; }
+  .wayfinding { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); max-width: none; width: auto; justify-content: space-between; gap: 8px; padding: 10px 12px; }
+  .wayfinding h1 { font-size: 17px; }
+  .wayfinding p { font-size: 12px; }
+}

@@ -24,6 +24,7 @@ export type ArrivalConfig = {
   instructorName: string;
   instructorIntro: string;
   videoUrl: string;
+  bonusPreview?: string;
   liveTitle: string;
   startsAt: string;
   endsAt: string | null;
@@ -115,7 +116,7 @@ function requestTemplate(value: unknown, label: string): string {
 
 /** Strict input boundary used by both the administrator editor and the public reader. */
 export function validateArrivalConfig(value: unknown): ArrivalConfig {
-  const v = record(value, ['version', 'title', 'description', 'welcomeBenefits', 'workTrial', 'officeDemo', 'instructorName', 'instructorIntro', 'videoUrl', 'liveTitle', 'startsAt', 'endsAt', 'liveUrl', 'audiences'], '무료 체험', ['welcomeBenefits', 'workTrial', 'officeDemo']);
+  const v = record(value, ['version', 'title', 'description', 'welcomeBenefits', 'workTrial', 'officeDemo', 'instructorName', 'instructorIntro', 'videoUrl', 'liveTitle', 'startsAt', 'endsAt', 'liveUrl', 'audiences', 'bonusPreview'], '무료 체험', ['welcomeBenefits', 'workTrial', 'officeDemo','bonusPreview']);
   if (v.version !== 1) fail('무료 체험 설정 버전을 확인해 주세요.');
   const groups = record(v.audiences, audiences, '체험 대상', ['work']);
   const parsedAudiences = {} as Record<Audience, ArrivalAudienceConfig>;
@@ -157,6 +158,7 @@ export function validateArrivalConfig(value: unknown): ArrivalConfig {
     instructorName: text(v.instructorName, ARRIVAL_CONFIG_LIMITS.instructorName, '강사 이름'),
     instructorIntro: text(v.instructorIntro, ARRIVAL_CONFIG_LIMITS.instructorIntro, '강사·팀 소개'),
     videoUrl,
+    ...(v.bonusPreview !== undefined ? {bonusPreview: text(v.bonusPreview, 500, '특전 미리보기', false)} : {}),
     liveTitle: text(v.liveTitle, ARRIVAL_CONFIG_LIMITS.liveTitle, '라이브 제목'),
     startsAt: timestamp(v.startsAt, '라이브 시작 시각'),
     endsAt: v.endsAt === null ? null : timestamp(v.endsAt, '라이브 종료 시각'),

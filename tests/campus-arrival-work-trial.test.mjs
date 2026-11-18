@@ -182,7 +182,7 @@ test('editing earlier decisions clears dependent completion but keeps the visito
 
 test('leaving for personal AI restores the real drafts and self-reported checks without creating them', () => {
   const state = model.initialArrivalState();
-  state.workTrial = completed(); state.step = 1;
+  state.workTrial = completed(); state.step = 1; state.station = 6;
   assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(state)), state);
   const legacy = {...state}; delete legacy.workTrial;
   assert.deepEqual(model.parseArrivalState(JSON.stringify(legacy)).workTrial, trial.initialWorkTrialState());
