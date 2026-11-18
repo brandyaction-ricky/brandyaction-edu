@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Exercise the actual React screen with deterministic transport failures and
 // responses. These tests never write to DEV/Production, Auth or Meta.
-async function fixture(page: Page, failClassification = false, metaOnly = false, multipleCampaigns = false) {
+async function fixture(page: Page, failClassification = false, metaOnly = false, multipleCampaigns = false, otherCreatives = false) {
   let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', updated_at: '2026-10-20T00:00:00Z', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: metaOnly, meta_ad_account_id: metaOnly ? 'act_245402678098216' : null, meta_campaign_ids: metaOnly ? ['120252432290300270'] : [], meta_sync_status: metaOnly ? 'success' : 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
   const sourceRows = metaOnly ? Array.from({ length: 8 }, (_, index) => ({ creative: `cr${String(index + 1).padStart(2, '0')}`, sessions: 0, visitors: 0, cta_click_sessions: 0, cta_clicks: 0 })) : [
     { creative: '소재 60', sessions: 60, visitors: 30, cta_click_sessions: 20, cta_clicks: 60 },
@@ -10,6 +10,11 @@ async function fixture(page: Page, failClassification = false, metaOnly = false,
     { creative: '소재 2', sessions: 2, visitors: 1, cta_click_sessions: 2, cta_clicks: 6 },
   ];
   const rows = sourceRows.map((row, index) => ({ ...row, campaign: metaOnly ? 'META_Cold_카톡방입장_2609' : 'qa', adset: metaOnly ? 'A_메인_브로드_25-54' : '광고세트', ad_type: 'unclassified', impressions: metaOnly ? 1000 + index : 0, link_clicks: metaOnly ? 50 + index : 0, spend: metaOnly ? 10000 + index : 0, landing_page_views: metaOnly ? 696 + index : null, landing_page_view_available: metaOnly, registration_available: metaOnly, registration_cost: null, registrations: metaOnly ? 5 + index : 0, avg_scroll_depth: metaOnly ? null : 50, avg_dwell_ms: metaOnly ? null : 60000 }));
+  if (otherCreatives) {
+    rows[0].creative = 'COLD_소재';
+    rows.push({ ...rows[0], adset: '확인 필요한 광고세트', creative: 'RT_보조 소재', spend: 0, registration_available: false });
+    rows.push({ ...rows[0], adset: '{{adset.name}}', creative: '{{ad.name}}', impressions: 0, link_clicks: 0, spend: 0, registrations: 0, landing_page_views: null, landing_page_view_available: false, registration_available: false });
+  }
   let classificationRequests = 0;
   const created: typeof campaign[] = [], saves: Record<string, unknown>[] = [];
   await page.route('**/api/landing/performance**', async route => {
@@ -67,6 +72,32 @@ test('Meta-only dimensions populate all supported filters and reset without web-
   await page.getByRole('button', { name: '전체 초기화', exact: true }).last().click();
   await expect(page).not.toHaveURL(/creative=/);
   await expect(page.getByRole('region', { name: '소재별 성과표' }).locator('tbody tr')).toHaveCount(8);
+});
+
+test('paid report groups selected Meta rows and opens zero-spend creatives on demand', async ({ page }, testInfo) => {
+  const result = await fixture(page, false, true, false, true);
+  const groups = page.getByRole('region', { name: '광고세트별 성과표' });
+  await expect(groups.locator('tbody tr')).toHaveCount(2);
+  const primary = groups.getByRole('row').filter({ hasText: 'A_메인_브로드_25-54' });
+  await expect(primary).toContainText('80,028원');
+  await expect(primary.getByRole('cell', { name: '68', exact: true })).toBeVisible();
+  await expect(groups.getByRole('row').filter({ hasText: '확인 필요한 광고세트' }).getByRole('cell', { name: '미수집', exact: true })).toHaveCount(2);
+  const creatives = page.getByRole('region', { name: '소재별 성과표' });
+  await expect(creatives.locator('tbody tr')).toHaveCount(8);
+  await expect(creatives.getByText('분류 제안 · 콜드')).toBeVisible();
+  await expect(creatives.getByRole('columnheader', { name: 'Meta CPM' })).toBeVisible();
+
+  const other = page.getByRole('button', { name: '기타 소재 2개 보기' });
+  await expect(other).toHaveAttribute('aria-expanded', 'false');
+  await other.click();
+  await expect(creatives.locator('tbody tr')).toHaveCount(10);
+  await expect(creatives.getByText('분류 제안 · 리타겟')).toBeVisible();
+  await expect(creatives.getByText('광고 URL 변수 미치환')).toBeVisible();
+  await expect(page.getByRole('button', { name: '기타 소재 2개 접기' })).toHaveAttribute('aria-expanded', 'true');
+  expect(result.requests()).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await groups.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('ad-set-and-creatives.png') });
 });
 
 test('sample threshold persists and conversion sorting keeps insufficient rows last in both directions', async ({ page }) => {

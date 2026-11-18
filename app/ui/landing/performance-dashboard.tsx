@@ -7,7 +7,8 @@ import { delta, displayDimension, rate, type DashboardReport } from '@/lib/landi
 import { count, money, signed, kstTime } from '@/lib/landing-admin-state';
 import { AdminButton, AdminDataTable, AdminMetric, AdminMetricGrid, AdminSection, AdminStatusBadge } from '@/features/admin-ui';
 import { CompactEmpty, InlineError } from './tracking-controls';
-import { DEFAULT_SAMPLE_MIN, funnelRate, parseSampleMin, sortPerformance, type SortKey } from '@/lib/landing-operations-phase1';
+import { DEFAULT_SAMPLE_MIN, funnelRate, hasUnresolvedAdParameter, parseSampleMin, sortPerformance, suggestAdType, summarizeAdSets, type SortKey } from '@/lib/landing-operations-phase1';
+import { adMetric } from '@/lib/landing-ad-trends';
 import { registrationCost } from '@/lib/landing-campaign-management';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';
 import { AdTypeControl, type Classify } from './ad-type-control';
@@ -91,18 +92,72 @@ export function TrendChart({ report, compare, onRetry }: { report: DashboardRepo
     </>}
   </AdminSection>;
 }
-const columns: [SortKey, string][] = [['adset', '광고세트'], ['creative', '소재'], ['sessions', '방문'], ['visitors', '고유 방문자'], ['cta_click_sessions', 'CTA 클릭 세션'], ['conversion', '방문 전환율'], ['avg_scroll_depth', '평균 스크롤'], ['avg_dwell_ms', '평균 체류'], ['spend', '광고비'], ['ctr', 'Meta CTR'], ['landing_page_views', 'Meta 랜딩 조회'], ['registrations', 'Meta 등록완료'], ['registration_cost', '등록완료 결과당 비용']];
+function AdSetSummary({ report }: { report: DashboardReport }) {
+  const groups = useMemo(() => summarizeAdSets(report.performance), [report.performance]);
+  if (!report.campaign.uses_ads || !report.data_state.meta_exists || !groups.length) return null;
+
+  return <AdminSection bordered title="광고세트별 성과" description="선택 기간·필터의 Meta 소재를 캠페인과 광고세트 표시 이름으로 묶어 합산합니다.">
+    <AdminDataTable label="광고세트별 성과표" className="tracking-adset-scroll">
+      <thead><tr>
+        <th scope="col">광고세트</th>
+        <th scope="col">캠페인</th>
+        <th scope="col" data-align="number">광고비</th>
+        <th scope="col" data-align="number">Meta 노출</th>
+        <th scope="col" data-align="number">Meta 링크 클릭</th>
+        <th scope="col" data-align="number">Meta CTR</th>
+        <th scope="col" data-align="number">Meta CPM</th>
+        <th scope="col" data-align="number">Meta 등록완료</th>
+        <th scope="col" data-align="number">등록완료 결과당 비용</th>
+      </tr></thead>
+      <tbody>{groups.map(group => {
+        const registrationStatus = group.registration_state === 'missing' ? '미수집' : group.registration_state === 'unknown' ? '확인 필요' : null;
+        const cpa = adMetric(group, 'cpa');
+        const cpm = adMetric(group, 'cpm');
+        return <tr key={JSON.stringify([group.campaign, group.adset])}>
+          <th scope="row">{group.adset}</th>
+          <td>{group.campaign}</td>
+          <td data-align="number">{money(group.spend)}</td>
+          <td data-align="number">{count(group.impressions)}</td>
+          <td data-align="number">{count(group.link_clicks)}</td>
+          <td data-align="number">{percentage(adMetric(group, 'ctr'))}</td>
+          <td data-align="number">{cpm === null ? '계산 불가' : money(cpm)}</td>
+          <td data-align="number">{registrationStatus ?? count(group.registrations)}</td>
+          <td data-align="number" title="광고세트 광고비 ÷ Meta 등록완료">{registrationStatus ?? (cpa == null ? '계산 불가' : money(cpa))}</td>
+        </tr>;
+      })}</tbody>
+    </AdminDataTable>
+  </AdminSection>;
+}
+
+const columns: [SortKey, string][] = [['adset', '광고세트'], ['creative', '소재'], ['sessions', '방문'], ['visitors', '고유 방문자'], ['cta_click_sessions', 'CTA 클릭 세션'], ['conversion', '방문 전환율'], ['avg_scroll_depth', '평균 스크롤'], ['avg_dwell_ms', '평균 체류'], ['spend', '광고비'], ['ctr', 'Meta CTR'], ['landing_page_views', 'Meta 랜딩 조회'], ['registrations', 'Meta 등록완료'], ['registration_cost', '등록완료 결과당 비용'], ['cpm', 'Meta CPM']];
 export function PerformanceTable({ report, onClassify, pending = false, sampleMin = String(DEFAULT_SAMPLE_MIN), onSampleMin, filterSummary = '적용된 상세 필터 없음' }: { report: DashboardReport; onClassify: Classify; pending?: boolean; sampleMin?: string; onSampleMin?: (value: string) => void; filterSummary?: string }) {
   const [sort, setSort] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'sessions', direction: 'desc' });
+  const [showOther, setShowOther] = useState(false);
   const threshold = parseSampleMin(sampleMin) ?? DEFAULT_SAMPLE_MIN;
   const rows = useMemo(() => sortPerformance(report.performance, sort.key, sort.direction, threshold), [report.performance, sort, threshold]);
+  const usePaidView = report.campaign.uses_ads && report.data_state.meta_exists;
+  const paidRows = usePaidView ? rows.filter(row => row.spend > 0) : rows;
+  const otherCount = rows.length - paidRows.length;
+  const shownRows = showOther ? rows : paidRows;
   return <AdminSection bordered title="소재별 성과" description={`${count(rows.length)}개 소재 · 열 제목을 눌러 정렬`} className="tracking-performance-section" actions={<label className="tracking-sample-min">표본 기준 · 방문<input className="admin-input" type="number" inputMode="numeric" min="1" max="10000" step="1" value={sampleMin} aria-invalid={parseSampleMin(sampleMin) === null} aria-describedby="tracking-sample-help" onChange={event => onSampleMin?.(event.target.value)}/></label>}>
     <p id="tracking-sample-help" className="tracking-help" role={parseSampleMin(sampleMin) === null ? 'alert' : undefined}>{parseSampleMin(sampleMin) === null ? '1~10,000의 정수를 입력해 주세요. 유효한 값이 입력될 때까지 기본 기준 30회를 사용합니다.' : `방문 ${count(threshold)}회 미만은 표본 부족으로 표시하며 전환율 정렬에서 뒤에 배치합니다. 원본 수치와 CSV는 유지됩니다.`}</p>
-    {rows.length ? <AdminDataTable label="소재별 성과표" tableClassName="tracking-performance-table"><thead><tr className="tracking-performance-context"><th scope="col" colSpan={columns.length + 1}>적용 필터 · {filterSummary}</th></tr><tr><th scope="col">광고 유형</th>{columns.map(([key, label]) => <th scope="col" data-align={['adset','creative'].includes(key) ? undefined : 'number'} key={key} aria-sort={sort.key === key ? sort.direction === 'desc' ? 'descending' : 'ascending' : 'none'}><button type="button" onClick={() => setSort({ key, direction: sort.key === key && sort.direction === 'desc' ? 'asc' : 'desc' })}>{label}{sort.key === key ? sort.direction === 'desc' ? <ArrowDown size={12} aria-hidden="true"/> : <ArrowUp size={12} aria-hidden="true"/> : <ArrowUpDown size={12} aria-hidden="true"/>}</button></th>)}</tr></thead><tbody>{rows.map(row => <tr key={JSON.stringify([row.campaign, row.adset, row.creative])}>
-      <td><AdTypeControl key={row.ad_type} row={row} disabled={pending} onSave={onClassify}/></td>
-      <th scope="row" className="tracking-identifier"><span tabIndex={0} title={displayDimension(row.adset)}>{displayDimension(row.adset)}</span></th><td className="tracking-identifier"><span tabIndex={0} title={`${displayDimension(row.creative)} · 캠페인: ${displayDimension(row.campaign)}`}>{displayDimension(row.creative)}</span>{!row.adset && !row.creative && row.sessions > 0 && <small className="tracking-help">광고 URL 매개변수가 전달되지 않음 (단축주소 등)</small>}</td>
+    {otherCount > 0 && <div className="tracking-other-creatives">
+      <AdminButton aria-expanded={showOther} onClick={() => setShowOther(value => !value)}>
+        기타 소재 {count(otherCount)}개 {showOther ? '접기' : '보기'}
+      </AdminButton>
+      {!shownRows.length && <span className="tracking-help">선택 기간에 광고비가 잡힌 소재가 없습니다.</span>}
+    </div>}
+    {rows.length ? <AdminDataTable label="소재별 성과표" tableClassName="tracking-performance-table"><thead><tr className="tracking-performance-context"><th scope="col" colSpan={columns.length + 1}>적용 필터 · {filterSummary}</th></tr><tr><th scope="col">광고 유형</th>{columns.map(([key, label]) => <th scope="col" data-align={['adset','creative'].includes(key) ? undefined : 'number'} key={key} aria-sort={sort.key === key ? sort.direction === 'desc' ? 'descending' : 'ascending' : 'none'}><button type="button" onClick={() => setSort({ key, direction: sort.key === key && sort.direction === 'desc' ? 'asc' : 'desc' })}>{label}{sort.key === key ? sort.direction === 'desc' ? <ArrowDown size={12} aria-hidden="true"/> : <ArrowUp size={12} aria-hidden="true"/> : <ArrowUpDown size={12} aria-hidden="true"/>}</button></th>)}</tr></thead><tbody>{shownRows.map(row => {
+      const adTypeSuggestion = suggestAdType(row);
+      const cpm = adMetric(row, 'cpm');
+      const unresolvedParameter = [row.campaign, row.adset, row.creative].some(hasUnresolvedAdParameter);
+      return <tr key={JSON.stringify([row.campaign, row.adset, row.creative])}>
+      <td><AdTypeControl key={row.ad_type} row={row} disabled={pending} onSave={onClassify}/>{adTypeSuggestion && <small className="tracking-help">분류 제안 · {adTypeSuggestion}</small>}</td>
+      <th scope="row" className="tracking-identifier"><span tabIndex={0} title={displayDimension(row.adset)}>{displayDimension(row.adset)}</span></th><td className="tracking-identifier"><span tabIndex={0} title={`${displayDimension(row.creative)} · 캠페인: ${displayDimension(row.campaign)}`}>{displayDimension(row.creative)}</span>{unresolvedParameter ? <small className="tracking-help">광고 URL 변수 미치환</small> : !row.adset && !row.creative && row.sessions > 0 && <small className="tracking-help">광고 URL 매개변수가 전달되지 않음 (단축주소 등)</small>}</td>
       <td data-align="number">{count(row.sessions)}</td><td data-align="number">{count(row.visitors)}</td><td data-align="number" title={`전체 클릭 ${count(row.cta_clicks)}회`}>{count(row.cta_click_sessions)}</td><td data-align="number" title={row.sessions ? `CTA 클릭 세션 ${count(row.cta_click_sessions)} ÷ 방문 ${count(row.sessions)} = ${rate(row.cta_click_sessions, row.sessions).toFixed(1)}%` : '분모가 0이므로 계산할 수 없습니다.'}>{row.sessions < threshold ? <span className="tracking-low-sample">표본 부족<small>방문 {count(row.sessions)}회</small></span> : `${rate(row.cta_click_sessions, row.sessions).toFixed(1)}%`}</td><td data-align="number">{row.avg_scroll_depth == null ? '—' : `${count(row.avg_scroll_depth)}%`}</td><td data-align="number">{row.avg_dwell_ms == null ? '—' : `${count(row.avg_dwell_ms / 1000)}초`}</td><td data-align="number">{money(row.spend)}</td><td data-align="number" title={`Meta 노출 ${count(row.impressions)} · Meta 링크 클릭 ${count(row.link_clicks)}`}>{row.impressions ? `${rate(row.link_clicks, row.impressions).toFixed(1)}%` : '계산 불가'}</td><td data-align="number" title="Meta landing_page_view · EDU 방문과 별도로 집계합니다.">{row.landing_page_view_available === true ? count(row.landing_page_views) : row.landing_page_view_available === false ? '미수집' : '확인 필요'}</td><td data-align="number" title={row.registration_available === false ? 'Meta에서 완료 등록 결과가 확인되지 않았습니다. 동기화 성공 여부와 별개로 결과를 미수집으로 표시합니다.' : row.registration_available == null ? '마지막 수집 당시 action별 수집 상태를 보관하지 않은 기존 기록입니다.' : undefined}>{row.registration_available === false ? '미수집' : row.registration_available == null ? '확인 필요' : count(row.registrations)}</td><td data-align="number" title={row.registration_cost == null ? '광고비 ÷ Meta 등록완료 · 원 단위 반올림' : 'Meta cost_per_action_type 원본값'}>{row.registration_available === false ? '미수집' : row.registration_available == null ? '확인 필요' : row.registrations === 0 ? '계산 불가' : money(Math.round(registrationCost(row)!))}{registrationCost(row) != null && <small className="tracking-help">{row.registration_cost == null ? '광고비 ÷ 등록완료' : 'Meta 원본'}</small>}</td>
-    </tr>)}</tbody></AdminDataTable> : <CompactEmpty title={report.data_state.sessions_exist ? '조건에 맞는 데이터가 없습니다.' : '선택 기간에 수집된 소재 데이터가 없습니다.'}>{report.data_state.sessions_exist ? '상세 필터를 초기화하거나 조회 기간을 변경해 주세요.' : 'UTM 또는 캠페인 설정의 Meta 연결 상태를 확인해 주세요.'}</CompactEmpty>}</AdminSection>;
+      <td data-align="number" title="광고비 ÷ Meta 노출 × 1,000">{cpm === null ? '계산 불가' : money(cpm)}</td>
+    </tr>;
+    })}</tbody></AdminDataTable> : <CompactEmpty title={report.data_state.sessions_exist ? '조건에 맞는 데이터가 없습니다.' : '선택 기간에 수집된 소재 데이터가 없습니다.'}>{report.data_state.sessions_exist ? '상세 필터를 초기화하거나 조회 기간을 변경해 주세요.' : 'UTM 또는 캠페인 설정의 Meta 연결 상태를 확인해 주세요.'}</CompactEmpty>}</AdminSection>;
 }
 const percentage = (value: number | null) => value === null ? '계산 불가' : `${value.toFixed(1)}%`;
 export function PerformanceDashboard({ report, compare, onClassify, pending, onRetry, filtered = false, sampleMin, onSampleMin, filterSummary }: { report: DashboardReport; compare: boolean; onClassify: Classify; pending?: boolean; onRetry?: () => void; filtered?: boolean; sampleMin?: string; onSampleMin?: (value: string) => void; filterSummary?: string }) {
@@ -154,6 +209,7 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
     {report.ui?.errors.insights && <InlineError onRetry={onRetry}>{report.ui.errors.insights}</InlineError>}
     {report.ui?.insights && <PerformanceInsights insights={report.ui.insights}/>}
     <div className="tracking-detail-heading"><div><h2>광고 소재 비교</h2><p className="tracking-help">EDU 방문·CTA와 Meta 랜딩 조회·등록완료는 서로 다른 집계입니다. UTM이 없는 방문은 소재에 추정 배분하지 않습니다.</p></div><AdminButton size="sm" aria-pressed={details} onClick={() => setDetails(value => !value)}>{details ? '핵심 항목만 보기' : '상세 항목 보기'}</AdminButton></div>
+    <AdSetSummary report={report}/>
     <PerformanceTable report={report} onClassify={onClassify} pending={pending} sampleMin={sampleMin} onSampleMin={onSampleMin} filterSummary={filterSummary}/>
     <TrendChart report={report} compare={compare} onRetry={onRetry}/>
   </div>;

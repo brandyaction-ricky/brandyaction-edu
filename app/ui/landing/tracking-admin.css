@@ -66,6 +66,11 @@
 .edu-admin .tracking-metric-details{border:1px solid var(--admin-border);border-radius:12px;padding:4px 16px;background:var(--admin-surface,#fff)}
 .edu-admin .tracking-funnel .admin-metric{border-radius:14px;box-shadow:0 2px 8px #17203304}
 .edu-admin .tracking-performance-table thead th{white-space:nowrap}
+.edu-admin .tracking-adset-scroll .admin-table-scroll{max-height:360px}
+.edu-admin .tracking-adset-scroll :is(th,td){overflow-wrap:anywhere}
+.edu-admin .tracking-adset-scroll [data-align=number]{white-space:nowrap}
+.edu-admin .tracking-other-creatives{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.edu-admin .tracking-other-creatives>.admin-button{min-height:44px}
 @media(max-width:720px){.edu-admin .tracking-detail-heading{align-items:flex-start}.edu-admin .tracking-detail-heading>.admin-button{flex-shrink:0}.edu-admin .tracking-periods>.admin-button{min-height:40px}}
 
 .edu-admin .tracking-priority-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:640px){.edu-admin .tracking-priority-metrics{grid-template-columns:1fr}.edu-admin .tracking-priority-metrics .admin-metric{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:12px 16px}.edu-admin .tracking-priority-metrics .admin-metric .admin-metric-value{font-size:20px}}
