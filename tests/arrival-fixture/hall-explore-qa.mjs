@@ -7,8 +7,12 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
   try {
     const size = mobile ? {width: 393, height: 852} : {width: 1280, height: 820};
     const page = await browser.newPage({viewport:size, isMobile:mobile, hasTouch:mobile});
+    await page.clock.setFixedTime(new Date('2026-11-18T12:00:00Z'));
     await page.addInitScript(() => {
-      if (window === window.top) localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', JSON.stringify({version:1, step:7, visitorAvatar:'male-d'}));
+      if (window === window.top) localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', JSON.stringify({
+        version:1, step:7, visitorAvatar:'male-d', spyPhase:'handed-off', canonPhase:3, hallReturnStep:8,
+        answers:{business:{a:'브라우저에 남긴 연습 입력',b:'다음 화면에서 사용할 참고 내용'}},
+      }));
     });
     await page.route('**/welcome-walk.mjs', async route => {
       const response = await route.fetch();
@@ -29,7 +33,10 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('link',{name:'Google 캘린더'})).toHaveCount(0);
     const schedule = loungeScheduleButton(page);
-    const personalTrial = page.getByRole('button',{name:'내 AI 체험으로 가기',exact:true});
+    const personalTrial = page.getByRole('button',{name:'내 AI 체험으로 돌아가기',exact:true});
+    const returnToCorridor = page.getByRole('button',{name:'복도로 돌아가기',exact:true});
+    await expect(returnToCorridor).toBeVisible();
+    await expect(page.getByRole('region',{name:'웰컴 라운지에서 할 수 있는 일'}).getByText('라이브까지 19일', {exact:true})).toBeVisible();
     await expect(schedule).toBeVisible();
     await expect(personalTrial).toBeVisible();
     await expect(frame.getByRole('button',{name:/자료 안내/})).toBeVisible();
@@ -53,10 +60,38 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     await openLoungeSchedule(page);
     await expect(world).toHaveAttribute('data-paused','true');
     await expect(world).toHaveAttribute('data-free-roam','false');
-    await page.getByRole('button',{name:/공간 둘러보기|웰컴 라운지로 돌아가기/}).click();
+    await expect(page.getByRole('region',{name:'캠퍼스 체험 안내'}).getByText('라이브까지 19일', {exact:true})).toBeVisible();
+    await expect(returnToCorridor).toBeVisible();
+    if (mobile) await returnToCorridor.tap();
+    else {
+      await page.getByRole('button',{name:'공간 둘러보기',exact:true}).click();
+      await expect(world).toHaveAttribute('data-free-roam','true');
+      await returnToCorridor.focus();
+      await page.keyboard.press('Enter');
+    }
+    await expect(world).toHaveAttribute('data-station','4');
+    await expect(world).toHaveAttribute('data-paused','false');
+    await expect(world).toHaveAttribute('data-free-roam','false');
+    if (!mobile) await expect(floor).toBeFocused();
+    const desk = page.getByRole('button',{name:'내용 열기',exact:true});
+    if (mobile) await desk.tap();
+    else await desk.click();
+    const canon = page.getByRole('dialog');
+    await expect(canon.getByRole('heading',{name:'같은 기준을 읽은 두 직원의 결과'})).toBeVisible();
+    await canon.getByRole('button',{name:'강의 전 무료자료 확인하기',exact:true}).click();
+    const hallTravel = page.locator('#arrival-desk-button');
+    await hallTravel.click();
+    const hallEntry = page.getByRole('button',{name:'웰컴 라운지 입장하기',exact:true});
+    const scheduleButton = loungeScheduleButton(page);
+    await expect(hallEntry.or(scheduleButton).filter({visible:true})).toBeVisible({timeout:20000});
+    if (await hallEntry.isVisible()) await hallEntry.click();
+    await expect(scheduleButton).toBeVisible();
     await expect(world).toHaveAttribute('data-free-roam','true');
+    await expect(personalTrial).toBeVisible();
     await personalTrial.click();
     await expect(world).toHaveAttribute('data-station','6');
-    console.log(engine.name(), {initial,afterKeys,afterPointer,arrivals:beforeArrivals});
+    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('moonshot:arrival:synthetic-local-qa:v1')));
+    expect(persisted).toMatchObject({canonPhase:3, hallReturnStep:8, answers:{business:{a:'브라우저에 남긴 연습 입력'}}});
+    console.log(engine.name(), {initial,afterKeys,afterPointer,arrivals:beforeArrivals, countdown:19, returnedToDesk:4, draftPreserved:true});
   } finally { await browser.close(); }
 }

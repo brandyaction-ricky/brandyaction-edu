@@ -1,14 +1,18 @@
 import {useEffect, useId, useRef, useState} from 'react';
 import {ArrowRight, ArrowUpRight, ChevronDown, Copy, MessageSquareText} from 'lucide-react';
-import {buildContentStationPrompt, CONTENT_STATION_EXAMPLE, type ContentStationInputs} from './content-station-prompt';
+import {buildContentStationPrompt, contentStationReady, CONTENT_STATION_EXAMPLE, CONTENT_STATION_LIMITS, type ContentStationDraft, type ContentStationInputs} from './content-station-prompt';
 import styles from './content-station.module.css';
 
-const emptyInputs: ContentStationInputs = {product: '', competitor: '', customer: '', facts: ''};
 const captions = ['마스크팩, 붙이고 자도 될까요?', '우리 제품의 권장 사용 시간 10~15분', '사용 전, 제품의 사용 가이드를 확인하세요.'];
 
-export function ContentStation({onComplete, revisit = false}: {onComplete: () => void; revisit?: boolean}) {
-  const [inputs, setInputs] = useState(emptyInputs);
-  const [prompt, setPrompt] = useState('');
+export function ContentStation({draft, onDraftChange, onComplete, revisit = false}: {
+  draft: ContentStationDraft;
+  onDraftChange: (draft: ContentStationDraft) => void;
+  onComplete: () => void;
+  revisit?: boolean;
+}) {
+  const {inputs} = draft;
+  const prompt = draft.requestReady ? buildContentStationPrompt(inputs) : '';
   const [copy, setCopy] = useState<'idle' | 'copied' | 'manual'>('idle');
   const [caption, setCaption] = useState(0);
   const copyVersion = useRef(0);
@@ -17,7 +21,7 @@ export function ContentStation({onComplete, revisit = false}: {onComplete: () =>
   const details = useRef<HTMLDetailsElement>(null);
   const promptText = useRef<HTMLTextAreaElement>(null);
   const transcriptId = useId();
-  const eligible = Boolean(inputs.product.trim() && inputs.competitor.trim());
+  const eligible = contentStationReady(inputs);
 
   useEffect(() => {
     const media = video.current;
@@ -33,18 +37,16 @@ export function ContentStation({onComplete, revisit = false}: {onComplete: () =>
 
   function edit(next: ContentStationInputs) {
     copyVersion.current++;
-    setInputs(next);
-    setPrompt('');
+    onDraftChange({inputs: next, requestReady: false});
     setCopy('idle');
   }
 
   function makePrompt(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const builtPrompt = buildContentStationPrompt(inputs);
-    if (!builtPrompt) return;
+    if (!eligible) return;
     copyVersion.current++;
     setCopy('idle');
-    setPrompt(builtPrompt);
+    onDraftChange({inputs, requestReady: true});
     requestAnimationFrame(() => resultHeading.current?.focus());
   }
 
@@ -78,21 +80,22 @@ export function ContentStation({onComplete, revisit = false}: {onComplete: () =>
 
     <section className={styles.exercise}>
       <h3>내 사업엔 어떻게 적용될 수 있을까?</h3>
-      <p>간단하게 경쟁사 조사부터, 우리 상품에 적용할 프롬프트를 만들어보세요.</p>
+      <p>내 상품과 경쟁사를 적으면 평소 쓰는 AI에 보낼 조사·제작 요청문을 만들 수 있어요.</p>
       <form className={styles.fields} onSubmit={makePrompt}>
         <button className={styles.exampleButton} type="button" onClick={() => edit(CONTENT_STATION_EXAMPLE)}>마스크팩 예시 넣기</button>
         <label>상품·서비스 <small>필수</small>
-          <input required maxLength={300} value={inputs.product} onChange={event => edit({...inputs, product: event.target.value})} placeholder="예: 반려동물 출장 사진 촬영"/>
+          <input required maxLength={CONTENT_STATION_LIMITS.product} value={inputs.product} onChange={event => edit({...inputs, product: event.target.value})} placeholder="예: 반려동물 출장 사진 촬영"/>
         </label>
         <label>비교할 경쟁사 이름이나 링크 <small>필수</small>
-          <input required maxLength={1200} value={inputs.competitor} onChange={event => edit({...inputs, competitor: event.target.value})} placeholder="경쟁사 이름 또는 홈페이지 주소"/>
+          <input required maxLength={CONTENT_STATION_LIMITS.competitor} value={inputs.competitor} onChange={event => edit({...inputs, competitor: event.target.value})} placeholder="경쟁사 이름 또는 홈페이지 주소"/>
         </label>
         <label>어떤 고객에게 필요한가요? <small>선택</small>
-          <input maxLength={400} value={inputs.customer} onChange={event => edit({...inputs, customer: event.target.value})} placeholder="예: 낯선 장소에서 반려견이 긴장하는 보호자"/>
+          <input maxLength={CONTENT_STATION_LIMITS.customer} value={inputs.customer} onChange={event => edit({...inputs, customer: event.target.value})} placeholder="예: 낯선 장소에서 반려견이 긴장하는 보호자"/>
         </label>
         <label>고객 질문과 실제 상품 특징·사용 가이드 <small>선택</small>
-          <textarea rows={3} maxLength={1800} value={inputs.facts} onChange={event => edit({...inputs, facts: event.target.value})} placeholder="예: 집에서 촬영이 가능한가요? 익숙한 집에서 촬영한 실제 사진을 보여줄 수 있어요."/>
+          <textarea rows={3} maxLength={CONTENT_STATION_LIMITS.facts} value={inputs.facts} onChange={event => edit({...inputs, facts: event.target.value})} placeholder="예: 집에서 촬영이 가능한가요? 익숙한 집에서 촬영한 실제 사진을 보여줄 수 있어요."/>
         </label>
+        <p className={styles.privacy}>공개할 수 있는 상품 정보만 적어주세요. 적은 상품 정보는 ‘내 AI 체험’에서도 가져올 수 있어요.</p>
         <button className={styles.primary} type="submit" disabled={!eligible}>프롬프트 만들기<ArrowRight size={16} aria-hidden="true"/></button>
       </form>
       {prompt && <div className={styles.result}>

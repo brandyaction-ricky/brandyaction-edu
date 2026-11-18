@@ -35,9 +35,10 @@ export function createWalkMotion(stations, isLobbyBlocked = () => false) {
   function sync(station, paused, reset = false, freeRoam = false) {
     if (!Number.isInteger(station) || station < 1 || station > stations.length) return;
     const explore = freeRoam === true && station === stations.length && !paused;
-    if (!synced || reset || (paused && station < state.station)) {
-      // Reopening a personal exercise or the welcome lounge means the visitor already arrived.
-      const start = explore || (paused && station >= 6) ? stations[station - 1]
+    const returning = synced && station < state.station;
+    if (!synced || reset || returning) {
+      // A corridor return starts at the reopened desk, within the active walking bounds.
+      const start = explore || (paused && station >= 6) || (returning && station > 1) ? stations[station - 1]
         : station === 1 ? entry : station === 7 ? stations[3] : stations[station - 2];
       state.x = start.x; state.z = start.z; state.facing = Math.PI / 2;
       arrivalSent = false;

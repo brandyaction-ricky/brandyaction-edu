@@ -26,6 +26,7 @@
 .fields { display: grid; gap: 13px; margin-top: 10px; }
 .fields label { min-width: 0; display: block; font-size: 14px; font-weight: 600; line-height: 1.5; }
 .fields small { color: var(--muted, #565e68); font-size: 12px; font-weight: 400; }
+.fields .privacy { margin: 0; color: var(--muted, #565e68); font-size: 13px; line-height: 1.6; word-break: keep-all; }
 .station :is(input, textarea) {
   display: block; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 46px; margin-top: 5px; padding: 9px 11px;
   border: 1px solid var(--line, #e2e5e9); border-radius: 7px; background: var(--paper, #fff); color: var(--ink, #161719); font: inherit; font-weight: 400;

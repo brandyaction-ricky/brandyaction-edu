@@ -1,5 +1,5 @@
-import {expect, webkit} from '@playwright/test';
-import {mkdir} from 'node:fs/promises';
+import {chromium, expect, webkit} from '@playwright/test';
+import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
 
@@ -8,10 +8,13 @@ if (url.pathname === '/') url.pathname = '/experience/moonshot';
 const output = process.env.ARRIVAL_QA_OUTPUT;
 if (output) await mkdir(output, {recursive: true});
 
-const browser = await webkit.launch();
+const desktop = process.env.ARRIVAL_QA_DESKTOP === '1';
+const viewports = desktop ? [{width:1440, height:1000}] : [{width:360, height:700}, {width:390, height:844}, {width:430, height:932}];
+const browser = await (desktop ? chromium : webkit).launch();
 try {
-  for (const viewport of [{width:360, height:700}, {width:390, height:844}, {width:430, height:932}]) {
-    const page = await browser.newPage({viewport, isMobile:true, hasTouch:true});
+  for (const viewport of viewports) {
+    const page = await browser.newPage({viewport, isMobile:!desktop, hasTouch:!desktop, acceptDownloads:true});
+    const press = node => desktop ? node.click() : node.tap();
     const capture = stage => output && page.screenshot({path:resolve(output, viewport.width + '-' + stage + '.png')});
     const frame = page.frameLocator('iframe[title*="직원 사무실"]');
     const world = frame.locator('#walk');
@@ -59,20 +62,34 @@ try {
         // Touch the 3D materials guide's head through the canvas, below its speech bubble.
         const box = await floor.boundingBox();
         await page.touchscreen.tap(box.x + box.width * .25, box.y + box.height * .48);
-      } else await materials.tap();
+      } else await press(materials);
       await expect(guide).toBeVisible();
       await capture('materials');
-      await guide.getByRole('button', {name:'라이브 특전', exact:true}).tap();
+      await expect(guide.getByRole('link', {name:/작업별 AI 활용 가이드/})).toHaveAttribute('href', 'https://edu.brandyaction.com/guide');
+      await expect(guide.getByRole('link', {name:/AI팀 설계도/})).toHaveAttribute('href', 'https://edu.brandyaction.com/ai-team-blueprint');
+      const pendingWorksheet = page.waitForEvent('download');
+      await press(guide.getByRole('link', {name:'회사 업무 기준표 받기', exact:true}));
+      const worksheet = await pendingWorksheet;
+      expect(await readFile(await worksheet.path(), 'utf8')).toContain('오늘 AI에게 맡길 일 한 가지');
+      await press(guide.getByRole('button', {name:'광고 영상 체험 열기'}));
+      const replay = page.getByRole('dialog', {name:'콘텐츠 제작 다시 보기', exact:true});
+      await expect(replay).toBeVisible();
+      await expect.poll(() => replay.locator('video').evaluate(element => element.duration)).toBeGreaterThan(0);
+      await press(replay.getByRole('button', {name:'자료 목록으로 돌아가기', exact:true}).first());
+      await expect(guide).toBeVisible();
+      await press(guide.getByRole('button', {name:'라이브 특전', exact:true}));
       await expect(guide.getByText(/라이브에서 비밀번호를 공개합니다/)).toBeVisible();
       await expect(guide.getByRole('listitem')).toHaveCount(3);
-      await guide.getByRole('button', {name:'라운지로 돌아가기', exact:true}).tap();
+      await press(guide.getByRole('button', {name:'라운지로 돌아가기', exact:true}));
       await expect(guide).not.toBeVisible();
       await expect(world).toHaveAttribute('data-paused', 'false');
 
-      await intro.tap();
+      await press(intro);
       await expect(team).toBeVisible();
+      await expect(team.getByText(/이번 라이브는 윤익이 진행합니다/)).toBeVisible();
       const video = await team.locator('video').elementHandle();
       await expect(team.locator('video')).toHaveAttribute('src','/campus/arrival/team-at-work.mp4');
+      expect(await video.evaluate(element => element.clientHeight > element.clientWidth)).toBe(true);
       await capture('team');
       videoPlayed = await video.evaluate(async element => {
         element.muted = true;
@@ -80,7 +97,7 @@ try {
         catch {return false;}
       });
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
-      await team.getByRole('button', {name:'라운지로 돌아가기', exact:true}).tap();
+      await press(team.getByRole('button', {name:'라운지로 돌아가기', exact:true}));
       await expect(team).not.toBeVisible();
       await expect(team.locator('video')).toHaveCount(0);
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.paused || element.ended)).toBe(true);

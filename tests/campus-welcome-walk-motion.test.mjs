@@ -93,6 +93,21 @@ test('stepping back from the live schedule restores the personal exercise at its
   assert.deepEqual([m.state.x, m.state.z], [40, 0]);
 });
 
+test('returning from the lounge starts at the last corridor desk and immediately allows movement', () => {
+  const m = createWalkMotion(stations);
+  m.sync(7, false, false, true);
+  advance(m, 1, 1, 0);
+  assert.ok(m.state.x > stations[6].x);
+  m.sync(4, false);
+  assert.equal(m.state.freeRoam, false);
+  assert.equal(m.state.paused, false);
+  assert.deepEqual([m.state.x, m.state.z], [stations[3].x, stations[3].z]);
+  advance(m, .3, -1, 0);
+  assert.ok(m.state.x < stations[3].x - 1);
+  m.walk();
+  assert.equal(advance(m), 1);
+});
+
 test('floor taps at the rendered threshold enter the current desk and near-edge taps stay on the path', () => {
   assert.equal(floorDestination({x:0.25,z:-2.08}, stations, 1), stations[0]);
   assert.equal(floorDestination({x:8.8,z:-1.5}, stations, 2), stations[1]);

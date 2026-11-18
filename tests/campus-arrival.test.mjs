@@ -12,6 +12,14 @@ const model = await moduleFrom('../features/campus/arrival/model.ts');
 const office = await moduleFrom('../features/campus/arrival/office-demo.ts');
 const officeCase = await moduleFrom('../features/campus/arrival/office-demo-case.ts');
 
+test('live countdown uses Seoul calendar days across midnight and follows a rescheduled date', () => {
+  const {liveCountdownLabel} = model;
+  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-06T14:59:59Z')), '라이브까지 1일');
+  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-06T15:00:00Z')), '오늘 라이브');
+  assert.equal(liveCountdownLabel('2026-12-09', new Date('2026-12-06T15:00:00Z')), '라이브까지 2일');
+  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-07T15:00:00Z')), '');
+});
+
 test('each visitor gets an immediately usable request based on their own two answers', () => {
   const answers = {a: '임시 입력 A — 나의 상품·고객·경험', b: '임시 입력 B — 나의 장점·질문·상황'};
   const requests = Object.fromEntries(content.audiences.map(audience => [audience, content.buildRequest(audience, answers)]));

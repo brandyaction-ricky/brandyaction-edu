@@ -186,9 +186,16 @@ test('leaving for personal AI restores the real drafts and self-reported checks 
   assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(state)), state);
   const legacy = {...state}; delete legacy.workTrial;
   assert.deepEqual(model.parseArrivalState(JSON.stringify(legacy)).workTrial, trial.initialWorkTrialState());
-  const allMax = model.initialArrivalState();
-  for (const answers of Object.values(allMax.answers)) {answers.a = '"'.repeat(500); answers.b = '"'.repeat(500);}
-  allMax.workTrial = trial.parseWorkTrialState({...completed(), role: '"'.repeat(240), reader: '"'.repeat(400), boundary: '"'.repeat(700), format: '"'.repeat(700), firstTask: '"'.repeat(2400), secondTask: 'a' + '"'.repeat(2399), feedback: '"'.repeat(700)});
-  assert.ok(JSON.stringify(allMax).length < model.ARRIVAL_STORAGE_LIMIT);
-  assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(allMax)), allMax, 'maximum valid state fits the browser storage boundary');
+  for (const unit of ['"', '\ud800']) {
+    const allMax = model.initialArrivalState();
+    for (const answers of Object.values(allMax.answers)) {answers.a = unit.repeat(500); answers.b = unit.repeat(500);}
+    allMax.workTrial = trial.parseWorkTrialState({...completed(), role: unit.repeat(240), reader: unit.repeat(400), boundary: unit.repeat(700), format: unit.repeat(700), firstTask: unit.repeat(2400), secondTask: 'a' + unit.repeat(2399), feedback: unit.repeat(700)});
+    allMax.audience = 'business';
+    allMax.companyRule = 0;
+    allMax.consentedCompanyRule = unit.repeat(240);
+    allMax.extra = unit.repeat(300);
+    allMax.contentDraft = {inputs: {product: unit.repeat(300), competitor: unit.repeat(1200), customer: unit.repeat(400), facts: unit.repeat(1800)}, requestReady: true};
+    assert.ok(JSON.stringify(allMax).length < model.ARRIVAL_STORAGE_LIMIT);
+    assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(allMax)), allMax, 'maximum valid state fits the browser storage boundary');
+  }
 });

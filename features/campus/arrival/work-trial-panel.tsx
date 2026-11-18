@@ -18,6 +18,19 @@ function RequestPicture({reusing}: {reusing: boolean}) {
   </figure>;
 }
 
+function WorkTrialExample() {
+  return <details className={s.workExample}>
+    <summary><FileText size={17}/>작성 없이 결과 예시 보기<ChevronDown size={16}/></summary>
+    <ol>
+      <li><h2>업무 기준을 정해요</h2><p>팀장에게 보고할 메모는 3줄 이내로 정리해요. 확인되지 않은 날짜나 담당자는 ‘미정’으로 표시해요.</p></li>
+      <li><h2>첫 업무를 맡겨요</h2><p>신입 안내 자료의 목차는 정했고, 배포 날짜는 아직이에요.</p><blockquote>안내 자료 목차 확정. 배포 날짜 미정.</blockquote></li>
+      <li><h2>피드백을 다음 업무에도 반영해요</h2><p>“팀장이 결정해야 할 일은 마지막 줄에 따로 적어줘.”</p><blockquote>안내 자료 목차 확정. 배포 날짜 미정.<br/>결정 필요 · 배포 날짜를 언제로 잡을까요?</blockquote></li>
+      <li><h2>다른 업무에도 같은 기준을 써요</h2><p>이번엔 워크숍 메모를 넣어요. 가까운 장소는 예약을 확인 중이고, 먼 장소는 예약할 수 있어요.</p><blockquote>가까운 장소는 예약 확인 중. 먼 장소는 예약 가능.<br/>결정 필요 · 확인을 기다릴까요, 예약 가능한 곳으로 정할까요?</blockquote></li>
+    </ol>
+    <p>매번 보고 형식을 다시 설명할 필요 없이, 다음에는 새 메모만 바꿔 같은 기준으로 보고받을 수 있어요.</p>
+  </details>;
+}
+
 export function WorkTrialPanel({config, state, onChange, onExit, onLive, persistenceEnabled, storageBlocked = false}: {
   config: WorkTrialConfig;
   state: WorkTrialState;
@@ -135,7 +148,8 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
       <header className={s.intro}><h1 ref={heading} tabIndex={-1}>{stageContent.title}</h1><p>{stageContent.description}</p></header>
 
       {state.step === 0 && <>
-        <button type="button" className={s.exampleButton} onClick={useSampleCriteria}><FileText size={17}/>예시 업무로 시작<ArrowRight size={15}/></button>
+        <WorkTrialExample/>
+        <button type="button" className={s.exampleButton} onClick={useSampleCriteria}>예시 업무로 시작<ArrowRight size={15}/></button>
         <div className={s.fields}>
           <label><span>{config.roleLabel}</span><textarea rows={2} maxLength={WORK_TRIAL_LIMITS.role} value={state.role} placeholder={config.roleDefault} onChange={event => patch({role: event.target.value})}/></label>
           <label><span>{config.readerLabel}</span><textarea rows={2} maxLength={WORK_TRIAL_LIMITS.reader} value={state.reader} placeholder={config.readerDefault} onChange={event => patch({reader: event.target.value})}/></label>

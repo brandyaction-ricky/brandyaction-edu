@@ -93,16 +93,32 @@
   z-index: 2;
   pointer-events: none;
 }
-.hallControls p {
+.hallStatus { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 8px; }
+.hallStatus:empty { display: none; }
+.hallStatus p {
   width: fit-content;
-  margin: 0 0 8px;
+  margin: 0;
   padding: 5px 9px;
   border-radius: 6px;
   background: #142b48;
   color: #fff;
   font-size: 12px;
 }
+.hallCountdown, .ticketCountdown {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: fit-content;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hallCountdown { background: #fff; color: #173b69; }
+.ticketCountdown { background: #eef2f8; color: #173b69; }
 .hallActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hallActions + .hallActions { margin-top: 8px; }
 .hallActions button {
   display: inline-flex;
   min-height: 44px;

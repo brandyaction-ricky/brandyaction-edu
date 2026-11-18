@@ -17,6 +17,17 @@
 .intro { margin-bottom:23px; }
 .intro h1 { margin:0; font-size:30px; font-weight:750; line-height:1.4; letter-spacing:-.04em; word-break:keep-all; white-space:pre-line; text-wrap:balance; }
 .panel .intro > p { margin:12px 0 0; font-size:16px; line-height:1.75; color:var(--muted,#626770); word-break:keep-all; }
+.workExample { margin-bottom:12px; border:1px solid var(--line,#e2e5e9); border-radius:8px; background:var(--surface-subtle,#f7f8fa); }
+.workExample > summary { display:flex; align-items:center; gap:9px; min-height:46px; padding:10px 13px; cursor:pointer; list-style:none; font-size:15px; font-weight:700; }
+.workExample > summary::-webkit-details-marker { display:none; }
+.workExample > summary svg { flex:none; }
+.workExample > summary svg:last-child { margin-left:auto; }
+.workExample[open] > summary svg:last-child { transform:rotate(180deg); }
+.workExample > ol { display:grid; gap:16px; margin:0; padding:0 14px 0 34px; }
+.workExample h2 { margin:0; font-size:15px; font-weight:750; }
+.workExample p { margin:4px 0 0; font-size:14px; line-height:1.65; word-break:keep-all; }
+.workExample blockquote { margin:7px 0 0; padding:8px 11px; border-left:2px solid var(--ba-red,#cf1728); background:var(--paper,#fff); font-size:14px; }
+.workExample > p { margin:14px 0 0; padding:12px 14px; border-top:1px solid var(--line,#e2e5e9); }
 .exampleButton { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 13px; color:var(--ink,#161719); border:1px solid var(--border-strong,#cfd3d8); border-radius:7px; background:var(--paper,#fff); margin-bottom:22px; font-weight:600!important; font-size:14px!important; }
 .exampleButton:hover { background:var(--surface-subtle,#f7f8fa); border-color:var(--ink,#161719); }
 .fields { display:grid; gap:18px; }

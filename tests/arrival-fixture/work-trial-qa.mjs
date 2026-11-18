@@ -22,9 +22,21 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
   try {
     await page.goto(base+path,{waitUntil:'domcontentloaded'});
     await finishOfficeReview(page);
+    const choices=page.getByLabel('내 상황에 맞는 체험 선택').getByRole('button');
+    await expect(choices).toHaveCount(4);
+    const sizes=await choices.evaluateAll(nodes=>nodes.map(node=>[node.offsetWidth,node.offsetHeight]));
+    expect(sizes.every(([width,height])=>width===sizes[0][0]&&height===sizes[0][1])).toBe(true);
+    await page.screenshot({path:resolve(out,`${name}-audiences.png`)});
     await page.getByRole('button',{name:/회사 업무에 AI를 써보고 싶어요/}).click();
     const step=page.locator('[data-work-step]');
     await expect(step).toHaveAttribute('data-work-step','0');
+    const example=page.getByText('작성 없이 결과 예시 보기',{exact:true});
+    await example.click();
+    await expect(page.getByRole('heading',{name:'다른 업무에도 같은 기준을 써요',exact:true})).toBeVisible();
+    await expect(step).toHaveAttribute('data-work-step','0');
+    await expect(step.getByRole('textbox').first()).toHaveValue('');
+    await capture('worked-example');
+    await example.click();
     await page.getByRole('button',{name:'예시 업무로 시작',exact:true}).click();
     await page.getByRole('radio',{name:'꼭 끝낼 일과 조정할 일부터'}).check();
     await capture('criteria');

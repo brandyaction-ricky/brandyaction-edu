@@ -239,12 +239,17 @@ async function start() {
   function sync(msg) {
     if (!Number.isInteger(msg.station) || !stations[msg.station-1]) return;
     if (avatars.includes(msg.avatar)) void chooseAvatar(msg.avatar);
-    const returningToDesk = msg.paused && msg.station < state.station;
+    const returningToDesk = msg.station < state.station;
     const wasRoaming = state.freeRoam;
     if (msg.reset || msg.station !== state.station) {pendingFloorPick = undefined; keys.clear();}
     motion.sync(msg.station, msg.paused === true, msg.reset === true, msg.freeRoam === true);
     if (state.freeRoam && !wasRoaming) floor.focus({preventScroll: true});
-    if (!synced || msg.reset || returningToDesk) { trackingX = undefined; keys.clear(); }
+    if (!synced || msg.reset || returningToDesk) {
+      trackingX = undefined;
+      trackingZ = state.z;
+      roamCamera = Number(state.freeRoam);
+      keys.clear();
+    }
     synced = true;
     if (state.paused) keys.clear();
     deskLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 42) : stations[state.station - 1].title;

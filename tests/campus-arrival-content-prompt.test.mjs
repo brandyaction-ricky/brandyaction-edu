@@ -5,7 +5,8 @@ import {build} from 'esbuild';
 
 const entry = fileURLToPath(new URL('../features/campus/arrival/content-station-prompt.ts', import.meta.url));
 const {outputFiles} = await build({entryPoints: [entry], bundle: true, platform: 'node', format: 'esm', write: false});
-const {buildContentStationPrompt, CONTENT_STATION_EXAMPLE} = await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].contents).toString('base64'));
+const {buildContentStationPrompt, parseContentStationDraft, reuseContentStationAnswers, CONTENT_STATION_EXAMPLE, CONTENT_STATION_LIMITS} =
+  await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].contents).toString('base64'));
 
 const realInputs = {
   product: '반려동물 출장 사진 촬영', competitor: 'https://example.com/studio',
@@ -33,4 +34,29 @@ test('fictional materials stay fictional after editing a different field', () =>
   assert.match(prompt, /가상 리뷰: 오래 붙이면 얼굴이 당겨요/);
   assert.match(prompt, /처음 마스크팩을 쓰는 고객/);
   assert.doesNotMatch(prompt, /공개 광고와 리뷰부터 검토/);
+});
+
+test('content draft restores typed data and only resumes a generated request with all required inputs', () => {
+  for (const requestReady of [true, false]) {
+    assert.deepEqual(parseContentStationDraft({inputs: realInputs, requestReady}), {inputs: realInputs, requestReady});
+  }
+  assert.deepEqual(parseContentStationDraft({
+    inputs: {product: '  입력 중 ', competitor: null, customer: '고객'.repeat(240), facts: '두 줄\r\n이어서\u0000'},
+    requestReady: true,
+  }), {
+    inputs: {product: '  입력 중 ', competitor: '', customer: '고객'.repeat(CONTENT_STATION_LIMITS.customer / 2), facts: '두 줄\n이어서'},
+    requestReady: false,
+  });
+  assert.equal(parseContentStationDraft({inputs: realInputs, requestReady: 'true'}).requestReady, false);
+});
+
+test('business exercise can reuse relevant content fields without changing existing work or using sample research', () => {
+  const empty = {a: '', b: ''};
+  const both = reuseContentStationAnswers(realInputs, empty);
+  assert.deepEqual(both, {a: `${realInputs.product}\n주요 고객: ${realInputs.customer}`, b: realInputs.facts});
+  assert.deepEqual(reuseContentStationAnswers(realInputs, {a: '새로 입력한 상품', b: ''}), {a: '새로 입력한 상품', b: realInputs.facts});
+  assert.deepEqual(reuseContentStationAnswers(realInputs, {a: ' ', b: '직접 적은 장점'}), {...both, b: '직접 적은 장점'});
+  assert.equal(reuseContentStationAnswers(realInputs, both), both);
+  assert.equal(reuseContentStationAnswers({...CONTENT_STATION_EXAMPLE, customer: '변경한 고객'}, empty), empty);
+  assert.equal(reuseContentStationAnswers({product: '', competitor: realInputs.competitor, customer: '', facts: ''}, empty), empty);
 });

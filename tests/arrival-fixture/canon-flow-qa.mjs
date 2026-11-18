@@ -10,6 +10,10 @@ if (output) await mkdir(output, {recursive:true});
 
 const route = new Map([[1, 2], [2, 3], [3, 4], [4, 7]]);
 const destinationX = {1:0, 2:8, 3:16, 4:24, 7:32};
+const contentDraft = {
+  product: '반려동물 출장 사진 촬영', competitor: 'https://example.com/qa-studio',
+  customer: '고령 반려견의 보호자', facts: '평소 생활하는 집에서 촬영하고 개인 화보를 전달합니다.',
+};
 const exchanges = [
   {button:'고객부터 알려줘보기', status:'바쁜 직장인 ↔ 보습 마스크팩 · 퇴근 후 사용하는 상황', connected:2},
   {button:'고객 질문도 알려주기', status:'고객 질문 ↔ 사용법 ↔ 콘텐츠·고객응대', connected:6},
@@ -63,6 +67,19 @@ for (const [device, engine, viewport] of [
   }
 
   async function inspect(station, dialog) {
+    if (station === 3) {
+      await dialog.getByLabel(/^상품·서비스/).fill(contentDraft.product);
+      await dialog.getByLabel(/^비교할 경쟁사 이름이나 링크/).fill(contentDraft.competitor);
+      await dialog.getByLabel(/^어떤 고객에게 필요한가요/).fill(contentDraft.customer);
+      await dialog.getByLabel(/^고객 질문과 실제 상품 특징/).fill(contentDraft.facts);
+      await tap(button(dialog, '프롬프트 만들기'));
+      await tap(button(dialog, '복도로 돌아가기'));
+      await expect(dialog).not.toBeVisible();
+      await tap(open);
+      await inspectContentDraft(dialog);
+      await capture('content-restored');
+      return;
+    }
     if (station !== 4) return;
     const map = dialog.getByRole('region', {name:'회사 지식 지도'});
     const connections = map.locator('li[data-connected="true"]');
@@ -106,6 +123,13 @@ for (const [device, engine, viewport] of [
     await expect(status).toHaveText(exchanges.at(-1).status);
     await expect(staff).toHaveCount(2);
   }
+  async function inspectContentDraft(dialog) {
+    await expect(dialog.getByLabel(/^상품·서비스/)).toHaveValue(contentDraft.product);
+    await expect(dialog.getByLabel(/^비교할 경쟁사 이름이나 링크/)).toHaveValue(contentDraft.competitor);
+    await expect(dialog.getByLabel(/^어떤 고객에게 필요한가요/)).toHaveValue(contentDraft.customer);
+    await expect(dialog.getByLabel(/^고객 질문과 실제 상품 특징/)).toHaveValue(contentDraft.facts);
+    await expect(dialog.getByRole('heading', {name:'내 사업에 적용할 프롬프트가 준비됐어요.'})).toBeVisible();
+  }
 
   try {
     await page.goto(url.href);
@@ -145,6 +169,7 @@ for (const [device, engine, viewport] of [
     const replay = page.getByRole('dialog', {name:'콘텐츠 제작 다시 보기', exact:true});
     await expect(replay).toBeVisible();
     await expect(replay.locator('video')).toHaveAttribute('src', '/campus/arrival/mask-example-silent.mp4');
+    await inspectContentDraft(replay);
     await tap(button(replay, '자료 목록으로 돌아가기').first());
     await expect(replay).not.toBeVisible();
     await expect(guide).toBeVisible();
@@ -168,9 +193,20 @@ for (const [device, engine, viewport] of [
     await tap(button(page, '웰컴 라운지로 돌아가기'));
     await expect(loungeScheduleButton(page)).toBeVisible();
     await openLoungeSchedule(page);
+    await tap(button(page, '내 AI 체험으로 가기'));
+    await tap(page.getByRole('button', {name:/이미 사업을 하고 있어요/}));
+    await tap(button(page, '내 상황으로 요청문 만들기'));
+    const productAnswer = page.getByLabel(/무엇을 판매하고/);
+    const factsAnswer = page.getByLabel(/가장 강조하고 싶은 상품의 특징/);
+    await productAnswer.fill('직접 적은 새로운 상품 정보');
+    await tap(button(page, '콘텐츠 담당자에게 적은 내용 가져오기'));
+    await expect(productAnswer).toHaveValue('직접 적은 새로운 상품 정보');
+    await expect(factsAnswer).toHaveValue(contentDraft.facts);
+    await expect(page.getByRole('status').filter({hasText:'비어 있던 칸에 가져왔어요.'})).toBeVisible();
+    await capture('content-reused');
     expect(errors).toEqual([]);
     expect(externalAI).toEqual([]);
-    console.log(JSON.stringify({device, viewport, visited, canonExchanges:exchanges.length, calendar:true, errors, externalAI}));
+    console.log(JSON.stringify({device, viewport, visited, canonExchanges:exchanges.length, calendar:true, contentDraftRestoredAndReused:true, errors, externalAI}));
   } catch (error) {
     await capture('canon-failure');
     throw error;

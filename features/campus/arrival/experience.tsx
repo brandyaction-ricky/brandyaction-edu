@@ -3,10 +3,11 @@
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {guideTitles, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
+import {reuseContentStationAnswers} from './content-station-prompt';
 import {TeamLeader} from './team-leader';
 import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
@@ -28,6 +29,22 @@ function ResultExample({text}: {text: string}) {
     const section = block.match(/^\[([^\]\n]{1,60})\]\n([\s\S]*)$/);
     return section ? <section key={index}><h3>{section[1]}</h3><p>{section[2]}</p></section> : <p key={index}>{block}</p>;
   })}</div>;
+}
+
+function LiveCountdown({date, className}: {date: string; className: string}) {
+  const [label, setLabel] = useState('');
+  useEffect(() => {
+    const update = () => setLabel(liveCountdownLabel(date));
+    const first = window.setTimeout(update, 0);
+    const refresh = window.setInterval(update, 60_000);
+    window.addEventListener('pageshow', update);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(refresh);
+      window.removeEventListener('pageshow', update);
+    };
+  }, [date]);
+  return label ? <span className={className}>{label}</span> : null;
 }
 
 export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false}: {config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean}) {
@@ -84,6 +101,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const room = step === 7 ? 'live' : 'office';
   const content = {...audienceContent[state.audience], ...config.audiences[state.audience]};
   const answers = state.answers[state.audience];
+  const canReuseDraft = step === 2 && state.audience === 'business'
+    && reuseContentStationAnswers(state.contentDraft.inputs, answers) !== answers;
   const effectiveAnswers = state.mode === 'example' ? content.example : answers;
   const offeredRule = state.audience !== 'work' && state.companyRule !== null
     ? officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).choices[state.companyRule].rule : '';
@@ -209,7 +228,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     if (station === 5 || station === 6 || station === 7 || (station === 2 && state.spyPhase !== 'handed-off')) return;
     closeDesk(false);
     setNearStation(undefined);
-    update({station: corridorNext[station], ...(station === 4 ? {hallReturnStep: null} : {})});
+    update({station: corridorNext[station]});
   }
   function advanceSpy(next: SpyPhase) {
     setState(value => {
@@ -227,6 +246,13 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function headToHall() {
     go(7, {station: 7, hallReturnStep: isPersonalTrialStep(step) ? step : 8});
+  }
+  function returnToCorridor() {
+    const lastDesk = state.spyPhase === 'handed-off' ? 4 : 2;
+    go(0, {station: lastDesk});
+    setNearStation(lastDesk);
+    if (sceneStatus === 'ready') restoreFloorFocus();
+    else requestAnimationFrame(() => deskButton.current?.focus({preventScroll: true}));
   }
   function openPersonalTrial() {
     go(arrivalBackStep(state), {station: 6});
@@ -296,6 +322,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function answer(field: keyof Answers, value: string) {
     setState(previous => ({...reconcileArrivalOfficeCase(previous, caseRevision), experience: 'none', handoff: 'ready', answers: {...previous.answers, [previous.audience]: {...previous.answers[previous.audience], [field]: value}}}));
+  }
+  function importContentAnswers() {
+    setState(previous => {
+      const current = reconcileArrivalOfficeCase(previous, caseRevision);
+      if (current.step !== 2 || current.audience !== 'business') return previous;
+      const business = reuseContentStationAnswers(current.contentDraft.inputs, current.answers.business);
+      if (business === current.answers.business) return previous;
+      return {...current, experience: 'none', handoff: 'ready', answers: {...current.answers, business}};
+    });
+    setNotice('비어 있던 칸에 가져왔어요. 아래에서 내용을 확인하고 수정할 수 있어요.');
   }
   async function copy(text: string, handoff = false) {
     if (!text) return;
@@ -384,8 +420,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
         {step === 8 && <>
           {title(<>지금 어떤 상황이신가요?</>, '가장 가까운 상황을 골라주세요. 나에게 맞는 결과 예시부터 보여드릴게요.')}
-          <div className={s.choices} aria-label="내 상황에 맞는 체험 선택">{audiences.filter(id => id !== 'work').map(id => {const Icon = icons[id]; return <button type="button" key={id} onClick={() => selectAudience(id)}><span className={s.choiceIcon}><Icon size={21}/></span><span><strong>{config.audiences[id].label}</strong><small>{config.audiences[id].goal}</small></span><ArrowRight size={17}/></button>;})}</div>
-          <button type="button" className={s.textButton} onClick={() => selectAudience('work')}><FileText size={16}/>{config.audiences.work.label}<ArrowRight size={15}/></button>
+          <div className={s.choices} aria-label="내 상황에 맞는 체험 선택">{audiences.map(id => {const Icon = icons[id]; return <button type="button" key={id} onClick={() => selectAudience(id)}><span className={s.choiceIcon}><Icon size={21}/></span><span><strong>{config.audiences[id].label}</strong><small>{config.audiences[id].goal}</small></span><ArrowRight size={17}/></button>;})}</div>
           <div className={s.liveTeaser}><p>{dateLabel} {timeLabel} · 무료 라이브</p><strong>{config.liveTitle}</strong><button type="button" className={s.textButton} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={16}/></button></div>
         </>}
         {step === 1 && <>
@@ -397,6 +432,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         </>}
         {step === 2 && <>
           {title(<>내 상황을 알려주세요.</>, '두 가지 답변을 바탕으로 AI에게 보낼 요청문을 만들어드립니다.')}
+          {(canReuseDraft || notice) && <div className={s.reuseDraft}>
+            {canReuseDraft && <button type="button" className={s.textButton} onClick={importContentAnswers}><Copy size={16} aria-hidden="true"/>콘텐츠 담당자에게 적은 내용 가져오기</button>}
+            <p role="status">{notice}</p>
+          </div>}
           <form id="arrival-brief" className={s.questions} onSubmit={event => {event.preventDefault(); if (requestReady(answers)) {update({mode: 'personal', experience: 'none', handoff: 'ready', step: 3}); setNotice('');}}}>
             <label><span><b>1</b>{content.q1}</span><textarea rows={2} maxLength={ANSWER_LIMIT} value={answers.a} onChange={e => answer('a', e.target.value)} placeholder={`예: ${content.example.a}`} required/><small>{content.hint1}</small></label>
             <label><span><b>2</b>{content.q2}</span><textarea rows={2} maxLength={ANSWER_LIMIT} value={answers.b} onChange={e => answer('b', e.target.value)} placeholder={`예: ${content.example.b}`} required/><small>{content.hint2}</small></label>
@@ -437,13 +476,15 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           {title(config.liveTitle)}
           <div className={s.ticket}>
             <p><strong>{dateLabel} {weekday}</strong><br/>{timeLabel} <small>한국 시간</small></p>
+            {!exploringHall && event.startsAt && <LiveCountdown date={event.date} className={entryStyle.ticketCountdown}/>}
           </div>
           <p className={s.calendarIntro}>{config.liveUrl ? '캘린더에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 참여 링크는 카톡방에서 안내할 예정이에요.'}</p>
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
           <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p></div></details>
+          <button type="button" className={s.textButton} onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
         </>}
         {step !== 3 && copyFallback && <div className={s.copyFallback}><label>직접 복사할 요청문<textarea ref={fallbackRef} readOnly value={copyFallback}/></label></div>}
-        {step !== 3 && step !== 7 && notice && <p className={s.notice} role="status">{notice}</p>}
+        {step !== 2 && step !== 3 && step !== 7 && notice && <p className={s.notice} role="status">{notice}</p>}
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
       {step !== 8 && <footer className={s.dockFooter}>
@@ -461,16 +502,20 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     </section>}
     {!officeIntro && !exploringHall && (step === 7 || explore || sceneStatus === 'ready') && <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
     {exploringHall && <section className={entryStyle.hallControls} aria-label="웰컴 라운지에서 할 수 있는 일">
-      {sceneStatus === 'ready' && <>
-        <p className={entryStyle.keyboardHint}>바닥을 클릭하거나 방향키로 이동하세요.</p>
-        <p className={entryStyle.touchHint}>가고 싶은 바닥을 터치하세요.</p>
-      </>}
+      <div className={entryStyle.hallStatus}>
+        {event.startsAt && <LiveCountdown date={event.date} className={entryStyle.hallCountdown}/>}
+        {sceneStatus === 'ready' && <>
+          <p className={entryStyle.keyboardHint}>바닥을 클릭하거나 방향키로 이동하세요.</p>
+          <p className={entryStyle.touchHint}>가고 싶은 바닥을 터치하세요.</p>
+        </>}
+      </div>
       <div className={entryStyle.hallActions}>
         <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>라이브 일정 보기</button>
         <button type="button" onClick={openPersonalTrial}>
           {state.hallReturnStep === null ? <ArrowRight size={16} aria-hidden="true"/> : <ArrowLeft size={16} aria-hidden="true"/>}
           {state.hallReturnStep === null ? '내 AI 체험으로 가기' : '내 AI 체험으로 돌아가기'}
         </button>
+        <button type="button" onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
       </div>
       {sceneStatus !== 'ready' && <div className={entryStyle.hallActions}>
         <button type="button" onClick={() => setLobbyGuide('materials')}>자료 안내</button>
@@ -482,6 +527,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       onCancel={event => {event.preventDefault(); event.stopPropagation(); if (revisitContent) closeContentReplay(); else closeDesk();}}>
       {openDeskStation && <CorridorPanel station={openDeskStation}
         spyPhase={state.spyPhase} onSpyAdvance={advanceSpy} canonPhase={state.canonPhase} onCanonAdvance={advanceCanon}
+        contentDraft={state.contentDraft} onContentDraftChange={contentDraft => update({contentDraft})}
         revisit={revisitContent} onClose={revisitContent ? closeContentReplay : closeDesk}
         onComplete={revisitContent ? closeContentReplay : finishStation}/>}
     </dialog>

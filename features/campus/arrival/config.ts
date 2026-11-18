@@ -65,7 +65,7 @@ export const DEFAULT_ARRIVAL: ArrivalConfig = {
   workTrial: DEFAULT_WORK_TRIAL,
   officeDemo: DEFAULT_OFFICE_DEMO,
   instructorName: '윤익 · 브랜디액션 팀',
-  instructorIntro: '업무를 정리하고, 고객을 이해하고, 아이디어의 다음 단계를 구체화하는 과정까지. 윤익님과 브랜디액션 팀이 내가 하는 일과 원하는 결과를 알려주고, 반복해서 업무를 맡길 AI 직원을 만드는 방법을 알려드립니다.',
+  instructorIntro: '이번 라이브는 윤익이 진행합니다. 브랜디액션 팀이 AI 사무실에서 업무를 맡기고 진행 상태를 확인하는 모습도 함께 보여드립니다. 라이브에서는 내 자료와 업무 기준을 정리해, 다음 업무에도 같은 기준을 쓰는 AI 직원을 만드는 과정을 다룹니다.',
   videoUrl: '',
   liveTitle: '매번 설명해야 했던 AI, 이제 내 일을 아는 직원으로',
   startsAt: liveEvent.startsAt!, endsAt: liveEvent.endsAt, liveUrl: liveEvent.infoUrl ?? '',

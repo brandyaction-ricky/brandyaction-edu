@@ -1,11 +1,13 @@
 import {audiences, isAudience, isRevision, cleanAnswer, REVISION_LIMIT, type Audience, type Answers, type Revision} from './content';
+import {parseContentStationDraft, type ContentStationDraft} from './content-station-prompt';
 import {OFFICE_DEMO_LIMITS, type OfficeDemoChoice, type OfficeDemoPhase} from './office-demo';
 import {DEFAULT_VISITOR_AVATAR, isVisitorAvatarId, type VisitorAvatarId} from './visitor-avatar-options';
 import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from './work-trial';
 
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
-export const ARRIVAL_STORAGE_LIMIT = 32_000;
+// JSON can use six characters to escape one stored UTF-16 code unit.
+export const ARRIVAL_STORAGE_LIMIT = 100_000;
 export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -31,12 +33,13 @@ export type ArrivalState = {
   handoff: 'ready' | 'copied';
   revision: Revision;
   extra: string;
+  contentDraft: ContentStationDraft;
   workTrial: WorkTrialState;
   deskReviewRevision: string;
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -95,6 +98,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       state.station = value.station === 5 ? 4 : value.station === 6 ? 7 : value.station as CorridorStation;
       if (state.station >= 3 && state.station <= 4 && state.spyPhase !== 'handed-off') state.station = 2;
     } else if (state.deskReview.phase !== 'draft') state.station = 2;
+    state.contentDraft = parseContentStationDraft(value.contentDraft);
     state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
   } catch {
@@ -156,6 +160,15 @@ export type LiveEvent = {
   endsAt: string | null;
   infoUrl: string | null;
 };
+const seoulDateFormat = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'});
+
+export function liveCountdownLabel(eventDate: string, now: Date = new Date()): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !Number.isFinite(now.getTime())) return '';
+  const days = (Date.parse(`${eventDate}T00:00:00Z`) - Date.parse(`${seoulDateFormat.format(now)}T00:00:00Z`)) / 86_400_000;
+  if (days > 0) return `라이브까지 ${days}일`;
+  return days === 0 ? '오늘 라이브' : '';
+}
+
 /** Start confirmed by the owner: Dec 7, 21:00 KST. End and YouTube URL remain pending. */
 export const liveEvent: LiveEvent = {
   id: 'moonshot-live-20261207', date: '2026-12-07', title: '문샷 챌린지 · AI 직원 라이브 시작',
@@ -170,7 +183,7 @@ function validCalendarEvent(event: LiveEvent): {start: Date; end: Date | null; u
   const start = new Date(event.startsAt), end = event.endsAt ? new Date(event.endsAt) : null;
   if (!Number.isFinite(start.getTime()) || (end && (!Number.isFinite(end.getTime()) || end <= start))) return null;
   try {
-    const koreanDate = new Intl.DateTimeFormat('sv-SE', {timeZone: event.timeZone, year: 'numeric', month: '2-digit', day: '2-digit'}).format(start);
+    const koreanDate = seoulDateFormat.format(start);
     if (koreanDate !== event.date) return null;
     const url = event.infoUrl ? new URL(event.infoUrl) : null;
     if (url && (url.protocol !== 'https:' || url.username || url.password)) return null;

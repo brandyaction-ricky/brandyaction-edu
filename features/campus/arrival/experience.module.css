@@ -261,7 +261,7 @@
 .textButton:hover { text-decoration: underline; }
 
 /* Make the visitor's situation the first thing they recognize. */
-.choices { display: grid; gap: 10px; }
+.choices { display: grid; grid-auto-rows: 1fr; gap: 10px; }
 .root .choices > button {
   border: 1px solid var(--line);
   background: var(--paper);
@@ -339,6 +339,10 @@
 .questions textarea { min-height: 104px; }
 .questions textarea::placeholder, .extraLabel textarea::placeholder { color: var(--muted); font-size: 16px; line-height: 1.65; }
 .questions label > small { display: block; font-size: 14px; line-height: 1.6; color: var(--muted); margin-top: 7px; }
+.reuseDraft { display: grid; justify-items: start; gap: 4px; margin-bottom: 12px; }
+.reuseDraft .textButton { color: var(--ba-info); font-weight: 650; text-align: left; }
+.reuseDraft .textButton svg { flex-shrink: 0; }
+.reuseDraft p { margin: 0; color: var(--ba-info); font-size: 14px; line-height: 1.6; word-break: keep-all; }
 .fine { font-size: 14px; line-height: 1.65; color: var(--muted); margin-top: 21px !important; word-break: keep-all; }
 .handoffCopy > p { color: var(--muted); font-size: 16px; line-height: 1.6; word-break: keep-all; }
 .handoffCopy .textButton { margin-top: 6px; }
@@ -534,7 +538,7 @@
   .calendarButtons > a > svg:first-child, .calendarButtons > button > svg:first-child { display: none; }
   .root:has(.dockHidden) .world { height: calc(100dvh - 64px); }
   .root:has(.dockHidden) .place { top: auto; bottom: 25px; }
-  .root:has(.questions textarea:focus) { --scene-height: 120px; }
+  .root:has(.questions) { --scene-height: 120px; }
   .root:has(.questions textarea:focus) .route,
   .root:has(.questions textarea:focus) .exploreButton { display: none; }
 }
