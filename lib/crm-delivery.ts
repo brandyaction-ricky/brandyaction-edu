@@ -28,6 +28,8 @@ export type Member = {
   recruitment?: boolean;
   purchaseBatch?: boolean;
   purchaseRoomLink?: string | null;
+  retention?: boolean;
+  retentionAccount?: string;
 };
 
 const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
@@ -60,6 +62,7 @@ export function crmDeliveryState() {
     configured: smsConfigured || emailConfigured,
     smsConfigured,
     emailConfigured,
+    retentionEnabled: process.env.CRM_RETENTION_ENABLED === 'true',
   };
 }
 
@@ -72,8 +75,11 @@ function message(
 ): MessageSchema {
   if (template.is_active === false)
     throw new Error("사용 중지된 템플릿은 발송할 수 없습니다.");
+  if (template.content.includes('#{수강계정}') && (!member.retention || !member.retentionAccount))
+    throw new Error('수강권이 연결된 로그인 계정을 확인하지 못해 발송하지 않았습니다.');
   const raw = member.recruitment ? recruitmentMessageLinks(template.content, member.entry_channel) : template.content;
-  const content = literalContent ? raw : render(member.purchaseRoomLink ? raw.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : raw, member);
+  const rendered = member.retention && member.retentionAccount ? raw.replaceAll('#{수강계정}',member.retentionAccount) : raw;
+  const content = literalContent ? raw : render(member.purchaseRoomLink ? rendered.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : rendered, member);
   if (template.channel === "alimtalk") {
     if (template.purpose === "marketing")
       throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.");
@@ -87,11 +93,12 @@ function message(
       kakaoOptions: {
         pfId: process.env.SOLAPI_KAKAO_PF_ID,
         templateId: template.alimtalk_template_id,
-        ...(member.purchaseBatch ? {
+        ...(member.purchaseBatch || member.retention ? {
           disableSms: true,
           variables: {
             ...(template.content.includes("#{이름}") ? { "#{이름}": member.full_name || "회원" } : {}),
             ...(member.purchaseRoomLink ? { "#{공지방링크}": member.purchaseRoomLink } : {}),
+            ...(member.retention && template.content.includes('#{수강계정}') ? { '#{수강계정}': member.retentionAccount! } : {}),
           },
         } : {}),
       },
@@ -173,7 +180,7 @@ async function providerOptOuts(service: SolapiMessageService, sender: string) {
 export async function sendBatch(
   template: Template,
   members: Member[],
-  context: { campaignId?: string; purchaseBatchId?: string; purchaseRoomLink?: string | null; purchaseText?: boolean; recruitment?: boolean; automationRuns?: Record<string, string> },
+  context: { campaignId?: string; purchaseBatchId?: string; purchaseRoomLink?: string | null; purchaseText?: boolean; recruitment?: boolean; retention?: boolean; automationRuns?: Record<string, string> },
   settings: SmsSettings,
 ) {
   const active = provider(settings.senderPhone);
@@ -186,6 +193,7 @@ export async function sendBatch(
     throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다.");
   const db = createAdminClient();
   let currentMembers = context.purchaseBatchId ? members.map(member => ({ ...member, purchaseBatch: true, purchaseRoomLink: context.purchaseRoomLink })) : members;
+  if(context.retention) currentMembers=currentMembers.map(member=>({...member,retention:true}));
   if (template.purpose === "marketing" && members.length) {
     // Recheck current consent and phone after campaign selection or recruitment claims.
     const latest = await db.from("profiles")
@@ -241,7 +249,7 @@ export async function sendBatch(
         sent_at: new Date().toISOString(),
       })
       .in("id", ids);
-    if (accepted.error && (context.recruitment || context.purchaseBatchId)) throw new Error("발송 접수 기록을 확인하지 못했습니다.");
+    if (accepted.error && (context.recruitment || context.purchaseBatchId || context.retention)) throw new Error("발송 접수 기록을 확인하지 못했습니다.");
     const failedPhones = new Set(
       response.failedMessageList.map((item) => digits(item.to)),
     );
@@ -268,15 +276,15 @@ export async function sendBatch(
       disabled: false,
     };
   } catch (error) {
-    const reason = (context.recruitment || context.purchaseBatchId) ? "메시지 사업자 접수 결과를 확인할 수 없습니다. 자동 재발송하지 않습니다." :
+    const reason = (context.recruitment || context.purchaseBatchId || context.retention) ? "메시지 사업자 접수 결과를 확인할 수 없습니다. 자동 재발송하지 않습니다." :
       error instanceof Error
         ? error.message.slice(0, 500)
         : "메시지 사업자 요청 실패";
     await db
       .from("crm_message_logs")
       .update({
-        status: (context.recruitment || context.purchaseBatchId) ? "unknown" : "failed",
-        provider_status: (context.recruitment || context.purchaseBatchId) ? "unknown" : "failed",
+        status: (context.recruitment || context.purchaseBatchId || context.retention) ? "unknown" : "failed",
+        provider_status: (context.recruitment || context.purchaseBatchId || context.retention) ? "unknown" : "failed",
         error_message: reason,
       })
       .in(
@@ -446,6 +454,7 @@ export async function dispatchDueCrm() {
       "*,automation:crm_automations(*,template:crm_templates(*)),member:profiles(id,phone,full_name,email,contact_email,marketing_consent,status)",
     )
     .eq("status", "pending")
+    .not("trigger_key", "like", "retention:%")
     .lte("scheduled_for", new Date().toISOString());
   if (!smsAvailable || purchaseOnly) runQuery = runQuery.like("trigger_key", "purchase_completed:%");
   const runResult = await runQuery
@@ -453,6 +462,8 @@ export async function dispatchDueCrm() {
     .limit(100);
   if (runResult.error) throw runResult.error;
   for (const run of runResult.data) {
+    // Retention runs have their own live eligibility and deduplication claim.
+    if (run.trigger_key.startsWith('retention:') || ['member_inactive','learning_stalled'].includes(run.automation?.trigger_type)) continue;
     const purchaseRun = run.automation.trigger_type === "purchase_completed" &&
       run.automation.template.purpose === "transactional";
     if (purchaseOnly && !purchaseRun) continue;
