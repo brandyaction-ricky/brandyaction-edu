@@ -99,3 +99,6 @@
 .presenceNote{flex:1 1 200px;min-width:0;text-align:left}
 
 .rosterMore{color:var(--text-secondary, #626770);font-size:13px}
+
+/* Staff names (R1): only staff can carry these words, so the colour is a trustworthy mark. */
+.staffName{color:#c2410c;font-weight:800}

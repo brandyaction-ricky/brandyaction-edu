@@ -31,9 +31,9 @@ function fixture() {
     lesson_progress: [{ id: uid(10), enrollment_id: uid(2), lesson_id: uid(6), completed_at: '2026-11-01' }],
   };
 }
-function database(data, { failTable, truncateTable } = {}) {
+function database(data, { failTable, truncateTable, gates } = {}) {
   const calls = [];
-  return { calls, from(table) {
+  return { calls, rpc(name, args) { calls.push({ rpc: name, args }); return Promise.resolve(gates ? { data: gates, error: null } : { data: null, error: { code: '42501' } }); }, from(table) {
     const filters = []; let columns, limit = Infinity;
     calls.push({ table, filters });
     const query = {
@@ -62,13 +62,23 @@ test('selected cohort hides another cohorts published lesson and fails closed on
  const data=fixture();data.curriculum_lessons[0].archived_at='2026-01-01';assert.equal((await load(data)).lessons.length,0);
 });
 
+test('locked marks come from the server-only progression read for this viewer',async()=>{
+ const data=fixture(),student=database(data),server=database(data,{gates:[{lessonId:uid(6),isUnlocked:false}]});
+ const result=await loadCampusSnapshot(student,user,uid(2),now,()=>server);
+ assert.equal(result.lessons[0].locked,true);
+ assert.deepEqual(server.calls.find(c=>c.rpc).args,{p_actor:user.id,p_enrollment:uid(2)});
+ assert.ok(!student.calls.some(c=>c.rpc));
+ const denied=await loadCampusSnapshot(student,user,uid(2),now,()=>database(data));
+ assert.equal(denied.lessons[0].locked,undefined);
+});
+
 test('server-only publication lookup follows owner authorization and never reads content with elevated access',async()=>{
  const data=fixture(),student=database(data,{failTable:'edu_cohort_week_visibility'}),server=database(data);let calls=0;
  const lookup=()=>{calls++;return server;};
  const result=await loadCampusSnapshot(student,user,uid(2),now,lookup);
  assert.equal(result.lessons.length,1);assert.equal(calls,1);
- assert.deepEqual(server.calls.map(c=>c.table),['edu_cohort_week_visibility','edu_cohort_lesson_visibility','site_settings']);
- assert.ok(server.calls.filter(c=>c.table!=='site_settings').every(c=>c.filters.some(f=>Array.isArray(f)&&f[0]==='cohort_id'&&f[1]===uid(4))));
+ assert.deepEqual(server.calls.filter(c=>c.table).map(c=>c.table),['edu_cohort_week_visibility','edu_cohort_lesson_visibility','site_settings']);
+ assert.ok(server.calls.filter(c=>c.table&&c.table!=='site_settings').every(c=>c.filters.some(f=>Array.isArray(f)&&f[0]==='cohort_id'&&f[1]===uid(4))));
  assert.ok(student.calls.every(c=>!c.table.startsWith('edu_cohort_')));
  const denied=()=>{throw Error('Elevated lookup must not run');};
  await loadCampusSnapshot(database(data),user,null,now,denied);

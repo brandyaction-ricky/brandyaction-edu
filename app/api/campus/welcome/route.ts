@@ -7,6 +7,7 @@ import {privateReply,problem} from '@/features/campus/webinar/server';
 import {fail,uuid} from '@/features/campus/webinar/domain';
 import {WELCOME_USER_PREFIX,mergeWelcomeState,type WelcomeUserState} from '@/features/campus/welcome/progress';
 import {tourAvatar} from '@/features/campus/tour/appearance';
+import { assertCampusName } from '@/lib/campus-staff-name';
 async function access(enrollmentId:unknown){
  if(process.env.EDU_CAMPUS_ENABLED!=='true')fail('공간이 준비 중입니다.',404);
  const user=await getAuthenticatedUser();if(!user||user.status!=='active')fail('로그인이 필요합니다.',401);if(!uuid(enrollmentId))fail('수강권을 확인해 주세요.');
@@ -29,7 +30,7 @@ export async function POST(request:Request){try{
  // Validate before making either write. A saved avatar remains valid if the later state write needs retrying.
  mergeWelcomeState(null,b,crypto.randomUUID());
  if(b.kind==='avatar'){
-  const a=tourAvatar(b.avatar),found=await db.from('edu_campus_space_profiles').select('user_id').eq('user_id',user.id).maybeSingle();if(found.error)throw found.error;const fields={nickname:a.nickname,gender:a.gender,coat:a.coat,avatar_model:a.model,hair_color:a.hairColor,skin_color:a.skinColor,pants_color:a.pantsColor,held_item:a.heldItem};const r=found.data?await db.from('edu_campus_space_profiles').update(fields).eq('user_id',user.id):await db.from('edu_campus_space_profiles').insert({user_id:user.id,status:'joinable',...fields});if(r.error)throw r.error;
+  const a=tourAvatar(b.avatar),found=await db.from('edu_campus_space_profiles').select('user_id').eq('user_id',user.id).maybeSingle();if(found.error)throw found.error;const fields={nickname:assertCampusName(a.nickname,user.role),gender:a.gender,coat:a.coat,avatar_model:a.model,hair_color:a.hairColor,skin_color:a.skinColor,pants_color:a.pantsColor,held_item:a.heldItem};const r=found.data?await db.from('edu_campus_space_profiles').update(fields).eq('user_id',user.id):await db.from('edu_campus_space_profiles').insert({user_id:user.id,status:'joinable',...fields});if(r.error)throw r.error;
  }
  const admin=createAdminClient();
  for(let attempt=0;attempt<3;attempt++){

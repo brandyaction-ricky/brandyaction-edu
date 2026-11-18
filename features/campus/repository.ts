@@ -31,7 +31,7 @@ export async function loadCampusScope(db: Database, viewer: { id: string }, enro
   if (!scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   return scope;
 }
-export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from'> | Promise<Pick<Database, 'from'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
+export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from' | 'rpc'> | Promise<Pick<Database, 'from' | 'rpc'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
     .eq('user_id', viewer.id).eq('status', 'active').order('created_at', { ascending: false }).limit(200))).filter(e => hasLearningAccess(e, now));
@@ -63,8 +63,11 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   // Read with the member's own client: the elevated client stays limited to visibility settings.
   const courseLessons=allWeeks.length?await rows(db.from('curriculum_lessons').select('id,week_id,day_number,archived_at',{count:'exact'}).in('week_id',allWeeks.map(w=>w.id)).eq('is_published',true).is('archived_at',null).limit(2000)):[];
   const dayNumbers=curriculumDayNumbers({curriculum_weeks:allWeeks,curriculum_lessons:courseLessons});
-  // The same open/locked rule the classroom uses; a failed read leaves lessons unmarked rather than hiding them.
-  const gates = lessons.length ? Promise.resolve().then(() => db.rpc('edu_read_lesson_progression', { p_actor: viewer.id, p_enrollment: scope.enrollmentId })).then(r => r.error || !Array.isArray(r.data) ? null : r.data as { lessonId: string; isUnlocked: boolean }[], () => null) : Promise.resolve(null);
+  // The same open/locked rule the classroom uses. The RPC is service-role only (like the classroom route),
+  // so it runs on the server client for this verified owner; a failed read leaves lessons unmarked rather than hiding them.
+  const gates = lessons.length ? Promise.resolve().then(() => visibilityDb.rpc('edu_read_lesson_progression', { p_actor: viewer.id, p_enrollment: scope.enrollmentId }))
+    .then(r => { if (r.error || !Array.isArray(r.data)) throw r.error ?? new Error('bad shape'); return r.data as { lessonId: string; isUnlocked: boolean }[]; })
+    .catch(e => { console.error('campus progression read failed', (e as { code?: string })?.code ?? 'unknown'); return null; }) : Promise.resolve(null);
   const [missions, progress] = lessons.length ? await Promise.all([
     rows(db.from('curriculum_missions').select('id,lesson_id,title,updated_at,is_required,is_published,archived_at', { count: 'exact' })
       .in('lesson_id', lessons.map(l => l.id)).eq('is_published', true).is('archived_at', null).limit(500)),

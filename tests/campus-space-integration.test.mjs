@@ -80,6 +80,11 @@ test('combined owner records, cohort publication, actual mission rewards, revoke
  await db.query("insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values($1,$2,$3,'별 동료','female','#527086','joinable')",[uid(20),uid(1),uid(111)]);
  await assert.rejects(db.query('select edu_campus_space_claim_seat($1,$2,$3)',[uid(20),uid(110),'desk-1']),/session/i);
  await db.query('select edu_campus_space_claim_seat($1,$2,$3)',[uid(20),uid(111),'desk-1']);
+ // A second window takes over at once (G3): updating the fresh row hits the 4-second limit; the join path deletes the other session's row first.
+ const takeOver="insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values($1,$2,$3,'별 동료','female','#527086','joinable') on conflict(cohort_id,user_id) do update set session_id=excluded.session_id";
+ await assert.rejects(db.query(takeOver,[uid(20),uid(1),uid(112)]),/rate limit/i);
+ await db.query('delete from edu_campus_space_presence where cohort_id=$1 and user_id=$2 and session_id<>$3',[uid(20),uid(1),uid(112)]);
+ await db.query(takeOver,[uid(20),uid(1),uid(112)]);
  await login(2);
  for(const table of ['edu_campus_focus_sessions','edu_campus_support_requests','edu_campus_preferences','edu_campus_business_records','edu_campus_space_profiles'])assert.equal((await db.query(`select * from ${table}`)).rows.length,0,table);
  assert.equal((await db.query('select * from edu_campus_posts')).rows.length,1);assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,1);

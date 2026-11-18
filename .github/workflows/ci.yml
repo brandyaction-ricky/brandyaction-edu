@@ -37,6 +37,24 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/campus-staff-qa4-release-20261118" ]; then
+            expected_main=bfc869a80506b9a0786121591d80db67a25c82eb
+            release_payload=62c283828df838e1adad2c8c1724adad960a606c
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/campus/community/route.ts|app/api/campus/welcome/route.ts|features/campus/community/handler.ts|features/campus/community/panel.module.css|features/campus/community/panel.tsx|features/campus/repository.ts|features/campus/space/handler.ts|features/campus/space/panel.module.css|features/campus/space/panel.tsx|features/campus/space/server.ts|features/campus/tour/preview.tsx|features/campus/ui/back-close.ts|features/campus/ui/campus-window.tsx|features/campus/ui/confirm-box.module.css|features/campus/ui/confirm-box.tsx|features/campus/ui/workspace.tsx|lib/campus-staff-name.ts|lib/curriculum-ai-sensitive.ts|tests/campus-browser/community.spec.ts|tests/campus-browser/staff-qa-1118.spec.ts|tests/campus-connection.test.mjs|tests/campus-space-integration.test.mjs|tests/campus-staff-name.test.mjs|tests/campus-welcome-account.test.mjs) ;;
+                *) echo "Unexpected campus staff QA round 4 release change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified campus staff QA round 4 payload (code-only); current production, database and central release controls preserved.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-ad-daily-release-20261118" ]; then
             expected_main=c9f8776b43aa56be14ec92dfe8fe801b7c953bb9
             release_payload=0d7b11f0d3cca2b1e66105abf9bf66f05fca1851

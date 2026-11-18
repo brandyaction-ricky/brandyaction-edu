@@ -101,7 +101,7 @@ test('private real-file selection and drag/paste attach bytes locally, not to co
 test('file sharing is a separate unchecked choice and private post changes revoke it',async({page})=>{
  await page.goto('/community');await compose(page,true);const files=page.getByRole('region',{name:'작업물 첨부'});await files.getByText(/파일 더 올리기/).click();await files.getByLabel('캡처·PDF 파일 첨부').setInputFiles({name:'공개할 캡처.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\nsample')});
  const check=files.getByRole('checkbox',{name:'이 파일을 같은 기수에 공개합니다'});await expect(check).not.toBeChecked();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();await check.check();await files.getByRole('button',{name:'확인한 파일 기수에 공유'}).click();await expect(files.getByText(/공개할 캡처.pdf.*기수 공개/)).toBeVisible();
- page.once('dialog',d=>void d.accept());await page.getByRole('button',{name:'나만 보기로 돌리기',exact:true}).click();await expect(files.getByText(/공개할 캡처.pdf.*나만 보기/)).toBeVisible();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();
+ await page.getByRole('button',{name:'나만 보기로 돌리기',exact:true}).click();await page.getByRole('alertdialog',{name:'확인'}).getByRole('button',{name:'나만 보기로 돌리기'}).click();await expect(files.getByText(/공개할 캡처.pdf.*나만 보기/)).toBeVisible();await expect(files.getByRole('button',{name:'확인한 파일 기수에 공유'})).toBeDisabled();
 });
 test('a landing page needs an address or a capture; the capture is shared with the post and reviews use three parts',async({page})=>{
  const requests:string[]=[];page.on('request',r=>{if(r.url().includes('/api/campus/'))requests.push(r.url());});await page.goto('/community');
