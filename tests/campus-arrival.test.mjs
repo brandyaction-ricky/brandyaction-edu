@@ -155,12 +155,28 @@ test('copy status persists independently of AI completion and rejects unrecogniz
 
 test('back navigation follows the personal, example and direct-calendar paths', () => {
   const state = model.initialArrivalState();
-  for (const [step, expected] of [[0, 0], [8, 0], [1, 8], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 0]]) {
+  for (const [step, expected] of [[0, 0], [8, 0], [1, 8], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 8]]) {
     assert.equal(model.arrivalBackStep({...state, step}), expected);
   }
   assert.equal(model.arrivalBackStep({...state, step: 5, mode: 'example', experience: 'example-viewed'}), 1);
-  assert.equal(model.arrivalBackStep({...state, step: 7, experience: 'self-reported'}), 5);
-  assert.equal(model.arrivalBackStep({...state, step: 7, mode: 'example', experience: 'example-viewed'}), 5);
+  assert.equal(model.arrivalBackStep({...state, step: 7, audience: 'business', experience: 'self-reported'}), 5);
+  assert.equal(model.arrivalBackStep({...state, step: 7, audience: 'business', mode: 'example', experience: 'example-viewed'}), 5);
+  assert.equal(model.arrivalBackStep({...state, step: 7, hallReturnStep: 1}), 1);
+});
+
+test('the delivered proposal and the exact return step survive reopening the walk', () => {
+  const state = {...model.initialArrivalState(), proposalSent: true, station: 7, hallReturnStep: 2};
+  state.answers.preparing = {a: '이번에 준비 중인 서비스', b: '고객에게 확인할 점'};
+  const walking = model.parseArrivalState(model.serializeArrivalState(state));
+  assert.equal(walking.station, 7);
+  assert.equal(walking.hallReturnStep, 2);
+  const inHall = model.parseArrivalState(model.serializeArrivalState({...walking, step: 7}));
+  assert.equal(model.arrivalBackStep(inHall), 2);
+  assert.equal(inHall.proposalSent, true);
+  assert.deepEqual(inHall.answers.preparing, state.answers.preparing);
+  const invalid = model.parseArrivalState(JSON.stringify({...state, proposalSent: 'true', hallReturnStep: 7}));
+  assert.equal(invalid.proposalSent, false);
+  assert.equal(invalid.hallReturnStep, null);
 });
 
 test('the audience selection resumes separately from the welcome introduction without losing drafts', () => {

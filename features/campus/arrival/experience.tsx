@@ -1,14 +1,15 @@
 'use client';
 
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useEffectEvent, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, googleCalendarUrl, calendarIcs, arrivalBackStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
+import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
 import {CorridorScene} from './corridor-scene';
 import {HallProgram} from './hall-program';
 import {CorridorPanel} from './corridor-panel';
 import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
+import {VisitorAvatar} from './visitor-avatar';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
@@ -36,10 +37,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [showExample, setShowExample] = useState(false);
   const [sceneStatus, setSceneStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [walkRequest, setWalkRequest] = useState(0);
+  const [walkAssist, setWalkAssist] = useState<'idle' | 'moving' | 'open'>('idle');
   const [sceneVisit, setSceneVisit] = useState(0);
   const [explore, setExplore] = useState(false);
   const [deskOpen, setDeskOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const deskDialog = useRef<HTMLDialogElement>(null);
   const introDialog = useRef<HTMLDialogElement>(null);
   const deskButton = useRef<HTMLButtonElement>(null);
@@ -49,9 +52,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const heading = useRef<HTMLHeadingElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
+  const walkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const visited = useRef(false);
   const step = state.step;
   const officeIntro = step === 0;
+  const canOpenStation = sceneStatus === 'unavailable' || walkAssist === 'open';
   const station = state.station;
   const destination = destinations[station - 1];
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
@@ -112,9 +117,25 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     if (introOpen) introDialog.current?.showModal();
     else introDialog.current?.close();
   }, [introOpen]);
+  useEffect(() => () => clearTimeout(walkTimer.current), []);
+
+  const onCorridorKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.repeat || event.key !== ' ' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    const next = deskButton.current;
+    if (!officeIntro || deskOpen || introOpen || avatarOpen || showReset || menu.current?.open || !next || next.disabled) return;
+    if (event.target instanceof HTMLElement && event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
+    event.preventDefault();
+    next.click();
+  });
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => onCorridorKey(event);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   function arrive(at: CorridorStation) {
     if (at !== station || step !== 0) return;
+    resetWalkAssist();
     if (at === 7) go(7);
     else if (at === 6) go(8);
     else setDeskOpen(true);
@@ -125,13 +146,20 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     update({station: (station + 1) as CorridorStation});
   }
   function headToHall() {
-    if (menu.current) menu.current.open = false;
-    go(0);
-    update({station: 7});
+    go(0, {station: 7, hallReturnStep: isPersonalTrialStep(step) ? step : 8});
   }
   function walkToStation() {
-    if (sceneStatus === 'unavailable') arrive(station);
-    else if (sceneStatus === 'ready') setWalkRequest(value => value + 1);
+    if (canOpenStation) arrive(station);
+    else if (sceneStatus === 'ready') {
+      clearTimeout(walkTimer.current);
+      setWalkRequest(value => value + 1);
+      setWalkAssist('moving');
+      walkTimer.current = setTimeout(() => setWalkAssist('open'), 4800);
+    }
+  }
+  function resetWalkAssist() {
+    clearTimeout(walkTimer.current);
+    setWalkAssist('idle');
   }
   function closeDesk() {
     deskDialog.current?.close();
@@ -140,7 +168,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
 
   function update(patch: Partial<ArrivalState>) {setState(value => ({...value, ...patch}));}
-  function go(next: ArrivalStep) {setDeskOpen(false); setIntroOpen(false); if (menu.current) menu.current.open = false; setNotice(''); setCopyFallback(''); setExplore(false); update({step: next});}
+  function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station' | 'hallReturnStep'> = {}) {
+    resetWalkAssist();
+    setDeskOpen(false);
+    setIntroOpen(false);
+    if (menu.current) menu.current.open = false;
+    setNotice('');
+    setCopyFallback('');
+    setExplore(false);
+    update({...route, step: next});
+  }
   function selectAudience(audience: Audience) {
     update({audience, mode: 'personal', experience: 'none', handoff: 'ready', extra: '', step: 1});
     setNotice(''); setCopyFallback('');
@@ -171,8 +208,9 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function reset() {
     if (menu.current) menu.current.open = false;
     try {if (persistenceKey) localStorage.removeItem(persistenceKey);} catch {}
+    resetWalkAssist();
     setSceneVisit(value => value + 1); setSceneStatus('loading'); setWalkRequest(0);
-    setState(initialArrivalState()); setDeskOpen(false); setIntroOpen(false); setCopyFallback(''); setExplore(false); setShowReset(false); setNotice('');
+    setState({...initialArrivalState(), visitorAvatar: state.visitorAvatar}); setDeskOpen(false); setIntroOpen(false); setCopyFallback(''); setExplore(false); setShowReset(false); setNotice('');
   }
   function exampleFinish() {update({mode: 'example', experience: 'example-viewed', handoff: 'ready', step: 5}); setNotice('');}
   function personalStart() {update({mode: 'personal', experience: 'none', step: 2}); setNotice('');}
@@ -182,7 +220,9 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label="웰컴존에서 라이브 홀까지 이어지는 통로">
       {hydrated && <CorridorScene key={sceneVisit} station={station} label={station === 3 ? config.officeDemo?.deskLabel : undefined}
-        paused={deskOpen || introOpen || showReset || (!officeIntro && !explore)}
+        avatar={state.visitorAvatar}
+        paused={deskOpen || introOpen || avatarOpen || showReset || (!officeIntro && !explore)}
+        freeRoam={step === 7 && explore}
         walkRequest={walkRequest} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
     </div>
     <header className={s.header}>
@@ -191,20 +231,27 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <div className={entryStyle.progress} aria-live="polite" aria-atomic="true"><span>문샷 웰컴존</span><i aria-hidden="true"/><b>{station === 7 ? 'LIVE' : String(station).padStart(2, '0') + ' / 06'}</b><strong>{destination}</strong></div>
       <details ref={menu} className={s.menu}><summary aria-label="체험 메뉴"><MoreHorizontal size={23}/></summary><div><span>{preview ? '저장 전 관리자 미리보기' : '브랜치 미리보기'}</span><button type="button" onClick={() => {if (menu.current) menu.current.open = false; setIntroOpen(true);}}>체험 소개</button>{!officeIntro && step !== 7 && <button type="button" onClick={headToHall}><CalendarDays size={16}/>라이브 홀로 이동</button>}<button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button></div></details>
     </header>
+    {officeIntro && station === 1 && sceneStatus === 'ready' && <div className={entryStyle.avatarControl}>
+      <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
+    </div>}
     {officeIntro ? <section className={entryStyle.wayfinding} aria-label="현재 목적지" data-walk-station={station}>
       <div>
         <span>다음 목적지</span>
         <h1>{destination}</h1>
-        <p>{sceneStatus === 'unavailable' ? '이 화면에서 같은 체험을 이어갈 수 있어요.' : '바닥을 누르거나 방향키로 걸어가세요.'}</p>
+        {canOpenStation ? <p>버튼으로 이곳의 내용을 바로 열 수 있어요.</p> : <>
+          <p className={entryStyle.keyboardHint}>스페이스바를 누르면 화살표 쪽으로 걸어가요.</p>
+          <p className={entryStyle.touchHint}>화살표 쪽 바닥을 터치하거나 옆 버튼을 누르세요.</p>
+          {station === 1 && <p>팀장 안내를 마치면 다음 장소가 열려요.</p>}
+        </>}
       </div>
-      <button id="arrival-desk-button" type="button" ref={deskButton} onClick={walkToStation} disabled={sceneStatus === 'loading'}>
-        {sceneStatus === 'loading' ? '공간 준비 중' : sceneStatus === 'unavailable' ? '내용 열기' : invitations[station - 1]}<ArrowRight size={16}/>
+      <button id="arrival-desk-button" type="button" ref={deskButton} onClick={walkToStation} disabled={sceneStatus === 'loading' || (!canOpenStation && walkAssist === 'moving')}>
+        {sceneStatus === 'loading' ? '공간 준비 중' : canOpenStation ? '내용 열기' : walkAssist === 'moving' ? '이동 중' : invitations[station - 1]}<ArrowRight size={16}/>
       </button>
     </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
       {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
         onChange={workTrial => update({workTrial, experience: workTrial.secondConfirmed ? 'self-reported' : 'none'})}
         onExit={() => go(8)} onLive={headToHall}/> : <>
-      <div className={s.dockTop}><span>{step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={() => {if (step === 7) {go(0);} else go(arrivalBackStep(state));}}><ArrowLeft size={14}/>이전</button></div>
+      <div className={s.dockTop}><span>{step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={() => go(arrivalBackStep(state), step === 7 ? {station: 6} : {})}><ArrowLeft size={14}/>{step === 7 ? '내 AI 체험으로 돌아가기' : '이전'}</button></div>
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
         {step === 8 && <>
           {title(<>지금 어떤 상황이신가요?</>, '가장 가까운 상황을 골라주세요. 나에게 맞는 결과 예시부터 보여드릴게요.')}
@@ -268,9 +315,14 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </>}
     </section>}
     {!officeIntro && <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
+    {step === 7 && explore && sceneStatus === 'ready' && <div className={entryStyle.hallControls}>
+      <p className={entryStyle.keyboardHint}>바닥을 클릭하거나 방향키로 이동하세요.</p>
+      <p className={entryStyle.touchHint}>가고 싶은 바닥을 터치하세요.</p>
+    </div>}
     <dialog ref={deskDialog} className={entryStyle.monitor} aria-label={destination} onCancel={event => {event.preventDefault(); event.stopPropagation(); closeDesk();}}>
       {deskOpen && station !== 6 && station !== 7 && <CorridorPanel station={station} config={config} review={state.deskReview}
         onReview={(phase, choice) => update({deskReview: {phase, choice}})}
+        proposalSent={state.proposalSent} onProposal={() => update({proposalSent: true})}
         ruleChoice={state.companyRule} onRuleChoice={companyRule => update({companyRule})}
         onClose={closeDesk} onComplete={finishStation}/>}
     </dialog>

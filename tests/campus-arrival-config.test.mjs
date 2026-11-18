@@ -194,3 +194,18 @@ test('calendar uses edited Korean date and time, stable campaign UID and no made
   assert.equal(google.searchParams.get('dates'), '20270103T163000Z/20270103T163000Z');
   assert.equal(google.searchParams.get('location'), 'https://example.com/live');
 });
+
+test('the optional live hall handout requires a complete public link and survives admin serialization', () => {
+  const saved = config.validateArrivalConfig({...draft(), handoutLabel: '  직원 실습 자료  ', handoutUrl: 'https://example.com/guide'});
+  assert.equal(saved.handoutLabel, '직원 실습 자료');
+  assert.equal(saved.handoutUrl, 'https://example.com/guide');
+  assert.deepEqual(config.validateArrivalConfig(JSON.parse(JSON.stringify(saved))), saved);
+  const cleared = config.validateArrivalConfig({...saved, handoutLabel: '', handoutUrl: ''});
+  assert.deepEqual(cleared, config.validateArrivalConfig(draft()));
+  for (const fields of [
+    {handoutLabel: '자료'}, {handoutUrl: 'https://example.com/guide'},
+    {handoutLabel: '자료', handoutUrl: 'http://example.com/'},
+    {handoutLabel: '자료', handoutUrl: 'https://example.com/guide?access_token=example'},
+    {handoutLabel: '자료', handoutUrl: null},
+  ]) rejects({...draft(), ...fields});
+});

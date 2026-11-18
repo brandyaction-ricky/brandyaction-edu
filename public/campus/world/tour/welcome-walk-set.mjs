@@ -1,3 +1,5 @@
+import {mountWelcomeLiveHall} from './welcome-live-hall.mjs';
+
 /** Six offices line one corridor, ending at the entrance to a separate live hall. */
 const TITLES = ['팀장 봇', '조사 직원', '기획 · 제작 직원', '고객 응대 직원', '회사 기준', '내 AI 체험', '라이브 홀'];
 const PALETTE = {
@@ -19,7 +21,11 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   const materials = new Map(), textures = new Set(), models = new Set(), batches = new Map();
   const scratch = new THREE.Object3D();
   const {navy, deep, steel, frost, pearl, floor, edge, ink, wood, blue, sand, green, red} = PALETTE;
-  const indicators = [];
+  const guide = new THREE.Group();
+  guide.name = 'walk-next-stop';
+  guide.visible = false;
+  root.add(guide);
+  let hallEntrance, liveHall, preloadHall;
   let disposed = false;
 
   function material(color, kind = 'matte') {
@@ -182,6 +188,16 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   }
 
   const stations = TITLES.map((title,index) => ({x: index*8, z: 0, title}));
+  // One raised arrow points to the reachable floor position, not to a desk
+  // behind glass. Reposition the same object as the visitor advances.
+  const arrowTip = new THREE.ConeGeometry(.37,.46,4);
+  const point = new THREE.Mesh(arrowTip,material(0x2254a4));
+  point.position.y = .44;
+  point.rotation.set(0,Math.PI/4,Math.PI);
+  const stem = new THREE.Mesh(cube,material(0x3871c4));
+  stem.position.y = .84;
+  stem.scale.set(.22,.42,.22);
+  guide.add(point,stem);
   // An open near edge leaves the path and avatar legible at a small screen width.
   box(root,19.75,-.37,-1.9,50,.66,10.4,navy);
   box(root,19.75,-.045,.70,50,.085,5.2,floor);
@@ -194,51 +210,55 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   box(root,-6.9,-.37,-1.90,3.35,.66,10.4,navy);
   box(root,-6.9,-.045,.70,3.35,.085,5.2,floor);
   box(root,-6.9,-.047,-4.50,3.35,.08,5.2,0xdee7e8);
-  box(root,-6.30,1.74,-6.61,4.60,3.48,.18,frost);
+  // The vestibule's doorway is a real gap in the back wall; its sidelight
+  // stays in the wall plane, separate from the office and walking aisle.
+  const doorX = -5.53;
+  box(root,-7.59,1.74,-6.61,2.02,3.48,.18,frost);
+  box(root,-4.24,1.74,-6.61,.48,3.48,.18,frost);
+  box(root,doorX,3.03,-6.61,2.10,.90,.18,frost);
   box(root,-6.30,3.46,-6.43,4.60,.21,.61,navy,'metal');
   box(root,-8.52,1.72,-4.83,.21,3.45,3.61,frost);
   for(let i=0;i<9;i++) box(root,-8.05+i*.16,1.58,-6.44,.08,2.77,.11,wood);
-  box(root,-5.68,2.14,-6.44,2.2,.55,.09,deep);
-  label(root,'문샷 캠퍼스',-5.68,2.14,-6.37,2.16,.49,'#263f56','#ffffff');
+  box(root,doorX,2.98,-6.44,2.28,.53,.09,deep);
+  label(root,'문샷 캠퍼스',doorX,2.98,-6.37,2.18,.47,'#263f56','#ffffff');
   plant(root,-7.10,-3.72,1.23);
-  // Glass doors identify the arrival end of the hall.
-  box(root,-3.8,1.48,-3.97,2.18,3.0,.24,navy,'metal');
-  for(const x of [-4.27,-3.33]) {
-    box(root,x,1.4,-3.81,.82,2.63,.06,0x98b8c9,'metal');
-    box(root,x,1.9,-3.77,.71,1.45,.025,0xb6d4dc);
-    box(root,x+(x < -4 ? .28:-.28),1.16,-3.72,.045,.40,.07,steel,'metal');
-  }
+  for(const x of [doorX-1.03,doorX+1.03]) box(root,x,1.28,-6.54,.09,2.56,.14,navy,'metal');
+  box(root,doorX,2.57,-6.54,2.15,.08,.14,navy,'metal');
+  box(root,doorX-.82,1.28,-6.54,.34,2.49,.035,0x9dbecc,'glass');
+  box(root,doorX-.63,1.28,-6.54,.045,2.50,.06,steel,'metal');
+  box(root,doorX,-.037,-7.27,2.1,.07,1.31,floor);
+  box(root,doorX,1.37,-7.93,2.36,2.76,.12,0x788f9a);
 
   for(let index=0;index<TITLES.length;index++){
     const g=groupAt(root,stations[index].x,0,0);
     g.userData.welcomeStation=index;
-    // Shared glazing and blade signs mark the six offices. The hall beyond the
-    // threshold has a deeper auditorium floor and its own stage backdrop.
-    const hall = index === TITLES.length - 1;
-    const back = hall ? -8.45 : -6.62;
-    const width = hall ? 9.75 : 7.98;
-    box(g,0,1.78,back,width,3.56,.18,hall ? navy : frost);
-    box(g,0,3.46,back+.19,width,.21,.61,navy,'metal');
-    box(g,0,.14,back+.18,width-.10,.25,.22,edge);
-    box(g,0,3.31,back+.43,width-.95,.045,.09,0xffdfa9,'light');
-    if (!hall) {
-      // A felt panel, skirting and a small working rug give the bays depth on mobile.
-      box(g,-2.76,1.55,back+.14,1.03,2.73,.06,0xb6c9cd);
-      for (const dx of [-.36,-.12,.12,.36]) box(g,-2.76+dx,1.55,back+.18,.027,2.69,.02,0x9bb4b9);
-      box(g,.10,.003,-3.93,5.16,.012,2.55,0xc6d4d3);
-      box(g,-3.52,1.2,-4.85,.055,2.36,2.9,0x97bbcb,'glass');
-      for (const z of [-6.25,-3.43]) box(g,-3.52,1.18,z,.08,2.34,.08,steel,'metal');
-      box(g,-3.52,2.34,-4.83,.09,.075,2.91,steel,'metal');
-      box(g,-3.52,.45,-4.83,.08,.045,2.91,pearl);
+    if (index === TITLES.length - 1) {
+      hallEntrance = g;
+      // Floor lighting marks the passage without screening the visitor or
+      // the atrium tower once the camera turns to face the hall.
+      for (const z of [-1.8, 2.65]) {
+        box(g,-4.10,.075,z,.9,.15,.19,deep,'metal');
+        box(g,-4.10,.16,z,.77,.025,.09,0xffdfa9,'light');
+      }
+      continue;
+    }
+    const back = -6.62;
+    box(g,0,1.78,back,7.98,3.56,.18,frost);
+    box(g,0,3.46,back+.19,7.98,.21,.61,navy,'metal');
+    box(g,0,.14,back+.18,7.88,.25,.22,edge);
+    box(g,0,3.31,back+.43,7.03,.045,.09,0xffdfa9,'light');
+    // A felt panel, skirting and a small working rug give the bays depth on mobile.
+    box(g,-2.76,1.55,back+.14,1.03,2.73,.06,0xb6c9cd);
+    for (const dx of [-.36,-.12,.12,.36]) box(g,-2.76+dx,1.55,back+.18,.027,2.69,.02,0x9bb4b9);
+    box(g,.10,.003,-3.93,5.16,.012,2.55,0xc6d4d3);
+    // The first two desks are on a continuous reception floor.
+    if (index >= 2) {
+      box(g,-3.52,1.05,-5.42,.055,2.06,2.10,0x97bbcb,'glass');
+      for (const z of [-6.43,-4.41]) box(g,-3.52,1.04,z,.08,2.08,.08,steel,'metal');
+      box(g,-3.52,2.08,-5.42,.09,.075,2.10,steel,'metal');
     }
     box(g,0,2.78,back+.18,4.8,.71,.15,navy);
     label(g,TITLES[index],0,2.78,back+.27,4.74,.66,'#263f56','#ffffff');
-    const cue = new THREE.Mesh(cube,material(red,'light'));
-    cue.position.set(0,.019,-1.47);
-    cue.scale.set(3.38,.035,.14);
-    cue.visible=false;
-    cue.userData.welcomeStation=index;
-    g.add(cue); indicators.push(cue);
 
     if(index===0){
       const f=groupAt(g,.76,0,-3.37);
@@ -312,30 +332,6 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       chair(g,-.80,-2.17);
       person(g,1.50,-3.79);
       plant(g,2.61,-4.76,.96);
-    }else{
-      box(g,.80,-.36,-2.59,10.6,.65,11.70,deep);
-      box(g,.80,-.041,-2.61,10.6,.08,11.75,0x8298ad);
-      // Passage at 44 m: leave the opening and the near sightline clear.
-      for(const z of [-1.48,1.61]){
-        box(g,-4.13,1.56,z,.22,3.14,.20,navy,'metal');
-        box(g,-4.01,1.56,z,.035,2.88,.061,0xffdaa1,'light');
-      }
-      box(g,-4.13,3.16,.07,.25,.18,3.30,navy,'metal');
-      box(g,-4.13,1.46,-5.08,.12,2.92,6.8,0x849db1,'glass');
-      for(const dx of [-3.6,3.5]) {
-        for(let i=0;i<4;i++) box(g,dx+i*.12,1.86,-7.93,.085,3.21,.18,[navy,blue,steel,navy][i]);
-      }
-      box(g,.13,.21,-4.23,6.2,.4,3.33,navy);
-      box(g,.13,.43,-4.23,6.22,.055,3.36,wood);
-      box(g,.13,.11,-2.22,3.7,.20,.71,edge);
-      box(g,.4,1.55,-5.83,3.9,1.6,.11,deep);
-      label(g,'MOONSHOT LIVE',.4,1.55,-5.75,3.77,1.47,'#172f46','#f4e6c5');
-      for(const dx of [-2.4,2.6]) {
-        box(g,dx,1.0,-4.78,.49,1.1,.5,deep);
-        for(const y of [.77,1.17]) ball(g,dx,y,-4.5,.30,.30,.08,steel);
-      }
-      round(g,-1.66,1.03,-3.73,.13,1.14,.13,steel);
-      box(g,-1.66,1.65,-3.73,.83,.11,.56,pearl);
     }
   }
 
@@ -360,15 +356,44 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
     });
     for(const resource of resources) resource.dispose?.();
   }
+  function prepareHall() {
+    preloadHall = undefined;
+    if (!disposed && !liveHall) liveHall = mountWelcomeLiveHall(THREE, hallEntrance);
+  }
+
   return {
     stations,
-    setNext(index) { indicators.forEach((cue,i)=>{cue.visible=i===index;}); },
+    // Coordinates use the original campus hall floor plan.
+    isHallBlocked(x, y) { return liveHall?.blockedAt(x, y) ?? true; },
+    setNext(index, stationIndex = index) {
+      guide.visible = Boolean(stations[index]);
+      if (guide.visible) {
+        const stop = stations[index];
+        guide.position.set(stop.x, 0, stop.z);
+        guide.userData.welcomeStation = index;
+      }
+      if (stationIndex >= 0 && stationIndex < 5 && preloadHall !== undefined) {
+        window.clearTimeout(preloadHall);
+        preloadHall = undefined;
+      }
+      if (stationIndex === 5 && !liveHall && preloadHall === undefined) {
+        // Build while the visitor is at the personal AI desk, ahead of the walk.
+        preloadHall = window.setTimeout(prepareHall, 0);
+      }
+      if (stationIndex === 6 && !liveHall) {
+        window.clearTimeout(preloadHall);
+        prepareHall();
+      }
+      if (liveHall && stationIndex >= 0) liveHall.room.visible = stationIndex >= 5;
+    },
     dispose() {
       if(disposed) return;
       disposed=true;
+      window.clearTimeout(preloadHall);
+      liveHall?.dispose();
       root.removeFromParent();
       root.traverse(node=>{ if(node.isInstancedMesh) node.dispose(); });
-      for(const geometry of [cube,cylinder,orb,plane]) geometry.dispose();
+      for(const geometry of [cube,cylinder,orb,plane,arrowTip]) geometry.dispose();
       for(const mat of materials.values()) mat.dispose();
       for(const texture of textures) texture.dispose();
       for(const model of models) releaseModel(model);

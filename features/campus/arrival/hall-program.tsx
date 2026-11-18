@@ -17,7 +17,8 @@ export function HallProgram({config}: {config: ArrivalConfig}) {
       </details>
     </section>
     <section><h3>가져갈 무료 자료</h3><p>오늘 고른 기준을 내 업무에 쓸 때 채워보세요.</p>
-      <a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16}/> 회사 업무 기준표 받기</a>
+      <div><a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16} aria-hidden="true"/> 회사 업무 기준표 받기</a></div>
+      {config.handoutLabel && config.handoutUrl && <div><a href={config.handoutUrl} target="_blank" rel="noopener noreferrer">{config.handoutLabel}<ExternalLink size={15} aria-hidden="true"/></a></div>}
     </section>
     <section><h3>강의 후 공개 특전</h3>
       {config.bonusPreview ? <details><summary>특전 미리보기</summary><p>{config.bonusPreview}</p></details> :

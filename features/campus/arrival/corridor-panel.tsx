@@ -1,5 +1,5 @@
 import {useEffect, useId, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, Check, ExternalLink} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Check, ChevronDown, ExternalLink} from 'lucide-react';
 import {welcomeCase} from './case-data';
 import type {ArrivalConfig} from './config';
 import {DEFAULT_OFFICE_DEMO, type OfficeDemoChoice, type OfficeDemoPhase} from './office-demo';
@@ -13,6 +13,8 @@ type Props = {
   station: Station;
   config: ArrivalConfig;
   review: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
+  proposalSent: boolean;
+  onProposal: () => void;
   ruleChoice?: OfficeDemoChoice | null;
   onRuleChoice?: (choice: OfficeDemoChoice) => void;
   onReview: (phase: OfficeDemoPhase, choice: OfficeDemoChoice) => void;
@@ -27,6 +29,11 @@ const nextActions: Record<Station, string> = {
   1: '조사 담당자 만나기', 2: '기획·제작 담당자 만나기', 3: '고객 응대 담당자 만나기',
   4: '회사 업무 기준 열기', 5: '내 일로 해보기',
 };
+
+function firstSentence(copy: string) {
+  const paragraph = copy.trim().split('\n')[0];
+  return paragraph.match(/^.*?[.!?。！？][”’」"']?(?=\s|$)/u)?.[0] ?? paragraph;
+}
 
 function ProductionMedia() {
   const {artwork, video} = welcomeCase;
@@ -45,17 +52,24 @@ function ProductionMedia() {
   </div>;
 }
 
-export function CorridorPanel({station, config, review, ruleChoice, onRuleChoice, onReview, onComplete, onClose}: Props) {
+export function CorridorPanel({station, config, review, proposalSent, onProposal, ruleChoice, onRuleChoice, onReview, onComplete, onClose}: Props) {
   const demo = config.officeDemo ?? DEFAULT_OFFICE_DEMO;
   const {greeting, brief, material, draft, choices} = officeCaseContent(demo);
   const revision = choices[review.choice];
   const {product, sources, observations, support} = welcomeCase;
-  const [proposalSent, setProposalSent] = useState(false);
   const [localChoice, setLocalChoice] = useState<OfficeDemoChoice | null>(null);
   const selected = ruleChoice === undefined ? localChoice : ruleChoice;
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  const choicesRef = useRef<HTMLFieldSetElement>(null);
+  const comparisonHeading = useRef<HTMLHeadingElement>(null);
+  function focusInsidePanel(element?: HTMLElement | null) {
+    const scroll = body.current;
+    if (!element || !scroll) return;
+    element.focus({preventScroll:true});
+    scroll.scrollTop += element.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 14;
+  }
   const approved = review.phase === 'approved';
   const showNext = (station !== 3 || approved) && (station !== 4 || proposalSent) && (station !== 5 || selected !== null);
   const titles: Record<Station, string> = {
@@ -140,23 +154,33 @@ export function CorridorPanel({station, config, review, ruleChoice, onRuleChoice
       </>}
 
       {station === 5 && <>
-        <p className={monitor.lead}>여러 직원이 일을 시작할 때 함께 읽는 회사 기준을 ‘정본’이라고 해요. 기준 한 줄을 골라 두 직원의 결과를 비교해 보세요.</p>
-        {approved && <p className={monitor.lead}>앞서 소개글을 승인할 때 고른 기준은 ‘{revision.rule}’이었어요.</p>}
-        <fieldset className={styles.rules}><legend>팀이 함께 쓸 기준</legend>
+        <p className={monitor.lead}>두 직원이 일을 시작할 때 함께 읽는 회사 기준을 ‘정본’이라고 해요. 기준을 하나 골라 소개글과 고객 답변의 첫 문장을 확인하세요.</p>
+        <fieldset className={styles.rules} ref={choicesRef}><legend>팀이 함께 쓸 기준</legend>
           {choices.map((item, i) => {
             const index: OfficeDemoChoice = i === 0 ? 0 : 1;
             return <button key={index} type="button" aria-pressed={selected === index} onClick={() => {
               if (ruleChoice === undefined) setLocalChoice(index);
               onRuleChoice?.(index);
+              // Wait for the selected rule's results and sticky footer to be laid out.
+              requestAnimationFrame(() => focusInsidePanel(comparisonHeading.current));
             }}><span>{item.rule}</span>{selected === index && <Check size={17} aria-hidden="true"/>}</button>;
           })}
         </fieldset>
-        {selected !== null && <div aria-live="polite" className={styles.outputs}>
-          <h3 className={styles.subhead}>소개글이 이렇게 달라져요</h3>
-          <CopyComparison draft={draft} revised={choices[selected].revised} beforeLabel="처음 소개글" afterLabel="기준을 적용한 소개글 · 예시"/>
-          <h3 className={styles.subhead}>같은 기준을 적용한 문의 답변</h3>
-          <CopyComparison draft={support.answer} revised={choices[selected].approvedAnswer} beforeLabel="처음 답변" afterLabel="기준을 적용한 답변 · 예시"/>
-          <p className={styles.after}>다음에 일을 맡길 때도 이 기준을 함께 주면, 직원마다 원하는 방향을 처음부터 설명할 일이 줄어듭니다.</p>
+        {selected !== null && <div className={styles.outputs} aria-live="polite">
+          <h3 ref={comparisonHeading} tabIndex={-1} className={styles.resultTitle}>두 직원이 쓴 첫 문장</h3>
+          <p className={styles.appliedRule}><span>적용한 기준</span> {choices[selected].rule}</p>
+          <dl className={styles.openings}>
+            <div><dt>기획·제작 직원의 소개글</dt><dd>{firstSentence(choices[selected].revised)}</dd></div>
+            <div><dt>고객 응대 직원의 답변</dt><dd>{firstSentence(choices[selected].approvedAnswer)}</dd></div>
+          </dl>
+          <details key={selected} className={styles.fullComparison}><summary>수정 전후 전체 문장 보기<ChevronDown size={16} aria-hidden="true"/></summary>
+            <h4>소개글</h4>
+            {approved && selected === review.choice && <p className={styles.approvalNote}>앞서 승인한 기준과 같아, 소개글의 첫 문장도 그대로예요.</p>}
+            <CopyComparison draft={approved && selected !== review.choice ? revision.revised : draft} revised={choices[selected].revised} beforeLabel={approved && selected !== review.choice ? '앞서 승인한 소개글' : '검토 전 최초 초안'} afterLabel="기준을 적용한 소개글 · 예시"/>
+            <h4>고객 문의 답변</h4>
+            <CopyComparison draft={support.answer} revised={choices[selected].approvedAnswer} beforeLabel="응대 책상에서 본 답변" afterLabel="기준을 적용한 답변 · 예시"/>
+          </details>
+          <button type="button" className={monitor.revisit} onClick={() => focusInsidePanel(choicesRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]'))}><ArrowLeft size={16} aria-hidden="true"/>다른 기준 비교하기</button>
         </div>}
       </>}
     </div>
@@ -165,7 +189,7 @@ export function CorridorPanel({station, config, review, ruleChoice, onRuleChoice
       <button className={monitor.primary} type="button" onClick={() => onReview('approved', review.choice)}>이 문장으로 승인하기<Check size={16} aria-hidden="true"/></button>
     </footer>}
     {station === 4 && !proposalSent && <footer className={monitor.footer}>
-      <button className={monitor.primary} type="button" onClick={() => setProposalSent(true)}>담당자에게 제안 전달하기<ArrowRight size={16} aria-hidden="true"/></button>
+      <button className={monitor.primary} type="button" onClick={onProposal}>담당자에게 제안 전달하기<ArrowRight size={16} aria-hidden="true"/></button>
     </footer>}
     {showNext && <footer className={monitor.footer}>
       <button className={monitor.primary} type="button" onClick={onComplete}>{nextActions[station]}<ArrowRight size={16} aria-hidden="true"/></button>

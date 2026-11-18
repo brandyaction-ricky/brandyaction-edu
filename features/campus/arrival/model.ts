@@ -1,15 +1,20 @@
 import {audiences, isAudience, isRevision, cleanAnswer, REVISION_LIMIT, type Audience, type Answers, type Revision} from './content';
 import type {OfficeDemoChoice, OfficeDemoPhase} from './office-demo';
+import {DEFAULT_VISITOR_AVATAR, isVisitorAvatarId, type VisitorAvatarId} from './visitor-avatar-options';
 import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from './work-trial';
 
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
 export const ARRIVAL_STORAGE_LIMIT = 32_000;
 export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type ArrivalState = {
   station: CorridorStation;
   companyRule: OfficeDemoChoice | null;
+  visitorAvatar: VisitorAvatarId;
+  proposalSent: boolean;
+  hallReturnStep: PersonalTrialStep | null;
   version: 1;
   step: ArrivalStep;
   audience: Audience;
@@ -23,7 +28,10 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, companyRule: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, companyRule: null, visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
+}
+export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
+  return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -62,6 +70,9 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       state.deskReview = {phase: desk.phase, choice: desk.choice};
     }
     state.companyRule = value.companyRule === 0 || value.companyRule === 1 ? value.companyRule : null;
+    if (isVisitorAvatarId(value.visitorAvatar)) state.visitorAvatar = value.visitorAvatar;
+    state.proposalSent = value.proposalSent === true;
+    if (isPersonalTrialStep(value.hallReturnStep)) state.hallReturnStep = value.hallReturnStep;
     // Existing personal exercises and calendar drafts reopen at their own destination.
     if (state.step === 7) state.station = 7;
     else if (state.step !== 0) state.station = 6;
@@ -90,7 +101,7 @@ export function arrivalBackStep(state: ArrivalState): ArrivalStep {
     case 4: return 2;
     case 5:
     case 6: return state.mode === 'example' ? 1 : 3;
-    case 7: return state.experience === 'none' ? 0 : 5;
+    case 7: return state.hallReturnStep ?? (state.experience !== 'none' && state.audience !== 'work' ? 5 : 8);
     default: return 0;
   }
 }

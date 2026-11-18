@@ -38,7 +38,20 @@
 .rules legend { padding: 0; }
 .rules button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 46px; margin-top: 6px; padding: 9px 13px; text-align: start; }
 .rules button[aria-pressed=true] { border-color: var(--ba-red, #bd2432); font-weight: 700; }
-.outputs > h3 + div { margin-top: 6px; }
+.outputs { margin-top: 20px; }
+.resultTitle { margin: 0; color: var(--ink, #161719); font-size: 20px; line-height: 1.4; }
+.resultTitle:focus { outline: none; }
+.panel .appliedRule { margin: 6px 0 14px; font-size: 14px; line-height: 1.5; }
+.appliedRule span { margin-inline-end: 4px; color: var(--muted, #565e68); }
+.openings { margin: 0; border-block: 1px solid var(--line, #dce1e6); }
+.openings > div { padding: 10px 0; }
+.openings > div + div { border-top: 1px solid var(--line, #dce1e6); }
+.panel .openings dt { font-size: 14px; }
+.panel .openings dd { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; margin-top: 3px; font-size: 17px; font-weight: 650; line-height: 1.5; }
+.fullComparison { border-bottom: 1px solid var(--line, #dce1e6); }
+.fullComparison h4 { margin: 10px 0 5px; font-size: 16px; }
+.fullComparison h4 ~ div { margin: 6px 0 14px; }
+.panel .approvalNote { margin: 4px 0 7px; font-size: 14px; color: var(--muted, #565e68); }
 @media (max-width: 600px) {
   .panel { max-block-size: calc(100dvh - 30px); }
   .media { gap: 10px; }
