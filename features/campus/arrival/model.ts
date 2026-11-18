@@ -67,7 +67,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     else if (state.step !== 0) state.station = 6;
     else if (typeof value.station === 'number' && Number.isInteger(value.station) && value.station >= 1 && value.station <= 7) {
       state.station = value.station as CorridorStation;
-      if (state.station > 3 && state.deskReview.phase !== 'approved') state.station = 3;
+      if ((state.station === 4 || state.station === 5) && state.deskReview.phase !== 'approved') state.station = 3;
     } else if (state.deskReview.phase === 'approved') state.station = 4;
     else if (state.deskReview.phase === 'feedback') state.station = 3;
     state.workTrial = parseWorkTrialState(value.workTrial);

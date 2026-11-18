@@ -15,7 +15,8 @@ export function createWalkMotion(stations) {
   function sync(station, paused, reset = false) {
     if (!Number.isInteger(station) || station < 1 || station > stations.length) return;
     if (!synced || reset) {
-      const start = station === 1 ? entry : stations[station - 2];
+      // Reopening a personal exercise or the live schedule means the visitor already arrived.
+      const start = paused && station >= 6 ? stations[station - 1] : station === 1 ? entry : stations[station - 2];
       state.x = start.x; state.z = start.z; state.facing = Math.PI / 2;
       arrivalSent = false;
       stop();

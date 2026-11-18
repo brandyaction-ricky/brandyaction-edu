@@ -52,3 +52,13 @@ test('restoring a later visit starts at the previous stop, pausing stops movemen
   m.sync(1,false,true);assert.equal(m.state.x,-3.6);
   m.sync(8,false);assert.equal(m.state.station,1);
 });
+
+test('reloading an open exercise starts at its own desk before walking into the hall', () => {
+  const m = createWalkMotion(stations);
+  m.sync(6, true);
+  assert.equal(m.state.x, stations[5].x);
+  m.sync(7, false);
+  assert.equal(m.state.x, stations[5].x);
+  m.walk();
+  assert.equal(advance(m), 1);
+});
