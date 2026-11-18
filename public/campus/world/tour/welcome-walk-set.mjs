@@ -1,7 +1,7 @@
-import {mountWelcomeLiveHall} from './welcome-live-hall.mjs';
+import {mountWelcomeOnboardingLobby} from './welcome-onboarding-lobby.mjs';
 
-/** Six offices line one corridor, ending at the entrance to a separate live hall. */
-const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '', '내 AI 체험', '라이브 홀'];
+/** Four stops line the corridor to the welcome lounge. */
+const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '', '내 AI 체험', '웰컴 라운지'];
 const PALETTE = {
   navy: 0x213951, deep: 0x142d45, steel: 0x678298, frost: 0xdfeaf0,
   pearl: 0xf0f2ee, floor: 0xc5d9e5, edge: 0x92abba, ink: 0x334950,
@@ -25,7 +25,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   guide.name = 'walk-next-stop';
   guide.visible = false;
   root.add(guide);
-  let hallEntrance, liveHall, preloadHall;
+  let lobbyEntrance, lobby, preloadLobby;
   let disposed = false;
 
   function material(color, kind = 'matte') {
@@ -189,9 +189,9 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
 
   const stops = [0, 8, 16, 24, 24, 32, 32];
   const stations = TITLES.map((title, index) => ({x: stops[index], z: 0, title}));
-  const hallIndex = stations.length - 1;
+  const lobbyIndex = stations.length - 1;
   const canonIndex = 3;
-  const corridorEnd = stations[hallIndex].x - 3.25;
+  const corridorEnd = stations[lobbyIndex].x - 3.25;
   const corridorStart = -5.25;
   const corridorLength = corridorEnd - corridorStart;
   const corridorCenter = corridorStart + corridorLength / 2;
@@ -236,13 +236,13 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   box(root,doorX,-.037,-7.27,2.1,.07,1.31,floor);
   box(root,doorX,1.37,-7.93,2.36,2.76,.12,0x788f9a);
 
-  for (const index of [0, 1, 2, canonIndex, hallIndex]) {
+  for (const index of [0, 1, 2, canonIndex, lobbyIndex]) {
     const g=groupAt(root,stations[index].x,0,0);
     g.userData.welcomeStation=index;
-    if (index === hallIndex) {
-      hallEntrance = g;
+    if (index === lobbyIndex) {
+      lobbyEntrance = g;
       // Floor lighting marks the passage without screening the visitor or
-      // the atrium tower once the camera turns to face the hall.
+      // the lounge as the visitor approaches.
       for (const z of [-1.8, 2.65]) {
         box(g,-4.10,.075,z,.9,.15,.19,deep,'metal');
         box(g,-4.10,.16,z,.77,.025,.09,0xffdfa9,'light');
@@ -337,16 +337,15 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
     });
     for(const resource of resources) resource.dispose?.();
   }
-  function prepareHall() {
-    preloadHall = undefined;
-    if (!disposed && !liveHall) liveHall = mountWelcomeLiveHall(THREE, hallEntrance);
+  function prepareLobby() {
+    preloadLobby = undefined;
+    if (!disposed && !lobby) lobby = mountWelcomeOnboardingLobby(THREE, lobbyEntrance);
   }
 
   return {
     stations,
-    hallAgendaPoint(out) { return liveHall?.agendaWorldPoint(out); },
-    // Coordinates use the original campus hall floor plan.
-    isHallBlocked(x, y) { return liveHall?.blockedAt(x, y) ?? true; },
+    lobbyGuidePoint(id, out) { return lobby?.guideWorldPoint(id, out); },
+    isLobbyBlocked(x, z) { return lobby?.blockedAt(x, z) ?? true; },
     setNext(index, stationIndex = index) {
       guide.visible = Boolean(stations[index]);
       if (guide.visible) {
@@ -355,25 +354,25 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
         guide.position.set(stop.x - .56, 0, stop.z);
         guide.userData.welcomeStation = index;
       }
-      if (stationIndex >= 0 && stationIndex < canonIndex && preloadHall !== undefined) {
-        window.clearTimeout(preloadHall);
-        preloadHall = undefined;
+      if (stationIndex >= 0 && stationIndex < canonIndex && preloadLobby !== undefined) {
+        window.clearTimeout(preloadLobby);
+        preloadLobby = undefined;
       }
-      if (stationIndex === canonIndex && !liveHall && preloadHall === undefined) {
+      if (stationIndex === canonIndex && !lobby && preloadLobby === undefined) {
         // Build while the visitor is at the company knowledge desk, ahead of the walk.
-        preloadHall = window.setTimeout(prepareHall, 0);
+        preloadLobby = window.setTimeout(prepareLobby, 0);
       }
-      if (stationIndex >= hallIndex - 1 && !liveHall) {
-        window.clearTimeout(preloadHall);
-        prepareHall();
+      if (stationIndex >= lobbyIndex - 1 && !lobby) {
+        window.clearTimeout(preloadLobby);
+        prepareLobby();
       }
-      if (liveHall && stationIndex >= 0) liveHall.room.visible = stationIndex >= hallIndex - 1;
+      if (lobby && stationIndex >= 0) lobby.room.visible = stationIndex >= lobbyIndex - 1;
     },
     dispose() {
       if(disposed) return;
       disposed=true;
-      window.clearTimeout(preloadHall);
-      liveHall?.dispose();
+      window.clearTimeout(preloadLobby);
+      lobby?.dispose();
       root.removeFromParent();
       root.traverse(node=>{ if(node.isInstancedMesh) node.dispose(); });
       for(const geometry of [cube,cylinder,orb,plane,arrowTip]) geometry.dispose();

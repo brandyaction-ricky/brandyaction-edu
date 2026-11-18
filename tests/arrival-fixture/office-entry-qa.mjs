@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, finishTeamLeaderVideo, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -32,7 +32,7 @@ try {
       const from = Number(await state.getAttribute('data-player-x'));
       if (await state.getAttribute('data-near-desk') === 'true') {
         if (mobile) await openDesk.tap(); else await openDesk.click();
-        await expect(station === 7 ? page.getByRole('link',{name:'Google 캘린더'}) : page.getByRole('dialog')).toBeVisible();
+        await expect(station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog')).toBeVisible();
         await expect(state).toHaveAttribute('data-arrivals', String(count));
         return;
       }
@@ -271,7 +271,7 @@ try {
         await page.locator('[aria-label="내 상황에 맞는 체험 선택"] button').first().tap();
         await button(page,'입력 없이 예시로 계속하기').tap();
         await expect(page.getByText('체험 예시 확인')).toBeVisible();
-        await button(page,'라이브 홀로 이동').tap();
+        await button(page,'웰컴 라운지로 이동').tap();
       } else {
         await page.getByRole('button',{name:/회사 업무에 AI/}).click();
         await button(page,'예시 업무로 시작').click();
@@ -294,6 +294,7 @@ try {
         await button(page,'두 번째 답변을 받았어요').click();
         await button(page,'라이브에서 이어서 배우기').click();
       }
+      await openLoungeSchedule(page);
       const calendar = page.getByRole('link',{name:'Google 캘린더'});
       await expect(calendar).toBeVisible();
       const google=new URL(await calendar.getAttribute('href'));

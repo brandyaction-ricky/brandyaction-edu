@@ -1,10 +1,12 @@
 'use client';
 
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState, type RefObject} from 'react';
 import type {CorridorStation} from './model';
+import type {OnboardingGuide} from './onboarding-program';
 import type {VisitorAvatarId} from './visitor-avatar-options';
 
 type Props = {
+  frame: RefObject<HTMLIFrameElement | null>;
   station: CorridorStation;
   label?: string;
   avatar: VisitorAvatarId;
@@ -12,23 +14,24 @@ type Props = {
   freeRoam: boolean;
   walkRequest: number;
   focusRequest: number;
+  materialsRequest: number;
   onStatus: (status: 'ready' | 'unavailable') => void;
   onProximity: (station: CorridorStation, near: boolean) => void;
   onArrive: (station: CorridorStation) => void;
-  onOpenSchedule: () => void;
+  onOpenGuide: (guide: OnboardingGuide) => void;
   className: string;
 };
 
-export function CorridorScene({station, label, avatar, paused, freeRoam, walkRequest, focusRequest, onStatus, onProximity, onArrive, onOpenSchedule, className}: Props) {
-  const frame = useRef<HTMLIFrameElement>(null);
+export function CorridorScene({frame, station, label, avatar, paused, freeRoam, walkRequest, focusRequest, materialsRequest, onStatus, onProximity, onArrive, onOpenGuide, className}: Props) {
   const [bridge, setBridge] = useState('');
   const [firstAvatar] = useState(avatar);
-  const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenSchedule});
+  const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenGuide});
   const lastWalk = useRef(walkRequest);
   const lastFocus = useRef(focusRequest);
+  const lastMaterials = useRef(materialsRequest);
   useEffect(() => {
-    current.current = {station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenSchedule};
-  }, [station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenSchedule]);
+    current.current = {station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenGuide};
+  }, [station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenGuide]);
 
   useEffect(() => {
     const token = crypto.randomUUID();
@@ -50,27 +53,27 @@ export function CorridorScene({station, label, avatar, paused, freeRoam, walkReq
       } else if (ready && !props.paused && msg.station === props.station) {
         if (msg.type === 'approach' || msg.type === 'depart') props.onProximity(props.station, msg.type === 'approach');
         if (msg.type === 'arrive') props.onArrive(props.station);
-        if (msg.type === 'open-schedule' && props.freeRoam && props.station === 7) props.onOpenSchedule();
+        if (msg.type === 'open-guide' && props.freeRoam && props.station === 7 && (msg.guide === 'materials' || msg.guide === 'intro')) props.onOpenGuide(msg.guide);
       }
     }
     window.addEventListener('message', receive);
     setBridge(token);
     return () => {window.removeEventListener('message', receive); window.clearTimeout(timeout);};
-  }, []);
+  }, [frame]);
   useEffect(() => {
-    if (bridge) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'sync', station, label, avatar, paused, freeRoam}, location.origin);
-  }, [bridge, station, label, avatar, paused, freeRoam]);
+    if (!bridge) return;
+    const focus = !paused && focusRequest !== lastFocus.current;
+    const highlightMaterials = !paused && materialsRequest !== lastMaterials.current;
+    lastFocus.current = focusRequest;
+    lastMaterials.current = materialsRequest;
+    frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'sync', station, label, avatar, paused, freeRoam, focus, highlightMaterials}, location.origin);
+  }, [bridge, frame, station, label, avatar, paused, freeRoam, focusRequest, materialsRequest]);
   useEffect(() => {
     if (walkRequest === lastWalk.current) return;
     lastWalk.current = walkRequest;
     if (bridge && !paused) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'walk', station}, location.origin);
-  }, [walkRequest, bridge, station, paused]);
-  useEffect(() => {
-    if (focusRequest === lastFocus.current) return;
-    lastFocus.current = focusRequest;
-    if (bridge && !paused) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'focus', station}, location.origin);
-  }, [focusRequest, bridge, station, paused]);
-  return bridge ? <iframe ref={frame} title="문샷 웰컴존 · 직원 사무실과 라이브 홀" className={className}
+  }, [walkRequest, bridge, frame, station, paused]);
+  return bridge ? <iframe ref={frame} title="문샷 웰컴존 · 직원 사무실과 웰컴 라운지" className={className}
     sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer"
     src={'/campus/world/tour/welcome-walk.html#' + new URLSearchParams({bridge, avatar: firstAvatar})}/> : null;
 }

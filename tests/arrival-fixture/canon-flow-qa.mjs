@@ -1,9 +1,10 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview} from './review-office.mjs';
+import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
 
-const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529');
+const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
+if (url.pathname === '/') url.pathname = '/experience/moonshot';
 const output = process.env.ARRIVAL_QA_OUTPUT;
 if (output) await mkdir(output, {recursive:true});
 
@@ -125,25 +126,48 @@ for (const [device, engine, viewport] of [
     });
     expect(visited).toEqual([1, 2, 3, 4, 7]);
     await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toHaveCount(0);
-    const resources = page.getByRole('region', {name:'라이브 홀 안내'});
-    await expect(resources.getByRole('heading', {name:'가져갈 무료 자료', exact:true})).toBeVisible();
+    await expect(world).toHaveAttribute('data-free-roam', 'true');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(calendar).toHaveCount(0);
+    await capture('lounge-entry');
+
+    await tap(frame.getByRole('button', {name: /자료 안내/}));
+    const guide = page.getByRole('dialog', {name: '무료자료 · 라이브 특전', exact: true});
+    const resources = guide.getByRole('region', {name:'웰컴 라운지 안내'});
+    await expect(resources.getByRole('heading', {name:'라이브 전에 볼 자료', exact:true})).toBeVisible();
     await expect(resources.getByRole('link', {name:'회사 업무 기준표 받기', exact:true})).toHaveAttribute('download', /업무-기준표\.txt$/);
-    await capture('hall-entry');
-    await tap(button(resources, 'AI 광고 영상 제작 체험 다시 보기'));
+    await capture('lounge-materials');
+    await tap(button(guide, '라이브 특전'));
+    await expect(resources.getByText(/라이브에서 비밀번호를 공개합니다/)).toBeVisible();
+    await expect(resources.getByRole('listitem')).toHaveCount(3);
+    await tap(button(guide, '무료자료'));
+    await tap(button(resources, '광고 영상 체험 열기'));
     const replay = page.getByRole('dialog', {name:'콘텐츠 제작 다시 보기', exact:true});
     await expect(replay).toBeVisible();
     await expect(replay.locator('video')).toHaveAttribute('src', '/campus/arrival/mask-example-silent.mp4');
-    await tap(button(replay, '라이브 홀로 돌아가기').first());
+    await tap(button(replay, '자료 목록으로 돌아가기').first());
     await expect(replay).not.toBeVisible();
-    await expect(calendar).toBeVisible();
-    await tap(button(page, '공간 둘러보기'));
-    await expect(world).toHaveAttribute('data-free-roam','true');
-    await tap(button(page, '라이브 일정 보기'));
-    await expect(calendar).toBeVisible();
+    await expect(guide).toBeVisible();
+    await tap(button(guide, '라운지로 돌아가기'));
+    await expect(loungeScheduleButton(page)).toBeVisible();
+
+    await tap(frame.getByRole('button', {name: /윤익 · 브랜디액션/}));
+    const team = page.getByRole('dialog', {name:'윤익 · 브랜디액션 팀', exact:true});
+    await expect(team).toBeVisible();
+    await expect(team.getByText('브랜디액션 팀이 AI와 일하는 모습')).toBeVisible();
+    await capture('lounge-team');
+    await tap(button(team, '무료자료 확인하러 가기'));
+    await expect(team).not.toBeVisible();
+    await expect(frame.getByRole('button', {name: /자료 안내/})).toHaveAttribute('data-primary', 'true');
+    await expect(guide).toHaveCount(0);
+    await openLoungeSchedule(page);
+    await capture('lounge-schedule');
+
     await tap(button(page, '내 AI 체험으로 가기'));
     await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toBeVisible();
-    await tap(button(page, '라이브 홀로 돌아가기'));
-    await expect(calendar).toBeVisible();
+    await tap(button(page, '웰컴 라운지로 돌아가기'));
+    await expect(loungeScheduleButton(page)).toBeVisible();
+    await openLoungeSchedule(page);
     expect(errors).toEqual([]);
     expect(externalAI).toEqual([]);
     console.log(JSON.stringify({device, viewport, visited, canonExchanges:exchanges.length, calendar:true, errors, externalAI}));

@@ -30,7 +30,7 @@ export function CorridorPanel({station, spyPhase, onSpyAdvance, canonPhase, onCa
   return <section className={monitor.monitor} aria-labelledby={labelId}>
     <header className={monitor.header}>
       <span id={labelId} ref={label} tabIndex={-1}>{locations[station]}</span>
-      <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>{revisit ? '라이브 홀로 돌아가기' : '복도로 돌아가기'}</button>
+      <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>{revisit ? '자료 목록으로 돌아가기' : '복도로 돌아가기'}</button>
     </header>
     {station === 2 && <SpyStation phase={spyPhase} onAdvance={onSpyAdvance} onComplete={onComplete}/>}
     {station === 3 && <div className={monitor.body}><ContentStation onComplete={onComplete} revisit={revisit}/></div>}

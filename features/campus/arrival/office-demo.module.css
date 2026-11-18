@@ -18,6 +18,7 @@
 .monitor svg { flex: 0 0 auto; }
 .header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;

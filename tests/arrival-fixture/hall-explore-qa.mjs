@@ -1,4 +1,5 @@
 import {chromium, expect, webkit} from '@playwright/test';
+import {loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
 
 const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4535');
 for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
@@ -19,34 +20,29 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     await page.goto(url.href);
     const frame = page.frameLocator('iframe[title*="직원 사무실"]');
     const world = frame.locator('#walk');
+    const floor = frame.locator('#floor');
     const position = () => world.evaluate(el => [Number(el.dataset.playerX), Number(el.dataset.playerZ)]);
     const distance = (a,b) => Math.hypot(a[0]-b[0], a[1]-b[1]);
     await expect(world).toHaveAttribute('data-ready','true', {timeout:20000});
-    await expect(world).toHaveAttribute('data-paused','true');
+    await expect(world).toHaveAttribute('data-free-roam','true');
     await expect.poll(async () => Number(await world.getAttribute('data-first-player-x'))).toBeGreaterThan(31);
-    await page.getByRole('button',{name:'공간 둘러보기', exact:true}).click();
-    await expect(world).toHaveAttribute('data-free-roam','true');
-    await expect(frame.locator('#floor')).toBeFocused();
-    const reopenSchedule = page.getByRole('button',{name:'라이브 일정 보기',exact:true});
-    const floorSchedule = frame.getByRole('button',{name:'라이브 일정 보기',exact:true});
-    await expect(reopenSchedule).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('link',{name:'Google 캘린더'})).toHaveCount(0);
+    const schedule = loungeScheduleButton(page);
     const personalTrial = page.getByRole('button',{name:'내 AI 체험으로 가기',exact:true});
+    await expect(schedule).toBeVisible();
     await expect(personalTrial).toBeVisible();
-    await expect(floorSchedule).toBeVisible();
-    if (mobile) await floorSchedule.tap();
-    else await floorSchedule.click();
-    await expect(page.getByRole('heading',{level:1})).toBeFocused();
-    await expect(page.getByRole('link',{name:'Google 캘린더'})).toBeVisible();
-    await page.getByRole('button',{name:'공간 둘러보기',exact:true}).click();
-    await expect(world).toHaveAttribute('data-free-roam','true');
+    await expect(frame.getByRole('button',{name:/자료 안내/})).toBeVisible();
+    await expect(frame.getByRole('button',{name:/윤익 · 브랜디액션/})).toBeVisible();
+    await floor.focus();
     const initial = await position();
     await page.keyboard.down('ArrowUp');
-    await expect.poll(async()=>distance(await position(), initial)).toBeGreaterThan(1.5);
-    await page.keyboard.up('ArrowUp');
+    try { await expect.poll(async()=>distance(await position(), initial)).toBeGreaterThan(1.5); }
+    finally { await page.keyboard.up('ArrowUp'); }
     await expect(world).toHaveAttribute('data-moving','false');
     const afterKeys = await position();
     const beforeArrivals = await world.getAttribute('data-arrivals');
-    const floorBox = await frame.locator('#floor').boundingBox();
+    const floorBox = await floor.boundingBox();
     const x = floorBox.x + floorBox.width * .72, y = floorBox.y + floorBox.height * .70;
     if (mobile) await page.touchscreen.tap(x,y);
     else await page.mouse.click(x,y);
@@ -54,11 +50,11 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     await expect(world).toHaveAttribute('data-arrivals', beforeArrivals);
     await expect(world).toHaveAttribute('data-avatar', 'male-d');
     const afterPointer = await position();
-    await reopenSchedule.click();
+    await openLoungeSchedule(page);
     await expect(world).toHaveAttribute('data-paused','true');
     await expect(world).toHaveAttribute('data-free-roam','false');
-    await expect(page.getByRole('link',{name:'Google 캘린더'})).toBeVisible();
-    await page.getByRole('button',{name:'공간 둘러보기',exact:true}).click();
+    await page.getByRole('button',{name:/공간 둘러보기|웰컴 라운지로 돌아가기/}).click();
+    await expect(world).toHaveAttribute('data-free-roam','true');
     await personalTrial.click();
     await expect(world).toHaveAttribute('data-station','6');
     console.log(engine.name(), {initial,afterKeys,afterPointer,arrivals:beforeArrivals});

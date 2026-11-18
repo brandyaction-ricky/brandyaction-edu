@@ -130,9 +130,9 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
         }}>다시 불러오기</button></p>}
         <div className={styles.next} data-available={canContinue || undefined} inert={!canContinue}>
           <p>{NEXT_DESCRIPTION}</p>
-          <button type="button" className={styles.cta} onClick={() => leave(onComplete)}>조사 담당자와 이야기해보기 →</button>
+          <button type="button" className={styles.cta} onClick={() => leave(onComplete)}>경쟁사 스파이 만나기</button>
         </div>
-        <p className={styles.srOnly} role="status">{canContinue ? '조사 담당자를 만나러 갈 수 있어요.' : ''}</p>
+        <p className={styles.srOnly} role="status">{canContinue ? '경쟁사 스파이를 만나러 갈 수 있어요.' : ''}</p>
       </div>}
     </div>
   </section>;

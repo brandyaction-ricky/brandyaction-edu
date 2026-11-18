@@ -10,6 +10,8 @@ const replies = {
   guide: {text: '응, 콘텐츠 담당자에게 전달해줘.', next: 'handed-off'},
 } as const;
 const REPLY_PAUSE_MS = 560;
+const REVIEW_MESSAGE_PAUSE_MS = 360;
+const REVIEW_MESSAGE_COUNT = 3;
 type RequestPhase = keyof typeof replies;
 
 const reviews = [
@@ -17,8 +19,8 @@ const reviews = [
   {rating: 3, title: '붙이고 자도 되나요?', opening: '에센스가 많이 남아 있어 그냥 자려고 했는데', quote: '언제 떼야 하는지 잘 모르겠어요.'},
 ] as const;
 
-function BotMessage({children, target}: {children: React.ReactNode; target?: React.Ref<HTMLDivElement>}) {
-  return <div className={styles.botRow} ref={target} tabIndex={-1}>
+function BotMessage({children, part}: {children: React.ReactNode; part?: 'summary' | 'reviews' | 'analysis'}) {
+  return <div className={styles.botRow} data-spy-reply={part}>
     <span className={styles.avatar}><Bot size={20} aria-hidden="true"/><span className={styles.screenReader}>경쟁사 스파이</span></span>
     <div className={styles.botMessage}>{children}</div>
   </div>;
@@ -30,26 +32,22 @@ function VisitorMessage({children}: {children: string}) {
 
 export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onAdvance: (phase: SpyPhase) => void; onComplete: () => void}) {
   const [pending, setPending] = useState<RequestPhase | null>(null);
+  const [reviewMessages, setReviewMessages] = useState(0);
   const shownPhase = pending ?? phase;
   const step = SPY_PHASES.indexOf(shownPhase);
+  const visibleReviews = step >= 1 ? REVIEW_MESSAGE_COUNT : reviewMessages;
   const reply = shownPhase === 'handed-off' ? null : replies[shownPhase];
   const sendDescription = useId();
   const body = useRef<HTMLDivElement>(null);
-  const activeMessage = useRef<HTMLDivElement>(null);
-  const typingMessage = useRef<HTMLDivElement>(null);
   const replyTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      const target = pending ? typingMessage.current : activeMessage.current;
       const transcript = body.current;
-      if (!target || !transcript) return;
-      if (!pending) target.focus({preventScroll: true});
-      const offset = target.getBoundingClientRect().top - transcript.getBoundingClientRect().top;
-      transcript.scrollTo({top: shownPhase === 'intro' && !pending ? 0 : transcript.scrollTop + offset - 14, behavior: 'instant'});
+      if (transcript) transcript.scrollTop = pending || shownPhase !== 'intro' ? transcript.scrollHeight : 0;
     });
     return () => cancelAnimationFrame(frame);
-  }, [pending, shownPhase]);
+  }, [pending, shownPhase, visibleReviews]);
   useEffect(() => () => {
     if (replyTimer.current !== null) window.clearTimeout(replyTimer.current);
   }, []);
@@ -57,10 +55,16 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
   function sendMessage() {
     if (phase === 'handed-off' || replyTimer.current !== null) return;
     setPending(phase);
-    replyTimer.current = window.setTimeout(() => {
+    function finishReply() {
       replyTimer.current = null;
       setPending(null);
-    }, REPLY_PAUSE_MS);
+    }
+    function revealReviewMessage(count: number) {
+      setReviewMessages(count);
+      if (count === REVIEW_MESSAGE_COUNT) finishReply();
+      else replyTimer.current = window.setTimeout(() => revealReviewMessage(count + 1), REVIEW_MESSAGE_PAUSE_MS);
+    }
+    replyTimer.current = window.setTimeout(phase === 'intro' ? () => revealReviewMessage(1) : finishReply, REPLY_PAUSE_MS);
     // Save the sent step before the visual pause so reopening skips only the typing indicator.
     onAdvance(replies[phase].next);
   }
@@ -68,13 +72,13 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
   return <>
     <div className={`${monitor.body} ${styles.body}`} ref={body} role="region" aria-label="경쟁사 스파이와 나눈 대화">
       <p className={styles.context}>마스크팩 가상 사례 · 예시 대화</p>
-      <div className={styles.transcript}>
-        <BotMessage target={shownPhase === 'intro' ? activeMessage : undefined}>
+      <div className={styles.transcript} role="log" aria-label="대화 메시지">
+        <BotMessage>
           <p>저는 경쟁사 스파이입니다.<br/>경쟁사의 광고와 고객 반응을 조사해<br/><strong>우리 브랜드에 활용할 기회를 찾아드립니다.</strong></p>
         </BotMessage>
-        {step >= 1 && <>
-          <VisitorMessage>{replies.intro.text}</VisitorMessage>
-          <BotMessage target={shownPhase === 'reviews' ? activeMessage : undefined}>
+        {(step >= 1 || pending === 'intro') && <VisitorMessage>{replies.intro.text}</VisitorMessage>}
+        {visibleReviews >= 1 && <BotMessage part="summary"><p><strong>경쟁사 3곳을 조사했어요!</strong></p></BotMessage>}
+        {visibleReviews >= 2 && <BotMessage part="reviews">
             <div className={styles.reviews} role="group" aria-label="가상 리뷰 재구성">
               <header><strong>상품 리뷰</strong><span>가상 리뷰 재구성</span></header>
               {reviews.map(item => <article key={item.rating} className={styles.review}>
@@ -86,13 +90,14 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
                 <p>{item.opening} <mark>{item.quote}</mark>{'ending' in item ? ` ${item.ending}` : ''}</p>
               </article>)}
             </div>
-            <p>두 리뷰에 <strong>얼마나 붙여야 하는지 모르겠다</strong>는 불편이 공통으로 나타나요. 권장 사용 시간이 눈에 잘 띄는지 살펴볼 만합니다.</p>
-            <p>우리 브랜드에서도 이런 불편을 줄일 방법을 찾아볼까요?</p>
-          </BotMessage>
-        </>}
+        </BotMessage>}
+        {visibleReviews >= 3 && <BotMessage part="analysis">
+          <p>두 리뷰에 <strong>얼마나 붙여야 하는지 모르겠다</strong>는 불편이 공통으로 나타나요. 권장 사용 시간이 눈에 잘 띄는지 살펴볼 만합니다.</p>
+          <p>우리 브랜드에서도 이런 불편을 줄일 방법을 찾아볼까요?</p>
+        </BotMessage>}
         {step >= 2 && <>
           <VisitorMessage>{replies.reviews.text}</VisitorMessage>
-          <BotMessage target={shownPhase === 'guide' ? activeMessage : undefined}>
+          <BotMessage>
             <p>이 가상 사례의 정본에서 상품 사용 가이드를 확인했어요.</p>
             <div className={styles.guide}>
               <span>회사 정본 · 상품 사용 가이드 예시</span>
@@ -104,7 +109,7 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
         </>}
         {step >= 3 && <>
           <VisitorMessage>{replies.guide.text}</VisitorMessage>
-          <BotMessage target={activeMessage}>
+          <BotMessage>
             <p><strong>체험에서 콘텐츠 담당자에게 전달한 내용이에요.</strong></p>
             <dl className={styles.handoff}>
               <div><dt>고객의 불편</dt><dd>얼마나 오래 붙여야 하는지 모르겠음</dd></div>
@@ -114,8 +119,8 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
           </BotMessage>
         </>}
         {pending && <>
-          <VisitorMessage>{replies[pending].text}</VisitorMessage>
-          <BotMessage target={typingMessage}>
+          {pending !== 'intro' && <VisitorMessage>{replies[pending].text}</VisitorMessage>}
+          <BotMessage>
             <div className={styles.typing} role="status">
               <span className={styles.screenReader}>답변을 작성 중이에요.</span>
               <span aria-hidden="true" className={styles.dots}><i/><i/><i/></span>

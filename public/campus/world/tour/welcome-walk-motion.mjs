@@ -1,27 +1,13 @@
-import {atriumHeightAt, canWalkAtrium, intersectAtriumRay} from './atrium-layout.mjs';
-
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const arrivalRadius = 0.68;
 const walkingSpeed = 4.7;
-const hallScale = 2 / 3;
+const lobbyBounds = {minX: -3.1, maxX: 10.55, minZ: -5.24, maxZ: 5.24};
 export const hasInteractiveDesk = station => (station >= 2 && station <= 4) || station === 7;
 
-// The campus atrium is mounted facing the corridor. Its local spawn is (0, 28).
-function atriumPoint(last, x, z) {
-  return {x: (z - last.z) / hallScale, y: 28 - (x - last.x) / hallScale};
-}
-export function hallHeight(last, x, z) {
-  const point = atriumPoint(last, x, z);
-  return atriumHeightAt(point.x, point.y) * hallScale;
-}
-export function hallFloorFromRay(last, near, far) {
-  function localRayPoint(point) {
-    const local = atriumPoint(last, point.x, point.z);
-    return {x: local.x, y: point.y / hallScale, z: local.y};
-  }
-  const hit = intersectAtriumRay(localRayPoint(near), localRayPoint(far));
-  if (!hit || hit.x < -21.5 || hit.x > 21.5 || hit.y < -9 || hit.y > 33) return null;
-  return {x: last.x + (28 - hit.y) * hallScale, z: last.z + hit.x * hallScale};
+export function lobbyFloorDestination(point, last) {
+  const x = point.x - last.x, z = point.z - last.z;
+  if (x < lobbyBounds.minX || x > lobbyBounds.maxX || z < lobbyBounds.minZ || z > lobbyBounds.maxZ) return null;
+  return {x: point.x, z: point.z};
 }
 
 // Taps near the painted floor stripe should approach the desk, including its visible threshold.
@@ -35,10 +21,9 @@ export function floorDestination(point, stations, station) {
 }
 
 /** The current stop bounds how far a visitor may walk. Arrival is re-armed by intent, not by a render. */
-export function createWalkMotion(stations, isHallBlocked = () => false) {
+export function createWalkMotion(stations, isLobbyBlocked = () => false) {
   const entry = { x: stations[0].x - 3.6, z: stations[0].z };
   const last = stations.at(-1);
-  const hallBounds = {minX: last.x - 3.1, maxX: last.x + 24.2, minZ: last.z - 13.8, maxZ: last.z + 13.8};
   const state = { ...entry, station: 1, freeRoam: false, paused: false, moving: false, facing: Math.PI / 2 };
   let goal = null;
   let arrivalSent = false;
@@ -51,7 +36,7 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
     if (!Number.isInteger(station) || station < 1 || station > stations.length) return;
     const explore = freeRoam === true && station === stations.length && !paused;
     if (!synced || reset || (paused && station < state.station)) {
-      // Reopening a personal exercise or the live schedule means the visitor already arrived.
+      // Reopening a personal exercise or the welcome lounge means the visitor already arrived.
       const start = explore || (paused && station >= 6) ? stations[station - 1]
         : station === 1 ? entry : station === 7 ? stations[3] : stations[station - 2];
       state.x = start.x; state.z = start.z; state.facing = Math.PI / 2;
@@ -70,13 +55,10 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
   }
 
   function bounded(x, z) {
-    if (state.freeRoam) return {x: clamp(x, hallBounds.minX, hallBounds.maxX), z: clamp(z, hallBounds.minZ, hallBounds.maxZ)};
+    if (state.freeRoam) return {x: clamp(x, last.x + lobbyBounds.minX, last.x + lobbyBounds.maxX), z: clamp(z, last.z + lobbyBounds.minZ, last.z + lobbyBounds.maxZ)};
     return {x: clamp(x, entry.x - 0.6, current().x + 0.45), z: clamp(z, -1.25, 2.35)};
   }
-  function canStep(from, x, z) {
-    const to = atriumPoint(last, x, z);
-    return !isHallBlocked(to.x, to.y) && canWalkAtrium(from, to);
-  }
+  const canStep = (x, z) => !isLobbyBlocked(x - last.x, z - last.z);
 
   function walk(x = current().x, z = current().z) {
     if (!synced || state.paused || (arrivalSent && !hasInteractiveDesk(state.station))) return false;
@@ -96,13 +78,10 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
       const distance = Math.min(walkingSpeed * Math.min(seconds, 0.075), goal ? length : Infinity);
       const next = bounded(state.x + distance * dx / length, state.z + distance * dz / length);
       let nextX = next.x, nextZ = next.z;
-      if (state.freeRoam) {
-        const from = atriumPoint(last, state.x, state.z);
-        if (!canStep(from, nextX, nextZ)) {
-          if (canStep(from, nextX, state.z)) nextZ = state.z;
-          else if (canStep(from, state.x, nextZ)) nextX = state.x;
-          else { stop(); return false; }
-        }
+      if (state.freeRoam && !canStep(nextX, nextZ)) {
+        if (canStep(nextX, state.z)) nextZ = state.z;
+        else if (canStep(state.x, nextZ)) nextX = state.x;
+        else { stop(); return false; }
       }
       state.moving = Math.hypot(nextX - state.x, nextZ - state.z) > 0.0001;
       if (state.moving) state.facing = Math.atan2(nextX - state.x, nextZ - state.z);

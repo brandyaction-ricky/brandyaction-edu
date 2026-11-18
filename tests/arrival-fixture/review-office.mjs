@@ -19,7 +19,7 @@ export function teamLeaderGuide(page) {
 }
 
 export function teamLeaderNext(guide) {
-  return guide.getByRole('button', {name: '조사 담당자와 이야기해보기 →', exact: true});
+  return guide.getByRole('button', {name: /^경쟁사 스파이 만나기(?: →)?$/});
 }
 
 export async function finishTeamLeaderVideo(guide) {
@@ -30,15 +30,24 @@ export async function finishTeamLeaderVideo(guide) {
   await expect(teamLeaderNext(guide)).toBeVisible();
 }
 
+export function loungeScheduleButton(page) {
+  return page.getByRole('button', {name: '라이브 일정 보기', exact: true});
+}
+
+export async function openLoungeSchedule(page) {
+  const calendar = page.getByRole('link', {name: 'Google 캘린더', exact: true});
+  if (!await calendar.isVisible()) await loungeScheduleButton(page).click();
+  await expect(calendar).toBeVisible({timeout: 20000});
+}
+
 // The desktop and mobile clipboard fixtures can use the equivalent HTML entry when WebGL is unavailable.
 export async function finishOfficeReview(page, {walk, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}, enterPersonal = true} = {}) {
-  const calendar = page.getByRole('link', {name:'Google 캘린더', exact:true});
   const travel = walk ?? (async station => {
     const action = page.locator('#arrival-desk-button');
     await action.click({timeout: 60000});
     if (station !== 1) {
-      const open = page.getByRole('button', {name: station === 7 ? '라이브 홀 입장하기' : '내용 열기', exact: true});
-      const destination = station === 7 ? calendar : page.getByRole('dialog');
+      const open = page.getByRole('button', {name: station === 7 ? '웰컴 라운지 입장하기' : '내용 열기', exact: true});
+      const destination = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog');
       await expect(open.or(destination).filter({visible: true})).toBeVisible({timeout: 20000});
       if (await open.isVisible()) await open.click();
     }
@@ -70,6 +79,6 @@ export async function finishOfficeReview(page, {walk, inspect = async () => {}, 
     await afterLeave(station);
   }
   await travel(7);
-  await expect(calendar).toBeVisible({timeout:20000});
+  await expect(loungeScheduleButton(page)).toBeVisible({timeout:20000});
   if (enterPersonal) await page.getByRole('button', {name:'내 AI 체험으로 가기', exact:true}).click();
 }

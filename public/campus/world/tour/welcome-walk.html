@@ -13,11 +13,15 @@
     <canvas id="floor" tabindex="0" aria-label="문샷 사무실 복도. 방향키나 WASD로 걷고, 목적지를 눌러 다가가세요."></canvas>
     <button id="destination" hidden>
       <span id="destination-label"></span>
-      <span id="destination-greeting" hidden>AI 직원에게 일을 맡기면<br>어떻게 일할까요?<br>저를 눌러 확인해보세요.</span>
+      <span id="destination-greeting" hidden></span>
       <span class="pointer" aria-hidden="true"></span>
     </button>
-    <button id="hall-schedule" type="button" hidden>
-      라이브 일정 보기
+    <button id="lobby-materials" class="lobby-guide" type="button" hidden>
+      <strong>자료 안내</strong><span>강의 전에 써볼 자료를 준비했어요. 저를 눌러 확인해보세요.</span>
+      <span class="pointer" aria-hidden="true"></span>
+    </button>
+    <button id="lobby-intro" class="lobby-guide" type="button" hidden>
+      <strong>윤익 · 브랜디액션</strong><span>이 AI팀을 실제로 쓰는 사람들, 윤익님과 브랜디액션을 소개할게요.</span>
       <span class="pointer" aria-hidden="true"></span>
     </button>
   </main>

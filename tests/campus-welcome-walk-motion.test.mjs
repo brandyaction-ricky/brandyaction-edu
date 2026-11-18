@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createWalkMotion, floorDestination, hallFloorFromRay, hallHeight, hasInteractiveDesk} from '../public/campus/world/tour/welcome-walk-motion.mjs';
+import {createWalkMotion, floorDestination, lobbyFloorDestination, hasInteractiveDesk} from '../public/campus/world/tour/welcome-walk-motion.mjs';
 
 const stations = Array.from({length: 7}, (_, i) => ({x: i*8, z: 0}));
 function advance(motion, seconds = 4, dx = 0, dz = 0) {
@@ -101,7 +101,7 @@ test('floor taps at the rendered threshold enter the current desk and near-edge 
   assert.equal(floorDestination({x:0,z:-25},stations,1), null);
 });
 
-test('free roam is limited to the final hall and never replays arrival near its entrance', () => {
+test('free roam is limited to the welcome lounge and never replays arrival near its entrance', () => {
   const m = createWalkMotion(stations);
   m.sync(1, false, false, true);assert.equal(m.state.freeRoam, false);
   m.sync(7, true, true);m.sync(7, false, false, true);
@@ -119,18 +119,19 @@ test('free roam is limited to the final hall and never replays arrival near its 
   assert.equal(m.state.freeRoam, false);assert.equal(m.state.x,40);
 });
 
-test('free roaming stops at the actual atrium obstacles', () => {
-  const m = createWalkMotion(stations, (_x, y) => y < 25);
+test('free roaming stops at the welcome lounge obstacles', () => {
+  const m = createWalkMotion(stations, x => x > 2);
   m.sync(7, false, true, true);
   advance(m, 2, 1, 0);
   assert.ok(m.state.x > 49.8 && m.state.x <= 50);
 });
 
-test('hall picking and foot height agree on the floor, staircase and upper gallery', () => {
+test('lounge floor picking accepts walkable points within the lounge, not beyond its walls', () => {
   const last = stations.at(-1);
-  for (const [x, z, height] of [[48, 0, 0], [60, 0, 2.8 * 8.3 / 14.3], [66, 0, 2.8]]) {
-    assert.ok(Math.abs(hallHeight(last, x, z) - height) < .001);
-    assert.deepEqual(hallFloorFromRay(last, {x, y:15, z}, {x, y:-5, z}), {x,z});
+  for (const [x, z] of [[48, 0], [53, -2], [58, 4]]) {
+    assert.deepEqual(lobbyFloorDestination({x,z},last), {x,z});
   }
-  assert.equal(hallFloorFromRay(last, {x:10, y:10, z:0}, {x:10, y:-3, z:0}), null);
+  for (const [x, z] of [[40, 0], [60, 0], [50, -6]]) {
+    assert.equal(lobbyFloorDestination({x,z},last), null);
+  }
 });

@@ -1,8 +1,11 @@
-.body { scroll-padding-block: 14px; }
+.body {
+  scroll-padding-block: 14px;
+  overflow-anchor: none;
+  -webkit-overflow-scrolling: touch;
+}
 .body .context { margin-bottom: 15px; color: var(--muted, #565e68); font-size: 13px; }
 .transcript { display: grid; gap: 14px; }
 .botRow { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 9px; align-items: start; }
-.botRow:focus { outline: none; }
 .avatar {
   display: grid;
   place-items: center;

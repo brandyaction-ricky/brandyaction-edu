@@ -1,22 +1,31 @@
-import { createWalkMotion, floorDestination, hallFloorFromRay, hallHeight, hasInteractiveDesk } from './welcome-walk-motion.mjs';
+import { createWalkMotion, floorDestination, lobbyFloorDestination, hasInteractiveDesk } from './welcome-walk-motion.mjs';
 
 const root = document.querySelector('#walk');
 const floor = document.querySelector('#floor');
 const marker = document.querySelector('#destination');
-const hallSchedule = document.querySelector('#hall-schedule');
+const lobbyGuides = [
+  ['materials', document.querySelector('#lobby-materials')],
+  ['intro', document.querySelector('#lobby-intro')],
+];
 const label = document.querySelector('#destination-label');
 const greeting = document.querySelector('#destination-greeting');
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get('bridge');
 const avatars = ['female-c', 'female-a', 'male-c', 'male-d'];
+const greetings = {
+  1: 'AI 직원에게 일을 맡기면 어떻게 일할까요?\n저를 눌러 확인해보세요.',
+  2: '경쟁사 고객들의 속마음, 제가 찾아왔어요. 저를 눌러 확인해보세요.',
+  3: '경쟁사 조사에서 찾은 내용을 콘텐츠로 만들었어요. 한번 보실래요?',
+  4: 'AI가 우리 회사를 알아가는 방법, 여기서 확인해보세요.',
+};
 const keys = new Set();
-let applySync, walkTo, pauseMovement, focusFloor;
+let applySync, walkTo, pauseMovement;
 let pendingSync;
 let ready = false, failed = false;
 
-function send(type, station) {
+function send(type, station, guide) {
   if (token && parent !== window)
-    parent.postMessage({ source: 'moonshot-walk', token, type, station }, location.origin);
+    parent.postMessage({ source: 'moonshot-walk', token, type, station, guide }, location.origin);
 }
 window.addEventListener('message', event => {
   const msg = event.data;
@@ -27,7 +36,6 @@ window.addEventListener('message', event => {
     applySync?.(msg);
   }
   if (msg.type === 'walk' && (msg.station == null || msg.station === pendingSync?.station)) walkTo?.();
-  if (msg.type === 'focus' && msg.station === pendingSync?.station) focusFloor?.();
   if (msg.type === 'init' && (ready || failed)) send(ready ? 'ready' : 'error');
 });
 
@@ -35,7 +43,7 @@ function fail() {
   if (failed) return;
   failed = true; ready = false;
   root.dataset.ready = 'false'; root.dataset.error = 'true'; marker.hidden = true;
-  hallSchedule.hidden = true;
+  for (const [, button] of lobbyGuides) button.hidden = true;
   pauseMovement?.();
   send('error');
 }
@@ -62,7 +70,7 @@ async function start() {
   const loader = createCampusAssetLoader();
   const set = buildWelcomeWalkSet(THREE, scene, { loader });
   const { stations } = set;
-  const motion = createWalkMotion(stations, set.isHallBlocked);
+  const motion = createWalkMotion(stations, set.isLobbyBlocked);
   const { state } = motion;
   const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 100);
   const figure = new THREE.Group();
@@ -117,7 +125,7 @@ async function start() {
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.032;
   shadow.scale.set(1, 0.72, 1);
   figure.add(shadow);
-  const aim = new THREE.Vector3(), projected = new THREE.Vector3(), hallAgenda = new THREE.Vector3();
+  const aim = new THREE.Vector3(), projected = new THREE.Vector3(), guidePoint = new THREE.Vector3();
   const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), groundHit = new THREE.Vector3();
   const footprint = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.235, 28), new THREE.MeshBasicMaterial({
@@ -128,9 +136,9 @@ async function start() {
   scene.add(footprint);
   let footprintUntil = 0;
   let width, height, trackingX, trackingZ = 0, roamCamera = 0, raf = 0, last = 0, arranged = false;
-  const rayEnd = new THREE.Vector3();
   let markerWidth = 110, markerHeight = 44, arrived = 0;
-  let hallScheduleWidth = 0, hallScheduleHeight = 0;
+  let lobbyHighlight = 0;
+  let pendingFloorPick;
   let shownIndex, shownStation, synced = false;
   function resize() {
     width = Math.max(1, root.clientWidth); height = Math.max(1, root.clientHeight);
@@ -144,36 +152,33 @@ async function start() {
     if (marker.hidden) return;
     markerWidth = marker.offsetWidth; markerHeight = marker.offsetHeight;
   }
-  const officeSky = new THREE.Color(0xe8eff1), hallSky = new THREE.Color(0x102740);
+  const officeSky = new THREE.Color(0xe8eff1), lobbySky = new THREE.Color(0xd9e6ed);
   function placeCamera(dt) {
     const lead = Math.min(1.7, Math.max(0, (stations[state.station-1].x - state.x) * 0.42));
     const focus = state.x + lead;
     trackingX = trackingX == null ? focus : trackingX + (focus - trackingX) * (1 - Math.exp(-7 * dt));
-    // The bearing stays fixed in the offices. Crossing the auditorium threshold reveals the original stage.
-    // A narrow viewport also needs room for the visitor in the foreground.
+    // Keep the camera turn gradual as the corridor opens into the welcome lounge.
     const cameraScale = width < 600 ? 1.24 : 1;
     const hallEntrance = stations.at(-1).x - 6;
     const progress = state.station === stations.length ? Math.max(0, Math.min(1, (state.x - hallEntrance) / 5.4)) : 0;
     const hall = progress * progress * (3 - 2 * progress);
     const narrow = width < 600;
     const blend = (from, to) => from + (to - from) * hall;
-    camera.position.set(trackingX - blend(1.65 * cameraScale, narrow ? 15.5 : 6.55),
-      blend(1.27 + 2.98 * cameraScale, narrow ? 9.1 : 4.69),
-      blend(-1.1 + 8.8 * cameraScale, narrow ? 8.4 : 4.45));
-    aim.set(trackingX + (narrow ? 8.4 : 5.2) * hall, 1.27 + 1.25 * hall, blend(-1.1, narrow ? -6.0 : -1.1));
+    camera.position.set(trackingX - blend(1.65 * cameraScale, narrow ? 5.6 : 4.4),
+      blend(1.27 + 2.98 * cameraScale, narrow ? 5.8 : 5.0),
+      blend(-1.1 + 8.8 * cameraScale, narrow ? 8.8 : 8.3));
+    aim.set(trackingX + 2.28 * hall, 1.27 + .44 * hall, blend(-1.1, -1.48));
     const follow = 1 - Math.exp(-7 * dt);
     roamCamera += (Number(state.freeRoam) - roamCamera) * follow;
     trackingZ += (state.z - trackingZ) * follow;
     if (roamCamera > 0.001) {
-      const altitude = hallHeight(stations.at(-1), state.x, state.z);
       const towards = (from, to) => from + (to - from) * roamCamera;
-      camera.position.set(towards(camera.position.x, trackingX - 6.1),
-        towards(camera.position.y, 5.2 + altitude), towards(camera.position.z, trackingZ + 6.3));
-      aim.set(towards(aim.x, trackingX + 0.7), towards(aim.y, 1.2 + altitude), towards(aim.z, trackingZ - 0.7));
+      camera.position.z = towards(camera.position.z, trackingZ + (narrow ? 8.8 : 8.3));
+      aim.z = towards(aim.z, trackingZ - 1.48);
     }
     const fov = blend(43, narrow ? 49 : 43);
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
-    scene.background.copy(officeSky).lerp(hallSky, hall);
+    scene.background.copy(officeSky).lerp(lobbySky, hall);
     scene.fog.color.copy(scene.background);
     camera.lookAt(aim); camera.updateMatrixWorld();
   }
@@ -188,27 +193,32 @@ async function start() {
     const x = (projected.x + 1) * width / 2 - markerWidth / 2;
     const y = (1 - projected.y) * height / 2 - markerHeight;
     const left = Math.max(10, Math.min(width - markerWidth - 10, x));
-    const top = Math.max(atReception ? 78 : 12, Math.min(height - markerHeight - 14, y));
+    const top = Math.max(72, Math.min(height - markerHeight - 96, y));
     marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
   }
-  function placeHallSchedule() {
-    if (!state.freeRoam || state.paused || !set.hallAgendaPoint(hallAgenda)) {
-      hallSchedule.hidden = true;
-      return;
+  function placeLobbyGuides() {
+    let previous;
+    for (const [id, button] of lobbyGuides) {
+      if (!state.freeRoam || state.paused || !set.lobbyGuidePoint(id, guidePoint)) {
+        button.hidden = true;
+        continue;
+      }
+      guidePoint.project(camera);
+      const x = (guidePoint.x + 1) * width / 2;
+      const y = (1 - guidePoint.y) * height / 2;
+      button.hidden = guidePoint.z < -1 || guidePoint.z > 1 || x < -28 || x > width + 28 || y > height - 82;
+      if (button.hidden) continue;
+      const w = button.offsetWidth, h = button.offsetHeight;
+      const left = Math.max(8, Math.min(width - w - 8, x - w / 2));
+      let top = Math.max(76, y - h);
+      if (previous && left < previous.right + 6 && left + w > previous.left - 6 && top + h > previous.top - 6 && top < previous.bottom + 6) {
+        top = Math.min(height - h - 86, previous.bottom + 8);
+      }
+      button.dataset.primary = String(id === 'materials' && (Math.abs(state.x - stations.at(-1).x) < 2.6 || performance.now() < lobbyHighlight));
+      button.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
+      previous = {left, right:left + w, top, bottom:top + h};
     }
-    hallAgenda.project(camera);
-    const x = (hallAgenda.x + 1) * width / 2;
-    const y = (1 - hallAgenda.y) * height / 2;
-    hallSchedule.hidden = hallAgenda.z < -1 || hallAgenda.z > 1 ||
-      x < 10 || x > width - 10 || y < 65 || y > height - 100;
-    if (hallSchedule.hidden) return;
-    if (!hallScheduleWidth) {
-      hallScheduleWidth = hallSchedule.offsetWidth;
-      hallScheduleHeight = hallSchedule.offsetHeight;
-    }
-    const left = Math.max(10, Math.min(width - hallScheduleWidth - 10, x - hallScheduleWidth / 2));
-    hallSchedule.style.transform = `translate(${Math.round(left)}px,${Math.round(y - hallScheduleHeight)}px)`;
   }
   let deskLabel = '';
   const needsDeskClick = () => hasInteractiveDesk(state.station);
@@ -231,17 +241,19 @@ async function start() {
     if (avatars.includes(msg.avatar)) void chooseAvatar(msg.avatar);
     const returningToDesk = msg.paused && msg.station < state.station;
     const wasRoaming = state.freeRoam;
+    if (msg.reset || msg.station !== state.station) {pendingFloorPick = undefined; keys.clear();}
     motion.sync(msg.station, msg.paused === true, msg.reset === true, msg.freeRoam === true);
     if (state.freeRoam && !wasRoaming) floor.focus({preventScroll: true});
     if (!synced || msg.reset || returningToDesk) { trackingX = undefined; keys.clear(); }
     synced = true;
     if (state.paused) keys.clear();
     deskLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 42) : stations[state.station - 1].title;
-    const atReception = state.station === 1;
-    marker.toggleAttribute('data-greeting', atReception);
-    label.hidden = atReception;
-    greeting.hidden = !atReception;
-    if (atReception) marker.setAttribute('aria-describedby', greeting.id);
+    const guide = greetings[state.station];
+    marker.toggleAttribute('data-greeting', Boolean(guide));
+    label.hidden = state.station === 1;
+    greeting.hidden = !guide;
+    greeting.textContent = guide ?? '';
+    if (guide) marker.setAttribute('aria-describedby', greeting.id);
     else marker.removeAttribute('aria-describedby');
     marker.hidden = state.paused || state.freeRoam;
     const active = marker.hidden ? -1 : state.station - 1;
@@ -251,7 +263,17 @@ async function start() {
     root.dataset.station = String(state.station); root.dataset.paused = String(state.paused);
     root.dataset.arrivals = String(arrived);
     root.dataset.freeRoam = String(state.freeRoam);
-    placeCamera(0); placeMarker(); placeHallSchedule();
+    if (msg.focus) floor.focus({preventScroll: true});
+    if (msg.highlightMaterials && state.freeRoam) {
+      lobbyHighlight = performance.now() + 4500;
+      motion.walk(stations.at(-1).x + 1.02, stations.at(-1).z);
+    }
+    placeCamera(0); placeMarker(); placeLobbyGuides();
+    if (!state.paused && pendingFloorPick) {
+      const {x, y} = pendingFloorPick;
+      pendingFloorPick = undefined;
+      pick(x, y);
+    }
   }
   function moveTo(x, z) {
     if (!ready || state.paused) return false;
@@ -282,8 +304,7 @@ async function start() {
       markDestination();
       send('depart', state.station);
     }
-    const elevation = state.station === stations.length ? hallHeight(stations.at(-1), state.x, state.z) : 0;
-    figure.position.set(state.x, elevation + 0.035, state.z);
+    figure.position.set(state.x, 0.035, state.z);
     const targetAngle = state.facing;
     const diff = Math.atan2(Math.sin(targetAngle - actor.rotation.y), Math.cos(targetAngle - actor.rotation.y));
     actor.rotation.y = arranged ? actor.rotation.y + diff * Math.min(1, dt * 13) : targetAngle;
@@ -296,16 +317,16 @@ async function start() {
     }
     footprint.visible = !state.paused && now < footprintUntil;
     mixer.update(dt);
-    placeCamera(dt); placeMarker(); placeHallSchedule(); renderer.render(scene, camera);
+    placeCamera(dt); placeMarker(); placeLobbyGuides(); renderer.render(scene, camera);
     root.dataset.playerX = state.x.toFixed(2); root.dataset.playerZ = state.z.toFixed(2);
     root.dataset.moving = String(state.moving);
   }
   floor.addEventListener('keydown', event => {
-    if (state.paused || event.metaKey || event.altKey || event.ctrlKey) return;
+    if (event.metaKey || event.altKey || event.ctrlKey) return;
     const k = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if (k === 'Enter' || k === ' ') {
       event.preventDefault();
-      if (!event.repeat && !openNearbyDesk()) moveTo();
+      if (!state.paused && !event.repeat && !openNearbyDesk()) moveTo();
       return;
     }
     if (!['ArrowRight','ArrowLeft','ArrowUp','ArrowDown','w','a','s','d'].includes(k)) return;
@@ -319,26 +340,36 @@ async function start() {
   }
 
   function pick(clientX, clientY) {
-    if (!ready || state.paused) return;
+    if (!ready) return;
+    if (state.paused) {
+      // The dialog can close a frame before the pause message reaches this canvas.
+      pendingFloorPick = {x: clientX, y: clientY};
+      return;
+    }
     const rect = floor.getBoundingClientRect();
     pointer.set((clientX - rect.left) / rect.width * 2 - 1, 1 - (clientY - rect.top) / rect.height * 2);
     ray.setFromCamera(pointer, camera);
+    const hit = ray.intersectObjects(scene.children, true).find(visibleSurface);
     if (state.freeRoam) {
       const lastStop = stations.at(-1);
-      const target = hallFloorFromRay(lastStop, ray.ray.origin, ray.ray.at(camera.far, rayEnd));
+      for (let node = hit?.object; node; node = node.parent) {
+        if (!node.userData.onboardingGuide) continue;
+        send('open-guide', state.station, node.userData.onboardingGuide);
+        return;
+      }
+      const target = ray.ray.intersectPlane(ground, groundHit) && lobbyFloorDestination(groundHit, lastStop);
       if (target && moveTo(target.x, target.z)) {
-        footprint.position.set(target.x, hallHeight(lastStop, target.x, target.z) + 0.045, target.z);
+        footprint.position.set(target.x, 0.045, target.z);
         footprintUntil = performance.now() + 850;
       }
       return;
     }
-    const hit = ray.intersectObjects(scene.children, true).find(visibleSurface);
     let target;
     // Keep future staff locked. The ground in front of any bay remains navigable.
     if (hit && hit.point.y > 0.12) {
       for (let node = hit.object; node; node = node.parent) {
         if (!Number.isInteger(node.userData.welcomeStation)) continue;
-        if (node.userData.welcomeStation !== state.station - 1) return;
+        if (node.userData.welcomeStation !== state.station - 1) break;
         if (openNearbyDesk()) return;
         target = stations[state.station - 1];
         break;
@@ -382,11 +413,10 @@ async function start() {
     pick(event.clientX, event.clientY);
   });
   marker.addEventListener('click', () => {if (!openNearbyDesk()) moveTo();});
-  hallSchedule.addEventListener('click', () => {
-    if (state.freeRoam && !state.paused) send('open-schedule', state.station);
+  for (const [id, button] of lobbyGuides) button.addEventListener('click', () => {
+    if (state.freeRoam && !state.paused) send('open-guide', state.station, id);
   });
   applySync = sync; walkTo = () => moveTo(); pauseMovement = () => { keys.clear(); motion.stop(); };
-  focusFloor = () => {if (!state.paused) floor.focus({preventScroll:true});};
   window.addEventListener('pagehide', event => {
     if (event.persisted) return;
     cancelAnimationFrame(raf); set.dispose?.(); renderer.dispose();
