@@ -243,3 +243,45 @@ test('campus save feedback stays below the answers and page buttons stay togethe
   }
   expect(await pages.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 });
+
+test('audio playing when the campus reader moves to the next task keeps going in a small bar (QA M4)', async ({ page }) => {
+  await mock(page);
+  const wav = Buffer.alloc(44 + 8000 * 2 * 30);
+  wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
+  await page.route('https://example.test/voice.wav', route => route.fulfill({ contentType: 'audio/wav', body: wav }));
+  await page.route('**/api/platform/lesson-blocks**', async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ json: { practice: null, ongoing: null, submission: null, editable: false, currentRevision: revision, revision, draft: null, previousDrafts: [], document: { schemaVersion: 1, checklist: [], blocks: [
+      { id: 'h1', type: 'heading', content: '듣기' }, { id: 'voice', type: 'audio', url: 'https://example.test/voice.wav', content: '1일차 안내 음성' },
+      { id: 'h2', type: 'heading', content: '정리하기' }, { id: 't2', type: 'text', content: '들은 내용을 정리합니다.' },
+    ] } } });
+  });
+  await page.goto('/lesson-blocks-test?guided');
+  const pages = page.locator('.lb-pages');
+  const toc = pages.getByRole('navigation', { name: '오늘의 작업 목차' });
+  await toc.getByRole('button', { name: /듣기/ }).click();
+  await pages.locator('audio').first().evaluate(async (a: HTMLAudioElement) => { a.muted = true; await a.play(); a.currentTime = 4; });
+  await toc.getByRole('button', { name: /정리하기/ }).click();
+  const bar = pages.getByRole('region', { name: '이어서 듣는 음성' });
+  await expect(bar).toContainText('1일차 안내 음성');
+  await expect.poll(() => bar.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThan(3.5);
+  await bar.getByRole('button', { name: '닫기' }).click();
+  await expect(bar).toHaveCount(0);
+});
+
+test('opening a lesson from 수업 자료 찾기 starts on the task with the searched word (QA M5)', async ({ page }) => {
+  await mock(page);
+  await page.route('**/api/platform/lesson-blocks**', async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ json: { practice: null, ongoing: null, submission: null, editable: false, currentRevision: revision, revision, draft: null, previousDrafts: [], document: { schemaVersion: 1, checklist: [], blocks: [
+      { id: 'h1', type: 'heading', content: '시작' }, { id: 't1', type: 'text', content: '오늘 할 일을 봅니다.' },
+      { id: 'h2', type: 'heading', content: '도구 설치' }, { id: 't2', type: 'text', content: '옵시디언을 설치합니다.' },
+    ] } } });
+  });
+  await page.addInitScript(() => sessionStorage.setItem('campus:find:11111111-1111-4111-8111-111111111111', '옵시디언'));
+  await page.goto('/lesson-blocks-test?guided');
+  const toc = page.locator('.lb-pages').getByRole('navigation', { name: '오늘의 작업 목차' });
+  await expect(toc.getByRole('button', { name: /도구 설치/ })).toHaveAttribute('aria-current', 'step');
+  expect(await page.evaluate(() => sessionStorage.getItem('campus:find:11111111-1111-4111-8111-111111111111'))).toBeNull();
+});

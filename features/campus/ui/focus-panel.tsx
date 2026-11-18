@@ -6,6 +6,7 @@ import {learnerMetrics} from '../learner-metrics';
 import {remainingSeconds} from '../focus-domain';
 import {createFocusTransport,type FocusResponse,type FocusWrite} from '../focus-client';
 import {useCampusDraftGuard} from './draft-guard';
+import {SPACE_CLOCK_EVENT,readSpaceClock,spaceClockKey} from '../space/mini-focus';
 import styles from './focus-panel.module.css';
 
 export function FocusPanel({snapshot,demo,onOpen,onSaved}:{snapshot:CampusSnapshot;demo:boolean;onOpen:(lessonId:string)=>void;onSaved?:()=>void}){
@@ -39,10 +40,12 @@ export function FocusPanel({snapshot,demo,onOpen,onSaved}:{snapshot:CampusSnapsh
   useEffect(()=>{if(!data||session?.status!=='running')return;const base=Date.parse(data.serverNow),anchor=performance.now();const timer=setInterval(()=>setServerClock(base+performance.now()-anchor),1000);return()=>clearInterval(timer);},[data,session?.status]);
   async function write(command:FocusWrite){
     if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');setSaved(false);const token=generation.current;
-    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start')setAction('');if(command.kind==='finish'){onSaved?.();setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
+    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start'){setAction('');stopRoomClock();}if(command.kind==='finish'){onSaved?.();setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
     catch(err){if(token===generation.current){const e=err as Error&{status?:number};setError(e.message);if(e.status===401||e.status===403){setData(null);setResult('');setNextStep('');}}}
     finally{if(token===generation.current){inFlight.current=false;setBusy(false);}}
   }
+  // One timer at a time (QA M8): a 15-minute run ends the room's free focus/break clock.
+  function stopRoomClock(){try{const key=spaceClockKey(snapshot,demo);if(!readSpaceClock(key))return;sessionStorage.setItem(key,JSON.stringify({phase:'idle',duration:0,elapsed:0,runningSince:null}));window.dispatchEvent(new CustomEvent(SPACE_CLOCK_EVENT,{detail:{key}}));}catch{/* Timer state is local. */}}
   function start(){const lesson=snapshot.lessons.find(l=>l.id===lessonId);if(!lesson||!action.trim()||!snapshot.selectedEnrollmentId)return;const signature=[lesson.id,lesson.version,action.trim()].join('|');if(startAttempt.current?.signature!==signature)startAttempt.current={signature,requestId:crypto.randomUUID()};void write({kind:'start',requestId:startAttempt.current.requestId,enrollmentId:snapshot.selectedEnrollmentId,lessonId:lesson.id,lessonVersion:lesson.version,actionText:action.trim()});}
   // Record what was done and what comes next without running the timer: one start and an immediate finish on the same API.
   async function quickRecord(){
