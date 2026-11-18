@@ -212,7 +212,8 @@ async function start() {
   function tick(now) {
     if (failed) return;
     raf = requestAnimationFrame(tick);
-    if (document.hidden || (last && now - last < 1000/40)) return;
+    // The parent restores the visitor's stop before the canvas draws its first frame.
+    if (!synced || document.hidden || (last && now - last < 1000/40)) return;
     const dt = last ? Math.min((now - last) / 1000, 0.075) : 1/60;
     last = now;
     const down = (a, b) => Number(keys.has(a) || keys.has(b));

@@ -134,10 +134,11 @@ export type WorkTrialState = {
   step: 0 | 1 | 2 | 3 | 4;
   role: string; reader: string; priority: WorkTrialPriority | ''; boundary: string; format: string;
   firstTask: string; feedback: string; secondTask: string;
+  copiedRequestId: string;
   firstConfirmed: boolean; feedbackConfirmed: boolean; secondConfirmed: boolean; checks: boolean[];
 };
 export function initialWorkTrialState(): WorkTrialState {
-  return {step: 0, role: '', reader: '', priority: '', boundary: '', format: '', firstTask: '', feedback: '', secondTask: '', firstConfirmed: false, feedbackConfirmed: false, secondConfirmed: false, checks: [false, false, false]};
+  return {step: 0, role: '', reader: '', priority: '', boundary: '', format: '', firstTask: '', feedback: '', secondTask: '', copiedRequestId: '', firstConfirmed: false, feedbackConfirmed: false, secondConfirmed: false, checks: [false, false, false]};
 }
 function input(value: unknown, limit: number): string {
   return typeof value === 'string' ? value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, limit) : '';
@@ -157,6 +158,7 @@ export function parseWorkTrialState(value: unknown): WorkTrialState {
   const v = value as Record<string, unknown>;
   const bounds = {role: WORK_TRIAL_LIMITS.role, reader: WORK_TRIAL_LIMITS.reader, boundary: WORK_TRIAL_LIMITS.rule, format: WORK_TRIAL_LIMITS.rule, firstTask: WORK_TRIAL_LIMITS.task, feedback: WORK_TRIAL_LIMITS.feedback, secondTask: WORK_TRIAL_LIMITS.task};
   for (const key of Object.keys(bounds) as (keyof typeof bounds)[]) state[key] = input(v[key], bounds[key]);
+  if (typeof v.copiedRequestId === 'string' && /^[a-z0-9]{1,7}$/.test(v.copiedRequestId)) state.copiedRequestId = v.copiedRequestId;
   state.priority = WORK_TRIAL_PRIORITIES.includes(v.priority as WorkTrialPriority) ? v.priority as WorkTrialPriority : '';
   const ready = hasCriteria(state);
   state.firstConfirmed = ready && Boolean(state.firstTask.trim()) && v.firstConfirmed === true;
@@ -201,4 +203,12 @@ export function buildWorkPrompt(config: WorkTrialConfig, state: WorkTrialState, 
   const source = stage === 'first' ? config.firstTemplate : stage === 'feedback' ? config.updateTemplate : config.reuseTemplate;
   const values = {manual, task: taskText, feedback: state.feedback.trim()};
   return source.replace(/\{\{(manual|task|feedback)\}\}/g, (_, key: keyof typeof values) => values[key]);
+}
+
+/** A browser-only copy marker lets a returning visitor resume without storing a duplicate request. */
+export function workPromptCopyId(prompt: string): string {
+  if (!prompt) return '';
+  let hash = 2166136261;
+  for (let index = 0; index < prompt.length; index++) hash = Math.imul(hash ^ prompt.charCodeAt(index), 16777619);
+  return (hash >>> 0).toString(36);
 }

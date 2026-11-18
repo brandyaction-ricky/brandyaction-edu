@@ -9,8 +9,8 @@ const rules = ['읽는 사람이 오늘 할 일로 시작한다.', '직원이 �
 if (output) await mkdir(output, {recursive: true});
 const browser = await chromium.launch({headless: true});
 try {
-  for (const [device, viewport] of [['pc', {width: 1440, height: 900}], ['mobile', {width: 390, height: 844}]]) {
-    const mobile = device === 'mobile';
+  for (const [device, viewport] of [['pc', {width: 1440, height: 900}], ['mobile', {width: 390, height: 844}], ['small-mobile', {width: 320, height: 568}]]) {
+    const mobile = device !== 'pc';
     const page = await browser.newPage({viewport, isMobile: mobile, hasTouch: mobile, permissions:['clipboard-read','clipboard-write']});
     const errors = [], externalAI = [], arrivals = [];
     page.on('pageerror', e => errors.push(e.message));
@@ -51,6 +51,7 @@ try {
         await expect(dialog.getByRole('heading',{name:'조사 담당자의 해석'})).toBeVisible();
       }
       if (station === 3) {
+        await expect(button(dialog,rules[0])).toBeInViewport({ratio: 0.95});
         for (let i=0;i<2;i++) {
           await button(dialog,rules[i]).click();
           await expect(dialog.getByText(i===0?/오늘 보낼 광고와 답장/:/광고 첫 문장과 고객 답변 초안/)).toBeVisible();
@@ -70,10 +71,12 @@ try {
         const changes=[];
         for (const rule of rules) {
           await button(dialog,rule).click();
-          const revised=dialog.locator('[aria-live="polite"]');
-          const copy=await revised.getByText('기준을 적용한 소개글 · 예시',{exact:true}).locator('..').locator('p').last().innerText();
-          const reply=await revised.getByText('기준을 적용한 답변 · 예시',{exact:true}).locator('..').locator('p').last().innerText();
-          changes.push([copy,reply]);
+          const revised=dialog.getByRole('heading',{name:'두 직원이 쓴 첫 문장'}).locator('..');
+          const openings=revised.locator('dl dd');
+          await expect(openings).toHaveCount(2);
+          for (const opening of await openings.all()) await expect(opening).toBeInViewport({ratio: 0.95});
+          changes.push(await openings.allTextContents());
+          if (rule === rules[0]) await button(dialog,'다른 기준 비교하기').click();
         }
         expect(changes[0][0]).not.toBe(changes[1][0]);
         expect(changes[0][1]).not.toBe(changes[1][1]);
@@ -127,6 +130,7 @@ try {
       const file=await readFile(await download.path(),'utf8');
       expect(download.suggestedFilename()).toMatch(/20261207\.ics$/);
       expect(file).toMatch(/DTSTART:20261207T120000Z/);
+      await expect(page.getByRole('status').filter({hasText:'일정 파일을 열고'})).toBeInViewport({ratio: 0.95});
       await capture('hall');
       expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(errors).toEqual([]);

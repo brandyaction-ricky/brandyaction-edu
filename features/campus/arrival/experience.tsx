@@ -56,12 +56,14 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const heading = useRef<HTMLHeadingElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
+  const focusCopiedRequest = useRef(false);
   const walkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const visited = useRef(false);
   const step = state.step;
   const officeIntro = step === 0;
-  const canOpenStation = sceneStatus === 'unavailable' || walkAssist === 'open';
+  const canOpenStation = sceneStatus !== 'ready' || walkAssist === 'open';
   const station = state.station;
+  const firstStop = station === 1;
   const destination = destinations[station - 1];
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
   const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
@@ -82,7 +84,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const date = new Date(config.startsAt);
   const dateLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',month:'long',day:'numeric'}).format(date);
   const timeLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',hour:'numeric',minute:'2-digit',hour12:true}).format(date).replace(/:(\d{2})$/, (_, minutes: string) => minutes === '00' ? '시' : `시 ${Number(minutes)}분`);
-  const dateNumber = new Intl.DateTimeFormat('en-US', {timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit'}).format(date).replace('/', '.');
   const weekday = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',weekday:'long'}).format(date);
 
   useEffect(() => {
@@ -117,6 +118,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   useEffect(() => {
     if (copyFallback) {fallbackRef.current?.focus(); fallbackRef.current?.select();}
   }, [copyFallback]);
+  useEffect(() => {
+    if (step !== 3 || state.handoff !== 'copied' || copyFallback || !focusCopiedRequest.current) return;
+    focusCopiedRequest.current = false;
+    scrollArea.current?.scrollTo({top: 0, behavior: 'instant'});
+    heading.current?.focus({preventScroll: true});
+  }, [step, state.handoff, copyFallback]);
 
   useEffect(() => {
     if (deskOpen) deskDialog.current?.showModal();
@@ -200,12 +207,18 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     try {
       await navigator.clipboard.writeText(text);
       setCopyFallback('');
-      if (handoff) update({handoff: 'copied'});
-      setNotice(handoff ? '복사했어요. 평소 쓰는 AI를 열어 붙여넣어 주세요.' : '복사했어요. 같은 AI 대화에 이어서 보내주세요.');
+      if (handoff) markRequestCopied();
+      else setNotice('복사했어요. 같은 AI 대화에 이어서 보내주세요.');
     } catch {
       setCopyFallback(text);
       setNotice('아래 글을 전체 선택해 직접 복사해 주세요.');
     }
+  }
+  function markRequestCopied() {
+    focusCopiedRequest.current = state.handoff !== 'copied' || Boolean(copyFallback);
+    update({handoff: 'copied'});
+    setCopyFallback('');
+    setNotice(state.handoff === 'copied' ? '요청문을 다시 복사했어요.' : '');
   }
   function saveCalendar() {
     const text = calendarIcs(event);
@@ -213,7 +226,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     const url = URL.createObjectURL(new Blob([text], {type: 'text/calendar;charset=utf-8'}));
     const a = document.createElement('a'); a.href = url; a.download = `moonshot-live-${event.date.replaceAll('-', '')}.ics`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    setNotice('일정 파일을 열고 캘린더에서 ‘추가’를 눌러주세요. 카톡 안에서 열리지 않으면 Safari로 열어주세요.');
+    setNotice('일정 파일을 열고 ‘추가’를 누르세요. 카톡에서 파일이 안 열리면 Safari로 이 페이지를 열어주세요.');
   }
   function reset() {
     if (menu.current) menu.current.open = false;
@@ -226,7 +239,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function personalStart() {update({mode: 'personal', experience: 'none', step: 2}); setNotice('');}
   const title = (text: React.ReactNode, description?: string) => <div className={s.intro}><h1 ref={heading} tabIndex={-1}>{text}</h1>{description && <p>{description}</p>}</div>;
 
-  return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined}>
+  return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined} data-scene-status={sceneStatus}>
     <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label="웰컴존에서 라이브 홀까지 이어지는 통로">
       {hydrated && <CorridorScene key={sceneVisit} station={station} label={station === 3 ? config.officeDemo?.deskLabel : undefined}
@@ -241,23 +254,29 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <div className={entryStyle.progress} aria-live="polite" aria-atomic="true"><span>문샷 웰컴존</span><i aria-hidden="true"/><b>{station === 7 ? 'LIVE' : String(station).padStart(2, '0') + ' / 06'}</b><strong>{destination}</strong></div>
       <details ref={menu} className={s.menu}><summary aria-label="체험 메뉴"><MoreHorizontal size={23}/></summary><div><span>{preview ? '저장 전 관리자 미리보기' : '브랜치 미리보기'}</span><button type="button" onClick={() => {if (menu.current) menu.current.open = false; setIntroOpen(true);}}>체험 소개</button>{!officeIntro && step !== 7 && <button type="button" onClick={headToHall}><CalendarDays size={16}/>라이브 홀로 이동</button>}<button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button></div></details>
     </header>
-    {officeIntro && station === 1 && sceneStatus === 'ready' && <div className={entryStyle.avatarControl}>
+    {officeIntro && firstStop && sceneStatus === 'ready' && <div className={entryStyle.avatarControl}>
       <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
     </div>}
-    {officeIntro ? <section className={entryStyle.wayfinding} aria-label="현재 목적지" data-walk-station={station}>
-      <div>
-        <span>다음 목적지</span>
-        <h1>{destination}</h1>
-        {canOpenStation ? <p>버튼으로 이곳의 내용을 바로 열 수 있어요.</p> : <>
-          <p className={entryStyle.keyboardHint}>스페이스바를 누르면 화살표 쪽으로 걸어가요.</p>
-          <p className={entryStyle.touchHint}>화살표 쪽 바닥을 터치하거나 옆 버튼을 누르세요.</p>
-          {station === 1 && <p>팀장 안내를 마치면 다음 장소가 열려요.</p>}
+    {officeIntro ? <section className={`${entryStyle.wayfinding} ${firstStop ? entryStyle.firstStop : ''}`} aria-label={firstStop ? '문샷 웰컴존 소개' : '현재 목적지'} data-walk-station={station}>
+      <div className={entryStyle.stopCopy}>
+        {firstStop ? <>
+          <h1>{config.title}</h1>
+          <p>조사부터 제작, 고객 응대까지. AI 직원들이 완성한 결과부터 살펴보세요.</p>
+        </> : <>
+          <span>다음 목적지</span>
+          <h1>{destination}</h1>
         </>}
       </div>
-      <button id="arrival-desk-button" type="button" ref={deskButton} onClick={walkToStation} disabled={sceneStatus === 'loading' || (!canOpenStation && walkAssist === 'moving')}>
-        {sceneStatus === 'loading' ? '공간 준비 중' : canOpenStation ? '내용 열기' : walkAssist === 'moving' ? '이동 중' : invitations[station - 1]}<ArrowRight size={16}/>
-      </button>
-    </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
+      <div className={entryStyle.wayfindingActions}>
+        <button id="arrival-desk-button" type="button" ref={deskButton} onClick={walkToStation} disabled={!canOpenStation && walkAssist === 'moving'}>
+          {sceneStatus === 'loading' && firstStop ? '팀장 안내 보기' : canOpenStation ? '내용 열기' : walkAssist === 'moving' ? '이동 중' : invitations[station - 1]}<ArrowRight size={16}/>
+        </button>
+        {sceneStatus === 'loading' ? <p role="status">공간을 준비하고 있어요.</p> : !canOpenStation && <div className={entryStyle.movementHint}>
+          <p className={entryStyle.keyboardHint}>스페이스바로도 이동할 수 있어요.</p>
+          <p className={entryStyle.touchHint}>화살표 쪽 바닥을 눌러도 이동해요.</p>
+        </div>}
+      </div>
+    </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${step === 3 && !workActive ? s.handoffDock : ''} ${step === 7 ? s.hallDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
       {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
         onChange={workTrial => update({workTrial, experience: workTrial.secondConfirmed ? 'self-reported' : 'none'})}
         onExit={() => go(8)} onLive={headToHall}/> : <>
@@ -291,14 +310,19 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <p className={s.fine}>이름·연락처·회사 기밀은 적지 마세요.<br/>{persistenceKey ? '적은 내용은 이 브라우저에만 저장돼요.' : '미리보기 입력은 저장하지 않아요. 닫으면 사라져요.'}</p>
         </>}
         {step === 3 && <>
-          {title(state.handoff === 'copied' ? <>이제 내 AI에<br/><em>붙여넣어 주세요.</em></> : <>AI에게 보낼 요청문이<br/><em>준비됐습니다.</em></>)}
+          {title(state.handoff === 'copied' ? '요청문을 복사했어요.' : 'AI에게 보낼 요청문이 준비됐어요.')}
           {!prompt ? <div className={s.recovery}><p>내 상황 두 가지를 먼저 알려주세요.</p><button type="button" className={s.primary} onClick={() => go(2)}>내 상황 입력하기<ArrowRight size={18}/></button></div> : <>
-            <div className={s.handoffSteps}>
-              <div className={s.handoffStep}><span className={state.handoff === 'copied' ? s.checked : ''}>{state.handoff === 'copied' ? <Check size={15}/> : '1'}</span><div><strong>요청문 복사하기</strong><p>입력한 내용과 원하는 결과를 담았습니다.</p><details className={s.promptDetails}><summary>요청문 펼쳐보기<ChevronDown size={14}/></summary><textarea aria-label="AI에게 보낼 요청문" readOnly value={prompt}/></details>{state.handoff === 'copied' && <button type="button" className={s.textButton} onClick={() => copy(prompt, true)}><Copy size={14}/>다시 복사</button>}</div></div>
-              <div className={s.handoffStep}><span>2</span><div><strong>평소 쓰는 AI에 붙여넣기</strong><p>새 대화에 붙여넣고 전송해 주세요.</p><div className={s.aiLinks}><a href="https://chatgpt.com/" target="_blank" rel="noreferrer">ChatGPT 열기<ArrowUpRight size={15}/></a><a href="https://claude.ai/new" target="_blank" rel="noreferrer">Claude 열기<ArrowUpRight size={15}/></a></div><small>다른 AI를 써도 괜찮아요.</small></div></div>
-              <div className={s.handoffStep}><span>3</span><div><strong>답변을 받으면 이곳으로 돌아오기</strong><p>{persistenceKey ? '이 화면과 입력한 내용은 그대로 남아 있어요.' : '이 미리보기를 닫지 않고 돌아오면 계속할 수 있어요.'}</p></div></div>
-            </div>
-            <p className={s.fine}>캠퍼스는 개인 AI의 답변을 읽지 않아요.</p>
+            {copyFallback ? <div className={s.copyFallback}><p className={s.notice} role="status">{notice}</p><label>직접 복사할 요청문<textarea ref={fallbackRef} readOnly value={copyFallback}/></label><button type="button" className={s.secondary} onClick={markRequestCopied}>직접 복사했어요<Check size={15}/></button></div>
+              : state.handoff === 'copied' ? <div className={s.handoffCopy}>
+                <p>평소 쓰는 AI의 새 대화에 붙여넣고 보내세요.</p>
+                <div className={s.aiLinks}><a href="https://chatgpt.com/" target="_blank" rel="noreferrer">ChatGPT 열기<ArrowUpRight size={15}/></a><a href="https://claude.ai/new" target="_blank" rel="noreferrer">Claude 열기<ArrowUpRight size={15}/></a></div>
+                <p className={s.fine}>답변을 받으면 이 탭으로 돌아와 아래 버튼을 눌러주세요.</p>
+                <button type="button" className={s.textButton} onClick={() => copy(prompt, true)}><Copy size={14}/>요청문 다시 복사</button>
+                {notice && <p className={s.notice} role="status">{notice}</p>}
+              </div> : <div className={s.handoffCopy}>
+                <p>먼저 아래 버튼으로 내 요청문을 복사하세요. 이어서 평소 쓰는 AI를 열 수 있어요.</p>
+                <details className={s.promptDetails}><summary>보낼 요청문 확인<ChevronDown size={14}/></summary><textarea aria-label="AI에게 보낼 요청문" readOnly value={prompt}/></details>
+              </div>}
           </>}
         </>}
         {step === 5 && <>
@@ -311,14 +335,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         </>}
         {step === 7 && <>
           {title(config.liveTitle)}
-          <div className={s.ticket}><div className={s.ticketHead}><span>MOONSHOT LIVE</span><span>무료 라이브</span></div><div className={s.ticketDate}><strong>{dateNumber}</strong><div>{weekday}<b>{timeLabel}</b><small>한국 시간</small></div></div><div className={s.ticketFoot}>{config.instructorName}</div></div>
-          <p className={s.calendarIntro}>라이브 일정을 캘린더에 저장하세요.<br/><strong>{config.liveUrl ? '저장한 일정에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 링크는 카톡방에서 안내해드려요.'}</strong></p>
-          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p><p>{config.instructorIntro}</p>{config.videoUrl && <a className={s.textButton} href={config.videoUrl} target="_blank" rel="noreferrer">강사·강의 소개 영상 보기<ArrowUpRight size={16}/></a>}</div></details>
+          <div className={s.ticket}>
+            <p><strong>{dateLabel} {weekday}</strong><br/>{timeLabel} <small>한국 시간</small></p>
+          </div>
+          <p className={s.calendarIntro}>{config.liveUrl ? '캘린더에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 참여 링크는 카톡방에서 안내할 예정이에요.'}</p>
+          {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
+          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p></div></details>
           <HallProgram config={config}/>
-          {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}<p className={s.fine}>{!config.endsAt && '종료 시각은 안내 예정이에요. 지금은 시작 시각을 저장합니다. '}캘린더 화면에서 마지막 ‘저장’ 또는 ‘추가’를 눌러주세요.</p>
         </>}
-        {copyFallback && <div className={s.copyFallback}><label>직접 복사할 요청문<textarea ref={fallbackRef} readOnly value={copyFallback}/></label>{step === 3 && <button type="button" className={s.secondary} onClick={() => {update({handoff: 'copied'}); setCopyFallback(''); setNotice('이제 평소 쓰는 AI에 붙여넣어 주세요.');}}>직접 복사했어요<Check size={15}/></button>}</div>}
-        {notice && <p className={s.notice} role="status">{notice}</p>}
+        {step !== 3 && copyFallback && <div className={s.copyFallback}><label>직접 복사할 요청문<textarea ref={fallbackRef} readOnly value={copyFallback}/></label></div>}
+        {step !== 3 && step !== 7 && notice && <p className={s.notice} role="status">{notice}</p>}
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
       {step !== 8 && <footer className={s.dockFooter}>
@@ -326,7 +352,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={s.primary} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={s.primary} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
         {step === 5 && <button type="button" className={s.primary} onClick={headToHall}>라이브 홀로 이동<ArrowRight size={18}/></button>}
-        {step === 7 && <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer"><CalendarDays size={18}/>Google 캘린더<ArrowUpRight size={14}/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={18}/>아이폰·기타 캘린더<ArrowRight size={14}/></button></div>}
+        {step === 7 && <div className={s.calendarActions}>
+          <p className={s.calendarHint}>캘린더에 일정 추가</p>
+          <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => setNotice('Google 캘린더에서 ‘저장’을 눌러주세요.')}><CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={16} aria-hidden="true"/>아이폰·기타 캘린더<ArrowRight size={14} aria-hidden="true"/></button></div>
+          <p className={s.calendarInstruction} role="status">{notice || (config.endsAt ? '캘린더에서 ‘저장’ 또는 ‘추가’를 누르면 완료돼요.' : '시작 시각을 담았어요. 캘린더에서 ‘저장’ 또는 ‘추가’를 눌러주세요.')}</p>
+        </div>}
       </footer>}
       </>}
     </section>}

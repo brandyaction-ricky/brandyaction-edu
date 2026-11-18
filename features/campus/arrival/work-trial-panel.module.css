@@ -53,11 +53,12 @@
 .retainedRule > span { display:block; font-size:13px; font-weight:650; color:var(--muted,#626770); }
 .panel .retainedRule > p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; font-size:16px; }
 .promptText { display:block; width:100%; height:210px; padding:12px; background:var(--surface-subtle,#f7f8fa); border:1px solid var(--line,#e2e5e9); border-radius:7px; line-height:1.7; }
-.handoff { padding-top:23px; }
+.handoff { margin:0 0 22px; padding:14px; background:#f2f7f4; border:1px solid #cfe0d5; border-radius:8px; }
 .handoff h2 { margin:0 0 7px; font-size:16px; line-height:1.6; }
+.handoff h2:focus { outline:none; }
 .panel .handoff > p { font-size:15px; color:var(--muted,#626770); line-height:1.75; word-break:keep-all; }
-.panel .handoff > .fine { font-size:13px; }
-.aiLinks { display:flex; flex-wrap:wrap; gap:10px; margin-top:13px; }
+.panel .handoff > .fine { font-size:13px; margin-top:9px; }
+.aiLinks { display:flex; flex-wrap:wrap; gap:8px; margin-top:11px; }
 .aiLinks a { display:inline-flex; align-items:center; gap:9px; min-height:44px; border:1px solid var(--border-strong,#cfd3d8); border-radius:7px; padding:10px 14px; font-size:15px; color:var(--ink,#161719); text-decoration:none; background:var(--paper,#fff); }
 .aiLinks a:hover { border-color:var(--ba-red,#cf1728); }
 .checks { padding:0; margin:0; border:0; min-width:0; }
@@ -104,7 +105,6 @@
 .requestPicture figcaption { display:flex; align-items:center; justify-content:center; gap:7px; padding-top:14px; font-size:14px; line-height:1.6; text-align:center; word-break:keep-all; }
 .requestPicture figcaption svg { flex:none; }
 .panel .packageHint { font-size:14px; color:var(--muted,#626770); margin:0 0 12px; line-height:1.7; }
-.handoff[data-copied=true] { margin-top:18px; padding:17px; background:#f2f7f4; border:1px solid #cfe0d5; border-radius:8px; }
 .valueExplanation > h2 { margin:0 0 18px; font-size:19px; line-height:1.6; white-space:pre-line; word-break:keep-all; }
 .valueComparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .valueComparison article { padding:18px; border:1px solid var(--line,#e2e5e9); border-radius:9px; background:var(--surface-subtle,#f7f8fa); }
@@ -148,7 +148,8 @@
   .footer { padding:12px 20px calc(14px + env(safe-area-inset-bottom)); border-radius:0; }
   .panel .primary { padding:11px 14px; font-size:15px; }
   .footerActions { gap:4px 12px; }
-  .footerActions .textButton span { display:none; }
+  .footerActions .textButton { font-size:13px; }
+  .aiLinks a { gap:5px; padding-inline:10px; }
   .taskHeading { align-items:flex-start; }
   .taskHeading > label { padding-top:8px; }
   .manual > header { padding:16px; }

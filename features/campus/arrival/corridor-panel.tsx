@@ -81,8 +81,11 @@ export function CorridorPanel({station, config, review, proposalSent, onProposal
   };
 
   useEffect(() => {
-    body.current?.scrollTo({top: 0, behavior: 'instant'});
-    heading.current?.focus({preventScroll: true});
+    const frame = requestAnimationFrame(() => {
+      body.current?.scrollTo({top: 0, behavior: 'instant'});
+      heading.current?.focus({preventScroll: true});
+    });
+    return () => cancelAnimationFrame(frame);
   }, [station, review.phase]);
 
   return <section className={`${monitor.monitor} ${styles.panel}`} aria-labelledby={headingId}>
@@ -121,13 +124,19 @@ export function CorridorPanel({station, config, review, proposalSent, onProposal
 
       {station === 3 && <>
         {review.phase === 'draft' && <>
-          <dl className={styles.notes}>
-            <div><dt>조사 담당자가 넘긴 자료</dt><dd>{material}</dd></div>
-            <div><dt>조사 결과에서 고른 장점</dt><dd>{brief}</dd></div>
-            <div><dt>이 장점을 담은 소개글 초안</dt><dd className={monitor.headline}>{draft}</dd></div>
+          <dl className={styles.draftNote}>
+            <div><dt>기획·제작 직원의 초안</dt><dd>{firstSentence(draft)}</dd></div>
           </dl>
-          <details className={styles.creative}><summary>이 상품의 광고 이미지·영상 보기</summary><ProductionMedia/></details>
           <FeedbackChoices choices={choices} onSelect={index => onReview('feedback', index)}/>
+          <details className={styles.creative}>
+            <summary>조사 자료와 광고·소개글 전체 보기<ChevronDown size={16} aria-hidden="true"/></summary>
+            <dl className={styles.notes}>
+              <div><dt>조사 담당자가 넘긴 자료</dt><dd>{material}</dd></div>
+              <div><dt>조사 결과에서 고른 장점</dt><dd>{brief}</dd></div>
+              <div><dt>소개글 초안 전체</dt><dd>{draft}</dd></div>
+            </dl>
+            <ProductionMedia/>
+          </details>
         </>}
         {review.phase === 'feedback' && <>
           <p className={styles.feedback}>내가 선택한 피드백<strong>{revision.feedback}</strong></p>
@@ -173,6 +182,7 @@ export function CorridorPanel({station, config, review, proposalSent, onProposal
             <div><dt>기획·제작 직원의 소개글</dt><dd>{firstSentence(choices[selected].revised)}</dd></div>
             <div><dt>고객 응대 직원의 답변</dt><dd>{firstSentence(choices[selected].approvedAnswer)}</dd></div>
           </dl>
+          <p className={styles.sharedRuleNote}>이 기준을 한곳에 두면, 직원마다 같은 설명을 반복하지 않아도 돼요.</p>
           <details key={selected} className={styles.fullComparison}><summary>수정 전후 전체 문장 보기<ChevronDown size={16} aria-hidden="true"/></summary>
             <h4>소개글</h4>
             {approved && selected === review.choice && <p className={styles.approvalNote}>앞서 승인한 기준과 같아, 소개글의 첫 문장도 그대로예요.</p>}

@@ -29,8 +29,10 @@
 .source { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; color: var(--ink, #161719); font-size: 14px; text-underline-offset: 3px; }
 .source:focus-visible { outline: 3px solid var(--ba-info, #315e8b); outline-offset: 2px; }
 .notes > div + div { margin-top: 12px; }
-.creative { margin: 12px 0; border-block: 1px solid var(--line, #e2e5e9); }
-.creative .media { margin: 0 0 14px; }
+.draftNote { margin: 0; padding: 11px 14px; border-inline-start: 3px solid var(--line, #dce1e6); background: var(--surface-subtle, #f5f6f7); }
+.draftNote dd { margin-top: 3px; font-size: 16px; font-weight: 650; line-height: 1.55; }
+.creative { margin: 16px 0 0; border-block: 1px solid var(--line, #e2e5e9); }
+.creative .media { margin: 14px 0; }
 .exchange { display: grid; gap: 12px; margin: 14px 0; }
 .exchange > div { padding: 10px 14px; border-inline-start: 3px solid var(--line, #d2d7db); }
 .exchange > div:last-child { border-color: var(--ba-red, #bd2432); }
@@ -48,6 +50,7 @@
 .openings > div + div { border-top: 1px solid var(--line, #dce1e6); }
 .panel .openings dt { font-size: 14px; }
 .panel .openings dd { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; margin-top: 3px; font-size: 17px; font-weight: 650; line-height: 1.5; }
+.panel .sharedRuleNote { margin: 10px 0 14px; color: var(--muted, #565e68); font-size: 14px; line-height: 1.6; }
 .fullComparison { border-bottom: 1px solid var(--line, #dce1e6); }
 .fullComparison h4 { margin: 10px 0 5px; font-size: 16px; }
 .fullComparison h4 ~ div { margin: 6px 0 14px; }
