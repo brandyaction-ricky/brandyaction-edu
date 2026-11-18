@@ -11,7 +11,7 @@ function harness({user={id},dbError=null,size=8,mime='image/png',bytes=png,ready
  const calls=[],storageCalls=[];
  const file={id,owner_id:id,course_id:id,name,size:8,kind,content_type:'image/png',extension:'png',path:`${id}/${id}.png`,sha256,ready_at:ready?'2026-09-28T12:00:00Z':null};
  const storage={createSignedUploadUrl:async(path,options)=>{storageCalls.push({action:'upload',path,options});return{data:{signedUrl:'https://storage.test/signed-upload',token:'private-token'}};},info:async()=>({data:{size,contentType:mime}}),download:async()=>({data:new Blob([bytes])}),createSignedUrl:async(path,seconds,options)=>{storageCalls.push({action:'read',path,seconds,options});return{data:{signedUrl}};}};
- const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='edu_complete_lesson_media'?{id,name:file.name,kind,size}:file,error:dbError};},storage:{from:bucket=>{assert.equal(bucket,'lesson-content-media');return storage;}}};
+ const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='edu_complete_lesson_media'?{id,name:file.name,kind,size}:file,error:typeof dbError==='function'?dbError(args):dbError};},storage:{from:bucket=>{assert.equal(bucket,'lesson-content-media');return storage;}}};
  const route=compile('app/api/platform/lesson-media/route.ts',{'node:crypto':crypto,'@/lib/lesson-media':files,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>db}});
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-media',{method:'POST',headers:origin?{origin}:{},body:JSON.stringify(body)}));
  const get=(query=`asset=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-media?'+query));
@@ -67,4 +67,10 @@ test('download filenames retain Korean and reserved characters without altering 
  }
  const inline=harness({kind:'image',signedUrl:'https://storage.test/object/sign/file.png?token=unchanged'});
  assert.equal((await inline.get()).headers.get('location'),'https://storage.test/object/sign/file.png?token=unchanged');
+});
+
+test('staff preview of a locked lesson reads its media without the enrollment; members stay locked (CEO 11-18)',async()=>{
+ const locked=args=>args.p_enrollment?{message:'BLOCK_LESSON_LOCKED'}:null,q=`asset=${id}&lesson=${id}&enrollment=${id}&revision=${id}`;
+ const staff=harness({user:{id,role:'staff'},ready:true,dbError:locked});assert.equal((await staff.get(q)).status,303);assert.deepEqual(staff.calls.map(c=>c.args.p_enrollment),[id,null]);
+ const member=harness({ready:true,dbError:locked});assert.equal((await member.get(q)).status,403);assert.equal(member.calls.length,1);
 });

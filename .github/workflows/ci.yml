@@ -37,6 +37,24 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/campus-preview-media-release-20261118" ]; then
+            expected_main=10f5f7386f1c6f1b8265e81324f300b20a2188b6
+            release_payload=f074ffe2c2c6924dc75cdcbfa3151915a3f20e70
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/platform/lesson-media/route.ts|tests/lesson-media-route.test.mjs) ;;
+                *) echo "Unexpected staff preview media release change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified staff preview media payload (code-only); current production, database and central release controls preserved.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-qa2-leftovers-release-20261118" ]; then
             expected_main=03643d19d45a45d04a2f0297f622818a728ed78e
             release_payload=4c98ac8413cb252fcf663deeb35076a0f4b86e94
