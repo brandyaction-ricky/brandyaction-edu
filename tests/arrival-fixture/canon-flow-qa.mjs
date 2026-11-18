@@ -87,7 +87,7 @@ for (const [device, engine, viewport] of [
     await expect(map.getByRole('listitem')).toHaveCount(12);
     await expect(connections).toHaveCount(0);
     await expect(status).toHaveText('아직 연결된 지식이 없어요.');
-    await expect(button(dialog, '강의 전 무료자료 확인하기')).toBeEnabled();
+    await expect(button(dialog, '웰컴 라운지로 가기')).toBeEnabled();
     await capture('canon-open');
     for (const [index, exchange] of exchanges.entries()) {
       await tap(button(dialog, exchange.button));
@@ -176,15 +176,20 @@ for (const [device, engine, viewport] of [
     await tap(button(guide, '라운지로 돌아가기'));
     await expect(loungeScheduleButton(page)).toBeVisible();
 
-    await tap(frame.getByRole('button', {name: /윤익 · 브랜디액션/}));
-    const team = page.getByRole('dialog', {name:'윤익 · 브랜디액션 팀', exact:true});
+    await tap(frame.getByRole('button', {name: /퇴사선배 윤익 · 브랜디액션/}));
+    const team = page.getByRole('dialog', {name:'퇴사선배 윤익 · 브랜디액션 팀', exact:true});
     await expect(team).toBeVisible();
     await expect(team.getByText('브랜디액션 팀이 AI와 일하는 모습')).toBeVisible();
     await capture('lounge-team');
     await tap(button(team, '무료자료 확인하러 가기'));
     await expect(team).not.toBeVisible();
-    await expect(frame.getByRole('button', {name: /자료 안내/})).toHaveAttribute('data-primary', 'true');
+    await expect(guide).toBeVisible();
+    await expect(guide.getByRole('heading', {name:'무료자료 · 라이브 특전', exact:true})).toBeFocused();
+    await expect(button(guide, '무료자료')).toHaveAttribute('aria-pressed', 'true');
+    await expect(resources.getByRole('heading', {name:'라이브 전에 볼 자료', exact:true})).toBeVisible();
+    await tap(button(guide, '라운지로 돌아가기'));
     await expect(guide).toHaveCount(0);
+    await expect(world).toHaveAttribute('data-paused', 'false');
     await openLoungeSchedule(page);
     await capture('lounge-schedule');
 

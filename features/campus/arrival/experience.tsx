@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
-import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
+import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
@@ -60,7 +60,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [sceneStatus, setSceneStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [walkRequest, setWalkRequest] = useState(0);
   const [focusRequest, setFocusRequest] = useState(0);
-  const [materialsRequest, setMaterialsRequest] = useState(0);
   const [walkAssist, setWalkAssist] = useState<'idle' | 'moving' | 'open'>('idle');
   const [nearStation, setNearStation] = useState<CorridorStation>();
   const [sceneVisit, setSceneVisit] = useState(0);
@@ -72,6 +71,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [avatarOpen, setAvatarOpen] = useState(false);
   const deskDialog = useRef<HTMLDialogElement>(null);
   const lobbyDialog = useRef<HTMLDialogElement>(null);
+  const lobbyGuideTrigger = useRef<HTMLButtonElement | null>(null);
   const sceneFrame = useRef<HTMLIFrameElement>(null);
   const introDialog = useRef<HTMLDialogElement>(null);
   const deskButton = useRef<HTMLButtonElement>(null);
@@ -173,8 +173,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }, [deskOpen, firstStop, revisitContent]);
   useEffect(() => {
     const dialog = lobbyDialog.current;
-    if (lobbyGuide && !revisitContent) dialog?.showModal();
-    else dialog?.close();
+    if (lobbyGuide && !revisitContent && dialog) {
+      if (!dialog.open) dialog.showModal();
+      dialog.querySelector('h2')?.focus({preventScroll: true});
+    } else dialog?.close();
   }, [lobbyGuide, revisitContent]);
   useEffect(() => {
     if (teamLeaderOpen || !restoreLeaderFocus.current) return;
@@ -265,11 +267,20 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     lobbyDialog.current?.close();
     setRevisitContent(true);
   }
-  function closeLobbyGuide(pointToMaterials = false) {
+  function openLobbyGuide(guide: OnboardingGuide, trigger: HTMLButtonElement | null = null) {
+    lobbyGuideTrigger.current = trigger;
+    setLobbyGuide(guide);
+  }
+  function closeLobbyGuide() {
     lobbyDialog.current?.close();
     setLobbyGuide(null);
-    restoreFloorFocus();
-    if (pointToMaterials) setMaterialsRequest(value => value + 1);
+    const trigger = lobbyGuideTrigger.current;
+    lobbyGuideTrigger.current = null;
+    requestAnimationFrame(() => {
+      if (lobbyDialog.current?.open) return;
+      if (trigger?.isConnected) trigger.focus({preventScroll: true});
+      else restoreFloorFocus();
+    });
   }
   function openHallSchedule() {
     focusHallSchedule.current = true;
@@ -377,8 +388,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       {hydrated && <CorridorScene key={sceneVisit} frame={sceneFrame} station={station} label={destination}
         avatar={state.visitorAvatar}
         paused={deskOpen || Boolean(lobbyGuide) || revisitContent || introOpen || avatarOpen || showReset || (!officeIntro && !explore)}
-        freeRoam={exploringHall} onOpenGuide={setLobbyGuide}
-        walkRequest={walkRequest} focusRequest={focusRequest} materialsRequest={materialsRequest} onProximity={updateProximity} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
+        freeRoam={exploringHall} onOpenGuide={openLobbyGuide}
+        walkRequest={walkRequest} focusRequest={focusRequest} onProximity={updateProximity} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
     </div>
     <header className={s.header} inert={teamLeaderOpen} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <div className={s.wordmark}>{/* eslint-disable-next-line @next/next/no-img-element -- Reuse the existing EDU brand asset. */}
@@ -396,10 +407,13 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <div className={entryStyle.stopCopy}>
         {firstStop ? <>
           <h1>{config.title}</h1>
-          <p>팀장 봇을 만나 AI 직원에게 일을 맡기고 보고받는 모습을 먼저 살펴보세요.</p>
+          <p>고객 후기에서 찾은 힌트가 광고 영상으로 완성되기까지, AI 직원들이 어떻게 일하는지 따라가 보세요.</p>
+          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>웰컴 라운지에서 <strong>AI팀 설계도와 회사 업무 기준표</strong>를 무료로 받을 수 있어요.</span></p>
         </> : <>
           <span>{nearStation === station ? '도착했어요' : '다음 목적지'}</span>
           <h1>{destination}</h1>
+          {station === 4 && <p className={entryStyle.nextReward}>여길 지나면 무료 자료가 있는 웰컴 라운지예요.</p>}
+          {station === 7 && <p className={entryStyle.nextReward}>AI팀 설계도와 회사 업무 기준표를 받아보세요.</p>}
         </>}
       </div>
       <div className={entryStyle.wayfindingActions}>
@@ -481,7 +495,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <p className={s.calendarIntro}>{config.liveUrl ? '캘린더에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 참여 링크는 카톡방에서 안내할 예정이에요.'}</p>
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
           <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p></div></details>
-          <button type="button" className={s.textButton} onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
+          <div className={entryStyle.scheduleActions}>
+            <button type="button" className={s.textButton} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={16} aria-hidden="true"/>무료 자료 열기</button>
+            <button type="button" className={s.textButton} onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
+          </div>
         </>}
         {step !== 3 && copyFallback && <div className={s.copyFallback}><label>직접 복사할 요청문<textarea ref={fallbackRef} readOnly value={copyFallback}/></label></div>}
         {step !== 2 && step !== 3 && step !== 7 && notice && <p className={s.notice} role="status">{notice}</p>}
@@ -510,6 +527,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         </>}
       </div>
       <div className={entryStyle.hallActions}>
+        <button type="button" onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 열기</button>
         <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>라이브 일정 보기</button>
         <button type="button" onClick={openPersonalTrial}>
           {state.hallReturnStep === null ? <ArrowRight size={16} aria-hidden="true"/> : <ArrowLeft size={16} aria-hidden="true"/>}
@@ -518,8 +536,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         <button type="button" onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
       </div>
       {sceneStatus !== 'ready' && <div className={entryStyle.hallActions}>
-        <button type="button" onClick={() => setLobbyGuide('materials')}>자료 안내</button>
-        <button type="button" onClick={() => setLobbyGuide('intro')}>윤익 · 브랜디액션</button>
+        <button type="button" onClick={event => openLobbyGuide('intro', event.currentTarget)}>퇴사선배 윤익 소개</button>
       </div>}
     </section>}
     {teamLeaderOpen && <TeamLeader greeting={officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting} onClose={closeDesk} onComplete={finishStation}/>}
@@ -533,8 +550,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     </dialog>
     <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? guideTitles[lobbyGuide] : undefined}
       onCancel={event => {event.preventDefault(); closeLobbyGuide();}}>
-      {lobbyGuide && <OnboardingProgram guide={lobbyGuide} config={config} dateLabel={dateLabel} onContentReplay={openContentReplay}
-        onClose={() => closeLobbyGuide()} onPointToMaterials={() => closeLobbyGuide(true)}/>}
+      {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} onContentReplay={openContentReplay}
+        onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')}/>}
     </dialog>
     <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>
       <header><h2>{config.title}</h2><button type="button" aria-label="소개 닫기" onClick={() => setIntroOpen(false)}><X size={20}/></button></header>

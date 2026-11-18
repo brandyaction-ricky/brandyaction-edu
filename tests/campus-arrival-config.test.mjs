@@ -17,7 +17,7 @@ test('editable defaults preserve the examples and all four working requests', ()
   const validated = config.validateArrivalConfig(config.DEFAULT_ARRIVAL);
   assert.deepEqual(validated, config.DEFAULT_ARRIVAL);
   assert.notEqual(validated.audiences.business.example, config.DEFAULT_ARRIVAL.audiences.business.example);
-  assert.equal(validated.instructorName, '윤익 · 브랜디액션 팀');
+  assert.equal(validated.instructorName, '퇴사선배 윤익 · 브랜디액션 팀');
   assert.equal(validated.startsAt, '2026-12-07T21:00:00+09:00');
   assert.equal(validated.endsAt, null);
   assert.equal(validated.videoUrl, '');

@@ -14,7 +14,6 @@ type Props = {
   freeRoam: boolean;
   walkRequest: number;
   focusRequest: number;
-  materialsRequest: number;
   onStatus: (status: 'ready' | 'unavailable') => void;
   onProximity: (station: CorridorStation, near: boolean) => void;
   onArrive: (station: CorridorStation) => void;
@@ -22,13 +21,12 @@ type Props = {
   className: string;
 };
 
-export function CorridorScene({frame, station, label, avatar, paused, freeRoam, walkRequest, focusRequest, materialsRequest, onStatus, onProximity, onArrive, onOpenGuide, className}: Props) {
+export function CorridorScene({frame, station, label, avatar, paused, freeRoam, walkRequest, focusRequest, onStatus, onProximity, onArrive, onOpenGuide, className}: Props) {
   const [bridge, setBridge] = useState('');
   const [firstAvatar] = useState(avatar);
   const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenGuide});
   const lastWalk = useRef(walkRequest);
   const lastFocus = useRef(focusRequest);
-  const lastMaterials = useRef(materialsRequest);
   useEffect(() => {
     current.current = {station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenGuide};
   }, [station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenGuide]);
@@ -63,11 +61,9 @@ export function CorridorScene({frame, station, label, avatar, paused, freeRoam, 
   useEffect(() => {
     if (!bridge) return;
     const focus = !paused && focusRequest !== lastFocus.current;
-    const highlightMaterials = !paused && materialsRequest !== lastMaterials.current;
     lastFocus.current = focusRequest;
-    lastMaterials.current = materialsRequest;
-    frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'sync', station, label, avatar, paused, freeRoam, focus, highlightMaterials}, location.origin);
-  }, [bridge, frame, station, label, avatar, paused, freeRoam, focusRequest, materialsRequest]);
+    frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'sync', station, label, avatar, paused, freeRoam, focus}, location.origin);
+  }, [bridge, frame, station, label, avatar, paused, freeRoam, focusRequest]);
   useEffect(() => {
     if (walkRequest === lastWalk.current) return;
     lastWalk.current = walkRequest;

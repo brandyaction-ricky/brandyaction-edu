@@ -20,9 +20,9 @@ try {
     const world = frame.locator('#walk');
     const floor = frame.locator('#floor');
     const materials = frame.getByRole('button', {name:/자료 안내/});
-    const intro = frame.getByRole('button', {name:/윤익 · 브랜디액션/});
+    const intro = frame.getByRole('button', {name:/퇴사선배 윤익 · 브랜디액션/});
     const guide = page.getByRole('dialog', {name:'무료자료 · 라이브 특전', exact:true});
-    const team = page.getByRole('dialog', {name:'윤익 · 브랜디액션 팀', exact:true});
+    const team = page.getByRole('dialog', {name:'퇴사선배 윤익 · 브랜디액션 팀', exact:true});
     const errors = [];
     let videoPlayed = false;
     page.on('pageerror', error => errors.push(error.message));
@@ -64,6 +64,7 @@ try {
         await page.touchscreen.tap(box.x + box.width * .25, box.y + box.height * .48);
       } else await press(materials);
       await expect(guide).toBeVisible();
+      await expect.poll(() => guide.locator('img').first().evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
       await capture('materials');
       await expect(guide.getByRole('link', {name:/작업별 AI 활용 가이드/})).toHaveAttribute('href', 'https://edu.brandyaction.com/guide');
       await expect(guide.getByRole('link', {name:/AI팀 설계도/})).toHaveAttribute('href', 'https://edu.brandyaction.com/ai-team-blueprint');
@@ -86,7 +87,7 @@ try {
 
       await press(intro);
       await expect(team).toBeVisible();
-      await expect(team.getByText(/이번 라이브는 윤익이 진행합니다/)).toBeVisible();
+      await expect(team.getByText(/퇴사선배 윤익과 브랜디액션 팀이 AI 직원에게 일을 맡기고/)).toBeVisible();
       const video = await team.locator('video').elementHandle();
       await expect(team.locator('video')).toHaveAttribute('src','/campus/arrival/team-at-work.mp4');
       expect(await video.evaluate(element => element.clientHeight > element.clientWidth)).toBe(true);
@@ -97,10 +98,17 @@ try {
         catch {return false;}
       });
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
-      await press(team.getByRole('button', {name:'라운지로 돌아가기', exact:true}));
+      await press(team.getByRole('button', {name:'무료자료 확인하러 가기', exact:true}));
       await expect(team).not.toBeVisible();
+      await expect(guide.getByRole('heading', {name:'무료자료 · 라이브 특전', exact:true})).toBeFocused();
+      await expect(guide.getByRole('button', {name:'무료자료', exact:true})).toHaveAttribute('aria-pressed', 'true');
+      await expect(guide.getByRole('heading', {name:'라이브 전에 볼 자료', exact:true})).toBeVisible();
       await expect(team.locator('video')).toHaveCount(0);
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.paused || element.ended)).toBe(true);
+      await expect.poll(() => guide.locator('img').first().evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+      await capture('materials-from-team');
+      await press(guide.getByRole('button', {name:'라운지로 돌아가기', exact:true}));
+      await expect(world).toHaveAttribute('data-paused', 'false');
       await openLoungeSchedule(page);
       expect(errors).toEqual([]);
       console.log(JSON.stringify({viewport, overlap, pick3d:viewport.width===390, videoPlayed, errors}));

@@ -125,7 +125,7 @@ export function mountWelcomeOnboardingLobby(THREE, parent) {
   }
 
   guide('materials', '자료 안내', 1.02, -2.65, palette.guideGreen, '#3a665d');
-  guide('intro', '윤익 · 브랜디액션', 4.85, -2.65, palette.guideBlue, '#355b7b');
+  guide('intro', '퇴사선배 윤익', 4.85, -2.65, palette.guideBlue, '#355b7b');
   bench(8.18, -4.22);
   plant(-2.35, -4.30);
   plant(9.74, -3.38);

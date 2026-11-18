@@ -137,7 +137,6 @@ async function start() {
   let footprintUntil = 0;
   let width, height, trackingX, trackingZ = 0, roamCamera = 0, raf = 0, last = 0, arranged = false;
   let markerWidth = 110, markerHeight = 44, arrived = 0;
-  let lobbyHighlight = 0;
   let pendingFloorPick;
   let shownIndex, shownStation, synced = false;
   function resize() {
@@ -215,7 +214,7 @@ async function start() {
       if (previous && left < previous.right + 6 && left + w > previous.left - 6 && top + h > previous.top - 6 && top < previous.bottom + 6) {
         top = Math.min(height - h - 86, previous.bottom + 8);
       }
-      button.dataset.primary = String(id === 'materials' && (Math.abs(state.x - stations.at(-1).x) < 2.6 || performance.now() < lobbyHighlight));
+      button.dataset.primary = String(id === 'materials' && Math.abs(state.x - stations.at(-1).x) < 2.6);
       button.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
       previous = {left, right:left + w, top, bottom:top + h};
     }
@@ -269,10 +268,6 @@ async function start() {
     root.dataset.arrivals = String(arrived);
     root.dataset.freeRoam = String(state.freeRoam);
     if (msg.focus) floor.focus({preventScroll: true});
-    if (msg.highlightMaterials && state.freeRoam) {
-      lobbyHighlight = performance.now() + 4500;
-      motion.walk(stations.at(-1).x + 1.02, stations.at(-1).z);
-    }
     placeCamera(0); placeMarker(); placeLobbyGuides();
     if (!state.paused && pendingFloorPick) {
       const {x, y} = pendingFloorPick;

@@ -145,10 +145,10 @@ export function CanonStation({phase, onAdvance, onHall}: {
     <footer className={styles.hall}>
       <div>
         <h2>12월 7일 라이브에서 이 전 과정을 알려드립니다.</h2>
-        <p>강의 전 무료자료를 확인해보세요.</p>
+        <p>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
       </div>
       <button className={styles.hallLink} type="button" onClick={onHall}>
-        강의 전 무료자료 확인하기<ArrowRight size={17} aria-hidden="true"/>
+        웰컴 라운지로 가기<ArrowRight size={17} aria-hidden="true"/>
       </button>
     </footer>
   </div>;

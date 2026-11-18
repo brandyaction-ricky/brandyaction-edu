@@ -85,6 +85,11 @@
 .wayfindingActions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; background: #173b69; color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 650; white-space: nowrap; }
 .firstStop { align-items: center; gap: 24px; padding: 18px 20px; }
 .firstStop .stopCopy > p { margin-top: 5px; font-size: 14px; line-height: 1.5; color: #41556a; word-break: keep-all; overflow-wrap: anywhere; }
+.firstStop .stopCopy > .materialsPreview { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: #eef3f9; color: #1b4777; }
+.materialsPreview svg { flex: none; margin-top: 2px; }
+.wayfinding .materialsPreview span { font-size: inherit; color: inherit; }
+.wayfinding .nextReward { margin-top: 4px; color: #41556a; font-size: 13px; line-height: 1.5; word-break: keep-all; }
+.scheduleActions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
 .touchHint { display: none; }
 .hallControls {
   position: absolute;

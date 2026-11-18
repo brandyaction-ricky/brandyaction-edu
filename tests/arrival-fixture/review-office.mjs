@@ -1,6 +1,6 @@
 import {expect} from '@playwright/test';
 
-const nextDesk = ['콘텐츠 실제 제작해보기', '내 사업을 아는 AI는 어떻게 만들까요?', '강의 전 무료자료 확인하기'];
+const nextDesk = ['콘텐츠 실제 제작해보기', '내 사업을 아는 AI는 어떻게 만들까요?', '웰컴 라운지로 가기'];
 
 export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 

@@ -78,7 +78,7 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     else await desk.click();
     const canon = page.getByRole('dialog');
     await expect(canon.getByRole('heading',{name:'같은 기준을 읽은 두 직원의 결과'})).toBeVisible();
-    await canon.getByRole('button',{name:'강의 전 무료자료 확인하기',exact:true}).click();
+    await canon.getByRole('button',{name:'웰컴 라운지로 가기',exact:true}).click();
     const hallTravel = page.locator('#arrival-desk-button');
     await hallTravel.click();
     const hallEntry = page.getByRole('button',{name:'웰컴 라운지 입장하기',exact:true});
