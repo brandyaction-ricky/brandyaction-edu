@@ -268,7 +268,7 @@ try {
       await finishOfficeReview(page,{walk,inspect,beforeLeave,afterLeave});
       await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toBeVisible();
       if (mobile) {
-        await page.locator('[aria-label="내 상황에 맞는 체험 선택"] button').first().tap();
+        await page.getByRole('button', {name:/이미 사업을 하고 있어요/}).tap();
         await button(page,'입력 없이 예시로 계속하기').tap();
         await expect(page.getByText('체험 예시 확인')).toBeVisible();
         await button(page,'웰컴 라운지로 이동').tap();
