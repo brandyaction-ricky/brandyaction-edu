@@ -2,19 +2,22 @@
 // Browser Back closes the top campus window instead of leaving the page (staff QA 11-17, R2).
 // All open windows share one extra history entry; a refused close (draft kept) restores it.
 const stack: { close: () => void }[] = [];
-let entry = false, ignore = false, listening = false, pending: ReturnType<typeof setTimeout> | null = null;
+let entry = false, listening = false, pushedLength = 0, pending: ReturnType<typeof setTimeout> | null = null;
+let carry: { state: unknown; url: string } | null = null;
 function pop() {
-  if (ignore) { ignore = false; return; }
+  // Our own step back: keep any address change made while the window was open (room, section).
+  if (carry) { history.replaceState(carry.state, '', carry.url); carry = null; return; }
   entry = false;
   stack.at(-1)?.close();
-  setTimeout(() => { if (stack.length && !entry) { history.pushState(history.state, ''); entry = true; } }, 0);
+  setTimeout(() => { if (stack.length && !entry) push(); }, 0);
 }
+function push() { history.pushState(history.state, ''); entry = true; pushedLength = history.length; }
 export function holdBack(close: () => void) {
   const item = { close };
   if (!listening) { window.addEventListener('popstate', pop); listening = true; }
   stack.push(item);
   if (pending) { clearTimeout(pending); pending = null; }
-  if (!entry) { history.pushState(history.state, ''); entry = true; }
+  if (!entry) push();
   return () => {
     stack.splice(stack.indexOf(item) >>> 0, 1);
     if (stack.length) return;
@@ -22,7 +25,11 @@ export function holdBack(close: () => void) {
     pending = setTimeout(() => {
       pending = null;
       if (stack.length) return;
-      if (entry) { entry = false; ignore = true; history.back(); }
+      if (!entry) return;
+      entry = false;
+      // Something else pushed an address after ours (a section change): leave our entry as a harmless extra step.
+      if (history.length !== pushedLength) return;
+      carry = { state: history.state, url: location.href }; history.back();
     }, 0);
   };
 }
