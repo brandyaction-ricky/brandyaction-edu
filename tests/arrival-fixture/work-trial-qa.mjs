@@ -70,7 +70,7 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);expect(overflow).toBe(false);
     await page.getByRole('button',{name:'라이브에서 이어서 배우기',exact:true}).click();await page.locator('#arrival-desk-button').click();await expect(page.getByRole('link',{name:/Google 캘린더/})).toBeVisible();
     expect(await page.getByRole('link',{name:/Google 캘린더/}).getAttribute('href')).toContain('20261207T120000Z');
-    await page.getByRole('button',{name:'이전',exact:true}).click();await expect(step).toHaveAttribute('data-work-step','4');
+    await page.getByRole('button',{name:'내 AI 체험으로 돌아가기',exact:true}).click();await expect(step).toHaveAttribute('data-work-step','4');
     await page.getByText('두 번째 답변에서 기준이 지켜졌는지 확인하기',{exact:true}).click();
     await page.getByRole('button',{name:'피드백을 보완하고 다시 해보기',exact:true}).click();await expect(step).toHaveAttribute('data-work-step','2');
     await page.getByRole('textbox',{name:'내 말로 수정하기',exact:true}).fill('불확실한 내용은 먼저 확인해줘.');
