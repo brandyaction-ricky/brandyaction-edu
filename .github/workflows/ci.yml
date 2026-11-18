@@ -37,16 +37,21 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
-          if [ "$head_ref" = "codex/edu-followup-images-release-20261118" ]; then
+          if [ "$head_ref" = "claude/campus-staff-preview-panel-release-20261118" ]; then
             expected_main=6993e04ed57fa15ff0b1acc8b50078971184e9df
-            release_payload=1fd223f534a72c9f1f645ef956e595e3e937c5ef
-            migration=supabase/migrations/20261118025908_question_followup_images.sql
+            release_payload=6caae00a25445367e609eb5ef30df3d3fab4bf5e
             test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
             git merge-base --is-ancestor "$release_payload" HEAD
             git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
-            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json ":(exclude)$migration"
-            test "$(git show "HEAD:$migration" | sha256sum | cut -d ' ' -f 1)" = 18d4d342d522ca683aafa3ed1eb4bfd5d9923a4808069adddcc2105e39055fd7
-            echo 'Verified the DEV-tested follow-up image change and the single pinned migration.'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|features/campus/ui/lesson-task-panel.tsx|tests/campus-staff-preview-panel.test.mjs) ;;
+                *) echo "Unexpected staff preview panel release change: $path"; exit 1 ;;
+              esac
+            done < <(git diff --name-only "$expected_main" HEAD)
+            echo 'Verified staff preview panel payload (code-only); current production, database and central release controls preserved.'
             exit 0
           fi
 
