@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-followup-images-release-20261118" ]; then
+            expected_main=0fb1d795fc00d168bbac18621fb025c5f05516f7
+            release_payload=08aa7de188b13781d1e589d7256c2fd16d02517d
+            migration=supabase/migrations/20261118025908_question_followup_images.sql
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json ":(exclude)$migration"
+            test "$(git show "HEAD:$migration" | sha256sum | cut -d ' ' -f 1)" = 18d4d342d522ca683aafa3ed1eb4bfd5d9923a4808069adddcc2105e39055fd7
+            echo 'Verified the DEV-tested follow-up image change and the single pinned migration.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-staff-preview-panel-release-20261118" ]; then
             expected_main=6993e04ed57fa15ff0b1acc8b50078971184e9df
             release_payload=6caae00a25445367e609eb5ef30df3d3fab4bf5e

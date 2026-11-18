@@ -56,7 +56,7 @@ test('answer attachments require image capability, remain operator-only, and use
  const off=harness();assert.equal((await off.post({...off.body,imageId:id})).status,400);assert.equal(off.calls.length,0);
  const h=harness({images:true,hub:true});await h.get();assert.equal(h.calls[0].name,'edu_read_question_thread_with_images');
  for(const extra of [{},{assistJobId:id}]){assert.equal((await h.post({...h.body,imageId:id,...extra})).status,200);assert.equal(h.calls.at(-1).name,'edu_add_question_answer_with_image');assert.equal(h.calls.at(-1).args.p_image,id);assert.equal(h.calls.at(-1).args.p_assist_job,extra.assistJobId||null);}
- const student=harness({images:true,operator:false});assert.equal((await student.post({...student.body,imageId:id})).status,403);assert.equal((await student.post({...student.body,action:'followup',imageId:id})).status,400);assert.equal(student.calls.length,0);
+ const student=harness({images:true,operator:false});assert.equal((await student.post({...student.body,imageId:id})).status,403);assert.equal(student.calls.length,0);
  const invalid=harness({images:true});for(const extra of [{imageId:'bad'},{imageId:id,action:'resolve'},{imageId:id,assistJobId:id}])assert.equal((await invalid.post({...invalid.body,...extra})).status,400);assert.equal(invalid.calls.length,0);
 });
 
@@ -66,4 +66,17 @@ test('thread metadata enrichment runs only after a successful authorized read, n
  assert.equal(seen.length,0);
  const h=harness({enrich});const result=await h.get();assert.equal((await result.json()).contextVerified,true);assert.equal(seen.length,1);
  await h.post(h.body);assert.equal(seen.length,1);
+});
+
+test('learner followup attachments use the owner-scoped atomic write and reject other attachment actions',async()=>{
+ const h=harness({images:true,hub:true,operator:false});
+ const body={...h.body,action:'followup',imageId:id,actor:'forged',visibility:'cohort'};
+ assert.equal((await h.post(body)).status,200);
+ assert.deepEqual(h.calls,[{name:'edu_add_question_followup_with_image',args:{p_actor:id,p_question:id,p_expected_head:null,p_request:id,p_content:body.content,p_image:id}}]);
+ assert.equal((await h.post({...body,assistJobId:id})).status,400);
+ assert.equal((await h.post({...body,action:'finish'})).status,400);
+ assert.equal(h.calls.length,1);
+ const off=harness({operator:false});
+ assert.equal((await off.post(body)).status,400);
+ assert.equal(off.calls.length,0);
 });

@@ -41,3 +41,21 @@ test('answer image upload, completion and reads use answer-scoped authorization 
  const denied=harness({dbError:{message:'BLOCK_FORBIDDEN'}});assert.equal((await denied.post({...denied.body,purpose:'answer',questionId:id})).status,403);assert.equal(denied.storageCalls.length,0);
  const invalid=harness();for(const body of [{...invalid.body,purpose:'bad'},{...invalid.body,purpose:'answer',questionId:'bad'}])assert.equal((await invalid.post(body)).status,400);assert.equal((await invalid.get(`question=${id}&answer=bad`)).status,400);assert.equal(invalid.calls.length,0);
 });
+
+test('followup image preparation and completion use question ownership and require enabled threads',async()=>{
+ const h=harness(),body={...h.body,purpose:'followup',questionId:id};
+ process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED='true';
+ try {
+  assert.equal((await h.post(body)).status,200);
+  assert.equal((await h.post({action:'complete',purpose:'followup',fileId:id})).status,200);
+  assert.deepEqual(h.calls.map(c=>c.name),['edu_prepare_followup_image','edu_owned_followup_image','edu_complete_followup_image']);
+  assert.equal(h.calls[0].args.p_question,id);
+  const denied=harness({dbError:{message:'QUESTION_NOT_FOUND'}});
+  assert.equal((await denied.post(body)).status,404);
+  assert.equal(denied.storageCalls.length,0);
+ } finally {
+  delete process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED;
+ }
+ assert.equal((await h.post(body)).status,404);
+ assert.equal(h.calls.length,3);
+});

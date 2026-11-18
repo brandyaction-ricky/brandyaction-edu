@@ -4,6 +4,11 @@ import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
 import { answerFileSpec, matchesAnswerFile } from '@/lib/lesson-files';
 const bucket = 'question-images';
+const imageRpcs = {
+  question: { prepare: 'edu_prepare_question_image', owned: 'edu_owned_question_image', complete: 'edu_complete_question_image' },
+  answer: { prepare: 'edu_prepare_answer_image', owned: 'edu_owned_answer_image', complete: 'edu_complete_answer_image' },
+  followup: { prepare: 'edu_prepare_followup_image', owned: 'edu_owned_followup_image', complete: 'edu_complete_followup_image' },
+};
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers });
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -34,11 +39,17 @@ export async function POST(request: Request) {
     if (request.headers.get('origin') !== new URL(request.url).origin) fail('허용되지 않은 요청입니다.', 403);
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const body = await readBody(request), db = createAdminClient();
-    if (body.purpose !== undefined && body.purpose !== 'answer') fail('파일 요청을 확인해 주세요.');
-    const answer = body.purpose === 'answer';
+    const purpose: unknown = body.purpose;
+    if (purpose !== undefined && purpose !== 'answer' && purpose !== 'followup') fail('파일 요청을 확인해 주세요.');
+    if (purpose === 'followup' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED !== 'true') fail('사용할 수 없는 기능입니다.', 404);
+    const rpcs = imageRpcs[purpose ?? 'question'];
     if (body.action === 'prepare') {
       let spec; try { spec = answerFileSpec(body.name, body.size, 'image'); } catch (e) { fail((e as Error).message); }
-      const { data: file, error } = await db.rpc(answer ? 'edu_prepare_answer_image' : 'edu_prepare_question_image', answer ? { p_actor: actor.id, p_question: id(body.questionId), p_request: id(body.requestId), p_spec: spec } : { p_actor: actor.id, p_lesson: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.lessonId), p_enrollment: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.enrollmentId), p_request: id(body.requestId), p_spec: spec });
+      const actorAndFile = { p_actor: actor.id, p_request: id(body.requestId), p_spec: spec };
+      const general = body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true';
+      const { data: file, error } = await db.rpc(rpcs.prepare, purpose
+        ? { ...actorAndFile, p_question: id(body.questionId) }
+        : { ...actorAndFile, p_lesson: general ? null : id(body.lessonId), p_enrollment: general ? null : id(body.enrollmentId) });
       if (error) throw error;
       if (file.ready_at) return reply({ id: file.id, name: file.name, size: file.size, ready: true });
       const upload = await db.storage.from(bucket).createSignedUploadUrl(file.path, { upsert: false });
@@ -46,7 +57,7 @@ export async function POST(request: Request) {
       return reply({ id: file.id, signedUrl: upload.data.signedUrl, contentType: file.content_type, ready: false });
     }
     if (body.action !== 'complete') fail('파일 요청을 확인해 주세요.');
-    const { data: file, error } = await db.rpc(answer ? 'edu_owned_answer_image' : 'edu_owned_question_image', { p_actor: actor.id, p_image: id(body.fileId) });
+    const { data: file, error } = await db.rpc(rpcs.owned, { p_actor: actor.id, p_image: id(body.fileId) });
     if (error) throw error;
     if (file.ready_at) return reply({ id: file.id, name: file.name, size: file.size });
     const storage = db.storage.from(bucket), info = await storage.info(file.path);
@@ -56,7 +67,7 @@ export async function POST(request: Request) {
     if (download.data.size !== file.size) fail('파일 업로드가 끝나지 않았습니다. 다시 시도해 주세요.');
     const bytes = new Uint8Array(await download.data.arrayBuffer()), spec = answerFileSpec(file.name, file.size, 'image');
     if (!matchesAnswerFile(bytes, spec)) fail('파일 내용과 확장자가 맞지 않습니다. 원본 파일을 확인해 주세요.');
-    const { data, error: completedError } = await db.rpc(answer ? 'edu_complete_answer_image' : 'edu_complete_question_image', { p_actor: actor.id, p_image: file.id, p_sha256: createHash('sha256').update(bytes).digest('hex') });
+    const { data, error: completedError } = await db.rpc(rpcs.complete, { p_actor: actor.id, p_image: file.id, p_sha256: createHash('sha256').update(bytes).digest('hex') });
     if (completedError) throw completedError;
     return reply(data);
   } catch (error) { return failure(error); }
