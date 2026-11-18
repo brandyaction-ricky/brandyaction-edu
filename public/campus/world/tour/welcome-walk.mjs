@@ -126,7 +126,7 @@ async function start() {
     if (!synced || msg.reset) { trackingX = undefined; keys.clear(); }
     synced = true;
     if (state.paused) keys.clear();
-    const currentLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 36) : stations[state.station - 1].title;
+    const currentLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 42) : stations[state.station - 1].title;
     label.textContent = currentLabel;
     marker.setAttribute('aria-label', currentLabel + ' 쪽으로 걷기');
     marker.hidden = state.paused;

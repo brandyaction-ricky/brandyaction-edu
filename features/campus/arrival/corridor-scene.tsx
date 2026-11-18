@@ -5,6 +5,7 @@ import type {CorridorStation} from './model';
 
 type Props = {
   station: CorridorStation;
+  label?: string;
   paused: boolean;
   walkRequest: number;
   onStatus: (status: 'ready' | 'unavailable') => void;
@@ -12,14 +13,14 @@ type Props = {
   className: string;
 };
 
-export function CorridorScene({station, paused, walkRequest, onStatus, onArrive, className}: Props) {
+export function CorridorScene({station, label, paused, walkRequest, onStatus, onArrive, className}: Props) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [bridge, setBridge] = useState('');
-  const current = useRef({station, paused, onStatus, onArrive});
+  const current = useRef({station, label, paused, onStatus, onArrive});
   const lastWalk = useRef(walkRequest);
   useEffect(() => {
-    current.current = {station, paused, onStatus, onArrive};
-  }, [station, paused, onStatus, onArrive]);
+    current.current = {station, label, paused, onStatus, onArrive};
+  }, [station, label, paused, onStatus, onArrive]);
 
   useEffect(() => {
     const token = crypto.randomUUID();
@@ -33,7 +34,7 @@ export function CorridorScene({station, paused, walkRequest, onStatus, onArrive,
       if (msg.type === 'ready') {
         ready = true;
         window.clearTimeout(timeout);
-        frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token, type:'sync', station:props.station, paused:props.paused}, location.origin);
+        frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token, type:'sync', station:props.station, label:props.label, paused:props.paused}, location.origin);
         props.onStatus('ready');
       } else if (msg.type === 'error') {
         window.clearTimeout(timeout);
@@ -47,8 +48,8 @@ export function CorridorScene({station, paused, walkRequest, onStatus, onArrive,
     return () => {window.removeEventListener('message', receive); window.clearTimeout(timeout);};
   }, []);
   useEffect(() => {
-    if (bridge) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'sync', station, paused}, location.origin);
-  }, [bridge, station, paused]);
+    if (bridge) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'sync', station, label, paused}, location.origin);
+  }, [bridge, station, label, paused]);
   useEffect(() => {
     if (walkRequest === lastWalk.current) return;
     lastWalk.current = walkRequest;

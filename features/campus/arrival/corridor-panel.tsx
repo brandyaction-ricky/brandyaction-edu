@@ -122,7 +122,7 @@ export function CorridorPanel({station, config, review, ruleChoice, onRuleChoice
         </>}
         {approved && <>
           <div className={monitor.rule}><p className={monitor.ruleLabel}><Check size={16} aria-hidden="true"/>내가 승인한 소개글</p><p className={monitor.headline}>{revision.revised}</p></div>
-          <p className={styles.after}>다음 책상에서는 같은 상품을 두고 문의를 받은 직원이 어떻게 답하는지 살펴봅니다.</p>
+          <p className={styles.after}>{demo.teamNote === DEFAULT_OFFICE_DEMO.teamNote ? '다음 책상에서는 같은 상품을 두고 문의를 받은 직원이 어떻게 답하는지 살펴봅니다.' : demo.teamNote}</p>
         </>}
       </>}
 

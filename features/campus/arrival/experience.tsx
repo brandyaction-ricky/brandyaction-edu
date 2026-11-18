@@ -181,7 +181,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined}>
     <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label="웰컴존에서 라이브 홀까지 이어지는 통로">
-      {hydrated && <CorridorScene key={sceneVisit} station={station}
+      {hydrated && <CorridorScene key={sceneVisit} station={station} label={station === 3 ? config.officeDemo?.deskLabel : undefined}
         paused={deskOpen || introOpen || showReset || (!officeIntro && !explore)}
         walkRequest={walkRequest} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
     </div>
