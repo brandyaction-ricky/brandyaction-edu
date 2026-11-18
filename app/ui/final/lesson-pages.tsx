@@ -42,10 +42,17 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
   }, [steps, document, enabled]);
   const pages = shown.map(p => p.blocks), labels = shown.map((p, n) => p.label || (n ? `작업 ${n + 1}` : '오늘의 시작'));
   const [index, setIndex] = useState(() => {
-    try { return positionKey ? Math.max(0, Number.parseInt(localStorage.getItem(positionKey) || '0', 10) || 0) : 0; }
+    try {
+      // Opened from 수업 자료 찾기: start on the task where the searched word appears, once (QA M5).
+      const hint = lessonId && sessionStorage.getItem('campus:find:' + lessonId);
+      if (hint) { sessionStorage.removeItem('campus:find:' + lessonId); const word = hint.toLowerCase(), at = pages.findIndex(p => JSON.stringify(p).toLowerCase().includes(word)); if (at >= 0) return at; }
+      return positionKey ? Math.max(0, Number.parseInt(localStorage.getItem(positionKey) || '0', 10) || 0) : 0;
+    }
     catch { return 0; }
   });
-  const position = useRef<HTMLParagraphElement>(null);
+  const position = useRef<HTMLParagraphElement>(null), body = useRef<HTMLDivElement>(null);
+  // Audio playing when the reader moves on keeps going in a small bar instead of stopping (QA M4).
+  const [carry, setCarry] = useState<{ src: string; time: number; rate: number; label: string; page: number } | null>(null);
   const toc = useRef<HTMLElement>(null), start = useRef<HTMLProgressElement>(null);
   // Keep the current task visible inside the short, scrollable task list.
   useEffect(() => { const list = toc.current, item = list?.querySelector<HTMLElement>('[aria-current=step]'); if (list && item) list.scrollTop = item.offsetTop - list.offsetTop - 8; }, [index, pages.length]);
@@ -53,6 +60,8 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
   const page = Math.min(index, pages.length - 1);
   const last = page === pages.length - 1;
   function move(next: number) {
+    const playing = Array.from(body.current?.querySelectorAll('audio') ?? []).find(a => !a.paused && !a.ended && (a.currentSrc || a.src));
+    if (playing) setCarry({ src: playing.currentSrc || playing.src, time: playing.currentTime, rate: playing.playbackRate, label: playing.closest('figure')?.querySelector('figcaption')?.textContent?.trim() || playing.getAttribute('aria-label') || '음성 자료', page });
     setIndex(next);
     try { if (positionKey) localStorage.setItem(positionKey, String(next)); } catch { /* Storage is optional. */ }
     position.current?.focus({ preventScroll: true });
@@ -65,7 +74,12 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
       {pages.map((_, n) => <li key={n}><button type="button" aria-current={n === page ? 'step' : undefined} disabled={busy} onClick={() => move(n)}><span>{n + 1}</span>{labels[n]}</button></li>)}
     </ol></nav>}
     <progress ref={start} aria-label="오늘의 작업 진행" value={page + 1} max={pages.length} />
-    {children(pages[page], last)}
+    {carry && <div className="lb-carry-audio" role="region" aria-label="이어서 듣는 음성">
+      <small>{carry.page + 1}번 작업 · {carry.label}</small>
+      <audio key={carry.src} src={carry.src} controls autoPlay aria-label={carry.label} onLoadedMetadata={e => { e.currentTarget.currentTime = carry.time; e.currentTarget.playbackRate = carry.rate; }} onEnded={() => setCarry(null)} />
+      <button type="button" className="btn small" onClick={() => setCarry(null)}>닫기</button>
+    </div>}
+    <div ref={body}>{children(pages[page], last)}</div>
     {(pages.length > 1 || continuation) && <nav aria-label="작업 이동">
       {pages.length > 1 && <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 작업</button>}
       {!last && <button type="button" className="btn primary" disabled={busy} onClick={() => move(page + 1)}>다음 작업 · {labels[page + 1]}</button>}

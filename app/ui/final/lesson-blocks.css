@@ -121,3 +121,7 @@
 .lb-pages>nav.lb-page-toc{display:block;margin-top:.25rem}.lb-pages>nav.lb-page-toc ol{width:100%}.lb-pages>nav.lb-page-toc button{width:100%;max-width:none;flex:none;min-height:40px}
 .lb-pages>nav.lb-page-toc ol{padding:0!important;margin:0!important}
 .lb-page-toc{max-height:min(11rem,30vh)!important;position:relative}.lb-pages>progress{scroll-margin-block-start:1rem}
+/* Audio carried across pages (campus reader, QA M4). */
+.lb-carry-audio{position:sticky;top:0;z-index:5;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.5rem .75rem;margin:.5rem 0;border:1px solid #d7e1ec;border-radius:12px;background:#f5f8fc}
+.lb-carry-audio small{flex-basis:100%;color:#4e5968}
+.lb-carry-audio audio{flex:1;min-width:200px;height:36px}
