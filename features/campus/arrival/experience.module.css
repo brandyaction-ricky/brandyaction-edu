@@ -317,6 +317,10 @@
 .questions { display: grid; gap: 22px; }
 .questions label > span { display: flex; align-items: flex-start; gap: 8px; font-size: 17px; font-weight: 650; line-height: 1.6; margin-bottom: 10px; word-break: keep-all; }
 .questions b { display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; background: var(--surface-subtle); border-radius: 50%; width: 24px; height: 24px; margin-top: 1px; }
+.questions .ruleOptIn { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.ruleOptIn input { flex: 0 0 18px; width: 18px; height: 18px; margin: 3px 0 0; accent-color: #244c75; }
+.questions .ruleOptIn > span { display: block; margin: 0; font-size: 15px; }
+.questions .ruleOptIn small { display: block; margin-top: 4px; font-size: 14px; font-weight: 400; color: var(--muted); }
 .questions textarea, .extraLabel textarea, .copyFallback textarea {
   display: block;
   width: 100%;

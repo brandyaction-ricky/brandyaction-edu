@@ -1,5 +1,5 @@
 import {audiences, isAudience, isRevision, cleanAnswer, REVISION_LIMIT, type Audience, type Answers, type Revision} from './content';
-import type {OfficeDemoChoice, OfficeDemoPhase} from './office-demo';
+import {OFFICE_DEMO_LIMITS, type OfficeDemoChoice, type OfficeDemoPhase} from './office-demo';
 import {DEFAULT_VISITOR_AVATAR, isVisitorAvatarId, type VisitorAvatarId} from './visitor-avatar-options';
 import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from './work-trial';
 
@@ -12,6 +12,7 @@ export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type ArrivalState = {
   station: CorridorStation;
   companyRule: OfficeDemoChoice | null;
+  consentedCompanyRule: string;
   visitorAvatar: VisitorAvatarId;
   proposalSent: boolean;
   hallReturnStep: PersonalTrialStep | null;
@@ -28,7 +29,7 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, companyRule: null, visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -70,6 +71,8 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       state.deskReview = {phase: desk.phase, choice: desk.choice};
     }
     state.companyRule = value.companyRule === 0 || value.companyRule === 1 ? value.companyRule : null;
+    if (state.companyRule !== null && state.audience !== 'work' && typeof value.consentedCompanyRule === 'string'
+      && value.consentedCompanyRule.length <= OFFICE_DEMO_LIMITS.rule) state.consentedCompanyRule = value.consentedCompanyRule;
     if (isVisitorAvatarId(value.visitorAvatar)) state.visitorAvatar = value.visitorAvatar;
     state.proposalSent = value.proposalSent === true;
     if (isPersonalTrialStep(value.hallReturnStep)) state.hallReturnStep = value.hallReturnStep;
@@ -89,6 +92,17 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
 }
 export function serializeArrivalState(state: ArrivalState): string {
   return JSON.stringify(parseArrivalState(JSON.stringify(state)));
+}
+
+/** Opt-in applies to the exact rule the visitor saw, even if an administrator edits the event later. */
+export function personalRequestRule(state: ArrivalState, offered: string): string {
+  return state.mode === 'personal' && state.audience !== 'work' && state.companyRule !== null
+    && offered === state.consentedCompanyRule ? offered : '';
+}
+
+export function addPersonalRequestRule(request: string, rule: string): string {
+  if (!request || !rule || request.includes(rule)) return request;
+  return `${request}\n\n[내가 선택한 작성 기준]\n${rule}\n내가 적은 자료에서 확인할 수 있는 내용에만 이 기준을 적용해줘.`;
 }
 
 /** Back follows the visitor's chosen path, including the optional example route. */

@@ -294,3 +294,23 @@ test('a stable URL retains URI punctuation instead of applying TEXT-only escapes
   const ics = model.calendarIcs({...configured, infoUrl: url}).replace(/\r\n /g, '');
   assert.ok(ics.includes(`URL:${url}\r\n`));
 });
+
+test('a personal request reuses only the exact, explicitly selected company rule', () => {
+  const state = {...model.initialArrivalState(), audience: 'business', companyRule: 0, step: 2};
+  const rule = '먼저 실제 결과를 보여준다.';
+  assert.equal(model.personalRequestRule(state, rule), '');
+  const optedIn = model.parseArrivalState(model.serializeArrivalState({...state, consentedCompanyRule: rule}));
+  assert.equal(model.personalRequestRule(optedIn, rule), rule);
+  for (const other of [{...optedIn, audience: 'work'}, {...optedIn, mode: 'example'}, {...optedIn, companyRule: null}]) {
+    assert.equal(model.personalRequestRule(other, rule), '');
+  }
+  assert.equal(model.personalRequestRule(optedIn, '나중에 편집한 기준'), '');
+  assert.equal(model.parseArrivalState(JSON.stringify({...state, consentedCompanyRule: true})).consentedCompanyRule, '');
+  const request = '내 자료로 소개글을 써줘.';
+  assert.equal(model.addPersonalRequestRule(request, ''), request);
+  assert.equal(model.addPersonalRequestRule('', rule), '');
+  const withRule = model.addPersonalRequestRule(request, rule);
+  assert.ok(withRule.startsWith(request));
+  assert.equal(withRule.split(rule).length - 1, 1);
+  assert.equal(model.addPersonalRequestRule(withRule, rule), withRule);
+});

@@ -3,7 +3,7 @@
 import {useEffect, useEffectEvent, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
+import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
 import {CorridorScene} from './corridor-scene';
 import {HallProgram} from './hall-program';
 import {CorridorPanel} from './corridor-panel';
@@ -11,6 +11,8 @@ import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
 import {VisitorAvatar} from './visitor-avatar';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
+import {officeCaseContent} from './office-demo-case';
+import {DEFAULT_OFFICE_DEMO} from './office-demo';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
 import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
@@ -65,9 +67,14 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const content = {...audienceContent[state.audience], ...config.audiences[state.audience]};
   const answers = state.answers[state.audience];
   const effectiveAnswers = state.mode === 'example' ? content.example : answers;
-  const prompt = buildManagedRequest(config, state.audience, effectiveAnswers);
+  const offeredRule = state.audience !== 'work' && state.companyRule !== null
+    ? officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).choices[state.companyRule].rule : '';
+  const appliedRule = personalRequestRule(state, offeredRule);
+  const prompt = addPersonalRequestRule(buildManagedRequest(config, state.audience, effectiveAnswers), appliedRule);
   const revision = buildRevision(state.audience, state.revision, state.extra);
-  const criteria = buildCriteria(state.audience, effectiveAnswers, state.revision, {mode: state.mode, extra: state.extra}).map(item => item.label === '맡길 일' ? {...item, value: content.goal} : item);
+  const criteria = buildCriteria(state.audience, effectiveAnswers, state.revision, {mode: state.mode, extra: state.extra})
+    .slice(0, 3).map(item => item.label === '맡길 일' ? {...item, value: content.goal} : item);
+  if (appliedRule) criteria.push({label: '내가 선택한 작성 기준', value: appliedRule});
   const event = arrivalLiveEvent(config);
   const calendarLink = googleCalendarUrl(event);
   const date = new Date(config.startsAt);
@@ -179,7 +186,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     update({...route, step: next});
   }
   function selectAudience(audience: Audience) {
-    update({audience, mode: 'personal', experience: 'none', handoff: 'ready', extra: '', step: 1});
+    update({audience, consentedCompanyRule: audience === state.audience ? state.consentedCompanyRule : '',
+      mode: 'personal', experience: 'none', handoff: 'ready', extra: '', step: 1});
     setNotice(''); setCopyFallback('');
   }
   function answer(field: keyof Answers, value: string) {
@@ -271,6 +279,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <form id="arrival-brief" className={s.questions} onSubmit={event => {event.preventDefault(); if (requestReady(answers)) {update({mode: 'personal', experience: 'none', handoff: 'ready', step: 3}); setNotice('');}}}>
             <label><span><b>1</b>{content.q1}</span><textarea rows={2} maxLength={ANSWER_LIMIT} value={answers.a} onChange={e => answer('a', e.target.value)} placeholder={`예: ${content.example.a}`} required/><small>{content.hint1}</small></label>
             <label><span><b>2</b>{content.q2}</span><textarea rows={2} maxLength={ANSWER_LIMIT} value={answers.b} onChange={e => answer('b', e.target.value)} placeholder={`예: ${content.example.b}`} required/><small>{content.hint2}</small></label>
+            {offeredRule && <label className={s.ruleOptIn}>
+              <input type="checkbox" checked={Boolean(appliedRule)} onChange={event => update({
+                consentedCompanyRule: event.target.checked ? offeredRule : '', handoff: 'ready', experience: 'none',
+              })}/>
+              <span>방금 고른 기준을 내 요청에도 쓰기<small>{offeredRule}</small></span>
+            </label>}
           </form>
           <p className={s.fine}>이름·연락처·회사 기밀은 적지 마세요.<br/>{persistenceKey ? '적은 내용은 이 브라우저에만 저장돼요.' : '미리보기 입력은 저장하지 않아요. 닫으면 사라져요.'}</p>
         </>}
@@ -289,7 +303,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <span className={s.achievement}><Check size={15}/>{state.experience === 'example-viewed' ? '체험 예시 확인' : state.experience === 'self-reported' ? '개인 AI 답변 확인' : '요청문 준비 완료'}</span>
           {title(<>매번 같은 설명을<br/><em>반복하지 않으려면?</em></>, '자주 쓰는 자료와 원하는 결과의 기준을 정리해두세요. AI 직원이 일을 할 때 참고할 업무 매뉴얼이 됩니다.')}
           {state.mode === 'example' ? <details className={s.disclosure}><summary>수정 요청과 결과 예시 보기<ChevronDown size={16}/></summary><div><span className={s.miniLabel}>이렇게 부탁했어요</span><p>“{content.example.revision}”</p><span className={s.miniLabel}>다듬은 결과 · 체험용 예시</span><ResultExample text={content.example.after}/></div></details> : <details className={s.disclosure}><summary>답변을 한 번 더 다듬고 싶어요<ChevronDown size={16}/></summary><div><p>아쉬운 점을 골라 같은 AI 대화에 이어서 보내세요.</p><div className={s.revisionChoices}>{revisionOptions.map(option => <button type="button" key={option.id} aria-pressed={state.revision === option.id} onClick={() => update({revision: option.id})}>{option.label}</button>)}</div>{state.revision === 'different' && <label className={s.extraLabel}>어떤 부분이 달랐나요?<textarea rows={2} maxLength={300} value={state.extra} onChange={e => update({extra: e.target.value})} placeholder="예: 선생님이 아니라 학부모에게 보내는 글이에요."/></label>}<p className={s.resultText}>{revision}</p><button type="button" className={s.secondary} disabled={!revision} onClick={() => copy(revision)}><Copy size={15}/>수정 요청 복사</button></div></details>}
-          <details className={s.disclosure}><summary>{state.mode === 'example' ? '예시에서 AI에게 알려준 내용' : 'AI에게 알려준 내용 보기'}<ChevronDown size={16}/></summary><div className={s.criteria}>{criteria.slice(0,3).map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}<button className={s.textButton} type="button" onClick={() => copy(criteria.slice(0,3).map(x => `${x.label}: ${x.value}`).join('\n'))}><Copy size={14}/>기준 복사하기</button></div></details>
+          <details className={s.disclosure}><summary>{state.mode === 'example' ? '예시에서 AI에게 알려준 내용' : 'AI에게 알려준 내용 보기'}<ChevronDown size={16}/></summary><div className={s.criteria}>{criteria.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}<button className={s.textButton} type="button" onClick={() => copy(criteria.map(x => `${x.label}: ${x.value}`).join('\n'))}><Copy size={14}/>기준 복사하기</button></div></details>
           <p className={s.insight}>{content.bridge}<br/><strong>{dateLabel} 라이브에서 방법을 알려드립니다.</strong></p>
           {state.mode === 'example' && <button type="button" className={s.textButton} onClick={personalStart}>내 상황으로 직접 해보기<ArrowRight size={14}/></button>}
         </>}
@@ -323,7 +337,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       {deskOpen && station !== 6 && station !== 7 && <CorridorPanel station={station} config={config} review={state.deskReview}
         onReview={(phase, choice) => update({deskReview: {phase, choice}})}
         proposalSent={state.proposalSent} onProposal={() => update({proposalSent: true})}
-        ruleChoice={state.companyRule} onRuleChoice={companyRule => update({companyRule})}
+        ruleChoice={state.companyRule} onRuleChoice={companyRule => update({companyRule, consentedCompanyRule: companyRule === state.companyRule ? state.consentedCompanyRule : ''})}
         onClose={closeDesk} onComplete={finishStation}/>}
     </dialog>
     <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>
