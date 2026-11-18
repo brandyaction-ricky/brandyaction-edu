@@ -3,7 +3,13 @@ import { expect, test } from '@playwright/test';
 test('member can save, reload and clear a delivery preference while login stays readonly', async ({ page }, testInfo) => {
   const user = { id:'synthetic-member', full_name:'합성 회원', email:'login@example.test', contact_email:null as string | null, phone:'01000000000', role:'student' };
   const writes: Record<string, unknown>[] = [];
+  const visits: { method: string; body: string | null }[] = [];
   await page.route('**/api/platform**', async route => {
+    if (new URL(route.request().url()).pathname === '/api/platform/member-visit') {
+      visits.push({ method: route.request().method(), body: route.request().postData() });
+      await route.fulfill({ json:{ ok:true } });
+      return;
+    }
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON(); writes.push(body);
       user.contact_email = body.contact_email?.trim().toLowerCase() || null;
@@ -12,6 +18,7 @@ test('member can save, reload and clear a delivery preference while login stays 
   });
   await page.goto('/public-data-test?publicScreen=my/profile');
   await expect(page.getByLabel('로그인 이메일', { exact:true })).toHaveValue('login@example.test');
+  await expect.poll(() => visits).toEqual([{ method:'POST', body:null }]);
   await expect(page.getByLabel('로그인 이메일', { exact:true })).toHaveAttribute('readonly', '');
   const email = page.getByLabel('안내받을 이메일', { exact:true });
   await expect(email).toHaveValue('');
@@ -29,6 +36,7 @@ test('member can save, reload and clear a delivery preference while login stays 
   await page.reload();
   await expect(email).toHaveValue('');
   await expect(page.getByLabel('로그인 이메일', { exact:true })).toHaveValue('login@example.test');
+  await expect.poll(() => visits).toEqual(Array.from({ length:3 }, () => ({ method:'POST', body:null })));
 });
 
 test('admin can save a delivery preference without any login email field', async ({ page }, testInfo) => {

@@ -21,12 +21,12 @@ export function kstLabel(value: unknown) {
   return input ? input.replace('T', ' ') + ' KST' : '기록 없음';
 }
 
-type Automation = { id?: unknown; is_active?: unknown; trigger_type?: unknown; trigger_tag_id?: unknown; trigger_course_id?: unknown };
+type Automation = { id?: unknown; is_active?: unknown; trigger_type?: unknown; trigger_tag_id?: unknown; trigger_course_id?: unknown; trigger_cohort_id?: unknown };
 export function overlappingAutomations(candidate: Automation, items: Automation[]) {
   if (!candidate.is_active) return [];
   return items.filter(item => {
     if (!item.is_active || (candidate.id && item.id === candidate.id) || item.trigger_type !== candidate.trigger_type) return false;
-    const key = candidate.trigger_type === 'purchase_completed' ? 'trigger_course_id' : candidate.trigger_type === 'tag_assigned' ? 'trigger_tag_id' : null;
+    const key = ['member_inactive','learning_stalled'].includes(String(candidate.trigger_type)) ? 'trigger_cohort_id' : candidate.trigger_type === 'purchase_completed' ? 'trigger_course_id' : candidate.trigger_type === 'tag_assigned' ? 'trigger_tag_id' : null;
     return !key || !candidate[key] || !item[key] || item[key] === candidate[key];
   });
 }

@@ -54,6 +54,7 @@ function handler(user, suppliedDb) {
  const db=suppliedDb||{rpc:async(...args)=>{calls.push(args);return {data:1};}};
  const exports=load('app/api/platform/workflows/route.ts',{
  '@/lib/submission-review':submissionReview,
+ '@/lib/crm-retention':load('lib/crm-retention.ts'),
  '@/lib/supabase/admin':{createAdminClient:()=>db},
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/platform-rules':load('lib/platform-rules.ts'),
@@ -146,4 +147,18 @@ test('private resource signing only follows a published lesson and authorized co
  assert.equal(signed,0);
  const response=await resource({id:uid,role:'admin'},{id:uid},{resource_storage_path:'edu/private.pdf',resource_name:'자료.pdf'})(req);
  assert.equal(response.status,303);assert.equal(signed,1);
+});
+
+test('retention rules require a live cohort, integer elapsed days and an information-only Alimtalk template',async()=>{
+ let template={id:uid,is_active:true,channel:'alimtalk',purpose:'transactional',alimtalk_template_id:'approved'};
+ let cohort={id:uid,status:'in_progress',operation_start_at:'2026-11-01T00:00:00Z'};
+ const writes=[];const db={from(table){let value;const q={select(){return q;},eq(){return q;},maybeSingle:async()=>({data:table==='crm_templates'?template:cohort}),insert(v){value=v;writes.push(v);return q;},single:async()=>({data:{id:uid,...value}})};return q;}};
+ const route=handler({id:uid,role:'admin'},db);
+ const body={action:'crm-save',kind:'automation',name:'가상 수강 독려',templateId:uid,triggerType:'learning_stalled',cohortId:uid,thresholdDays:3,delayMinutes:0,isActive:true};
+ for(const thresholdDays of [0,366,1.2,'3',null])assert.equal((await route.POST(request({...body,thresholdDays}))).status,400);
+ assert.equal((await route.POST(request({...body,cohortId:''}))).status,400);
+ for(const change of [{channel:'sms'},{purpose:'marketing'},{alimtalk_template_id:null},{is_active:false}]){const before=template;template={...template,...change};assert.equal((await route.POST(request(body))).status,400);template=before;}
+ for(const change of [{status:'completed'},{operation_start_at:null}]){const before=cohort;cohort={...cohort,...change};assert.equal((await route.POST(request(body))).status,400);cohort=before;}
+ assert.equal(writes.length,0);assert.equal((await route.POST(request(body))).status,200);
+ assert.equal(writes[0].threshold_days,3);assert.equal(writes[0].trigger_cohort_id,uid);assert.equal(writes[0].trigger_course_id,null);
 });
