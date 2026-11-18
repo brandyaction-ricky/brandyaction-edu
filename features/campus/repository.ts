@@ -31,7 +31,7 @@ export async function loadCampusScope(db: Database, viewer: { id: string }, enro
   if (!scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   return scope;
 }
-export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from' | 'rpc'> | Promise<Pick<Database, 'from' | 'rpc'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
+export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null; role?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from' | 'rpc'> | Promise<Pick<Database, 'from' | 'rpc'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
     .eq('user_id', viewer.id).eq('status', 'active').order('created_at', { ascending: false }).limit(200))).filter(e => hasLearningAccess(e, now));
@@ -78,6 +78,8 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
     .select('id,enrollment_id,mission_id,attempt_number,status', { count: 'exact' })
     .eq('enrollment_id', scope.enrollmentId).in('mission_id', missions.map(m => m.id)).limit(1000)) : [];
   const snapshot = campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now, dayNumbers }), open = await gates;
-  if (open) snapshot.lessons = snapshot.lessons.map(l => ({ ...l, locked: !open.some(g => g.lessonId === l.id && g.isUnlocked) }));
+  // Staff/admins keep the mark but can open the lesson (read-only preview, CEO 11-18).
+  const staff = viewer.role === 'admin' || viewer.role === 'staff';
+  if (open) snapshot.lessons = snapshot.lessons.map(l => { const locked = !open.some(g => g.lessonId === l.id && g.isUnlocked); return staff && locked ? { ...l, locked: false, staffPreview: true } : { ...l, locked }; });
   return { ...snapshot, guidedLessons };
 }

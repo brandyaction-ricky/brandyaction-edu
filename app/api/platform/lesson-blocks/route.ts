@@ -83,9 +83,14 @@ export async function GET(request: Request) {
       if (error) throw error;
       return reply({ ...data, document: publicLessonBlocks(validateLessonBlocks(data.document)) });
     }
-    const { data, error } = await db.rpc('edu_read_lesson_blocks', {
-      p_actor: user.id, p_lesson: requiredId(params.get('lesson')), p_enrollment: optionalId(params.get('enrollment')), p_revision: optionalId(params.get('revision')),
+    const read = (enrollmentId: string | null) => db.rpc('edu_read_lesson_blocks', {
+      p_actor: user.id, p_lesson: requiredId(params.get('lesson')), p_enrollment: enrollmentId, p_revision: optionalId(params.get('revision')),
     });
+    let { data, error } = await read(optionalId(params.get('enrollment')));
+    // Staff and admins open lessons their own enrollment has not unlocked yet (CEO 11-18) as a read-only preview.
+    // The RPC itself only allows the enrollment-free read to lesson editors, so a member cannot take this path.
+    const staffPreview = error?.message === 'BLOCK_LESSON_LOCKED' && !params.get('revision') && ['admin', 'staff'].includes(String((user as { role?: string }).role));
+    if (staffPreview) ({ data, error } = await read(null));
     if (error) throw error;
     if (!data) fail('학습 내용을 찾을 수 없습니다.', 404);
     const document = data.document ? validateLessonBlocks(data.document) : null;
@@ -107,6 +112,7 @@ export async function GET(request: Request) {
         ...(!document && { body: content?.body_text || '', video: content?.vod_url || '', link: content?.external_url || '' }),
       };
     }
+    if (staffPreview) return reply({ ...data, ...(campus && {campus}), editable: false, draft: null, previousDrafts: [], submission: null, submissions: [], practice: null, staffPreview: true, document: document && publicLessonBlocks(document) });
     return reply({ ...data, ...(campus && {campus}), practice, document: document && (data.editable === true ? document : publicLessonBlocks(document)) });
   } catch (error) { return failure(error); }
 }

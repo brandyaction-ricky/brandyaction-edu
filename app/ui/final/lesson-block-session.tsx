@@ -31,6 +31,8 @@ type Snapshot = {
   previousDrafts: { revision: string; updatedAt: string }[];
   submission?: Submission | null;
   submissions?: Submission[];
+  /** Staff/admin reading a lesson their enrollment has not unlocked yet: nothing is saved. */
+  staffPreview?: boolean;
 };
 async function request<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, { method: body ? 'POST' : 'GET', cache: 'no-store', credentials: 'same-origin', signal, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
@@ -145,7 +147,8 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
   }
   return <section id="lesson-reading-start" className="lesson-block-session" aria-label="학습 내용과 내 답변">
     {practice && <div className="lb-session-notice">졸업생 개인 실습입니다. 입력·저장과 프롬프트 생성은 계속 이용할 수 있습니다. 공식 미션 제출과 멘토 검수는 종료되었습니다.</div>}
-    {readOnly && !practice ? <div className="lb-session-notice">졸업생 열람 모드입니다. 공개된 최신 수업과 기존 답변을 볼 수 있습니다.</div>
+    {snapshot.staffPreview ? <div className="lb-session-notice">운영진 미리보기예요. 수강생에게는 아직 잠긴 수업이라 답변은 저장되지 않아요.</div>
+      : readOnly && !practice ? <div className="lb-session-notice">졸업생 열람 모드입니다. 공개된 최신 수업과 기존 답변을 볼 수 있습니다.</div>
       : historical ? <div className="lb-session-notice">이전 수업에서 작성한 답변입니다. 읽기만 할 수 있습니다. <button className="btn small" type="button" onClick={() => select(null)}>현재 수업으로</button></div>
       : null}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
@@ -206,7 +209,7 @@ function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onC
     ? <>{intro}<LegacyCampusLesson material={material} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} completed={completed} onCompleted={onCompleted} renderContinuation={renderContinuation} />{resource}</>
     : <>{fallback}</>;
   if (!canRenderLessonBlocks(loaded.snapshot.document)) return <p role="alert">학습 도구를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>;
-  return <>{intro}<SessionContent completed={completed} renderContinuation={renderContinuation} campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
+  return <>{intro}<SessionContent completed={completed} renderContinuation={renderContinuation} campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly || loaded.snapshot.staffPreview === true} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
 }
 
 export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, completed, onCompleted, renderContinuation }: SessionProps & { material: CampusMaterial }) {

@@ -7,7 +7,7 @@ function compile(file, mocks={}) { const out={};new Function('exports','require'
 const blocks=compile('lib/lesson-blocks.ts',{'./lesson-guided-tools':compile('lib/lesson-guided-tools.ts'),'./lesson-calculators':compile('lib/lesson-calculators.ts')});
 const document={schemaVersion:1,blocks:[{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'q',prompt:'시험',options:['가','나'],correctIndex:1}]}},{id:'answer',type:'question',question:{label:'질문',kind:'text',required:true}}],checklist:[]};
 function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision,savedDraft=null,savedSubmission=null,graduate=false}={}) {
- const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return ['edu_read_lesson_blocks','edu_read_block_submission'].includes(name)?{data:{editable,revision,currentRevision:current,document,draft:savedDraft,submission:savedSubmission,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};
+ const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return ['edu_read_lesson_blocks','edu_read_block_submission'].includes(name)?{data:{editable,revision,currentRevision:current,document,draft:savedDraft,submission:savedSubmission,previousDrafts:[]},error:typeof readError==='function'?readError(args):readError}:{data:{writeId:id,revision},error:saveError};}};
  const route=compile('app/api/platform/lesson-blocks/route.ts',{'@/lib/lesson-blocks':blocks,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/alumni-practice-server':{readAlumniPractice:async()=>({enabled:graduate,draft:null})},'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{if(graduate)throw Object.assign(new Error('공식 제출 종료'),{status:403});}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user}});
  const get=(query=`lesson=${lesson}&enrollment=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-blocks?'+query));
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-blocks',{method:'POST',headers:origin?{origin,'content-type':'application/json'}:{},body:JSON.stringify(body)}));
@@ -80,3 +80,13 @@ test('learner reopen is bound to the latest owned submission and cannot imperson
  const quiz=await h.post({...h.draft,action:'grade',blockId:'quiz',values:{blocks:{quiz:{q:1}},checklist:[]}});assert.equal(quiz.status,200);assert.equal((await quiz.json()).result.passed,true);
  for(const action of ['draft','submit','reopen']){const before=h.calls.length;assert.equal((await h.post({...h.draft,action,writeId:id,submissionId:id,expectedStateId:id})).status,403);assert.equal(h.calls.length,before);}
  });
+
+test('staff open a lesson their enrollment has not unlocked as a read-only preview; members stay locked (CEO 11-18)',async()=>{
+ const lockedOnEnrollment=args=>args.p_enrollment?{message:'BLOCK_LESSON_LOCKED'}:null;
+ const staff=harness({user:{id,role:'staff'},editable:true,readError:lockedOnEnrollment,savedDraft:{values:{blocks:{},checklist:[]},writeId:id,updatedAt:'x'}});
+ const r=await staff.get();assert.equal(r.status,200);const body=await r.json();
+ assert.equal(body.staffPreview,true);assert.equal(body.editable,false);assert.equal(body.draft,null);assert.doesNotMatch(JSON.stringify(body),/correctIndex/);
+ assert.deepEqual(staff.calls.map(c=>c.args.p_enrollment),[id,null]);
+ const member=harness({readError:lockedOnEnrollment});assert.equal((await member.get()).status,403);assert.equal(member.calls.length,1);
+ const old=harness({user:{id,role:'admin'},readError:lockedOnEnrollment});assert.equal((await old.get(`lesson=${lesson}&enrollment=${id}&revision=${revision}`)).status,403);
+});
