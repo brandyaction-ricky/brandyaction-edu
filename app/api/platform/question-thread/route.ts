@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   if (!['followup', 'finish'].includes(body.action) && !await getOperatorUser('members', user)) fail('질문에 답변할 권한이 없습니다.', 403);
   const question = id(body.questionId); let r;
   const image = body.imageId == null ? null : id(body.imageId);
-  if (image && (body.action !== 'answer' || process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true')) fail('답변 사진 첨부를 사용할 수 없습니다.', 400);
+  if (image && (!['answer', 'followup'].includes(body.action) || process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true')) fail('이미지 첨부를 사용할 수 없습니다.', 400);
   if (body.action === 'delete') {
    if (body.expectedHeadId !== null && !uuid(body.expectedHeadId)) fail('최신 답변을 확인해 주세요.');
    r = await createAdminClient().rpc('edu_delete_question_answer', { p_actor: user.id, p_question: question, p_answer: id(body.answerId), p_expected_head: body.expectedHeadId });
@@ -60,10 +60,15 @@ export async function POST(request: Request) {
     if (body.action !== 'answer' || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') fail('초안 연결을 확인해 주세요.');
     id(body.assistJobId);
    }
-   if (image) r = await createAdminClient().rpc('edu_add_question_answer_with_image', { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId, p_request: id(body.requestId), p_content: body.content, p_image: image, p_assist_job: body.assistJobId || null });
-   else if (body.assistJobId !== undefined) {
-    r = await createAdminClient().rpc('edu_answer_from_assist', {p_actor:user.id,p_question:question,p_job:id(body.assistJobId),p_request:id(body.requestId),p_content:body.content});
-   } else r = await createAdminClient().rpc(body.action === 'followup' ? 'edu_add_question_followup' : 'edu_add_question_answer', { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId, p_request: id(body.requestId), p_content: body.content });
+   const args = { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId, p_request: id(body.requestId), p_content: body.content };
+   const db = createAdminClient();
+   if (image && body.action === 'followup') {
+    r = await db.rpc('edu_add_question_followup_with_image', { ...args, p_image: image });
+   } else if (image) {
+    r = await db.rpc('edu_add_question_answer_with_image', { ...args, p_image: image, p_assist_job: body.assistJobId || null });
+   } else if (body.assistJobId !== undefined) {
+    r = await db.rpc('edu_answer_from_assist', {p_actor:user.id,p_question:question,p_job:id(body.assistJobId),p_request:id(body.requestId),p_content:body.content});
+   } else r = await db.rpc(body.action === 'followup' ? 'edu_add_question_followup' : 'edu_add_question_answer', args);
   }
   if (r.error) throw r.error; return reply(r.data);
  } catch (e) { return failure(e); }
