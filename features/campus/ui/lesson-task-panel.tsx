@@ -23,6 +23,8 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const gates = useLessonProgression(enrollment, enabled, snapshot.fetchedAt);
  const [reading, setReading] = useState(initialLesson || '');
  const gate = gates.lessons?.find(row => row.lessonId === lesson?.id);
+ // Staff/admins open lessons still locked for their enrollment as a read-only preview (CEO 11-18).
+ const open = Boolean(gate?.isUnlocked || lesson?.staffPreview);
  const heading = useRef<HTMLHeadingElement>(null);
  const focusNext = useRef(false);
  useEffect(() => {
@@ -33,11 +35,11 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
    }
  }, [reading]);
  const next = lesson && snapshot.lessons[snapshot.lessons.indexOf(lesson) + 1];
- const nextGate = next && gates.lessons?.find(row => row.lessonId === next.id);
+ const nextGate = next && gates.lessons?.find(row => row.lessonId === next.id), nextOpen = Boolean(nextGate?.isUnlocked || next?.staffPreview);
  const graduate = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.graduate;
  // Same N6 card as the top of the classroom curriculum; lessons (day 2) point learners to it.
  const courseId = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.courseId;
- if (enabled && lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
+ if (enabled && lesson && reading === lesson.id && open) return <section className={styles.reader} aria-label="캠퍼스 수업">
    <DiagnosisEntry key={'n6'+enrollment} courseId={courseId}/>
    <div className={styles.readerTools}><button type="button" className="btn small" onClick={() => {
      if (!mayLeave || mayLeave()) { setReading(''); gates.reload(); }
@@ -50,9 +52,9 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
      renderContinuation={ready => <NextLessonAction
        end="현재 공개된 마지막 수업입니다."
        position={next && [next.week !== undefined && next.week + '주차', next.day + '일차'].filter(Boolean).join(' · ')}
-       reason={!ready ? '학습 완료 또는 제출 후 이동할 수 있어요.' : !nextGate?.isUnlocked ? nextGate?.reason || '아직 열리지 않은 수업입니다.' : undefined}
+       reason={!ready ? '학습 완료 또는 제출 후 이동할 수 있어요.' : !nextOpen ? nextGate?.reason || '아직 열리지 않은 수업입니다.' : undefined}
        onOpen={() => {
-         if (!ready || !next || !nextGate?.isUnlocked || (mayLeave && !mayLeave())) return;
+         if (!ready || !next || !nextOpen || (mayLeave && !mayLeave())) return;
          focusNext.current = true;
          setChosen(next.id);
          setReading(next.id);
@@ -70,8 +72,8 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
   {enabled && gates.error && <p role="alert">{gates.error} <button type="button" onClick={gates.reload}>실습 목록 다시 불러오기</button></p>}
   <div className={styles.top}><label>수업 선택<select value={lesson.id} onChange={e=>setChosen(e.target.value)}>{snapshot.lessons.map(l=><option key={l.id} value={l.id} disabled={l.locked}>{l.week !== undefined ? l.week === 0 ? '준비 주차 · ' : l.week + '주차 · ' : ''}{l.day}일차 · {l.title}{l.completed?' · 완료':l.locked?' · 잠김':''}</option>)}</select></label></div>
   <article className={styles.next}><span className={styles.day}>{lesson.day}일차</span><h2>{lesson.title}</h2><p>{primaryMission?'과제의 안내와 검토 의견을 확인해 주세요.':!lesson.missions.length?(lesson.completed?'필요한 부분을 다시 볼 수 있어요.':'공부하던 수업을 이어서 보세요.'):lesson.completed?'필요한 부분을 다시 보거나 아래에서 과제를 확인하세요.':'공부하던 수업을 이어서 보고, 배운 내용을 과제로 적용해 보세요.'}</p>{enabled ? <>
-    <button className={styles.primary} disabled={!gate?.isUnlocked} onClick={() => setReading(lesson.id)}>{lesson.completed ? '캠퍼스에서 다시 보기' : '캠퍼스에서 수업 열기'}</button>
-    {!gate?.isUnlocked && <p role="status">{gate?.reason || (gates.lessons ? '수업 개방 상태를 확인해 주세요.' : '수업 개방 상태를 확인하고 있어요.')}</p>}
+    <button className={styles.primary} disabled={!open} onClick={() => setReading(lesson.id)}>{lesson.completed ? '캠퍼스에서 다시 보기' : '캠퍼스에서 수업 열기'}</button>
+    {!open && <p role="status">{gate?.reason || (gates.lessons ? '수업 개방 상태를 확인해 주세요.' : '수업 개방 상태를 확인하고 있어요.')}</p>}
     {primaryMission && <button onClick={() => onOpen(lesson.id,primaryMission.id)}>{action}</button>}
   </> : <button className={styles.primary} onClick={()=>onOpen(lesson.id,primaryMission?.id)}>{live && !primaryMission ? (lesson.completed ? '수업 다시 보기' : '수업 열기') : action}<span aria-hidden="true"> →</span></button>}</article>
   {lesson.missions.length>0&&<div className={styles.tasks}><h3>이 수업의 과제</h3>{lesson.missions.map(m=><div key={m.id} className={styles.task}><div><strong>{m.title}</strong><p>{statusText[m.status]||'상태 확인이 필요해요'}</p></div>{m.id!==primaryMission?.id&&<button onClick={()=>onOpen(lesson.id,m.id)}>{m.status==='not_started'?'과제 열기':m.status==='changes_requested'||m.status==='rejected'?'검토 의견 보기':'제출 내용 보기'}</button>}</div>)}</div>}
