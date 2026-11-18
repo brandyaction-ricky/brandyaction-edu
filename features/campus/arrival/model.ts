@@ -11,9 +11,12 @@ export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export const SPY_PHASES = ['intro', 'reviews', 'guide', 'handed-off'] as const;
 export type SpyPhase = typeof SPY_PHASES[number];
+export type CanonPhase = 0 | 1 | 2 | 3;
+export const corridorNext = {1: 2, 2: 3, 3: 4, 4: 7} as const;
 export type ArrivalState = {
   station: CorridorStation;
   spyPhase: SpyPhase;
+  canonPhase: CanonPhase;
   companyRule: OfficeDemoChoice | null;
   consentedCompanyRule: string;
   visitorAvatar: VisitorAvatarId;
@@ -33,7 +36,7 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, spyPhase: 'intro', companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -78,6 +81,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       state.deskReview = {phase: desk.phase, choice: desk.choice};
     }
     state.spyPhase = SPY_PHASES.find(phase => phase === value.spyPhase) ?? 'intro';
+    if (value.canonPhase === 1 || value.canonPhase === 2 || value.canonPhase === 3) state.canonPhase = value.canonPhase;
     state.companyRule = value.companyRule === 0 || value.companyRule === 1 ? value.companyRule : null;
     if (state.companyRule !== null && state.audience !== 'work' && typeof value.consentedCompanyRule === 'string'
       && value.consentedCompanyRule.length <= OFFICE_DEMO_LIMITS.rule) state.consentedCompanyRule = value.consentedCompanyRule;
@@ -88,8 +92,8 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     if (state.step === 7) state.station = 7;
     else if (state.step !== 0) state.station = 6;
     else if (typeof value.station === 'number' && Number.isInteger(value.station) && value.station >= 1 && value.station <= 7) {
-      state.station = value.station as CorridorStation;
-      if (state.station >= 3 && state.station <= 5 && state.spyPhase !== 'handed-off') state.station = 2;
+      state.station = value.station === 5 ? 4 : value.station === 6 ? 7 : value.station as CorridorStation;
+      if (state.station >= 3 && state.station <= 4 && state.spyPhase !== 'handed-off') state.station = 2;
     } else if (state.deskReview.phase !== 'draft') state.station = 2;
     state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
@@ -130,7 +134,7 @@ export function addPersonalRequestRule(request: string, rule: string): string {
 /** Back follows the visitor's chosen path, including the optional example route. */
 export function arrivalBackStep(state: ArrivalState): ArrivalStep {
   switch (state.step) {
-    case 8: return 0;
+    case 8: return 7;
     case 1: return 8;
     case 2: return 1;
     case 3:

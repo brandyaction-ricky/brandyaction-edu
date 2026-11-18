@@ -1,5 +1,5 @@
 import {Office3D} from '../office/vendor/office3d.js';
-import {buildLunarAtrium} from './lunar-atrium.mjs';
+import {buildLunarAtrium, WELCOME_AGENDA_DISPLAY} from './lunar-atrium.mjs';
 import {batchAtriumBoxes} from './static-batches.mjs';
 
 /** Mount the member campus live room in the walk's existing renderer. */
@@ -60,6 +60,10 @@ export function mountWelcomeLiveHall(THREE, parent) {
   }
   return {
     room,
+    agendaWorldPoint(out) {
+      const [left, front] = WELCOME_AGENDA_DISPLAY;
+      return room.localToWorld(out.set(left + 3, 2.7, front + .32));
+    },
     blockedAt(x, y, radius = .28) {
       return obstacles.some(rect => x > rect.left - radius && x < rect.right + radius &&
         y > rect.front - radius && y < rect.back + radius);

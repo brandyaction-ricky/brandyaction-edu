@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createWalkMotion, floorDestination, hallFloorFromRay, hallHeight} from '../public/campus/world/tour/welcome-walk-motion.mjs';
+import {createWalkMotion, floorDestination, hallFloorFromRay, hallHeight, hasInteractiveDesk} from '../public/campus/world/tour/welcome-walk-motion.mjs';
 
 const stations = Array.from({length: 7}, (_, i) => ({x: i*8, z: 0}));
 function advance(motion, seconds = 4, dx = 0, dz = 0) {
@@ -19,7 +19,7 @@ test('only the active stop opens once; walking to each new stop continues from t
     m.walk();
     assert.equal(advance(m), 1);
     assert.ok(Math.abs(m.state.x - stations[id-1].x) < .7);
-    assert.equal(m.walk(), false);
+    assert.equal(m.walk(), hasInteractiveDesk(id));
     assert.equal(advance(m), 0);
     m.sync(id, true);
     assert.equal(m.walk(), false);
@@ -35,6 +35,27 @@ test('closing a monitor re-arms it for deliberate input without immediately open
   m.walk();assert.equal(advance(m),1);
 });
 
+test('approaching an interactive desk allows leaving and returning by key or floor click', () => {
+  const m = createWalkMotion(stations);
+  for (const id of [2, 3, 4, 7]) {
+    m.sync(id, false);
+    assert.equal(m.walk(), true);
+    assert.equal(advance(m, 6), 1);
+    assert.equal(m.atDesk(), true);
+    m.sync(id, true);
+    m.sync(id, false);
+    const deskX = m.state.x;
+    assert.equal(advance(m, .4, -1, 0), 0);
+    assert.ok(m.state.x < deskX - 1);
+    assert.equal(m.atDesk(), false);
+    m.walk();
+    assert.equal(advance(m, 6), 1);
+    assert.equal(m.walk(deskX - 2, 0), true);
+    assert.equal(advance(m), 0);
+    assert.equal(m.atDesk(), false);
+  }
+});
+
 test('manual movement is bounded and works when walking back toward the station', () => {
   const m = createWalkMotion(stations);
   m.sync(2,false);
@@ -46,7 +67,7 @@ test('manual movement is bounded and works when walking back toward the station'
 
 test('restoring a later visit starts at the previous stop, pausing stops movement, reset restores the entrance', () => {
   const m = createWalkMotion(stations);
-  m.sync(7,false);assert.equal(m.state.x,40);
+  m.sync(7,false);assert.equal(m.state.x,stations[3].x);
   m.walk();advance(m,.5);const x=m.state.x;
   m.sync(7,true);assert.equal(advance(m),0);assert.equal(m.state.x,x);
   m.sync(1,false,true);assert.equal(m.state.x,-3.6);

@@ -6,7 +6,7 @@ import styles from './content-station.module.css';
 const emptyInputs: ContentStationInputs = {product: '', competitor: '', customer: '', facts: ''};
 const captions = ['마스크팩, 붙이고 자도 될까요?', '우리 제품의 권장 사용 시간 10~15분', '사용 전, 제품의 사용 가이드를 확인하세요.'];
 
-export function ContentStation({onComplete}: {onComplete: () => void}) {
+export function ContentStation({onComplete, revisit = false}: {onComplete: () => void; revisit?: boolean}) {
   const [inputs, setInputs] = useState(emptyInputs);
   const [prompt, setPrompt] = useState('');
   const [copy, setCopy] = useState<'idle' | 'copied' | 'manual'>('idle');
@@ -114,7 +114,7 @@ export function ContentStation({onComplete}: {onComplete: () => void}) {
     <section className={styles.bridge}>
       <h3>서로 다른 AI 직원이 같은 기준으로 일하려면?</h3>
       <p>조사와 제작을 맡은 직원 모두 같은 상품 사용 가이드를 봤어요. 다음 장소에서 회사 기준 하나가 두 직원의 답을 어떻게 바꾸는지 확인해 보세요.</p>
-      <button className={styles.primary} type="button" onClick={onComplete}>내 사업을 아는 AI는 어떻게 만들까요?<ArrowRight size={16} aria-hidden="true"/></button>
+      <button className={styles.primary} type="button" onClick={onComplete}>{revisit ? '라이브 홀로 돌아가기' : '내 사업을 아는 AI는 어떻게 만들까요?'}<ArrowRight size={16} aria-hidden="true"/></button>
     </section>
   </div>;
 }

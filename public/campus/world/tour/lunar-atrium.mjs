@@ -2,6 +2,7 @@ import {buildLibraryTrail} from './library-wayfinding.mjs';
 import {atriumFinish} from './atrium-finish.mjs';
 import {atriumHeightAt} from './atrium-layout.mjs';
 export {atriumHeightAt} from './atrium-layout.mjs';
+export const WELCOME_AGENDA_DISPLAY = [-7.4, 24.3];
 /** Arrival hall: real geometry, transparent envelope and a walkable upper gallery. */
 export function buildLunarAtrium(office,group,box,{guidedPreview=false}={}){
  const a=atriumFinish(office,group),cream=0xd8d2c6,ink=0x555a5d,blue=0x315bea,warm=0xffd6a0;
@@ -89,7 +90,7 @@ export function buildLunarAtrium(office,group,box,{guidedPreview=false}={}){
  a.cylinder(-15.8,21,.03,2.1,.02,0x7d858a,'fabric');a.cylinder(-15.8,21,.05,.92,.55,0x777f87,'metal');a.cylinder(-15.8,21,.6,.97,.06,0xb0b4b4,'metal');
  for(const [x,y]of[[-20,16],[-7,17],[20,25],[7,-6],[-20,29]])a.plant(x,y,0,1.25);
  // Low display islands retain existing experiential entry points without obstructing the entrance.
- for(const [x,y,title,sub]of(guidedPreview?[[-18,25,'오늘 만든 작은 결과','라이브에서 다음으로 이어가요'],[8,27,'12월 7일 · 문샷 라이브','AI와 일하는 기준을 배워요']]:[[-18,25,'01  고객 발견','AI로 고객의 문제를 찾아요'],[8,27,'02  콘텐츠와 실험','만들고, 반응을 확인해요']])){
+ for(const [x,y,title,sub]of(guidedPreview?[[...WELCOME_AGENDA_DISPLAY,'문샷 라이브','날짜 확인하고 캘린더에 담기'],[8,27,'내 AI 체험','업무 매뉴얼 만들기']]:[[-18,25,'01  고객 발견','AI로 고객의 문제를 찾아요'],[8,27,'02  콘텐츠와 실험','만들고, 반응을 확인해요']])){
   a.rounded(x,y,0,6,1.4,.9,.25,cream);collision(x,y,6,1.4);
   a.rounded(x+.2,y+.15,.9,5.6,.15,1.4,.1,0x253c52,'metal');
   a.label(title,x+3,y+.32,1.9,5,.4);a.label(sub,x+3,y+.33,1.3,5,.28,{color:'#b9ccdf'});

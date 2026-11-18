@@ -4,6 +4,7 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const arrivalRadius = 0.68;
 const walkingSpeed = 4.7;
 const hallScale = 2 / 3;
+export const hasInteractiveDesk = station => (station >= 2 && station <= 4) || station === 7;
 
 // The campus atrium is mounted facing the corridor. Its local spawn is (0, 28).
 function atriumPoint(last, x, z) {
@@ -51,7 +52,8 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
     const explore = freeRoam === true && station === stations.length && !paused;
     if (!synced || reset || (paused && station < state.station)) {
       // Reopening a personal exercise or the live schedule means the visitor already arrived.
-      const start = explore || (paused && station >= 6) ? stations[station - 1] : station === 1 ? entry : stations[station - 2];
+      const start = explore || (paused && station >= 6) ? stations[station - 1]
+        : station === 1 ? entry : station === 7 ? stations[3] : stations[station - 2];
       state.x = start.x; state.z = start.z; state.facing = Math.PI / 2;
       arrivalSent = false;
       stop();
@@ -77,13 +79,14 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
   }
 
   function walk(x = current().x, z = current().z) {
-    if (!synced || state.paused || arrivalSent) return false;
+    if (!synced || state.paused || (arrivalSent && !hasInteractiveDesk(state.station))) return false;
     goal = bounded(x, z);
     return true;
   }
 
   function update(seconds, keyX, keyZ) {
-    if (!synced || state.paused || arrivalSent) return false;
+    const interactive = hasInteractiveDesk(state.station);
+    if (!synced || state.paused || (arrivalSent && !interactive)) return false;
     let dx = keyX, dz = keyZ;
     if (dx || dz) goal = null;
     else if (goal) { dx = goal.x - state.x; dz = goal.z - state.z; }
@@ -106,11 +109,16 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
       else if (goal) stop();
       state.x = nextX; state.z = nextZ;
     }
-    if (atDesk()) {
-      stop(); state.facing = Math.PI;
+    const near = atDesk();
+    if (near && !arrivalSent) {
       arrivalSent = true;
+      // Stop an intentional walk to the desk. Manual walking stays available.
+      if (!interactive || (goal && goal.x === current().x && goal.z === current().z)) {
+        stop(); state.facing = Math.PI;
+      }
       return true;
     }
+    if (!near && interactive) arrivalSent = false;
     if (goal && Math.hypot(goal.x - state.x, goal.z - state.z) < 0.02) stop();
     return false;
   }

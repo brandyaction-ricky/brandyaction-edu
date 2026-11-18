@@ -5,7 +5,6 @@ import {finishOfficeReview, finishTeamLeaderVideo, spyActions, teamLeaderGuide, 
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
-const rules = ['읽는 사람이 오늘 할 일로 시작한다.', '직원이 완성한 결과물을 먼저 보여준다.'];
 if (output) await mkdir(output, {recursive: true});
 const browser = await chromium.launch({headless: true});
 try {
@@ -20,7 +19,7 @@ try {
     });
     const frame = page.frameLocator('iframe[title*="직원 사무실"]');
     const marker = frame.getByRole('button', {name:/쪽으로 걷기/});
-    const openDesk = frame.getByRole('button', {name:/열기$/});
+    const openDesk = frame.getByRole('button', {name:/열기$|입장하기$/});
     const state = frame.locator('#walk');
     const button = (root, name) => root.getByRole('button',{name, exact:true});
     async function capture(stage) {
@@ -33,7 +32,7 @@ try {
       const from = Number(await state.getAttribute('data-player-x'));
       if (await state.getAttribute('data-near-desk') === 'true') {
         if (mobile) await openDesk.tap(); else await openDesk.click();
-        await expect(page.getByRole('dialog')).toBeVisible();
+        await expect(station === 7 ? page.getByRole('link',{name:'Google 캘린더'}) : page.getByRole('dialog')).toBeVisible();
         await expect(state).toHaveAttribute('data-arrivals', String(count));
         return;
       }
@@ -41,9 +40,9 @@ try {
       if (mobile) await marker.tap(); else await marker.click();
       await expect(state).toHaveAttribute('data-arrivals', String(count+1), {timeout:20000});
       const to = Number(await state.getAttribute('data-player-x'));
-      expect(Math.abs(to-(station-1)*8)).toBeLessThan(.75);
+      expect(Math.abs(to-(station === 7 ? 32 : (station-1)*8))).toBeLessThan(.75);
       arrivals.push({station,from,to});
-      if (station >= 2 && station <= 4) {
+      if (station !== 1) {
         await expect(state).toHaveAttribute('data-near-desk', 'true');
         await expect(openDesk).toBeVisible();
         await expect(page.getByRole('dialog')).not.toBeVisible();
@@ -54,14 +53,12 @@ try {
     }
     const worldPosition = () => state.evaluate(element => [element.dataset.playerX, element.dataset.playerZ, element.dataset.arrivals]);
     let positionBeforeLeave;
-    async function beforeLeave(station) {
-      if (station > 3) return;
+    async function beforeLeave() {
       await expect(state).toHaveAttribute('data-moving', 'false');
       positionBeforeLeave = await worldPosition();
     }
     async function afterLeave(station) {
-      if (station > 3) return;
-      await expect(state).toHaveAttribute('data-station', String(station+1));
+      await expect(state).toHaveAttribute('data-station', String(station === 4 ? 7 : station+1));
       await expect(state).toHaveAttribute('data-moving', 'false');
       await expect(marker).toBeVisible();
       expect(await worldPosition()).toEqual(positionBeforeLeave);
@@ -133,15 +130,28 @@ try {
         await expect(video).toHaveCount(0);
         await start.click();
       }
+      await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
+      await video.evaluate(element => {element.pause(); element.currentTime = 4.5;});
+      await expect.poll(async () => Number(await seek.inputValue())).toBe(4.5);
+      await expect(next).toHaveCount(0);
+      await video.evaluate(element => {element.currentTime = 5;});
+      await expect(next).toBeVisible();
+      expect(await video.evaluate(element => element.ended)).toBe(false);
+      await video.evaluate(element => {element.currentTime = 1;});
+      await expect.poll(async () => Number(await seek.inputValue())).toBe(1);
+      await expect(next).toBeVisible();
+      await expect(next).toBeInViewport({ratio:0.95});
+      await capture('leader-continue-at-five-seconds');
+      await button(guide,'재생').click();
       await finishTeamLeaderVideo(guide);
+      await expect.poll(() => video.evaluate(element => element.ended)).toBe(true);
       await expect(invitation).toBeVisible();
       await next.scrollIntoViewIfNeeded();
       await expect(next).toBeInViewport({ratio:0.95});
       await capture('leader-complete');
       if (!mobile) {
         await button(guide,'다시 재생').click();
-        await expect(next).toHaveCount(0);
-        await expect(invitation).toBeHidden();
+        await expect(next).toBeVisible();
         await finishTeamLeaderVideo(guide);
       }
     }
@@ -151,11 +161,24 @@ try {
       if (station === 2) {
         const conversation = dialog.getByRole('region', {name:'경쟁사 스파이와 나눈 대화'});
         const reviews = dialog.getByRole('group', {name:'가상 리뷰 재구성'});
+        if (!mobile) {
+          await button(dialog,'복도로 돌아가기').click();
+          const floor = frame.locator('#floor');
+          await expect(floor).toBeFocused();
+          const deskX = Number(await state.getAttribute('data-player-x'));
+          await page.keyboard.down('ArrowLeft');
+          try {await expect.poll(async () => Number(await state.getAttribute('data-player-x'))).toBeLessThan(deskX - 1);}
+          finally {await page.keyboard.up('ArrowLeft');}
+          await expect(state).toHaveAttribute('data-near-desk','false');
+          await expect(dialog).not.toBeVisible();
+          await walk(2);
+        }
         await expect(conversation).toContainText('우리 브랜드에 활용할 기회를 찾아드립니다.');
         await expect(dialog.getByRole('textbox')).toHaveCount(0);
         await expect(reviews).toHaveCount(0);
         // Dispatch a duplicate tap before React commits the next phase.
         await button(dialog, spyActions[0]).evaluate(element => {element.click(); element.click();});
+        await expect(dialog.getByRole('status').filter({hasText:'답변을 작성 중이에요.'})).toBeAttached();
         await expect(reviews).toHaveCount(1);
         await expect(reviews.getByRole('article')).toHaveCount(2);
         await expect(reviews.getByText('별점 2점', {exact:true})).toHaveCount(1);
@@ -228,24 +251,11 @@ try {
         expect(await prompt.inputValue()).not.toContain(ownInputs[0][1]);
       }
       if (station === 4) {
-        const changes=[];
-        for (const rule of rules) {
-          await button(dialog,rule).click();
-          const revised=dialog.getByRole('heading',{name:'두 직원이 쓴 첫 문장'}).locator('..');
-          const openings=revised.locator('dl dd');
-          await expect(openings).toHaveCount(2);
-          for (const opening of await openings.all()) await expect(opening).toBeInViewport({ratio: 0.95});
-          changes.push(await openings.allTextContents());
-          if (rule === rules[0]) await button(dialog,'다른 기준 비교하기').click();
-        }
-        expect(changes[0][0]).not.toBe(changes[1][0]);
-        expect(changes[0][1]).not.toBe(changes[1][1]);
+        const map = dialog.getByRole('region',{name:'회사 지식 지도'});
+        await expect(map.getByRole('listitem')).toHaveCount(12);
+        await expect(map.getByRole('status')).toHaveText('아직 연결된 지식이 없어요.');
         await capture('principle');
-        await button(dialog,'복도로 돌아가기').click();
-        await walk(4);
-        await expect(button(dialog,rules[1])).toHaveAttribute('aria-pressed','true');
       }
-      if (station === 5) await expect(dialog.getByText('상품 소개 페이지 담당자에게 전할 제안')).toBeVisible();
     }
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
@@ -284,8 +294,9 @@ try {
         await button(page,'두 번째 답변을 받았어요').click();
         await button(page,'라이브에서 이어서 배우기').click();
       }
-      await walk(7);
-      const google=new URL(await page.getByRole('link',{name:'Google 캘린더'}).getAttribute('href'));
+      const calendar = page.getByRole('link',{name:'Google 캘린더'});
+      await expect(calendar).toBeVisible();
+      const google=new URL(await calendar.getAttribute('href'));
       expect(google.hostname).toBe('calendar.google.com');
       expect(google.searchParams.get('dates')).toContain('20261207T120000Z');
       const saved=page.waitForEvent('download');

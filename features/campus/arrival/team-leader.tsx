@@ -5,6 +5,7 @@ import styles from './team-leader.module.css';
 const VIDEO_SOURCE = '/campus/arrival/team-leader-telegram.mp4';
 const VIDEO_LABEL = '텔레그램에서 AI 직원에게 일을 맡기고 보고받는 모습';
 const NEXT_DESCRIPTION = '각 담당자들이 어떻게 일하는지 직접 확인해보실까요?';
+const CONTINUE_AFTER_SECONDS = 5;
 
 function timestamp(seconds: number) {
   const whole = Math.floor(seconds);
@@ -18,6 +19,7 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [playbackError, setPlaybackError] = useState(false);
+  const [canContinue, setCanContinue] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -65,6 +67,11 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
     setPosition(value);
   }
 
+  function updatePosition(time: number) {
+    setPosition(time);
+    if (time >= CONTINUE_AFTER_SECONDS) setCanContinue(true);
+  }
+
   async function toggleFullscreen() {
     const container = player.current;
     const media = video.current as (HTMLVideoElement & {webkitEnterFullscreen?: () => void}) | null;
@@ -95,11 +102,11 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
             <video ref={video} src={VIDEO_SOURCE} muted playsInline preload="metadata" width={464} height={848}
               aria-label={VIDEO_LABEL} aria-describedby={descriptionId}
               onLoadedMetadata={event => setDuration(event.currentTarget.duration)}
-              onTimeUpdate={event => setPosition(event.currentTarget.currentTime)}
+              onTimeUpdate={event => updatePosition(event.currentTarget.currentTime)}
               onPlay={() => {setPlaying(true); setEnded(false);}}
               onPause={() => setPlaying(false)}
-              onEnded={() => {setPlaying(false); setEnded(true);}}
-              onError={() => setPlaybackError(true)}/>
+              onEnded={() => {setPlaying(false); setEnded(true); setCanContinue(true);}}
+              onError={() => {setPlaybackError(true); setCanContinue(true);}}/>
           </div>
           <p id={descriptionId} className={styles.srOnly}>무음 영상입니다. 텔레그램에서 업무를 지시하고 AI 직원이 자료를 확인해 결과를 보고하는 장면을 보여줍니다.</p>
           <div className={styles.controls} role="group" aria-label="영상 재생 조작">
@@ -121,10 +128,11 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
           media.load();
           void media.play().catch(() => {});
         }}>다시 불러오기</button></p>}
-        {ended && <div className={styles.next}>
-          <p role="status">{NEXT_DESCRIPTION}</p>
+        <div className={styles.next} data-available={canContinue || undefined} inert={!canContinue}>
+          <p>{NEXT_DESCRIPTION}</p>
           <button type="button" className={styles.cta} onClick={() => leave(onComplete)}>조사 담당자와 이야기해보기 →</button>
-        </div>}
+        </div>
+        <p className={styles.srOnly} role="status">{canContinue ? '조사 담당자를 만나러 갈 수 있어요.' : ''}</p>
       </div>}
     </div>
   </section>;

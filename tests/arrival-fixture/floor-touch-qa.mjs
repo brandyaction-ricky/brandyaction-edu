@@ -39,7 +39,19 @@ for (const engine of [chromium, webkit]) {
     await frame.getByRole('button', {name:/열기$/}).tap();
     await expect(page.getByRole('region', {name:'경쟁사 스파이와 나눈 대화'})).toBeVisible();
     await expect(walk).toHaveAttribute('data-arrivals', '2');
-    console.log(engine.name() + ' mobile floor taps reached the first and second desks once.');
+    await page.getByRole('button', {name:'복도로 돌아가기', exact:true}).tap();
+    await expect(walk).toHaveAttribute('data-paused', 'false');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    const deskX = await walk.getAttribute('data-player-x');
+    await page.touchscreen.tap(35, 575);
+    await expect(walk).not.toHaveAttribute('data-player-x', deskX);
+    await expect(walk).toHaveAttribute('data-near-desk', 'false');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await frame.getByRole('button', {name:/쪽으로 걷기/}).tap();
+    await frame.getByRole('button', {name:/열기$/}).tap();
+    await expect(page.getByRole('region', {name:'경쟁사 스파이와 나눈 대화'})).toBeVisible();
+    await expect(walk).toHaveAttribute('data-arrivals', '3');
+    console.log(engine.name() + ' mobile floor taps worked before and after closing the spy desk.');
   } finally {
     await browser.close();
   }

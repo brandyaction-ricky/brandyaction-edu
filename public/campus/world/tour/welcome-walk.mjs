@@ -1,15 +1,16 @@
-import { createWalkMotion, floorDestination, hallFloorFromRay, hallHeight } from './welcome-walk-motion.mjs';
+import { createWalkMotion, floorDestination, hallFloorFromRay, hallHeight, hasInteractiveDesk } from './welcome-walk-motion.mjs';
 
 const root = document.querySelector('#walk');
 const floor = document.querySelector('#floor');
 const marker = document.querySelector('#destination');
+const hallSchedule = document.querySelector('#hall-schedule');
 const label = document.querySelector('#destination-label');
 const greeting = document.querySelector('#destination-greeting');
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get('bridge');
 const avatars = ['female-c', 'female-a', 'male-c', 'male-d'];
 const keys = new Set();
-let applySync, walkTo, pauseMovement;
+let applySync, walkTo, pauseMovement, focusFloor;
 let pendingSync;
 let ready = false, failed = false;
 
@@ -26,6 +27,7 @@ window.addEventListener('message', event => {
     applySync?.(msg);
   }
   if (msg.type === 'walk' && (msg.station == null || msg.station === pendingSync?.station)) walkTo?.();
+  if (msg.type === 'focus' && msg.station === pendingSync?.station) focusFloor?.();
   if (msg.type === 'init' && (ready || failed)) send(ready ? 'ready' : 'error');
 });
 
@@ -33,6 +35,7 @@ function fail() {
   if (failed) return;
   failed = true; ready = false;
   root.dataset.ready = 'false'; root.dataset.error = 'true'; marker.hidden = true;
+  hallSchedule.hidden = true;
   pauseMovement?.();
   send('error');
 }
@@ -114,7 +117,7 @@ async function start() {
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.032;
   shadow.scale.set(1, 0.72, 1);
   figure.add(shadow);
-  const aim = new THREE.Vector3(), projected = new THREE.Vector3();
+  const aim = new THREE.Vector3(), projected = new THREE.Vector3(), hallAgenda = new THREE.Vector3();
   const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), groundHit = new THREE.Vector3();
   const footprint = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.235, 28), new THREE.MeshBasicMaterial({
@@ -127,6 +130,7 @@ async function start() {
   let width, height, trackingX, trackingZ = 0, roamCamera = 0, raf = 0, last = 0, arranged = false;
   const rayEnd = new THREE.Vector3();
   let markerWidth = 110, markerHeight = 44, arrived = 0;
+  let hallScheduleWidth = 0, hallScheduleHeight = 0;
   let shownIndex, shownStation, synced = false;
   function resize() {
     width = Math.max(1, root.clientWidth); height = Math.max(1, root.clientHeight);
@@ -188,8 +192,26 @@ async function start() {
     marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
   }
+  function placeHallSchedule() {
+    if (!state.freeRoam || state.paused || !set.hallAgendaPoint(hallAgenda)) {
+      hallSchedule.hidden = true;
+      return;
+    }
+    hallAgenda.project(camera);
+    const x = (hallAgenda.x + 1) * width / 2;
+    const y = (1 - hallAgenda.y) * height / 2;
+    hallSchedule.hidden = hallAgenda.z < -1 || hallAgenda.z > 1 ||
+      x < 10 || x > width - 10 || y < 65 || y > height - 100;
+    if (hallSchedule.hidden) return;
+    if (!hallScheduleWidth) {
+      hallScheduleWidth = hallSchedule.offsetWidth;
+      hallScheduleHeight = hallSchedule.offsetHeight;
+    }
+    const left = Math.max(10, Math.min(width - hallScheduleWidth - 10, x - hallScheduleWidth / 2));
+    hallSchedule.style.transform = `translate(${Math.round(left)}px,${Math.round(y - hallScheduleHeight)}px)`;
+  }
   let deskLabel = '';
-  const needsDeskClick = () => state.station >= 2 && state.station <= 4;
+  const needsDeskClick = () => hasInteractiveDesk(state.station);
   function markDestination() {
     const near = needsDeskClick() && motion.atDesk();
     root.dataset.nearDesk = String(near);
@@ -229,7 +251,7 @@ async function start() {
     root.dataset.station = String(state.station); root.dataset.paused = String(state.paused);
     root.dataset.arrivals = String(arrived);
     root.dataset.freeRoam = String(state.freeRoam);
-    placeCamera(0); placeMarker();
+    placeCamera(0); placeMarker(); placeHallSchedule();
   }
   function moveTo(x, z) {
     if (!ready || state.paused) return false;
@@ -252,9 +274,13 @@ async function start() {
     }
     const progressed = motion.update(dt, dx, dz);
     if (progressed) {
-      keys.clear(); arrived++; root.dataset.arrivals = String(arrived);
+      if (!state.moving) keys.clear();
+      arrived++; root.dataset.arrivals = String(arrived);
       markDestination();
       send(needsDeskClick() ? 'approach' : 'arrive', state.station);
+    } else if (needsDeskClick() && root.dataset.nearDesk === 'true' && !motion.atDesk()) {
+      markDestination();
+      send('depart', state.station);
     }
     const elevation = state.station === stations.length ? hallHeight(stations.at(-1), state.x, state.z) : 0;
     figure.position.set(state.x, elevation + 0.035, state.z);
@@ -270,7 +296,7 @@ async function start() {
     }
     footprint.visible = !state.paused && now < footprintUntil;
     mixer.update(dt);
-    placeCamera(dt); placeMarker(); renderer.render(scene, camera);
+    placeCamera(dt); placeMarker(); placeHallSchedule(); renderer.render(scene, camera);
     root.dataset.playerX = state.x.toFixed(2); root.dataset.playerZ = state.z.toFixed(2);
     root.dataset.moving = String(state.moving);
   }
@@ -356,7 +382,11 @@ async function start() {
     pick(event.clientX, event.clientY);
   });
   marker.addEventListener('click', () => {if (!openNearbyDesk()) moveTo();});
+  hallSchedule.addEventListener('click', () => {
+    if (state.freeRoam && !state.paused) send('open-schedule', state.station);
+  });
   applySync = sync; walkTo = () => moveTo(); pauseMovement = () => { keys.clear(); motion.stop(); };
+  focusFloor = () => {if (!state.paused) floor.focus({preventScroll:true});};
   window.addEventListener('pagehide', event => {
     if (event.persisted) return;
     cancelAnimationFrame(raf); set.dispose?.(); renderer.dispose();

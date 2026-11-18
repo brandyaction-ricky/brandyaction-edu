@@ -1,7 +1,7 @@
 import {mountWelcomeLiveHall} from './welcome-live-hall.mjs';
 
 /** Six offices line one corridor, ending at the entrance to a separate live hall. */
-const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '고객 응대 직원', '내 AI 체험', '라이브 홀'];
+const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '', '내 AI 체험', '라이브 홀'];
 const PALETTE = {
   navy: 0x213951, deep: 0x142d45, steel: 0x678298, frost: 0xdfeaf0,
   pearl: 0xf0f2ee, floor: 0xc5d9e5, edge: 0x92abba, ink: 0x334950,
@@ -187,7 +187,14 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
     }
   }
 
-  const stations = TITLES.map((title,index) => ({x: index*8, z: 0, title}));
+  const stops = [0, 8, 16, 24, 24, 32, 32];
+  const stations = TITLES.map((title, index) => ({x: stops[index], z: 0, title}));
+  const hallIndex = stations.length - 1;
+  const canonIndex = 3;
+  const corridorEnd = stations[hallIndex].x - 3.25;
+  const corridorStart = -5.25;
+  const corridorLength = corridorEnd - corridorStart;
+  const corridorCenter = corridorStart + corridorLength / 2;
   // One raised arrow points to the reachable floor position, not to a desk
   // behind glass. Reposition the same object as the visitor advances.
   const arrowTip = new THREE.ConeGeometry(.37,.46,4);
@@ -199,13 +206,13 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   stem.scale.set(.22,.42,.22);
   guide.add(point,stem);
   // An open near edge leaves the path and avatar legible at a small screen width.
-  box(root,19.75,-.37,-1.9,50,.66,10.4,navy);
-  box(root,19.75,-.045,.70,50,.085,5.2,floor);
-  box(root,19.75,-.047,-4.50,50,.08,5.2,0xdee7e8);
-  box(root,19.75,-.013,3.24,50,.025,.09,steel);
-  box(root,19.75,-.013,-1.71,50,.023,.13,edge);
-  box(root,19.75,-.33,3.31,50,.045,.045,0xa7c4d7);
-  for(let x=-4;x<=44;x+=2) box(root,x,-.001,.77,.022,.009,4.96,0xb0c7d6);
+  box(root,corridorCenter,-.37,-1.9,corridorLength,.66,10.4,navy);
+  box(root,corridorCenter,-.045,.70,corridorLength,.085,5.2,floor);
+  box(root,corridorCenter,-.047,-4.50,corridorLength,.08,5.2,0xdee7e8);
+  box(root,corridorCenter,-.013,3.24,corridorLength,.025,.09,steel);
+  box(root,corridorCenter,-.013,-1.71,corridorLength,.023,.13,edge);
+  box(root,corridorCenter,-.33,3.31,corridorLength,.045,.045,0xa7c4d7);
+  for(let x=-4;x<=corridorEnd;x+=2) box(root,x,-.001,.77,.022,.009,4.96,0xb0c7d6);
   // The entrance has its own short vestibule, visible before the visitor takes a step.
   box(root,-6.9,-.37,-1.90,3.35,.66,10.4,navy);
   box(root,-6.9,-.045,.70,3.35,.085,5.2,floor);
@@ -229,10 +236,10 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   box(root,doorX,-.037,-7.27,2.1,.07,1.31,floor);
   box(root,doorX,1.37,-7.93,2.36,2.76,.12,0x788f9a);
 
-  for(let index=0;index<TITLES.length;index++){
+  for (const index of [0, 1, 2, canonIndex, hallIndex]) {
     const g=groupAt(root,stations[index].x,0,0);
     g.userData.welcomeStation=index;
-    if (index === TITLES.length - 1) {
+    if (index === hallIndex) {
       hallEntrance = g;
       // Floor lighting marks the passage without screening the visitor or
       // the atrium tower once the camera turns to face the hall.
@@ -294,19 +301,6 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       // Mounted colour samples make this the production studio.
       for(let i=0;i<4;i++) box(g,-2.20+i*.4,1.54,-6.46,.34,.53,.035,[sand,red,green,blue][i]);
       round(g,1.4,1.1,-2.93,.25,.12,.25,red);
-    }else if(index===4){
-      // A service counter with a chat display, a seated rep and desk phone.
-      desk(g,.75,-3.19,3.15);
-      chair(g,-1.12,-3.90);
-      person(g,-1.12,-3.90,true);
-      desktop(g,.73,-3.20);
-      box(g,-.40,1.08,-2.99,.47,.09,.32,deep);
-      box(g,-.40,1.17,-3.05,.52,.10,.12,blue);
-      box(g,1.54,1.86,-6.40,2.14,1.09,.065,navy);
-      for(const [x,y,w,c] of [[1.36,2.06,1.1,frost],[1.72,1.74,.93,0x85bdcd]]) {
-        box(g,x,y,-6.34,w,.18,.025,c,'light');
-      }
-      plant(g,-2.40,-4.8,.72);
     }else if(index===3){
       shelf(g,-1.42,-5.46);
       shelf(g,1.10,-5.46);
@@ -318,20 +312,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       for (let row=0;row<3;row++) box(g,-.69,.822,-3.12+row*.072,.25,.012,.017,steel);
       box(g,.55,.98,-3.17,.84,.53,.06,navy);
       label(g,'원본 자료',.55,.98,-3.129,.78,.45,'#263f56','#ffffff');
-    }else if(index===5){
-      // An accessible one-person workstation with an advisor and visitor chair.
-      box(g,0,1.59,-5.38,3.63,1.83,.16,deep);
-      box(g,0,1.59,-5.28,3.46,1.65,.035,blue);
-      // Screen graphic for choosing one's own AI work trial.
-      for(const [x,scale] of [[-.72,1],[.18,.68],[.85,.68]]) {
-        ball(g,x,1.78,-5.22,.43*scale,.47*scale,.07,sand);
-        ball(g,x,1.26,-5.22,.83*scale,.58*scale,.07,pearl);
-      }
-      desk(g,-.28,-3.12,2.48);
-      desktop(g,-.45,-3.20);
-      chair(g,-.80,-2.17);
-      person(g,1.50,-3.79);
-      plant(g,2.61,-4.76,.96);
+
     }
   }
 
@@ -363,6 +344,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
 
   return {
     stations,
+    hallAgendaPoint(out) { return liveHall?.agendaWorldPoint(out); },
     // Coordinates use the original campus hall floor plan.
     isHallBlocked(x, y) { return liveHall?.blockedAt(x, y) ?? true; },
     setNext(index, stationIndex = index) {
@@ -373,19 +355,19 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
         guide.position.set(stop.x - .56, 0, stop.z);
         guide.userData.welcomeStation = index;
       }
-      if (stationIndex >= 0 && stationIndex < 5 && preloadHall !== undefined) {
+      if (stationIndex >= 0 && stationIndex < canonIndex && preloadHall !== undefined) {
         window.clearTimeout(preloadHall);
         preloadHall = undefined;
       }
-      if (stationIndex === 5 && !liveHall && preloadHall === undefined) {
-        // Build while the visitor is at the personal AI desk, ahead of the walk.
+      if (stationIndex === canonIndex && !liveHall && preloadHall === undefined) {
+        // Build while the visitor is at the company knowledge desk, ahead of the walk.
         preloadHall = window.setTimeout(prepareHall, 0);
       }
-      if (stationIndex === 6 && !liveHall) {
+      if (stationIndex >= hallIndex - 1 && !liveHall) {
         window.clearTimeout(preloadHall);
         prepareHall();
       }
-      if (liveHall && stationIndex >= 0) liveHall.room.visible = stationIndex >= 5;
+      if (liveHall && stationIndex >= 0) liveHall.room.visible = stationIndex >= hallIndex - 1;
     },
     dispose() {
       if(disposed) return;

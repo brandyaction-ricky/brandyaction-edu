@@ -11,21 +11,24 @@ type Props = {
   paused: boolean;
   freeRoam: boolean;
   walkRequest: number;
+  focusRequest: number;
   onStatus: (status: 'ready' | 'unavailable') => void;
-  onApproach: (station: CorridorStation) => void;
+  onProximity: (station: CorridorStation, near: boolean) => void;
   onArrive: (station: CorridorStation) => void;
+  onOpenSchedule: () => void;
   className: string;
 };
 
-export function CorridorScene({station, label, avatar, paused, freeRoam, walkRequest, onStatus, onApproach, onArrive, className}: Props) {
+export function CorridorScene({station, label, avatar, paused, freeRoam, walkRequest, focusRequest, onStatus, onProximity, onArrive, onOpenSchedule, className}: Props) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [bridge, setBridge] = useState('');
   const [firstAvatar] = useState(avatar);
-  const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onApproach, onArrive});
+  const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenSchedule});
   const lastWalk = useRef(walkRequest);
+  const lastFocus = useRef(focusRequest);
   useEffect(() => {
-    current.current = {station, label, avatar, paused, freeRoam, onStatus, onApproach, onArrive};
-  }, [station, label, avatar, paused, freeRoam, onStatus, onApproach, onArrive]);
+    current.current = {station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenSchedule};
+  }, [station, label, avatar, paused, freeRoam, onStatus, onProximity, onArrive, onOpenSchedule]);
 
   useEffect(() => {
     const token = crypto.randomUUID();
@@ -45,8 +48,9 @@ export function CorridorScene({station, label, avatar, paused, freeRoam, walkReq
         window.clearTimeout(timeout);
         props.onStatus('unavailable');
       } else if (ready && !props.paused && msg.station === props.station) {
-        if (msg.type === 'approach') props.onApproach(props.station);
+        if (msg.type === 'approach' || msg.type === 'depart') props.onProximity(props.station, msg.type === 'approach');
         if (msg.type === 'arrive') props.onArrive(props.station);
+        if (msg.type === 'open-schedule' && props.freeRoam && props.station === 7) props.onOpenSchedule();
       }
     }
     window.addEventListener('message', receive);
@@ -61,6 +65,11 @@ export function CorridorScene({station, label, avatar, paused, freeRoam, walkReq
     lastWalk.current = walkRequest;
     if (bridge && !paused) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'walk', station}, location.origin);
   }, [walkRequest, bridge, station, paused]);
+  useEffect(() => {
+    if (focusRequest === lastFocus.current) return;
+    lastFocus.current = focusRequest;
+    if (bridge && !paused) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'focus', station}, location.origin);
+  }, [focusRequest, bridge, station, paused]);
   return bridge ? <iframe ref={frame} title="문샷 웰컴존 · 직원 사무실과 라이브 홀" className={className}
     sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer"
     src={'/campus/world/tour/welcome-walk.html#' + new URLSearchParams({bridge, avatar: firstAvatar})}/> : null;

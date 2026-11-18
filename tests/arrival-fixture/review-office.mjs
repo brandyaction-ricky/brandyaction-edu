@@ -1,13 +1,16 @@
 import {expect} from '@playwright/test';
 
-const nextDesk = ['콘텐츠 실제 제작해보기', '내 사업을 아는 AI는 어떻게 만들까요?', '고객 응대 직원 만나기', '내 일로 해보기'];
+const nextDesk = ['콘텐츠 실제 제작해보기', '내 사업을 아는 AI는 어떻게 만들까요?', '강의 전 무료자료 확인하기'];
 
 export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 
 export async function finishSpyHandoff(dialog) {
   for (const label of spyActions) {
     const action = dialog.getByRole('button', {name: label, exact: true});
-    if (await action.isVisible()) await action.click();
+    if (await action.isVisible()) {
+      await action.click();
+      await expect(dialog.getByRole('status').filter({hasText:'답변을 작성 중이에요.'})).toHaveCount(0);
+    }
   }
 }
 
@@ -28,20 +31,20 @@ export async function finishTeamLeaderVideo(guide) {
 }
 
 // The desktop and mobile clipboard fixtures can use the equivalent HTML entry when WebGL is unavailable.
-export async function finishOfficeReview(page, {walk, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}} = {}) {
+export async function finishOfficeReview(page, {walk, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}, enterPersonal = true} = {}) {
+  const calendar = page.getByRole('link', {name:'Google 캘린더', exact:true});
   const travel = walk ?? (async station => {
     const action = page.locator('#arrival-desk-button');
     await action.click({timeout: 60000});
-    if (station >= 2 && station <= 4) {
-      const open = page.getByRole('button', {name: '내용 열기', exact: true});
-      const dialog = page.getByRole('dialog');
-      await expect(open.or(dialog).filter({visible: true})).toBeVisible({timeout: 20000});
+    if (station !== 1) {
+      const open = page.getByRole('button', {name: station === 7 ? '라이브 홀 입장하기' : '내용 열기', exact: true});
+      const destination = station === 7 ? calendar : page.getByRole('dialog');
+      await expect(open.or(destination).filter({visible: true})).toBeVisible({timeout: 20000});
       if (await open.isVisible()) await open.click();
     }
   });
-  for (let station = 1; station <= 6; station++) {
+  for (const station of [1, 2, 3, 4]) {
     await travel(station);
-    if (station === 6) return;
     if (station === 1) {
       const guide = teamLeaderGuide(page);
       await expect(guide).toBeVisible({timeout: 20000});
@@ -61,13 +64,12 @@ export async function finishOfficeReview(page, {walk, inspect = async () => {}, 
     await expect(dialog).toBeVisible({timeout: 20000});
     await inspect(station, dialog);
     if (station === 2) await finishSpyHandoff(dialog);
-    if (station === 4 && !await dialog.locator('button[aria-pressed="true"]').count()) {
-      await dialog.locator('fieldset button').first().click();
-    }
-    if (station === 5) await dialog.getByRole('button', {name:'담당자에게 제안 전달하기'}).click();
     await beforeLeave(station);
     await dialog.getByRole('button', {name:nextDesk[station - 2], exact:true}).click();
     await expect(dialog).not.toBeVisible();
     await afterLeave(station);
   }
+  await travel(7);
+  await expect(calendar).toBeVisible({timeout:20000});
+  if (enterPersonal) await page.getByRole('button', {name:'내 AI 체험으로 가기', exact:true}).click();
 }

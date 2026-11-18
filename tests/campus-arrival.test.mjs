@@ -157,7 +157,7 @@ test('copy status persists independently of AI completion and rejects unrecogniz
 
 test('back navigation follows the personal, example and direct-calendar paths', () => {
   const state = model.initialArrivalState();
-  for (const [step, expected] of [[0, 0], [8, 0], [1, 8], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 8]]) {
+  for (const [step, expected] of [[0, 0], [8, 7], [1, 8], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 8]]) {
     assert.equal(model.arrivalBackStep({...state, step}), expected);
   }
   assert.equal(model.arrivalBackStep({...state, step: 5, mode: 'example', experience: 'example-viewed'}), 1);
@@ -179,6 +179,16 @@ test('the delivered proposal and the exact return step survive reopening the wal
   const invalid = model.parseArrivalState(JSON.stringify({...state, proposalSent: 'true', hallReturnStep: 7}));
   assert.equal(invalid.proposalSent, false);
   assert.equal(invalid.hallReturnStep, null);
+});
+
+test('the canon demo persists its phase and the retired desks resume on the active corridor', () => {
+  assert.deepEqual(model.corridorNext, {1: 2, 2: 3, 3: 4, 4: 7});
+  const parse = patch => model.parseArrivalState(JSON.stringify({...model.initialArrivalState(), spyPhase: 'handed-off', ...patch}));
+  assert.equal(parse({station: 5, canonPhase: 2}).station, 4);
+  assert.equal(parse({station: 5, canonPhase: 2}).canonPhase, 2);
+  assert.equal(parse({station: 6}).station, 7);
+  assert.equal(parse({station: 6, step: 3}).station, 6);
+  assert.equal(parse({station: 4, canonPhase: 5}).canonPhase, 0);
 });
 
 test('the audience selection resumes separately from the welcome introduction without losing drafts', () => {
@@ -348,7 +358,7 @@ test('an edited case resets its old review and selected rule while preserving th
     state.workTrial.role = '내가 만든 개인 AI 직원';
     state.workTrial.firstTask = '내 첫 업무 메모';
     const changed = model.reconcileArrivalOfficeCase(model.parseArrivalState(model.serializeArrivalState(state)), after);
-    assert.equal(changed.station, station);
+    assert.equal(changed.station, 4);
     assert.deepEqual(changed.deskReview, {phase: 'draft', choice: 0});
     assert.equal(changed.companyRule, null);
     assert.equal(changed.deskReviewRevision, after);
@@ -370,7 +380,7 @@ test('legacy case approvals enter the new example at the spy desk while preservi
     legacy.answers.business = {a: '원래 상품', b: '원래 장점'};
     const changed = model.reconcileArrivalOfficeCase(model.parseArrivalState(JSON.stringify(legacy)), revision);
     assert.equal(changed.step, step);
-    assert.equal(changed.station, step === 0 && station >= 3 && station <= 5 ? 2 : station);
+    assert.equal(changed.station, step === 0 && station >= 3 && station <= 5 ? 2 : step === 0 && station === 6 ? 7 : station);
     assert.equal(changed.handoff, 'copied');
     assert.equal(changed.experience, 'self-reported');
     assert.deepEqual(changed.answers.business, legacy.answers.business);
