@@ -314,7 +314,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </footer>}
       </>}
     </section>}
-    {!officeIntro && <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
+    {!officeIntro && (explore || sceneStatus === 'ready') && <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
     {step === 7 && explore && sceneStatus === 'ready' && <div className={entryStyle.hallControls}>
       <p className={entryStyle.keyboardHint}>바닥을 클릭하거나 방향키로 이동하세요.</p>
       <p className={entryStyle.touchHint}>가고 싶은 바닥을 터치하세요.</p>

@@ -369,7 +369,8 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       guide.visible = Boolean(stations[index]);
       if (guide.visible) {
         const stop = stations[index];
-        guide.position.set(stop.x, 0, stop.z);
+        // Mark the near edge of the arrival radius so it also fits the first portrait view.
+        guide.position.set(stop.x - .56, 0, stop.z);
         guide.userData.welcomeStation = index;
       }
       if (stationIndex >= 0 && stationIndex < 5 && preloadHall !== undefined) {
