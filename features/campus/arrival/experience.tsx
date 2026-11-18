@@ -5,6 +5,9 @@ import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, Briefcas
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, serializeArrivalState, ARRIVAL_STORAGE_KEY, googleCalendarUrl, calendarIcs, arrivalBackStep, type ArrivalState, type ArrivalStep} from './model';
 import {Scene as ArrivalScene} from './scene';
+import {OfficeDemo} from './office-demo-panel';
+import {DEFAULT_OFFICE_DEMO} from './office-demo';
+import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
 import s from './experience.module.css';
@@ -12,8 +15,7 @@ import theme from '../ui/theme.module.css';
 import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
-const chapters = ['웰컴존', '체험 사무실', '라이브 홀'];
-const rooms = ['welcome', 'office', 'live'] as const;
+const chapters = ['직원 만나기', '내 일로 체험', '라이브 홀'];
 
 /** Optional [section] lines keep editable examples readable; other text stays literal. */
 function ResultExample({text}: {text: string}) {
@@ -33,6 +35,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [showExample, setShowExample] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [explore, setExplore] = useState(false);
+  const [deskOpen, setDeskOpen] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
+  const deskDialog = useRef<HTMLDialogElement>(null);
+  const introDialog = useRef<HTMLDialogElement>(null);
+  const deskButton = useRef<HTMLButtonElement>(null);
   const resetDialog = useRef<HTMLDialogElement>(null);
   const exampleDialog = useRef<HTMLDialogElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
@@ -41,9 +48,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
   const visited = useRef(false);
   const step = state.step;
+  const officeIntro = step === 0;
+  const demoConfig = config.officeDemo ?? DEFAULT_OFFICE_DEMO;
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
   const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
-  const chapter = step === 0 || step === 8 ? 0 : step === 7 ? 2 : 1;
+  const chapter = officeIntro ? 0 : step === 7 ? 2 : 1;
+  const room = step === 7 ? 'live' : 'office';
   const content = {...audienceContent[state.audience], ...config.audiences[state.audience]};
   const answers = state.answers[state.audience];
   const effectiveAnswers = state.mode === 'example' ? content.example : answers;
@@ -91,8 +101,23 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     if (copyFallback) {fallbackRef.current?.focus(); fallbackRef.current?.select();}
   }, [copyFallback]);
 
+  useEffect(() => {
+    if (deskOpen) deskDialog.current?.showModal();
+    else deskDialog.current?.close();
+  }, [deskOpen]);
+  useEffect(() => {
+    if (introOpen) introDialog.current?.showModal();
+    else introDialog.current?.close();
+  }, [introOpen]);
+
+  function closeDesk() {
+    deskDialog.current?.close();
+    setDeskOpen(false);
+    deskButton.current?.focus();
+  }
+
   function update(patch: Partial<ArrivalState>) {setState(value => ({...value, ...patch}));}
-  function go(next: ArrivalStep) {if (menu.current) menu.current.open = false; setNotice(''); setCopyFallback(''); setExplore(false); update({step: next});}
+  function go(next: ArrivalStep) {setDeskOpen(false); setIntroOpen(false); if (menu.current) menu.current.open = false; setNotice(''); setCopyFallback(''); setExplore(false); update({step: next});}
   function selectAudience(audience: Audience) {
     update({audience, mode: 'personal', experience: 'none', handoff: 'ready', extra: '', step: 1});
     setNotice(''); setCopyFallback('');
@@ -123,38 +148,44 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function reset() {
     if (menu.current) menu.current.open = false;
     try {if (persistenceKey) localStorage.removeItem(persistenceKey);} catch {}
-    setState(initialArrivalState()); setCopyFallback(''); setExplore(false); setShowReset(false); setNotice('');
+    setState(initialArrivalState()); setDeskOpen(false); setIntroOpen(false); setCopyFallback(''); setExplore(false); setShowReset(false); setNotice('');
   }
   function exampleFinish() {update({mode: 'example', experience: 'example-viewed', handoff: 'ready', step: 5}); setNotice('');}
   function personalStart() {update({mode: 'personal', experience: 'none', step: 2}); setNotice('');}
   const title = (text: React.ReactNode, description?: string) => <div className={s.intro}><h1 ref={heading} tabIndex={-1}>{text}</h1>{description && <p>{description}</p>}</div>;
 
-  return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={rooms[chapter]}>
-    <a href="#arrival-content" className={s.skip}>체험 안내로 바로가기</a>
+  return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined}>
+    <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label={`${chapters[chapter]} 공간`}>
-      <ArrivalScene room={rooms[chapter]} demoTitle={state.audience === 'work' ? workConfig.title : config.audiences[state.audience].goal} demoPhase={state.audience === 'work' ? 'brief' : step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={() => setShowExample(true)} className={s.scene}/>
+      <ArrivalScene room={room} officeIntro={officeIntro} demoTitle={officeIntro ? demoConfig.deskLabel : state.audience === 'work' ? workConfig.title : config.audiences[state.audience].goal} demoPhase={officeIntro ? 'result' : state.audience === 'work' ? 'brief' : step === 1 || state.experience !== 'none' ? 'result' : 'brief'} onReady={setSceneReady} onAction={action => {
+        if (action === 'office:demo' && officeIntro) setDeskOpen(true);
+        else if (!officeIntro && state.audience !== 'work') setShowExample(true);
+        else setExplore(false);
+      }} className={s.scene}/>
       <div className={s.worldShade}/>
     </div>
     <header className={s.header}>
       <div className={s.wordmark}>{/* eslint-disable-next-line @next/next/no-img-element -- Reuse the existing EDU brand asset. */}
       <img src="/brandy-action-logo.png" alt="브랜디액션"/><small>EDU</small></div>
       <ol className={s.route} aria-label="체험 경로">{chapters.map((label,i) => <li key={label} aria-current={chapter === i ? 'step' : undefined}><span>{i < chapter ? <Check size={11}/> : i + 1}</span>{label}{i < 2 && <i/>}</li>)}</ol>
-      <details ref={menu} className={s.menu}><summary aria-label="체험 메뉴"><MoreHorizontal size={23}/></summary><div><span>{preview ? '저장 전 관리자 미리보기' : '브랜치 미리보기'}</span><button type="button" onClick={() => go(7)}><CalendarDays size={16}/>라이브 일정 바로 보기</button><button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button></div></details>
+      <details ref={menu} className={s.menu}><summary aria-label="체험 메뉴"><MoreHorizontal size={23}/></summary><div><span>{preview ? '저장 전 관리자 미리보기' : '브랜치 미리보기'}</span><button type="button" onClick={() => {if (menu.current) menu.current.open = false; setIntroOpen(true);}}>체험 소개</button><button type="button" onClick={() => go(7)}><CalendarDays size={16}/>라이브 일정 바로 보기</button><button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button></div></details>
     </header>
-    <div className={s.place}><span className={s.placeDot}/>{chapters[chapter]}<small>{!sceneReady ? '공간을 준비하는 동안에도 시작할 수 있어요' : chapter === 0 ? 'AI에게 맡길 일 선택하기' : chapter === 1 ? '내 상황으로 AI 체험하기' : `${dateLabel} ${timeLabel} · 무료 라이브`}</small></div>
+    {!officeIntro && <div className={s.place}><span className={s.placeDot}/>{chapters[chapter]}<small>{!sceneReady ? '공간을 준비하는 동안에도 시작할 수 있어요' : chapter === 1 ? '내 상황으로 AI 체험하기' : `${dateLabel} ${timeLabel} · 무료 라이브`}</small></div>}
 
-    <section className={`${s.dock} ${step === 0 ? s.welcomeDock : ''} ${workActive ? s.workDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
+    {officeIntro ? <section className={entryStyle.briefing} data-scene-ready={sceneReady} aria-label="팀장 안내">
+      <div>
+        <span>문샷 캠퍼스 · 팀장</span>
+        <h1>{demoConfig.greeting}</h1>
+      </div>
+      <button id="arrival-desk-button" type="button" ref={deskButton} onClick={() => setDeskOpen(true)}>
+        {sceneReady ? '모니터 바로 보기' : demoConfig.deskLabel}<ArrowRight size={17}/>
+      </button>
+    </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내">
       {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
         onChange={workTrial => update({workTrial, experience: workTrial.secondConfirmed ? 'self-reported' : 'none'})}
         onExit={() => go(8)} onLive={() => go(7)}/> : <>
-      <div className={s.dockTop}><span>{step === 0 ? '문샷 캠퍼스에 오신 것을 환영합니다' : step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span>{step > 0 && <button type="button" className={s.back} onClick={() => go(step === 7 && state.audience === 'work' && state.workTrial.role ? 1 : arrivalBackStep(state))}><ArrowLeft size={14}/>이전</button>}</div>
+      <div className={s.dockTop}><span>{step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={() => go(step === 7 && state.audience === 'work' && state.workTrial.role ? 1 : arrivalBackStep(state))}><ArrowLeft size={14}/>이전</button></div>
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
-        {step === 0 && <>
-          <p className={s.welcomeEyebrow}>문샷 캠퍼스 · 무료 라이브 사전 체험</p>
-          {title(config.title, config.description)}
-          <div className={s.welcomeOverview}><h2>내가 하던 일에, 이렇게 AI를 써보세요</h2><ul>{config.welcomeBenefits.map((benefit, index) => <li key={index}><Check size={16}/><span>{benefit}</span></li>)}</ul></div>
-          <p className={s.welcomeHow}>결과 예시를 본 뒤, 내 상황에 맞는 요청문을 만들어 평소 쓰는 ChatGPT나 Claude에 보내보세요.</p>
-        </>}
         {step === 8 && <>
           {title(<>지금 어떤 상황이신가요?</>, '가장 가까운 상황을 골라주세요. 나에게 맞는 결과 예시부터 보여드릴게요.')}
           <div className={s.choices} aria-label="내 상황에 맞는 체험 선택">{audiences.map(id => {const Icon = icons[id]; return <button type="button" key={id} onClick={() => selectAudience(id)}><span className={s.choiceIcon}><Icon size={21}/></span><span><strong>{config.audiences[id].label}</strong><small>{config.audiences[id].goal}</small></span><ArrowRight size={17}/></button>;})}</div>
@@ -206,7 +237,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
       {step !== 8 && <footer className={s.dockFooter}>
-        {step === 0 && <><span className={s.footerHint}>{dateLabel} {timeLabel} 무료 라이브 전에 체험해보세요.</span><button type="button" className={s.primary} onClick={() => go(8)}>내 상황에 맞는 체험 시작하기<ArrowRight size={18}/></button></>}
         {step === 1 && <button type="button" className={s.primary} onClick={personalStart}>내 상황으로 요청문 만들기<ArrowRight size={18}/></button>}
         {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={s.primary} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={s.primary} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
@@ -214,8 +244,17 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 7 && <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer"><CalendarDays size={18}/>Google 캘린더<ArrowUpRight size={14}/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={18}/>아이폰·기타 캘린더<ArrowRight size={14}/></button></div>}
       </footer>}
       </>}
-    </section>
-    <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>
+    </section>}
+    {!officeIntro && <button className={s.exploreButton} type="button" onClick={() => setExplore(!explore)}>{explore ? '체험 계속하기' : '공간 둘러보기'}{explore ? <ArrowLeft size={15}/> : <ArrowUpRight size={15}/>}</button>}
+    <dialog ref={deskDialog} className={entryStyle.monitor} aria-label="광고 담당자의 모니터" onCancel={event => {event.preventDefault(); event.stopPropagation(); closeDesk();}}>
+      {deskOpen && <OfficeDemo config={demoConfig} phase={state.deskReview.phase} choice={state.deskReview.choice}
+        onPhaseChange={(phase, choice) => update({deskReview: {phase, choice}})}
+        onClose={closeDesk} onPersonal={() => go(8)}/>}
+    </dialog>
+    <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>
+      <header><h2>{config.title}</h2><button type="button" aria-label="소개 닫기" onClick={() => setIntroOpen(false)}><X size={20}/></button></header>
+      <div className={s.exampleBody}><p>{config.description}</p><ul>{config.welcomeBenefits.map((benefit, i) => <li key={i}>{benefit}</li>)}</ul></div>
+    </dialog>
     <dialog ref={exampleDialog} className={s.exampleDialog} onCancel={() => setShowExample(false)} aria-labelledby="arrival-example-title">
       <header><div><span>미리 준비한 결과 예시</span><h2 id="arrival-example-title">{content.goal}</h2></div><button type="button" aria-label="결과 예시 닫기" onClick={() => setShowExample(false)}><X size={20}/></button></header>
       <div className={s.exampleBody}><ResultExample text={content.example.before}/></div>

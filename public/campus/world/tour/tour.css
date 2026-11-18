@@ -108,3 +108,13 @@ body[data-guided-preview="true"] .guided-example-action:not([hidden]){
 body[data-guided-preview="true"] .guided-example-action:hover{background:#f7f8f9;border-color:#a9aeb6}
 body[data-guided-preview="true"] .guided-example-action:focus-visible{outline:3px solid #315e8b;outline-offset:3px}
 body[data-guided-preview="true"] .guided-example-action:after{display:none}
+
+body[data-office-intro="true"] .guided-example-action:after {
+ display:block; left:50%; top:100%; width:10px; height:10px;
+ background:inherit; border:0; border-right:1px solid #d6dbdf; border-bottom:1px solid #d6dbdf;
+ transform:translate(-50%,-55%) rotate(45deg); transform-origin:center;
+}
+
+body[data-office-intro="true"] .guided-example-action span {
+ min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}

@@ -1,4 +1,5 @@
 import {audiences, isAudience, isRevision, cleanAnswer, REVISION_LIMIT, type Audience, type Answers, type Revision} from './content';
+import type {OfficeDemoChoice, OfficeDemoPhase} from './office-demo';
 import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from './work-trial';
 
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
@@ -16,9 +17,10 @@ export type ArrivalState = {
   revision: Revision;
   extra: string;
   workTrial: WorkTrialState;
+  deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState()};
+  return {version: 1, step: 0, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReview: {phase: 'draft', choice: 0}};
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -52,6 +54,10 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     state.handoff = value.handoff === 'copied' ? 'copied' : 'ready';
     if (isRevision(value.revision)) state.revision = value.revision;
     state.extra = answer(value.extra).slice(0, REVISION_LIMIT);
+    const desk = value.deskReview;
+    if (object(desk) && (desk.phase === 'feedback' || desk.phase === 'approved') && (desk.choice === 0 || desk.choice === 1)) {
+      state.deskReview = {phase: desk.phase, choice: desk.choice};
+    }
     state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
   } catch {

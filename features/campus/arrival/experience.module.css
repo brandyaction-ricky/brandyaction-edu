@@ -183,7 +183,6 @@
   font-size: 14px;
   color: var(--muted);
 }
-.welcomeDock .dockTop { display: none; }
 .root .back {
   display: flex;
   align-items: center;
@@ -219,13 +218,6 @@
 }
 .intro h1 em { font-style: normal; color: var(--ink); }
 .intro > p { font-size: 17px; line-height: 1.75; margin-top: 14px; color: var(--muted); word-break: keep-all; }
-.root .welcomeEyebrow { margin-bottom: 12px; color: var(--ba-red); font-size: 14px; font-weight: 650; }
-.welcomeOverview { border-top: 1px solid var(--line); padding-top: 18px; }
-.welcomeOverview h2 { font-size: 16px; font-weight: 650; line-height: 1.6; margin: 0 0 12px; }
-.welcomeOverview ul { padding: 0; margin: 0; list-style: none; display: grid; gap: 10px; }
-.welcomeOverview li { display: flex; align-items: flex-start; gap: 9px; font-size: 16px; line-height: 1.6; word-break: keep-all; }
-.welcomeOverview li svg { flex: none; margin-top: 5px; color: var(--ba-red); }
-.root .welcomeHow { margin-top: 20px; color: var(--muted); font-size: 15px; line-height: 1.75; word-break: keep-all; }
 .dockFooter {
   flex-shrink: 0;
   padding: 17px 30px 22px;
@@ -541,4 +533,12 @@
   .root:has(.workDock) { --scene-height: 132px; }
   .root:has(.workDock) .place { display: none; }
   .root:has(.workDock) .exploreButton { top: 112px; }
+}
+
+/* The entrance shows the navigable office before opening any lesson panels. */
+.root[data-office-entry] .world { inset: 72px 0 0; height: auto; }
+.root[data-office-entry] .worldShade { display: none; }
+@media (max-width: 700px) {
+  .root[data-office-entry] .world { inset-block-start: 64px; }
+  .root[data-office-entry] .route { display: none; }
 }

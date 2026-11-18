@@ -6,6 +6,7 @@ export type ArrivalRoom = 'welcome' | 'office' | 'live';
 
 type SceneProps = {
   room: ArrivalRoom;
+  officeIntro?: boolean;
   demoPhase?: 'brief' | 'result';
   demoTitle?: string;
   onAction?: (id: string) => void;
@@ -26,10 +27,10 @@ const actions: Record<ArrivalRoom, readonly string[]> = {
 };
 
 /** A local presentation bridge. It never mounts the member host, presence or reporting APIs. */
-export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 맡길 첫 업무', onAction, className, onReady }: SceneProps) {
+export function Scene({ room, officeIntro = false, demoPhase = 'result', demoTitle = '내 AI에게 맡길 첫 업무', onAction, className, onReady }: SceneProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const token = useRef('');
-  const active = useRef({ room, demoPhase, demoTitle, onAction, onReady });
+  const active = useRef({ room, officeIntro, demoPhase, demoTitle, onAction, onReady });
   const ready = useRef(false);
   const [bridge, setBridge] = useState('');
 
@@ -39,8 +40,8 @@ export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 �
   }, []);
 
   useEffect(() => {
-    active.current = { room, demoPhase, demoTitle, onAction, onReady };
-  }, [room, demoPhase, demoTitle, onAction, onReady]);
+    active.current = { room, officeIntro, demoPhase, demoTitle, onAction, onReady };
+  }, [room, officeIntro, demoPhase, demoTitle, onAction, onReady]);
 
   useEffect(() => {
     // Keep the capability tied to the iframe document, including effect reconnects.
@@ -61,7 +62,8 @@ export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 �
         post('guided-demo', { phase: active.current.demoPhase, title: active.current.demoTitle.slice(0, 160) });
         // Read the most recent room: the visitor may advance while models are still loading.
         post('room', { id: active.current.room });
-        post('camera', { mode: 'overall' });
+        post('guided-office-intro', { enabled: active.current.officeIntro });
+        post('camera', { mode: active.current.officeIntro && active.current.room === 'office' ? 'third' : 'overall' });
         active.current.onReady?.(true);
       } else if (message.type === 'room' && ready.current && message.payload?.id === active.current.room) {
         active.current.onReady?.(true);
@@ -75,7 +77,7 @@ export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 �
     window.addEventListener('message', receive);
     // Fast Refresh or an effect reconnect can retain an already loaded iframe.
     // Repeating init requests its ready acknowledgement without reloading the scene.
-    if (frame.current) post('init', { guidedPreview: true, initialRoom: active.current.room, demoPhase: active.current.demoPhase, demoTitle: active.current.demoTitle.slice(0, 160), visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
+    if (frame.current) post('init', { guidedPreview: true, officeIntro: active.current.officeIntro, initialRoom: active.current.room, demoPhase: active.current.demoPhase, demoTitle: active.current.demoTitle.slice(0, 160), visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
     return () => {
       ready.current = false;
       window.removeEventListener('message', receive);
@@ -85,6 +87,10 @@ export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 �
   useEffect(() => {
     if (ready.current) post('room', { id: room });
   }, [room, post]);
+
+  useEffect(() => {
+    if (ready.current) post('guided-office-intro', { enabled: officeIntro });
+  }, [officeIntro, post]);
 
   useEffect(() => {
     if (ready.current) post('guided-demo', { phase: demoPhase, title: demoTitle.slice(0, 160) });
@@ -102,7 +108,7 @@ export function Scene({ room, demoPhase = 'result', demoTitle = '내 AI에게 �
     onLoad={() => {
       ready.current = false;
       active.current.onReady?.(false);
-      post('init', { guidedPreview: true, initialRoom: active.current.room, demoPhase: active.current.demoPhase, demoTitle: active.current.demoTitle.slice(0, 160), visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
+      post('init', { guidedPreview: true, officeIntro: active.current.officeIntro, initialRoom: active.current.room, demoPhase: active.current.demoPhase, demoTitle: active.current.demoTitle.slice(0, 160), visitor: false, devPresence: false, qaCrowd: false, ambientCount: 0 });
     }}
   /> : null;
 }

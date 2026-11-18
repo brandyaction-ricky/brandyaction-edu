@@ -1,3 +1,4 @@
+import {finishOfficeReview} from './review-office.mjs';
 import {chromium, expect} from '@playwright/test';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -34,7 +35,7 @@ try {
     }
     try {
       await page.goto(base + path, {waitUntil: 'domcontentloaded'});
-      await page.getByRole('button', {name: '내 상황에 맞는 체험 시작하기', exact: true}).click();
+      await finishOfficeReview(page);
       await page.getByRole('button', {name: /회사 업무에 AI를 써보고 싶어요/}).click();
       await expect(step).toHaveAttribute('data-work-step', '0');
       await page.getByRole('button', {name: '예시 업무로 시작', exact: true}).click();

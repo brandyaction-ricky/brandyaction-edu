@@ -9,6 +9,8 @@ import {audiences, type Audience} from './content';
 import {ARRIVAL_CONFIG_LIMITS as limits, DEFAULT_ARRIVAL, validateArrivalConfig, type ArrivalConfig} from './config';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
 import {WorkTrialEditor} from './work-trial-editor';
+import {DEFAULT_OFFICE_DEMO} from './office-demo';
+import {OfficeDemoEditor} from './office-demo-editor';
 import styles from './editor.module.css';
 
 const Experience = lazy(() => import('./experience').then(module => ({default: module.ArrivalExperience})));
@@ -53,6 +55,7 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
     welcomeBenefits: storedValue.welcomeBenefits ?? DEFAULT_ARRIVAL.welcomeBenefits,
     audiences: {...DEFAULT_ARRIVAL.audiences, ...storedValue.audiences},
     workTrial: storedValue.workTrial ?? DEFAULT_WORK_TRIAL,
+    officeDemo: Object.hasOwn(storedValue, 'officeDemo') ? storedValue.officeDemo : DEFAULT_OFFICE_DEMO,
   } : undefined;
   const [preview, setPreview] = useState<ArrivalConfig | null>(null);
   const [error, setError] = useState('');
@@ -92,20 +95,24 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
     <p className={styles.scope}>편집 후 하단 ‘설정 저장’을 눌러야 보관됩니다. 저장해도 모집 체험이 자동 공개되지 않습니다.</p>
     {error && <p ref={errorBox} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
 
-    <EditorDisclosure title="1. 첫 화면 · 강사 소개" initialOpen>
+    <EditorDisclosure title="사무실 입장 · 광고 직원 시연" initialOpen>
+      <OfficeDemoEditor disabled={disabled} value={value.officeDemo} onChange={next => patch('officeDemo', next)}/>
+    </EditorDisclosure>
+
+    <EditorDisclosure title="체험 소개 · 강사 소개">
       <fieldset disabled={disabled} className={styles.fields}>
-        <AdminTextarea label="첫 화면 제목" required maxLength={limits.title} rows={2} value={value.title} onChange={event => patch('title', event.target.value)}/>
-        <AdminTextarea label="첫 화면 안내" required maxLength={limits.description} rows={3} value={value.description} onChange={event => patch('description', event.target.value)}/>
-        {value.welcomeBenefits.map((benefit, index) => <AdminInput key={index} label={`첫 화면 체험 안내 ${index + 1}`} helper={index === 0 ? '상황을 선택하기 전 모든 방문자가 보는 문구입니다. 사업자에게만 해당하는 설명은 대상별 체험에 적어주세요.' : undefined} required maxLength={limits.goal} value={benefit} onChange={event => patch('welcomeBenefits', value.welcomeBenefits.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}/>)}
+        <AdminTextarea label="체험 소개 제목" helper="첫 화면 메뉴에서 ‘체험 소개’를 열면 표시됩니다." required maxLength={limits.title} rows={2} value={value.title} onChange={event => patch('title', event.target.value)}/>
+        <AdminTextarea label="체험 소개 본문" required maxLength={limits.description} rows={3} value={value.description} onChange={event => patch('description', event.target.value)}/>
+        {value.welcomeBenefits.map((benefit, index) => <AdminInput key={index} label={`체험 소개 · 해볼 수 있는 일 ${index + 1}`} required maxLength={limits.welcomeBenefit} value={benefit} onChange={event => patch('welcomeBenefits', value.welcomeBenefits.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}/>)}
         <AdminInput label="강사 이름" required maxLength={limits.instructorName} value={value.instructorName} onChange={event => patch('instructorName', event.target.value)}/>
         <AdminTextarea label="강사·팀 소개" required maxLength={limits.instructorIntro} rows={3} value={value.instructorIntro} onChange={event => patch('instructorIntro', event.target.value)}/>
         <AdminInput label="소개 영상 주소 · 선택" type="url" maxLength={limits.url} placeholder="https://www.youtube.com/watch?v=…" helper="영상이 없으면 비워두세요. 방문자가 직접 눌러서 시청합니다." value={value.videoUrl} onChange={event => patch('videoUrl', event.target.value)}/>
       </fieldset>
     </EditorDisclosure>
 
-    {audiences.map((id, index) => {
+    {audiences.map(id => {
       const item = value.audiences[id];
-      return <EditorDisclosure key={id} title={`${index + 2}. ${audienceNames[id]} · 체험 내용`}>
+      return <EditorDisclosure key={id} title={`${audienceNames[id]} · 체험 내용`}>
         <fieldset disabled={disabled} className={styles.fields}>
           <div className={styles.grid}>
             <AdminInput label="대상 안내 · 버튼의 큰 제목" helper={id === 'work' ? '예: 회사 업무에 AI를 써보고 싶어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.' : '예: 이미 사업을 하고 있어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.'} required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
@@ -132,7 +139,7 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
       </EditorDisclosure>;
     })}
 
-    <EditorDisclosure title={`${audiences.length + 2}. 라이브 안내 · 일정 저장`}>
+    <EditorDisclosure title="라이브 안내 · 일정 저장">
       <fieldset disabled={disabled} className={styles.fields}>
         <AdminInput label="라이브 제목" required maxLength={limits.liveTitle} value={value.liveTitle} onChange={event => patch('liveTitle', event.target.value)}/>
         <div className={styles.grid}>

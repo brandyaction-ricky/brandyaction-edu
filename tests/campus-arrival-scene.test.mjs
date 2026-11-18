@@ -83,7 +83,7 @@ test('the guided marker announces a prepared example rather than real AI complet
   let label = '', openResult;
   const sent = [];
   const button = {classList: {add: value => classes.push(value)}, replaceChildren: value => {label = value;}, setAttribute: (key, value) => {attributes[key] = value;}};
-  const context = {guidedPreview: true, guidedDemoTitle: '내 경험으로 할 일 후보 찾기', room: 'office', currentRole: 'student', deskMarkers: [],
+  const context = {guidedPreview: true, officeIntro: false, guidedDemoTitle: '내 경험으로 할 일 후보 찾기', room: 'office', currentRole: 'student', deskMarkers: [],
     layer: {}, officeSeats: [], deskProfiles: [], deskJobs: [], deskLive: false,
     send: (type, payload) => sent.push([type, payload.id]),
     makeDeskMarkers: (_layer, _seats, _profiles, _jobs, open) => {openResult = open; return [{b: button}];}};
@@ -102,7 +102,7 @@ test('the short mobile scene keeps its one action clear of the top route and bot
   for (const [width, height] of [[320, 160], [390, 160], [390, 210], [390, 120]]) {
     for (const point of [{x: -100, y: -100}, {x: width / 2, y: height / 2}, {x: width + 100, y: height + 100}]) {
       const button = {style: {}};
-      const context = {guidedPreview: true, office: {cw: width, ch: height, projectInteriorPoint: () => point}, deskMarkers: [{b: button, item: {}}]};
+      const context = {guidedPreview: true, officeIntro: false, office: {cw: width, ch: height, projectInteriorPoint: () => point}, deskMarkers: [{b: button, item: {}}]};
       vm.createContext(context);
       vm.runInContext(functionSource(source, 'positionCurrentDeskMarkers', 'configureGuidedLabels') + '\npositionCurrentDeskMarkers();', context);
       const [x, y] = button.style.transform.match(/[\d.]+/g).map(Number);
@@ -153,4 +153,36 @@ test('the guided world leaves the main next action to the host', () => {
   vm.createContext(context);
   vm.runInContext(source.slice(source.indexOf('function actions(){'), source.indexOf('\nlet ', source.indexOf('function actions(){'))), context);
   assert.equal(vm.runInContext('actions().length', context), 0);
+});
+
+test('first visit starts in the aisle facing the selected employee in the movable office layout', async () => {
+  const {introSeatIndex, introEntrance, introBalloonPosition} = await import('../public/campus/world/tour/intro-desk.mjs');
+  const {createCampusPlan, findCampusRoomAt} = await import('../public/campus/world/office/vendor/campus-plan.js');
+  const desk = createCampusPlan().officeSeats[introSeatIndex];
+  const spawn = introEntrance(desk);
+  assert.equal(findCampusRoomAt(spawn.x, spawn.y), 'office');
+  const heading = Math.atan2(desk.seat.x - spawn.x, desk.seat.y - spawn.y);
+  assert.ok(Math.abs(heading - spawn.yaw) < .35);
+  let projected;
+  const office = {cw: 390, ch: 720, projectInteriorPoint(item) {projected = item; return {x: 190, y: 270};}};
+  assert.deepEqual(introBalloonPosition(office, desk), {x: 118, y: 226});
+  assert.equal(projected.x, desk.seat.x);
+  assert.equal(projected.y, desk.seat.y);
+  office.projectInteriorPoint = () => null;
+  assert.equal(introBalloonPosition(office, desk), null);
+});
+
+test('tap the demo employee, their workstation or neither from two camera directions', async () => {
+  const {introSeatIndex, hitsIntroDesk} = await import('../public/campus/world/tour/intro-desk.mjs');
+  const {createCampusPlan} = await import('../public/campus/world/office/vendor/campus-plan.js');
+  const desks = createCampusPlan().officeSeats;
+  const desk = desks[introSeatIndex], other = desks[introSeatIndex + 1];
+  const tapFromAbove = (x, z) => hitsIntroDesk({x, y: 5, z}, {x, y: -5, z}, desks);
+  assert.ok(tapFromAbove(desk.seat.x, desk.seat.y));
+  assert.ok(tapFromAbove(desk.x + .7, desk.y + .6));
+  assert.ok(!tapFromAbove(other.x + .7, other.y + .6));
+  assert.ok(!tapFromAbove(27, 17));
+  assert.ok(hitsIntroDesk({x: 26, y: 1.2, z: desk.seat.y}, {x: 18, y: 1.2, z: desk.seat.y}, desks));
+  // A neighbouring desk in front of the selected one intercepts the tap.
+  assert.ok(!hitsIntroDesk({x: desk.x + .7, y: .8, z: 24}, {x: desk.x + .7, y: .8, z: 10}, desks));
 });

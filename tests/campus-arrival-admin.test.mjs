@@ -26,15 +26,31 @@ test('older webinar settings stay valid without adding recruitment defaults on r
 test('webinar save validation preserves edited recruitment settings and existing purchased welcome content independently', () => {
   const arrival = structuredClone(DEFAULT_ARRIVAL);
   arrival.title = '운영자가 수정한 첫 안내';
+  arrival.officeDemo.greeting = '새 광고의 첫 문장을 함께 골라주세요.';
+  arrival.officeDemo.choices[1].rule = '회의 중 결정된 내용부터 소개한다.';
   arrival.audiences.preparing.example.after = '운영자가 수정한 창업 질문 세 개';
   arrival.endsAt = null;
   const input = {...event, welcome: DEFAULT_WELCOME, arrival};
   const saved = validateWebinar(JSON.parse(JSON.stringify(input)));
   assert.equal(saved.arrival.title, arrival.title);
+  assert.deepEqual(saved.arrival.officeDemo, arrival.officeDemo);
   assert.equal(saved.arrival.audiences.preparing.example.after, arrival.audiences.preparing.example.after);
   assert.equal(saved.arrival.endsAt, null);
   assert.equal(Date.parse(saved.endsAt), Date.parse(event.endsAt));
   assert.deepEqual(saved.welcome, validateWelcome(DEFAULT_WELCOME));
+});
+
+test('previously saved recruitment welcome adds the office demo without mutating campaign edits', () => {
+  const arrival = structuredClone(DEFAULT_ARRIVAL);
+  delete arrival.officeDemo;
+  arrival.liveTitle = '기존 행사에서 직접 붙인 라이브 제목';
+  const saved = validateWebinar({...event, arrival});
+  assert.deepEqual(saved.arrival.officeDemo, DEFAULT_ARRIVAL.officeDemo);
+  assert.equal(saved.arrival.liveTitle, arrival.liveTitle);
+  assert.equal(Object.hasOwn(arrival, 'officeDemo'), false);
+  for (const officeDemo of [null, {}, {...DEFAULT_ARRIVAL.officeDemo, choices: []}]) {
+    assert.throws(() => validateWebinar({...event, arrival: {...arrival, officeDemo}}), {status: 400});
+  }
 });
 
 test('saving recruitment content does not publish it through the existing public webinar projection', () => {
