@@ -1,13 +1,13 @@
 import {mountWelcomeLiveHall} from './welcome-live-hall.mjs';
 
 /** Six offices line one corridor, ending at the entrance to a separate live hall. */
-const TITLES = ['팀장 봇', '조사 직원', '기획 · 제작 직원', '고객 응대 직원', '회사 기준', '내 AI 체험', '라이브 홀'];
+const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '고객 응대 직원', '내 AI 체험', '라이브 홀'];
 const PALETTE = {
   navy: 0x213951, deep: 0x142d45, steel: 0x678298, frost: 0xdfeaf0,
   pearl: 0xf0f2ee, floor: 0xc5d9e5, edge: 0x92abba, ink: 0x334950,
   wood: 0xc8a176, blue: 0x456c9e, sand: 0xdfc8a6, green: 0x638879, red: 0xb93846,
 };
-const CHARACTERS = ['male-a','female-d','male-b','female-f',null,'male-e'];
+const CHARACTERS = ['male-a','female-d','male-b',null,'female-f','male-e'];
 const KENNEY = '/campus/world/office/vendor/assets/kenney/';
 
 export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
@@ -294,7 +294,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       // Mounted colour samples make this the production studio.
       for(let i=0;i<4;i++) box(g,-2.20+i*.4,1.54,-6.46,.34,.53,.035,[sand,red,green,blue][i]);
       round(g,1.4,1.1,-2.93,.25,.12,.25,red);
-    }else if(index===3){
+    }else if(index===4){
       // A service counter with a chat display, a seated rep and desk phone.
       desk(g,.75,-3.19,3.15);
       chair(g,-1.12,-3.90);
@@ -307,7 +307,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
         box(g,x,y,-6.34,w,.18,.025,c,'light');
       }
       plant(g,-2.40,-4.8,.72);
-    }else if(index===4){
+    }else if(index===3){
       shelf(g,-1.42,-5.46);
       shelf(g,1.10,-5.46);
       box(g,-.22,.68,-3.07,2.42,.12,.82,wood);

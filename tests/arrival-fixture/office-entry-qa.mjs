@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, finishTeamLeaderVideo, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {finishOfficeReview, finishTeamLeaderVideo, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -12,27 +12,61 @@ try {
   for (const [device, viewport] of [['pc', {width: 1440, height: 900}], ['mobile', {width: 390, height: 844}], ['small-mobile', {width: 320, height: 568}]]) {
     const mobile = device !== 'pc';
     const page = await browser.newPage({viewport, isMobile: mobile, hasTouch: mobile, permissions:['clipboard-read','clipboard-write']});
-    const errors = [], externalAI = [], arrivals = [];
+    const errors = [], externalAI = [], maskVideoRequests = [], arrivals = [];
     page.on('pageerror', e => errors.push(e.message));
-    page.on('request', r => { if (/^https:\/\/(chatgpt\.com|claude\.ai|api\.openai\.com|api\.anthropic\.com)\//.test(r.url())) externalAI.push(r.url()); });
+    page.on('request', r => {
+      if (/^https:\/\/(chatgpt\.com|claude\.ai|api\.openai\.com|api\.anthropic\.com)\//.test(r.url())) externalAI.push(r.url());
+      if (new URL(r.url()).pathname === '/campus/arrival/mask-example-silent.mp4') maskVideoRequests.push(r.url());
+    });
     const frame = page.frameLocator('iframe[title*="직원 사무실"]');
     const marker = frame.getByRole('button', {name:/쪽으로 걷기/});
+    const openDesk = frame.getByRole('button', {name:/열기$/});
     const state = frame.locator('#walk');
     const button = (root, name) => root.getByRole('button',{name, exact:true});
     async function capture(stage) {
       if (output) await page.screenshot({path:resolve(output, device+'-'+stage+'.png'), animations:'disabled'});
     }
     async function walk(station) {
-      await expect(marker).toBeVisible({timeout:60000});
       await expect(state).toHaveAttribute('data-ready','true');
       await expect(state).toHaveAttribute('data-station', String(station));
       const count = Number(await state.getAttribute('data-arrivals'));
       const from = Number(await state.getAttribute('data-player-x'));
+      if (await state.getAttribute('data-near-desk') === 'true') {
+        if (mobile) await openDesk.tap(); else await openDesk.click();
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await expect(state).toHaveAttribute('data-arrivals', String(count));
+        return;
+      }
+      await expect(marker).toBeVisible({timeout:60000});
       if (mobile) await marker.tap(); else await marker.click();
       await expect(state).toHaveAttribute('data-arrivals', String(count+1), {timeout:20000});
       const to = Number(await state.getAttribute('data-player-x'));
       expect(Math.abs(to-(station-1)*8)).toBeLessThan(.75);
       arrivals.push({station,from,to});
+      if (station >= 2 && station <= 4) {
+        await expect(state).toHaveAttribute('data-near-desk', 'true');
+        await expect(openDesk).toBeVisible();
+        await expect(page.getByRole('dialog')).not.toBeVisible();
+        if (station === 2) await capture('spy-arrived');
+        if (mobile) await openDesk.tap(); else await openDesk.click();
+        await expect(state).toHaveAttribute('data-arrivals', String(count+1));
+      }
+    }
+    const worldPosition = () => state.evaluate(element => [element.dataset.playerX, element.dataset.playerZ, element.dataset.arrivals]);
+    let positionBeforeLeave;
+    async function beforeLeave(station) {
+      if (station > 3) return;
+      await expect(state).toHaveAttribute('data-moving', 'false');
+      positionBeforeLeave = await worldPosition();
+    }
+    async function afterLeave(station) {
+      if (station > 3) return;
+      await expect(state).toHaveAttribute('data-station', String(station+1));
+      await expect(state).toHaveAttribute('data-moving', 'false');
+      await expect(marker).toBeVisible();
+      expect(await worldPosition()).toEqual(positionBeforeLeave);
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      if (station === 2) expect(maskVideoRequests).toEqual([]);
     }
     async function inspectLeader(guide) {
       const intro = guide.getByRole('heading', {name:'AI봇들과 함께 일하면 어떻게 될까요?', exact:true});
@@ -113,29 +147,87 @@ try {
     }
     async function inspect(station, dialog) {
       if (station === 1) await inspectLeader(dialog);
+      else expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
       if (station === 2) {
-        const sources=dialog.getByRole('link', {name:'원문 열기'});
-        expect((await sources.evaluateAll(links=>links.map(a=>new URL(a.href).hostname))).sort()).toEqual(['brandyaction-edu.com','grow.google','www.coursera.org']);
-        await expect(dialog.getByRole('heading',{name:'조사 담당자의 해석'})).toBeVisible();
+        const conversation = dialog.getByRole('region', {name:'경쟁사 스파이와 나눈 대화'});
+        const reviews = dialog.getByRole('group', {name:'가상 리뷰 재구성'});
+        await expect(conversation).toContainText('우리 브랜드에 활용할 기회를 찾아드립니다.');
+        await expect(dialog.getByRole('textbox')).toHaveCount(0);
+        await expect(reviews).toHaveCount(0);
+        // Dispatch a duplicate tap before React commits the next phase.
+        await button(dialog, spyActions[0]).evaluate(element => {element.click(); element.click();});
+        await expect(reviews).toHaveCount(1);
+        await expect(reviews.getByRole('article')).toHaveCount(2);
+        await expect(reviews.getByText('별점 2점', {exact:true})).toHaveCount(1);
+        await expect(reviews.getByText('별점 3점', {exact:true})).toHaveCount(1);
+        await expect(reviews.getByRole('heading', {name:'오래 붙이면 더 좋은 줄 알았어요'})).toBeVisible();
+        await expect(reviews.getByRole('heading', {name:'붙이고 자도 되나요?'})).toBeVisible();
+        await expect(conversation).toContainText('얼마나 붙여야 하는지 모르겠다');
+        await capture('spy-reviews');
+        await page.reload({waitUntil:'domcontentloaded'});
+        await walk(2);
+        await expect(reviews.getByRole('article')).toHaveCount(2);
+        await expect(button(dialog, spyActions[0])).toHaveCount(0);
+        await button(dialog, spyActions[1]).click();
+        await expect(conversation.getByText('10~15분 사용 후 떼어내세요.', {exact:true})).toBeVisible();
+        await button(dialog, spyActions[2]).click();
+        for (const label of ['고객의 불편', '우리 상품의 기준', '맡긴 일']) {
+          await expect(conversation.getByText(label, {exact:true})).toHaveCount(1);
+        }
+        await capture('spy-handoff');
       }
       if (station === 3) {
-        await expect(button(dialog,rules[0])).toBeInViewport({ratio: 0.95});
-        for (let i=0;i<2;i++) {
-          await button(dialog,rules[i]).click();
-          await expect(dialog.getByText(i===0?/오늘 보낼 광고와 답장/:/광고 첫 문장과 고객 답변 초안/)).toBeVisible();
-          if (!i) await button(dialog,'다른 피드백으로 비교하기').click();
-        }
-        await button(dialog,'이 문장으로 승인하기').click();
-        await button(dialog,'복도로 돌아가기').click();
-        await expect(dialog).not.toBeVisible();
-        await walk(3);
-        await expect(dialog.getByText(/광고 첫 문장과 고객 답변 초안/)).toBeVisible();
-        await page.reload({waitUntil:'domcontentloaded'});
-        await walk(3);
-        await expect(dialog.getByRole('heading',{name:'이 소개글로 승인했어요.'})).toBeVisible();
+        const film = dialog.locator('figure');
+        const video = film.locator('video');
+        await expect(film.getByText('AI만으로 제작한 영상', {exact:true})).toBeVisible();
+        await expect(video).toHaveAttribute('src', '/campus/arrival/mask-example-silent.mp4');
+        await expect.poll(() => video.evaluate(element => element.videoWidth)).toBeGreaterThan(0);
+        expect(await video.evaluate(element => element.muted && element.playsInline && element.controls)).toBe(true);
+        await expect(film.getByText('마스크팩, 붙이고 자도 될까요?', {exact:true})).toBeVisible();
+        await video.evaluate(element => element.play());
+        await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
+        await video.evaluate(element => element.pause());
+        await video.evaluate(element => {element.currentTime = 5;});
+        await expect(film.getByText('우리 제품의 권장 사용 시간 10~15분', {exact:true})).toBeVisible();
+        await capture('content-example');
+        await video.evaluate(element => {element.currentTime = 9.2;});
+        await expect(film.getByText('사용 전, 제품의 사용 가이드를 확인하세요.', {exact:true})).toBeVisible();
+
+        const create = button(dialog,'프롬프트 만들기');
+        const copy = button(dialog,'프롬프트 복사');
+        const ownInputs = [
+          [/상품·서비스/, '검수용 반려동물 방문 사진'],
+          [/비교할 경쟁사/, '검수용 A 사진팀'],
+          [/어떤 고객/, '낯선 스튜디오에서 긴장하는 반려견 보호자'],
+          [/고객 질문과 실제 상품/, '예약 전 실제 포트폴리오를 보여드립니다.'],
+        ];
+        await expect(create).toBeDisabled();
+        const firstField = dialog.getByRole('textbox', {name:ownInputs[0][0]});
+        await firstField.fill(' ');
+        await expect(create).toBeDisabled();
+        for (const [name, value] of ownInputs) await dialog.getByRole('textbox', {name}).fill(value);
+        await create.click();
+        await dialog.getByText('프롬프트 보기', {exact:true}).click();
+        const prompt = dialog.getByRole('textbox', {name:'생성한 프롬프트'});
+        const generated = await prompt.inputValue();
+        for (const [, value] of ownInputs) expect(generated).toContain(value);
+        for (const requirement of ['실제로 읽은 자료의 URL', '웹이나 일부 자료를 열 수 없으면', '첫 3초', '장면표', '공개 전에 검수']) expect(generated).toContain(requirement);
+        await copy.click();
+        await expect(dialog.getByRole('status')).toContainText('복사했어요.');
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(generated);
+        await expect(dialog.getByRole('link', {name:'ChatGPT 열기'})).toHaveAttribute('href','https://chatgpt.com/');
+        await expect(dialog.getByRole('link', {name:'Claude 열기'})).toHaveAttribute('href','https://claude.ai/new');
+        await capture('content-prompt');
+        await firstField.fill('');
+        await expect(create).toBeDisabled();
+        await expect(copy).toHaveCount(0);
+        await button(dialog,'마스크팩 예시 넣기').click();
+        await create.click();
+        await dialog.getByText('프롬프트 보기', {exact:true}).click();
+        await expect(prompt).toHaveValue(/검색하거나 실제 조사처럼 설명하지 말고/);
+        expect(await prompt.inputValue()).not.toContain(ownInputs[0][1]);
       }
-      if (station === 4) await expect(dialog.getByText('상품 소개 페이지 담당자에게 전할 제안')).toBeVisible();
-      if (station === 5) {
+      if (station === 4) {
         const changes=[];
         for (const rule of rules) {
           await button(dialog,rule).click();
@@ -150,9 +242,10 @@ try {
         expect(changes[0][1]).not.toBe(changes[1][1]);
         await capture('principle');
         await button(dialog,'복도로 돌아가기').click();
-        await walk(5);
+        await walk(4);
         await expect(button(dialog,rules[1])).toHaveAttribute('aria-pressed','true');
       }
+      if (station === 5) await expect(dialog.getByText('상품 소개 페이지 담당자에게 전할 제안')).toBeVisible();
     }
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
@@ -162,7 +255,7 @@ try {
       await expect(page.locator('video')).toHaveCount(0);
       await page.evaluate(()=>document.fonts.ready);
       await capture('entry');
-      await finishOfficeReview(page,{walk,inspect});
+      await finishOfficeReview(page,{walk,inspect,beforeLeave,afterLeave});
       await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toBeVisible();
       if (mobile) {
         await page.locator('[aria-label="내 상황에 맞는 체험 선택"] button').first().tap();

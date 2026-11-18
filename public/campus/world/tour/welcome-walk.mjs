@@ -188,6 +188,22 @@ async function start() {
     marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
   }
+  let deskLabel = '';
+  const needsDeskClick = () => state.station >= 2 && state.station <= 4;
+  function markDestination() {
+    const near = needsDeskClick() && motion.atDesk();
+    root.dataset.nearDesk = String(near);
+    label.textContent = near ? deskLabel + ' 열기' : deskLabel;
+    marker.setAttribute('aria-label', deskLabel + (near ? ' 열기' : ' 쪽으로 걷기'));
+    sizeMarker();
+  }
+  function openNearbyDesk() {
+    if (!state.paused && needsDeskClick() && motion.atDesk()) {
+      send('arrive', state.station);
+      return true;
+    }
+    return false;
+  }
   function sync(msg) {
     if (!Number.isInteger(msg.station) || !stations[msg.station-1]) return;
     if (avatars.includes(msg.avatar)) void chooseAvatar(msg.avatar);
@@ -198,9 +214,7 @@ async function start() {
     if (!synced || msg.reset || returningToDesk) { trackingX = undefined; keys.clear(); }
     synced = true;
     if (state.paused) keys.clear();
-    const currentLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 42) : stations[state.station - 1].title;
-    label.textContent = currentLabel;
-    marker.setAttribute('aria-label', currentLabel + ' 쪽으로 걷기');
+    deskLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 42) : stations[state.station - 1].title;
     const atReception = state.station === 1;
     marker.toggleAttribute('data-greeting', atReception);
     label.hidden = atReception;
@@ -211,7 +225,7 @@ async function start() {
     const active = marker.hidden ? -1 : state.station - 1;
     if (shownIndex !== active || shownStation !== state.station) set.setNext(active, state.station - 1);
     shownIndex = active; shownStation = state.station;
-    sizeMarker();
+    markDestination();
     root.dataset.station = String(state.station); root.dataset.paused = String(state.paused);
     root.dataset.arrivals = String(arrived);
     root.dataset.freeRoam = String(state.freeRoam);
@@ -239,7 +253,8 @@ async function start() {
     const progressed = motion.update(dt, dx, dz);
     if (progressed) {
       keys.clear(); arrived++; root.dataset.arrivals = String(arrived);
-      send('arrive', state.station);
+      markDestination();
+      send(needsDeskClick() ? 'approach' : 'arrive', state.station);
     }
     const elevation = state.station === stations.length ? hallHeight(stations.at(-1), state.x, state.z) : 0;
     figure.position.set(state.x, elevation + 0.035, state.z);
@@ -262,7 +277,11 @@ async function start() {
   floor.addEventListener('keydown', event => {
     if (state.paused || event.metaKey || event.altKey || event.ctrlKey) return;
     const k = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-    if (k === 'Enter' || k === ' ') { event.preventDefault(); if (!event.repeat) moveTo(); return; }
+    if (k === 'Enter' || k === ' ') {
+      event.preventDefault();
+      if (!event.repeat && !openNearbyDesk()) moveTo();
+      return;
+    }
     if (!['ArrowRight','ArrowLeft','ArrowUp','ArrowDown','w','a','s','d'].includes(k)) return;
     event.preventDefault(); keys.add(k);
   });
@@ -294,6 +313,7 @@ async function start() {
       for (let node = hit.object; node; node = node.parent) {
         if (!Number.isInteger(node.userData.welcomeStation)) continue;
         if (node.userData.welcomeStation !== state.station - 1) return;
+        if (openNearbyDesk()) return;
         target = stations[state.station - 1];
         break;
       }
@@ -335,7 +355,7 @@ async function start() {
     if (start && Math.hypot(start.x - event.clientX, start.y - event.clientY) > 12) return;
     pick(event.clientX, event.clientY);
   });
-  marker.addEventListener('click', () => moveTo());
+  marker.addEventListener('click', () => {if (!openNearbyDesk()) moveTo();});
   applySync = sync; walkTo = () => moveTo(); pauseMovement = () => { keys.clear(); motion.stop(); };
   window.addEventListener('pagehide', event => {
     if (event.persisted) return;

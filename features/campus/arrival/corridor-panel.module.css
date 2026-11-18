@@ -7,30 +7,14 @@
 .panel h2 { margin: 0 0 12px; font-size: clamp(22px, 2.2vw, 30px); letter-spacing: -.04em; line-height: 1.4; }
 .panel h2:focus { outline: none; }
 .panel p { white-space: pre-line; }
-.panel .subhead { margin: 23px 0 8px; font-size: 16px; line-height: 1.5; }
-.panel .feedback { color: var(--muted, #565e68); font-size: 14px; }
-.feedback strong { display: block; margin-top: 3px; color: var(--ink, #161719); font-size: 16px; }
 .panel .after { margin-top: 14px; color: var(--muted, #565e68); }
-.media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-inline-size: 430px; gap: 14px; margin-top: 14px; }
-.media figure { min-width: 0; margin: 0; }
-.media a { display: block; border-radius: 7px; cursor: zoom-in; }
-.media a:focus-visible { outline: 3px solid var(--ba-info, #315e8b); outline-offset: 2px; }
-.media :is(img, video) { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #15171c; border-radius: 7px; }
-.media figcaption { margin-top: 5px; color: var(--muted, #565e68); font-size: 13px; line-height: 1.5; }
 .notes { margin: 0; }
-.panel :is(dt, .evidence strong, .exchange h3, .rules legend) { margin: 0; font-size: 14px; font-weight: 650; color: var(--muted, #565e68); }
+.panel :is(dt, .exchange h3, .rules legend) { margin: 0; font-size: 14px; font-weight: 650; color: var(--muted, #565e68); }
 .panel dd { margin: 0; }
-.evidence, .notes { border-radius: 8px; padding: 14px 16px; background: var(--surface-subtle, #f5f6f7); }
-.evidence + .evidence, .notes + .notes { margin-top: 8px; }
-.evidence p, .notes dd, .exchange p { line-height: 1.65; }
-.evidence p, .notes dd { margin-top: 3px; }
-.source { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; color: var(--ink, #161719); font-size: 14px; text-underline-offset: 3px; }
-.source:focus-visible { outline: 3px solid var(--ba-info, #315e8b); outline-offset: 2px; }
+.notes { border-radius: 8px; padding: 14px 16px; background: var(--surface-subtle, #f5f6f7); }
+.notes dd, .exchange p { line-height: 1.65; }
+.notes dd { margin-top: 3px; }
 .notes > div + div { margin-top: 12px; }
-.draftNote { margin: 0; padding: 11px 14px; border-inline-start: 3px solid var(--line, #dce1e6); background: var(--surface-subtle, #f5f6f7); }
-.draftNote dd { margin-top: 3px; font-size: 16px; font-weight: 650; line-height: 1.55; }
-.creative { margin: 16px 0 0; border-block: 1px solid var(--line, #e2e5e9); }
-.creative .media { margin: 14px 0; }
 .exchange { display: grid; gap: 12px; margin: 14px 0; }
 .exchange > div { padding: 10px 14px; border-inline-start: 3px solid var(--line, #d2d7db); }
 .exchange > div:last-child { border-color: var(--ba-red, #bd2432); }
@@ -52,9 +36,7 @@
 .fullComparison { border-bottom: 1px solid var(--line, #dce1e6); }
 .fullComparison h4 { margin: 10px 0 5px; font-size: 16px; }
 .fullComparison h4 ~ div { margin: 6px 0 14px; }
-.panel .approvalNote { margin: 4px 0 7px; font-size: 14px; color: var(--muted, #565e68); }
 @media (max-width: 600px) {
   .panel { max-block-size: calc(100dvh - 30px); }
-  .media { gap: 10px; }
-  .evidence, .notes { padding: 12px 14px; }
+  .notes { padding: 12px 14px; }
 }

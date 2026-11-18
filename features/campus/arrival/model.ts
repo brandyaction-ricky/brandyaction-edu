@@ -9,8 +9,11 @@ export const ARRIVAL_STORAGE_LIMIT = 32_000;
 export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export const SPY_PHASES = ['intro', 'reviews', 'guide', 'handed-off'] as const;
+export type SpyPhase = typeof SPY_PHASES[number];
 export type ArrivalState = {
   station: CorridorStation;
+  spyPhase: SpyPhase;
   companyRule: OfficeDemoChoice | null;
   consentedCompanyRule: string;
   visitorAvatar: VisitorAvatarId;
@@ -30,7 +33,7 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, spyPhase: 'intro', companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -74,6 +77,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     if (object(desk) && (desk.phase === 'feedback' || desk.phase === 'approved') && (desk.choice === 0 || desk.choice === 1)) {
       state.deskReview = {phase: desk.phase, choice: desk.choice};
     }
+    state.spyPhase = SPY_PHASES.find(phase => phase === value.spyPhase) ?? 'intro';
     state.companyRule = value.companyRule === 0 || value.companyRule === 1 ? value.companyRule : null;
     if (state.companyRule !== null && state.audience !== 'work' && typeof value.consentedCompanyRule === 'string'
       && value.consentedCompanyRule.length <= OFFICE_DEMO_LIMITS.rule) state.consentedCompanyRule = value.consentedCompanyRule;
@@ -85,9 +89,8 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     else if (state.step !== 0) state.station = 6;
     else if (typeof value.station === 'number' && Number.isInteger(value.station) && value.station >= 1 && value.station <= 7) {
       state.station = value.station as CorridorStation;
-      if ((state.station === 4 || state.station === 5) && state.deskReview.phase !== 'approved') state.station = 3;
-    } else if (state.deskReview.phase === 'approved') state.station = 4;
-    else if (state.deskReview.phase === 'feedback') state.station = 3;
+      if (state.station >= 3 && state.station <= 5 && state.spyPhase !== 'handed-off') state.station = 2;
+    } else if (state.deskReview.phase !== 'draft') state.station = 2;
     state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
   } catch {
@@ -98,7 +101,7 @@ export function serializeArrivalState(state: ArrivalState): string {
   return JSON.stringify(parseArrivalState(JSON.stringify(state)));
 }
 
-/** Revising the example invalidates its approval, never the visitor's independent drafts. */
+/** A changed example invalidates the selected rule and any prompt that used it. */
 export function reconcileArrivalOfficeCase(state: ArrivalState, revision: string): ArrivalState {
   if (state.deskReviewRevision === revision) return state;
   const promptChanged = state.mode === 'personal' && state.audience !== 'work'
@@ -109,7 +112,6 @@ export function reconcileArrivalOfficeCase(state: ArrivalState, revision: string
     deskReview: {phase: 'draft', choice: 0},
     companyRule: null,
     consentedCompanyRule: '',
-    station: state.step === 0 && (state.station === 4 || state.station === 5) ? 3 : state.station,
     ...(promptChanged ? {handoff: 'ready', experience: 'none'} as const : {}),
   };
 }

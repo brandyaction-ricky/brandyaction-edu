@@ -3,7 +3,7 @@
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation} from './model';
+import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {HallProgram} from './hall-program';
 import {CorridorPanel} from './corridor-panel';
@@ -19,8 +19,8 @@ import theme from '../ui/theme.module.css';
 import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
-const destinations = ['팀장 봇', '조사 직원', '기획·제작 직원', '고객 응대 직원', '회사 기준 보관함', '내 AI 체험', '라이브 홀'] as const;
-const invitations = ['팀장 만나기', '조사 직원 만나기', '제작 직원 만나기', '응대 직원 만나기', '회사 기준 보러 가기', '체험 직원 만나기', '라이브 홀로 가기'] as const;
+const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '고객 응대 직원', '내 AI 체험', '라이브 홀'] as const;
+const invitations = ['팀장 만나기', '경쟁사 스파이에게 가기', '콘텐츠 담당자에게 가기', '정본 보러 가기', '응대 직원 만나기', '체험 직원 만나기', '라이브 홀로 가기'] as const;
 
 /** Optional [section] lines keep editable examples readable; other text stays literal. */
 function ResultExample({text}: {text: string}) {
@@ -43,6 +43,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [sceneStatus, setSceneStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [walkRequest, setWalkRequest] = useState(0);
   const [walkAssist, setWalkAssist] = useState<'idle' | 'moving' | 'open'>('idle');
+  const [nearStation, setNearStation] = useState<CorridorStation>();
   const [sceneVisit, setSceneVisit] = useState(0);
   const [explore, setExplore] = useState(false);
   const [deskOpen, setDeskOpen] = useState(false);
@@ -64,8 +65,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const visited = useRef(false);
   const step = state.step;
   const officeIntro = step === 0;
-  const canOpenStation = sceneStatus !== 'ready' || walkAssist === 'open';
   const station = state.station;
+  const canOpenStation = sceneStatus !== 'ready' || nearStation === station || walkAssist === 'open';
   const firstStop = station === 1;
   const teamLeaderOpen = officeIntro && firstStop && deskOpen;
   const destination = destinations[station - 1];
@@ -163,6 +164,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
+  function approach(at: CorridorStation) {
+    if (at !== station || step !== 0 || deskOpen) return;
+    resetWalkAssist();
+    setNearStation(at);
+  }
   function arrive(at: CorridorStation) {
     if (at !== station || step !== 0 || deskOpen) return;
     resetWalkAssist();
@@ -178,9 +184,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     }
   }
   function finishStation() {
-    if (station >= 6) return;
+    if (station >= 6 || (station === 2 && state.spyPhase !== 'handed-off')) return;
     closeDesk(false);
     update({station: (station + 1) as CorridorStation});
+  }
+  function advanceSpy(next: SpyPhase) {
+    setState(value => {
+      const current = reconcileArrivalOfficeCase(value, caseRevision);
+      const expected = SPY_PHASES[SPY_PHASES.indexOf(current.spyPhase) + 1];
+      return current.station === 2 && next === expected ? {...current, spyPhase: next} : current;
+    });
   }
   function headToHall() {
     go(0, {station: 7, hallReturnStep: isPersonalTrialStep(step) ? step : 8});
@@ -256,6 +269,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     if (menu.current) menu.current.open = false;
     try {if (persistenceKey) localStorage.removeItem(persistenceKey);} catch {}
     resetWalkAssist();
+    setNearStation(undefined);
     setSceneVisit(value => value + 1); setSceneStatus('loading'); setWalkRequest(0);
     setState({...initialArrivalState(), visitorAvatar: state.visitorAvatar}); setDeskOpen(false); setIntroOpen(false); setCopyFallback(''); setExplore(false); setShowReset(false); setNotice('');
   }
@@ -266,11 +280,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined} data-scene-status={sceneStatus}>
     <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip} inert={teamLeaderOpen}>체험 안내로 바로가기</a>
     <div className={s.world} aria-label="웰컴존에서 라이브 홀까지 이어지는 통로" inert={teamLeaderOpen}>
-      {hydrated && <CorridorScene key={sceneVisit} station={station} label={station === 3 ? config.officeDemo?.deskLabel : undefined}
+      {hydrated && <CorridorScene key={sceneVisit} station={station} label={destination}
         avatar={state.visitorAvatar}
         paused={deskOpen || introOpen || avatarOpen || showReset || (!officeIntro && !explore)}
         freeRoam={step === 7 && explore}
-        walkRequest={walkRequest} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
+        walkRequest={walkRequest} onApproach={approach} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
     </div>
     <header className={s.header} inert={teamLeaderOpen} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <div className={s.wordmark}>{/* eslint-disable-next-line @next/next/no-img-element -- Reuse the existing EDU brand asset. */}
@@ -287,7 +301,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <h1>{config.title}</h1>
           <p>팀장 봇을 만나 AI 직원에게 일을 맡기고 보고받는 모습을 먼저 살펴보세요.</p>
         </> : <>
-          <span>다음 목적지</span>
+          <span>{nearStation === station ? '도착했어요' : '다음 목적지'}</span>
           <h1>{destination}</h1>
         </>}
       </div>
@@ -391,8 +405,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     </div>}
     {teamLeaderOpen && <TeamLeader greeting={officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting} onClose={closeDesk} onComplete={finishStation}/>}
     <dialog ref={deskDialog} className={entryStyle.monitor} aria-label={destination} onCancel={event => {event.preventDefault(); event.stopPropagation(); closeDesk();}}>
-      {deskOpen && station !== 1 && station !== 6 && station !== 7 && <CorridorPanel station={station} config={config} review={state.deskReview}
-        onReview={(phase, choice) => update({deskReview: {phase, choice}})}
+      {deskOpen && station !== 1 && station !== 6 && station !== 7 && <CorridorPanel station={station} config={config}
+        spyPhase={state.spyPhase} onSpyAdvance={advanceSpy}
         proposalSent={state.proposalSent} onProposal={() => update({proposalSent: true})}
         ruleChoice={state.companyRule} onRuleChoice={companyRule => update({companyRule, consentedCompanyRule: companyRule === state.companyRule ? state.consentedCompanyRule : ''})}
         onClose={closeDesk} onComplete={finishStation}/>}

@@ -1,6 +1,15 @@
 import {expect} from '@playwright/test';
 
-const nextDesk = ['기획·제작 담당자 만나기', '고객 응대 담당자 만나기', '회사 업무 기준 열기', '내 일로 해보기'];
+const nextDesk = ['콘텐츠 실제 제작해보기', '내 사업을 아는 AI는 어떻게 만들까요?', '고객 응대 직원 만나기', '내 일로 해보기'];
+
+export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
+
+export async function finishSpyHandoff(dialog) {
+  for (const label of spyActions) {
+    const action = dialog.getByRole('button', {name: label, exact: true});
+    if (await action.isVisible()) await action.click();
+  }
+}
 
 export function teamLeaderGuide(page) {
   return page.getByRole('region', {name: '팀장 봇 안내', exact: true});
@@ -19,8 +28,17 @@ export async function finishTeamLeaderVideo(guide) {
 }
 
 // The desktop and mobile clipboard fixtures can use the equivalent HTML entry when WebGL is unavailable.
-export async function finishOfficeReview(page, {walk, inspect = async () => {}} = {}) {
-  const travel = walk ?? (async () => { await page.locator('#arrival-desk-button').click({timeout: 60000}); });
+export async function finishOfficeReview(page, {walk, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}} = {}) {
+  const travel = walk ?? (async station => {
+    const action = page.locator('#arrival-desk-button');
+    await action.click({timeout: 60000});
+    if (station >= 2 && station <= 4) {
+      const open = page.getByRole('button', {name: '내용 열기', exact: true});
+      const dialog = page.getByRole('dialog');
+      await expect(open.or(dialog).filter({visible: true})).toBeVisible({timeout: 20000});
+      if (await open.isVisible()) await open.click();
+    }
+  });
   for (let station = 1; station <= 6; station++) {
     await travel(station);
     if (station === 6) return;
@@ -33,23 +51,23 @@ export async function finishOfficeReview(page, {walk, inspect = async () => {}} 
       }
       const next = teamLeaderNext(guide);
       if (!await next.isVisible()) await finishTeamLeaderVideo(guide);
+      await beforeLeave(station);
       await next.click();
       await expect(guide).toHaveCount(0);
+      await afterLeave(station);
       continue;
     }
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({timeout: 20000});
     await inspect(station, dialog);
-    if (station === 3 && await dialog.locator('fieldset').count() > 0) {
+    if (station === 2) await finishSpyHandoff(dialog);
+    if (station === 4 && !await dialog.locator('button[aria-pressed="true"]').count()) {
       await dialog.locator('fieldset button').first().click();
     }
-    if (station === 3 && await dialog.getByRole('button', {name:'이 문장으로 승인하기'}).count()) {
-      await dialog.getByRole('button', {name:'이 문장으로 승인하기'}).click();
-    }
-    if (station === 4) await dialog.getByRole('button', {name:'담당자에게 제안 전달하기'}).click();
-    if (station === 5 && !await dialog.locator('button[aria-pressed="true"]').count()) {
-      await dialog.locator('fieldset button').first().click();
-    }
+    if (station === 5) await dialog.getByRole('button', {name:'담당자에게 제안 전달하기'}).click();
+    await beforeLeave(station);
     await dialog.getByRole('button', {name:nextDesk[station - 2], exact:true}).click();
+    await expect(dialog).not.toBeVisible();
+    await afterLeave(station);
   }
 }

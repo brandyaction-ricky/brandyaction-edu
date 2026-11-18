@@ -35,7 +35,17 @@ try {
     }
     try {
       await page.goto(base + path, {waitUntil: 'domcontentloaded'});
-      await finishOfficeReview(page);
+      await finishOfficeReview(page, {inspect: async (station, dialog) => {
+        if (station !== 3) return;
+        await dialog.getByRole('button', {name:'마스크팩 예시 넣기', exact:true}).click();
+        await dialog.getByRole('button', {name:'프롬프트 만들기', exact:true}).click();
+        await dialog.getByRole('button', {name:'프롬프트 복사', exact:true}).click();
+        await expect(dialog.getByRole('status')).toContainText('아래 요청문을 직접 복사해 주세요.');
+        const manualPrompt = dialog.getByRole('textbox', {name:'생성한 프롬프트', exact:true});
+        await expect(manualPrompt).toBeVisible();
+        await expect(manualPrompt).toBeFocused();
+        expect(await manualPrompt.evaluate(element => element.value.length > 0 && element.selectionStart === 0 && element.selectionEnd === element.value.length)).toBe(true);
+      }});
       await page.getByRole('button', {name: /회사 업무에 AI를 써보고 싶어요/}).click();
       await expect(step).toHaveAttribute('data-work-step', '0');
       await page.getByRole('button', {name: '예시 업무로 시작', exact: true}).click();
@@ -78,11 +88,11 @@ try {
       await expect(confirmed).toHaveAttribute('data-copied', 'true');
       await expect(status).toContainText('직접 복사한 매뉴얼을 메모장에 보관해 주세요');
       await expect(fallback).toHaveCount(0);
-      expect(await page.evaluate(() => window.__deniedClipboardWrites)).toBe(4);
+      expect(await page.evaluate(() => window.__deniedClipboardWrites)).toBe(5);
       await page.screenshot({path: resolve(out, `${device}-manual-confirmed.png`)});
       expect(errors).toEqual([]);
       expect(apiRequests).toEqual([]);
-      results.push({device, viewport, passed: true, deniedWrites: 4, manualLength: selection.length, selectedEntireManual: true, falseCopiedLabelBeforeConfirmation: false, adjacentDenialStatus: true, explicitConfirmationLabel: '매뉴얼 복사됨', apiRequests: 0, errors});
+      results.push({device, viewport, passed: true, deniedWrites: 5, selectedContentStationPrompt: true, manualLength: selection.length, selectedEntireManual: true, falseCopiedLabelBeforeConfirmation: false, adjacentDenialStatus: true, explicitConfirmationLabel: '매뉴얼 복사됨', apiRequests: 0, errors});
     } catch (error) {
       await page.screenshot({path: resolve(out, `${device}-failure.png`)});
       throw error;

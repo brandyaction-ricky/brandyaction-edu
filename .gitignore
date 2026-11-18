@@ -16,3 +16,4 @@ supabase/.temp/
 
 # Original media is supplied to the access-protected welcome preview separately.
 /public/campus/arrival/team-leader-telegram.mp4
+/public/campus/arrival/mask-example-silent.mp4

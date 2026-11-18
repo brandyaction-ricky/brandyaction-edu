@@ -12,19 +12,20 @@ type Props = {
   freeRoam: boolean;
   walkRequest: number;
   onStatus: (status: 'ready' | 'unavailable') => void;
+  onApproach: (station: CorridorStation) => void;
   onArrive: (station: CorridorStation) => void;
   className: string;
 };
 
-export function CorridorScene({station, label, avatar, paused, freeRoam, walkRequest, onStatus, onArrive, className}: Props) {
+export function CorridorScene({station, label, avatar, paused, freeRoam, walkRequest, onStatus, onApproach, onArrive, className}: Props) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [bridge, setBridge] = useState('');
   const [firstAvatar] = useState(avatar);
-  const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onArrive});
+  const current = useRef({station, label, avatar, paused, freeRoam, onStatus, onApproach, onArrive});
   const lastWalk = useRef(walkRequest);
   useEffect(() => {
-    current.current = {station, label, avatar, paused, freeRoam, onStatus, onArrive};
-  }, [station, label, avatar, paused, freeRoam, onStatus, onArrive]);
+    current.current = {station, label, avatar, paused, freeRoam, onStatus, onApproach, onArrive};
+  }, [station, label, avatar, paused, freeRoam, onStatus, onApproach, onArrive]);
 
   useEffect(() => {
     const token = crypto.randomUUID();
@@ -43,8 +44,9 @@ export function CorridorScene({station, label, avatar, paused, freeRoam, walkReq
       } else if (msg.type === 'error') {
         window.clearTimeout(timeout);
         props.onStatus('unavailable');
-      } else if (ready && msg.type === 'arrive' && !props.paused && msg.station === props.station) {
-        props.onArrive(props.station);
+      } else if (ready && !props.paused && msg.station === props.station) {
+        if (msg.type === 'approach') props.onApproach(props.station);
+        if (msg.type === 'arrive') props.onArrive(props.station);
       }
     }
     window.addEventListener('message', receive);

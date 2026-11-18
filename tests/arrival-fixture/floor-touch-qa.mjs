@@ -8,8 +8,10 @@ for (const engine of [chromium, webkit]) {
   try {
     const page = await browser.newPage({viewport: {width: 393, height: 852}, isMobile: true, hasTouch: true});
     await page.goto(url.href);
-    const walk = page.frameLocator('iframe[title*="직원 사무실"]').locator('#walk');
+    const frame = page.frameLocator('iframe[title*="직원 사무실"]');
+    const walk = frame.locator('#walk');
     await expect(walk).toHaveAttribute('data-ready', 'true', {timeout: 20000});
+    await expect(walk).toHaveAttribute('data-player-x', /^-?\d+\.\d+$/);
     const start = await walk.getAttribute('data-player-x');
 
     // Touch the visible light threshold between the carpet and the red floor stripe.
@@ -26,13 +28,16 @@ for (const engine of [chromium, webkit]) {
     await expect(walk).toHaveAttribute('data-station', '2');
 
     // Follow the corridor ahead of the avatar. Retry only after the previous walk settles.
-    for (let step = 0; step < 5 && await walk.getAttribute('data-paused') !== 'true'; step++) {
+    for (let step = 0; step < 5 && await walk.getAttribute('data-near-desk') !== 'true'; step++) {
       const x = await walk.getAttribute('data-player-x');
       await page.touchscreen.tap(347, 544);
       await expect(walk).not.toHaveAttribute('data-player-x', x);
       await expect(walk).toHaveAttribute('data-moving', 'false');
     }
-    await expect(page.getByRole('heading', {name:'어떤 말을 광고에 담을까요?'})).toBeVisible();
+    await expect(walk).toHaveAttribute('data-near-desk', 'true');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await frame.getByRole('button', {name:/열기$/}).tap();
+    await expect(page.getByRole('region', {name:'경쟁사 스파이와 나눈 대화'})).toBeVisible();
     await expect(walk).toHaveAttribute('data-arrivals', '2');
     console.log(engine.name() + ' mobile floor taps reached the first and second desks once.');
   } finally {

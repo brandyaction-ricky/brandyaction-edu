@@ -43,6 +43,7 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
   let arrivalSent = false;
   let synced = false;
   const current = () => stations[state.station - 1];
+  const atDesk = () => !state.freeRoam && Math.hypot(current().x - state.x, current().z - state.z) <= arrivalRadius;
   const stop = () => { goal = null; state.moving = false; };
 
   function sync(station, paused, reset = false, freeRoam = false) {
@@ -105,7 +106,7 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
       else if (goal) stop();
       state.x = nextX; state.z = nextZ;
     }
-    if (!state.freeRoam && Math.hypot(current().x - state.x, current().z - state.z) <= arrivalRadius) {
+    if (atDesk()) {
       stop(); state.facing = Math.PI;
       arrivalSent = true;
       return true;
@@ -113,5 +114,5 @@ export function createWalkMotion(stations, isHallBlocked = () => false) {
     if (goal && Math.hypot(goal.x - state.x, goal.z - state.z) < 0.02) stop();
     return false;
   }
-  return { state, sync, walk, update, stop };
+  return { state, sync, walk, update, stop, atDesk };
 }
