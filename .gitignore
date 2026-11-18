@@ -13,3 +13,6 @@ supabase/.temp/
 
 /test-results/
 /playwright-report/
+
+# Original media is supplied to the access-protected welcome preview separately.
+/public/campus/arrival/team-leader-telegram.mp4

@@ -1,4 +1,5 @@
 import {chromium, webkit, expect} from '@playwright/test';
+import {finishTeamLeaderVideo, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4533');
 
@@ -15,10 +16,13 @@ for (const engine of [chromium, webkit]) {
     // A tap on the floating destination button would miss the original regression.
     await page.touchscreen.tap(354, 515);
     await expect(walk).not.toHaveAttribute('data-player-x', start);
-    const visitResearcher = page.getByRole('button', {name: '조사 담당자 만나기', exact: true});
-    await expect(visitResearcher).toBeVisible();
+    const guide = teamLeaderGuide(page);
+    const startVideo = guide.getByRole('button', {name:'지금 확인하기', exact:true});
+    await expect(startVideo).toBeVisible();
     await expect(walk).toHaveAttribute('data-arrivals', '1');
-    await visitResearcher.click();
+    await startVideo.click();
+    await finishTeamLeaderVideo(guide);
+    await teamLeaderNext(guide).click();
     await expect(walk).toHaveAttribute('data-station', '2');
 
     // Follow the corridor ahead of the avatar. Retry only after the previous walk settles.

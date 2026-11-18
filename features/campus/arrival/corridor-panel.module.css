@@ -17,9 +17,7 @@
 .media a:focus-visible { outline: 3px solid var(--ba-info, #315e8b); outline-offset: 2px; }
 .media :is(img, video) { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #15171c; border-radius: 7px; }
 .media figcaption { margin-top: 5px; color: var(--muted, #565e68); font-size: 13px; line-height: 1.5; }
-.deliverables, .notes { margin: 0; }
-.deliverables > div { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 7px 0; border-top: 1px solid var(--line, #e2e5e9); }
-.deliverables dt { min-width: 78px; }
+.notes { margin: 0; }
 .panel :is(dt, .evidence strong, .exchange h3, .rules legend) { margin: 0; font-size: 14px; font-weight: 650; color: var(--muted, #565e68); }
 .panel dd { margin: 0; }
 .evidence, .notes { border-radius: 8px; padding: 14px 16px; background: var(--surface-subtle, #f5f6f7); }

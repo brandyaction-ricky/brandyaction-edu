@@ -7,6 +7,7 @@ import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcile
 import {CorridorScene} from './corridor-scene';
 import {HallProgram} from './hall-program';
 import {CorridorPanel} from './corridor-panel';
+import {TeamLeader} from './team-leader';
 import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
 import {VisitorAvatar} from './visitor-avatar';
@@ -50,6 +51,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const deskDialog = useRef<HTMLDialogElement>(null);
   const introDialog = useRef<HTMLDialogElement>(null);
   const deskButton = useRef<HTMLButtonElement>(null);
+  const leaderTrigger = useRef<HTMLElement | null>(null);
+  const restoreLeaderFocus = useRef(false);
   const resetDialog = useRef<HTMLDialogElement>(null);
   const exampleDialog = useRef<HTMLDialogElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
@@ -64,6 +67,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const canOpenStation = sceneStatus !== 'ready' || walkAssist === 'open';
   const station = state.station;
   const firstStop = station === 1;
+  const teamLeaderOpen = officeIntro && firstStop && deskOpen;
   const destination = destinations[station - 1];
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
   const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
@@ -126,9 +130,19 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }, [step, state.handoff, copyFallback]);
 
   useEffect(() => {
-    if (deskOpen) deskDialog.current?.showModal();
+    if (deskOpen && !firstStop) deskDialog.current?.showModal();
     else deskDialog.current?.close();
-  }, [deskOpen]);
+  }, [deskOpen, firstStop]);
+  useEffect(() => {
+    if (teamLeaderOpen || !restoreLeaderFocus.current) return;
+    const frame = requestAnimationFrame(() => {
+      restoreLeaderFocus.current = false;
+      const trigger = leaderTrigger.current;
+      leaderTrigger.current = null;
+      (trigger?.isConnected && !trigger.hidden ? trigger : deskButton.current)?.focus({preventScroll: true});
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [teamLeaderOpen]);
   useEffect(() => {
     if (introOpen) introDialog.current?.showModal();
     else introDialog.current?.close();
@@ -150,15 +164,22 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }, []);
 
   function arrive(at: CorridorStation) {
-    if (at !== station || step !== 0) return;
+    if (at !== station || step !== 0 || deskOpen) return;
     resetWalkAssist();
     if (at === 7) go(7);
     else if (at === 6) go(8);
-    else setDeskOpen(true);
+    else {
+      if (at === 1) {
+        const active = document.activeElement;
+        const frameTarget = active instanceof HTMLIFrameElement ? active.contentDocument?.activeElement : null;
+        leaderTrigger.current = frameTarget?.matches('#destination, #floor') ? frameTarget as HTMLElement : deskButton.current;
+      }
+      setDeskOpen(true);
+    }
   }
   function finishStation() {
     if (station >= 6) return;
-    closeDesk();
+    closeDesk(false);
     update({station: (station + 1) as CorridorStation});
   }
   function headToHall() {
@@ -177,10 +198,13 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     clearTimeout(walkTimer.current);
     setWalkAssist('idle');
   }
-  function closeDesk() {
+  function closeDesk(returnToTrigger = true) {
     deskDialog.current?.close();
     setDeskOpen(false);
-    deskButton.current?.focus();
+    if (teamLeaderOpen) {
+      if (!returnToTrigger) leaderTrigger.current = null;
+      restoreLeaderFocus.current = true;
+    } else deskButton.current?.focus();
   }
 
   function update(patch: Partial<ArrivalState>) {setState(value => ({...reconcileArrivalOfficeCase(value, caseRevision), ...patch}));}
@@ -240,28 +264,28 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const title = (text: React.ReactNode, description?: string) => <div className={s.intro}><h1 ref={heading} tabIndex={-1}>{text}</h1>{description && <p>{description}</p>}</div>;
 
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined} data-scene-status={sceneStatus}>
-    <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip}>체험 안내로 바로가기</a>
-    <div className={s.world} aria-label="웰컴존에서 라이브 홀까지 이어지는 통로">
+    <a href={officeIntro ? '#arrival-desk-button' : '#arrival-content'} className={s.skip} inert={teamLeaderOpen}>체험 안내로 바로가기</a>
+    <div className={s.world} aria-label="웰컴존에서 라이브 홀까지 이어지는 통로" inert={teamLeaderOpen}>
       {hydrated && <CorridorScene key={sceneVisit} station={station} label={station === 3 ? config.officeDemo?.deskLabel : undefined}
         avatar={state.visitorAvatar}
         paused={deskOpen || introOpen || avatarOpen || showReset || (!officeIntro && !explore)}
         freeRoam={step === 7 && explore}
         walkRequest={walkRequest} onArrive={arrive} onStatus={setSceneStatus} className={s.scene}/>}
     </div>
-    <header className={s.header}>
+    <header className={s.header} inert={teamLeaderOpen} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <div className={s.wordmark}>{/* eslint-disable-next-line @next/next/no-img-element -- Reuse the existing EDU brand asset. */}
       <img src="/brandy-action-logo.png" alt="브랜디액션"/><small>EDU</small></div>
       <div className={entryStyle.progress} aria-live="polite" aria-atomic="true"><span>문샷 웰컴존</span><i aria-hidden="true"/><b>{station === 7 ? 'LIVE' : String(station).padStart(2, '0') + ' / 06'}</b><strong>{destination}</strong></div>
       <details ref={menu} className={s.menu}><summary aria-label="체험 메뉴"><MoreHorizontal size={23}/></summary><div><span>{preview ? '저장 전 관리자 미리보기' : '브랜치 미리보기'}</span><button type="button" onClick={() => {if (menu.current) menu.current.open = false; setIntroOpen(true);}}>체험 소개</button>{!officeIntro && step !== 7 && <button type="button" onClick={headToHall}><CalendarDays size={16}/>라이브 홀로 이동</button>}<button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button></div></details>
     </header>
-    {officeIntro && firstStop && sceneStatus === 'ready' && <div className={entryStyle.avatarControl}>
+    {officeIntro && firstStop && sceneStatus === 'ready' && !teamLeaderOpen && <div className={entryStyle.avatarControl}>
       <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
     </div>}
-    {officeIntro ? <section className={`${entryStyle.wayfinding} ${firstStop ? entryStyle.firstStop : ''}`} aria-label={firstStop ? '문샷 웰컴존 소개' : '현재 목적지'} data-walk-station={station}>
+    {officeIntro ? <section className={`${entryStyle.wayfinding} ${firstStop ? entryStyle.firstStop : ''}`} aria-label={firstStop ? '문샷 웰컴존 소개' : '현재 목적지'} data-walk-station={station} inert={teamLeaderOpen} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <div className={entryStyle.stopCopy}>
         {firstStop ? <>
           <h1>{config.title}</h1>
-          <p>조사부터 제작, 고객 응대까지. AI 직원들이 완성한 결과부터 살펴보세요.</p>
+          <p>팀장 봇을 만나 AI 직원에게 일을 맡기고 보고받는 모습을 먼저 살펴보세요.</p>
         </> : <>
           <span>다음 목적지</span>
           <h1>{destination}</h1>
@@ -365,8 +389,9 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <p className={entryStyle.keyboardHint}>바닥을 클릭하거나 방향키로 이동하세요.</p>
       <p className={entryStyle.touchHint}>가고 싶은 바닥을 터치하세요.</p>
     </div>}
+    {teamLeaderOpen && <TeamLeader greeting={officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting} onClose={closeDesk} onComplete={finishStation}/>}
     <dialog ref={deskDialog} className={entryStyle.monitor} aria-label={destination} onCancel={event => {event.preventDefault(); event.stopPropagation(); closeDesk();}}>
-      {deskOpen && station !== 6 && station !== 7 && <CorridorPanel station={station} config={config} review={state.deskReview}
+      {deskOpen && station !== 1 && station !== 6 && station !== 7 && <CorridorPanel station={station} config={config} review={state.deskReview}
         onReview={(phase, choice) => update({deskReview: {phase, choice}})}
         proposalSent={state.proposalSent} onProposal={() => update({proposalSent: true})}
         ruleChoice={state.companyRule} onRuleChoice={companyRule => update({companyRule, consentedCompanyRule: companyRule === state.companyRule ? state.consentedCompanyRule : ''})}

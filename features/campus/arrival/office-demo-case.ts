@@ -18,7 +18,8 @@ export function officeCaseContent(demo: OfficeDemoConfig) {
   const choices: [CaseChoice, CaseChoice] = [choice(0), choice(1)];
   return {
     ...demo,
-    greeting: demo.greeting === original.greeting ? '우리 팀이 만든 광고부터 보실래요?' : demo.greeting,
+    greeting: [original.greeting, '우리 팀이 만든 광고부터 보실래요?'].includes(demo.greeting)
+      ? 'AI봇들과 함께 일하면 어떻게 될까요?' : demo.greeting,
     brief: demo.brief === original.brief ? welcomeCase.positioning : demo.brief,
     material: demo.material === original.material ? welcomeCase.sources.map(source => source.label).join(' · ') : demo.material,
     draft: demo.draft === original.draft ? welcomeCase.intro : demo.draft,

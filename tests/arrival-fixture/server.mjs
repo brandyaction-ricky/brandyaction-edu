@@ -79,7 +79,23 @@ const server = createServer(async (req, res) => {
       if (!path.startsWith(publicRoot + sep)) return reply(res, 404, {error: '검수 파일을 찾지 못했습니다.'});
       try {
         if (!(await stat(path)).isFile()) throw Error('not a file');
-        res.setHeader('Content-Type', mime[extname(path)] || 'application/octet-stream');
+        const type = mime[extname(path)] || 'application/octet-stream';
+        res.setHeader('Content-Type', type);
+        if (type === 'video/mp4') {
+          const bytes = await readFile(path);
+          const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
+          res.setHeader('Accept-Ranges', 'bytes');
+          if (range) {
+            const start = Number(range[1]), end = range[2] ? Math.min(Number(range[2]), bytes.length - 1) : bytes.length - 1;
+            if (start > end) {
+              res.writeHead(416, {'Content-Range': `bytes */${bytes.length}`}); res.end(); return;
+            }
+            res.writeHead(206, {'Content-Range': `bytes ${start}-${end}/${bytes.length}`, 'Content-Length': end - start + 1});
+            res.end(req.method === 'HEAD' ? undefined : bytes.subarray(start, end + 1)); return;
+          }
+          res.setHeader('Content-Length', bytes.length);
+          res.end(req.method === 'HEAD' ? undefined : bytes); return;
+        }
         res.end(req.method === 'HEAD' ? undefined : await readFile(path)); return;
       } catch {return reply(res, 404, {error: '검수 파일을 찾지 못했습니다.'});}
     }

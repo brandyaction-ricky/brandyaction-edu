@@ -8,7 +8,7 @@ import {CopyComparison, FeedbackChoices} from './office-demo-parts';
 import monitor from './office-demo.module.css';
 import styles from './corridor-panel.module.css';
 
-type Station = 1 | 2 | 3 | 4 | 5;
+type Station = 2 | 3 | 4 | 5;
 type Props = {
   station: Station;
   config: ArrivalConfig;
@@ -23,10 +23,10 @@ type Props = {
 };
 
 const locations: Record<Station, string> = {
-  1: '팀장', 2: '조사 담당자', 3: '기획·제작 담당자', 4: '고객 응대 담당자', 5: '회사 업무 기준',
+  2: '조사 담당자', 3: '기획·제작 담당자', 4: '고객 응대 담당자', 5: '회사 업무 기준',
 };
 const nextActions: Record<Station, string> = {
-  1: '조사 담당자 만나기', 2: '기획·제작 담당자 만나기', 3: '고객 응대 담당자 만나기',
+  2: '기획·제작 담당자 만나기', 3: '고객 응대 담당자 만나기',
   4: '회사 업무 기준 열기', 5: '내 일로 해보기',
 };
 
@@ -54,7 +54,7 @@ function ProductionMedia() {
 
 export function CorridorPanel({station, config, review, proposalSent, onProposal, ruleChoice, onRuleChoice, onReview, onComplete, onClose}: Props) {
   const demo = config.officeDemo ?? DEFAULT_OFFICE_DEMO;
-  const {greeting, brief, material, draft, choices} = officeCaseContent(demo);
+  const {brief, material, draft, choices} = officeCaseContent(demo);
   const revision = choices[review.choice];
   const {product, sources, observations, support} = welcomeCase;
   const [localChoice, setLocalChoice] = useState<OfficeDemoChoice | null>(null);
@@ -73,7 +73,6 @@ export function CorridorPanel({station, config, review, proposalSent, onProposal
   const approved = review.phase === 'approved';
   const showNext = (station !== 3 || approved) && (station !== 4 || proposalSent) && (station !== 5 || selected !== null);
   const titles: Record<Station, string> = {
-    1: greeting,
     2: '어떤 말을 광고에 담을까요?',
     3: approved ? '이 소개글로 승인했어요.' : review.phase === 'feedback' ? '요청하신 방향으로 고쳐봤어요.' : '소개글의 첫 문장을 정해주세요.',
     4: '이런 문의가 들어오면 어떻게 답할까요?',
@@ -95,17 +94,6 @@ export function CorridorPanel({station, config, review, proposalSent, onProposal
     </header>
     <div className={monitor.body} ref={body}>
       <h2 id={headingId} ref={heading} tabIndex={-1}>{titles[station]}</h2>
-
-      {station === 1 && <>
-        <p className={monitor.lead}>오늘 살펴볼 상품은 {product}입니다. 실제 자료로 만든 광고를 보고, 내가 팀장이라면 어떻게 고칠지 한 번 골라보세요.</p>
-        <ProductionMedia/>
-        <h3 className={styles.subhead}>담당자들의 책상에 놓인 일</h3>
-        <dl className={styles.deliverables}>
-          <div><dt>조사</dt><dd>원문에서 광고에 담을 단서 찾기</dd></div>
-          <div><dt>기획·제작</dt><dd>소개글과 광고 이미지·영상 검토하기</dd></div>
-          <div><dt>고객 응대</dt><dd>문의에 답하고 상품 안내에 보탤 내용 찾기</dd></div>
-        </dl>
-      </>}
 
       {station === 2 && <>
         <p className={monitor.lead}>{product}에 관해 읽은 자료입니다. 원문에서 무엇을 확인했고, 무엇을 더 잘 설명해야 할지 살펴보세요.</p>

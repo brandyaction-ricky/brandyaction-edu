@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview} from './review-office.mjs';
+import {finishOfficeReview, finishTeamLeaderVideo, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -20,7 +20,7 @@ try {
     const state = frame.locator('#walk');
     const button = (root, name) => root.getByRole('button',{name, exact:true});
     async function capture(stage) {
-      if (output) await page.screenshot({path:resolve(output, device+'-'+stage+'.png')});
+      if (output) await page.screenshot({path:resolve(output, device+'-'+stage+'.png'), animations:'disabled'});
     }
     async function walk(station) {
       await expect(marker).toBeVisible({timeout:60000});
@@ -34,17 +34,85 @@ try {
       expect(Math.abs(to-(station-1)*8)).toBeLessThan(.75);
       arrivals.push({station,from,to});
     }
-    async function inspect(station, dialog) {
-      if (station === 1) {
-        const image=dialog.getByRole('img');
-        expect(await image.evaluate(async el => {await el.decode();return el.naturalWidth;})).toBeGreaterThan(0);
-        const video=dialog.locator('video');
-        await expect(video).toHaveAttribute('controls','');
-        await expect.poll(() => video.evaluate(el=>el.readyState)).toBeGreaterThan(0);
-        await video.evaluate(async el=>{el.muted=true; await el.play();});
-        await expect.poll(()=>video.evaluate(el=>el.currentTime)).toBeGreaterThan(0);
-        await video.evaluate(el=>el.pause());
+    async function inspectLeader(guide) {
+      const intro = guide.getByRole('heading', {name:'AI봇들과 함께 일하면 어떻게 될까요?', exact:true});
+      const start = button(guide,'지금 확인하기');
+      const next = teamLeaderNext(guide);
+      const invitation = guide.getByText('각 담당자들이 어떻게 일하는지 직접 확인해보실까요?', {exact:true});
+      const video = guide.locator('video');
+      const fullscreen = button(guide,'전체 화면');
+      const seek = guide.getByRole('slider', {name:'재생 위치', exact:true});
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(intro).toBeVisible();
+      await expect(start).toBeInViewport({ratio:0.95});
+      await expect(video).toHaveCount(0);
+      await expect(next).toHaveCount(0);
+      await expect(guide.getByText('담당자들의 책상에 놓인 일')).toHaveCount(0);
+      await capture('leader-intro');
+      if (device === 'small-mobile') {
+        await page.evaluate(() => {
+          const play = HTMLMediaElement.prototype.play;
+          HTMLMediaElement.prototype.play = function() {
+            HTMLMediaElement.prototype.play = play;
+            window.__leaderAutoplayBlocked = true;
+            return Promise.reject(new DOMException('Autoplay blocked for this QA run', 'NotAllowedError'));
+          };
+        });
       }
+      await start.click();
+      await expect(video).toHaveAttribute('src', '/campus/arrival/team-leader-telegram.mp4');
+      await expect(video).toHaveAttribute('aria-label', '텔레그램에서 AI 직원에게 일을 맡기고 보고받는 모습');
+      await expect(page.locator('iframe[title*="직원 사무실"]')).toBeVisible();
+      await expect(fullscreen).toBeInViewport({ratio:0.95});
+      await expect(seek).toBeInViewport({ratio:0.95});
+      expect(await guide.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await expect(invitation).toBeHidden();
+      await expect(next).toHaveCount(0);
+      if (device === 'small-mobile') {
+        await expect.poll(() => page.evaluate(() => window.__leaderAutoplayBlocked)).toBe(true);
+        await button(guide,'재생').click();
+      }
+      await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
+      expect(await video.evaluate(element => ({muted:element.muted, loop:element.loop, width:element.videoWidth, height:element.videoHeight})))
+        .toEqual({muted:true, loop:false, width:464, height:848});
+      await capture('leader-playing');
+      if (!mobile) {
+        await button(guide,'일시정지').click();
+        await expect.poll(() => video.evaluate(element => element.paused)).toBe(true);
+        const startTime = Number(await seek.inputValue());
+        await seek.press('ArrowRight');
+        await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(startTime);
+        await expect(button(guide,'재생')).toBeVisible();
+        if (await page.evaluate(() => document.fullscreenEnabled)) {
+          await fullscreen.click();
+          await expect.poll(() => video.evaluate(element => document.fullscreenElement?.contains(element))).toBe(true);
+          await expect.poll(() => video.evaluate(element => getComputedStyle(element).objectFit)).toBe('contain');
+          await button(guide,'전체 화면 닫기').click();
+          await expect(fullscreen).toBeVisible();
+        }
+        await button(guide,'재생').click();
+        await page.keyboard.press('Escape');
+        await expect(guide).toHaveCount(0);
+        await expect(video).toHaveCount(0);
+        await page.locator('#arrival-desk-button').click();
+        await expect(intro).toBeVisible();
+        await expect(video).toHaveCount(0);
+        await start.click();
+      }
+      await finishTeamLeaderVideo(guide);
+      await expect(invitation).toBeVisible();
+      await next.scrollIntoViewIfNeeded();
+      await expect(next).toBeInViewport({ratio:0.95});
+      await capture('leader-complete');
+      if (!mobile) {
+        await button(guide,'다시 재생').click();
+        await expect(next).toHaveCount(0);
+        await expect(invitation).toBeHidden();
+        await finishTeamLeaderVideo(guide);
+      }
+    }
+    async function inspect(station, dialog) {
+      if (station === 1) await inspectLeader(dialog);
       if (station === 2) {
         const sources=dialog.getByRole('link', {name:'원문 열기'});
         expect((await sources.evaluateAll(links=>links.map(a=>new URL(a.href).hostname))).sort()).toEqual(['brandyaction-edu.com','grow.google','www.coursera.org']);
@@ -89,6 +157,9 @@ try {
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
       await expect(marker).toBeVisible({timeout:60000});
+      await expect(marker).toContainText('AI 직원에게 일을 맡기면');
+      await expect(teamLeaderGuide(page)).toHaveCount(0);
+      await expect(page.locator('video')).toHaveCount(0);
       await page.evaluate(()=>document.fonts.ready);
       await capture('entry');
       await finishOfficeReview(page,{walk,inspect});

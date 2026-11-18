@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/welcome-experience-20261117": false,
       "codex/campus-admin-session": false,
       "codex/campus-guided-lessons": false,
       "codex/campus-cohort-reader": false,

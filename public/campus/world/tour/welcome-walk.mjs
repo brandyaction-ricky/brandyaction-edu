@@ -4,6 +4,7 @@ const root = document.querySelector('#walk');
 const floor = document.querySelector('#floor');
 const marker = document.querySelector('#destination');
 const label = document.querySelector('#destination-label');
+const greeting = document.querySelector('#destination-greeting');
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get('bridge');
 const avatars = ['female-c', 'female-a', 'male-c', 'male-d'];
@@ -131,6 +132,7 @@ async function start() {
     width = Math.max(1, root.clientWidth); height = Math.max(1, root.clientHeight);
     renderer.setSize(width, height, false);
     camera.aspect = width / height; camera.updateProjectionMatrix();
+    sizeMarker();
   }
   new ResizeObserver(resize).observe(root);
   resize();
@@ -174,11 +176,15 @@ async function start() {
   function placeMarker() {
     if (marker.hidden) return;
     const station = stations[state.station - 1];
-    projected.set(station.x, 2.65, station.z - 2.25).project(camera);
+    // Pin the entrance greeting above the team leader, beside the reception desk.
+    const atReception = state.station === 1;
+    if (atReception) projected.set(station.x - 1.43, 2.24, station.z - 3.49);
+    else projected.set(station.x, 2.65, station.z - 2.25);
+    projected.project(camera);
     const x = (projected.x + 1) * width / 2 - markerWidth / 2;
     const y = (1 - projected.y) * height / 2 - markerHeight;
     const left = Math.max(10, Math.min(width - markerWidth - 10, x));
-    const top = Math.max(12, Math.min(height - markerHeight - 14, y));
+    const top = Math.max(atReception ? 78 : 12, Math.min(height - markerHeight - 14, y));
     marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
   }
@@ -195,6 +201,12 @@ async function start() {
     const currentLabel = typeof msg.label === 'string' && msg.label.trim() ? msg.label.trim().slice(0, 42) : stations[state.station - 1].title;
     label.textContent = currentLabel;
     marker.setAttribute('aria-label', currentLabel + ' 쪽으로 걷기');
+    const atReception = state.station === 1;
+    marker.toggleAttribute('data-greeting', atReception);
+    label.hidden = atReception;
+    greeting.hidden = !atReception;
+    if (atReception) marker.setAttribute('aria-describedby', greeting.id);
+    else marker.removeAttribute('aria-describedby');
     marker.hidden = state.paused || state.freeRoam;
     const active = marker.hidden ? -1 : state.station - 1;
     if (shownIndex !== active || shownStation !== state.station) set.setNext(active, state.station - 1);
