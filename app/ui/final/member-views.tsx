@@ -1381,6 +1381,7 @@ export function MemberViews({
           </div>
           <p className="member-scroll-hint" id="member-menu-hint">메뉴를 좌우로 밀어 더 보기 ↔</p>
           <nav ref={navRef} className="account-nav" aria-label="마이페이지" aria-describedby="member-menu-hint">
+            {["admin", "staff"].includes(user.role) && <Link href="/my/curriculum-review">커리큘럼 전체 검수</Link>}
             {["admin", "staff"].includes(user.role) && (
               <Link className="member-mobile-admin-tab" href="/admin">
                 <Settings />

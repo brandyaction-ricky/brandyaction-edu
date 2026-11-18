@@ -41,9 +41,10 @@ export function matchesLessonMedia(bytes: Uint8Array, spec: LessonMediaSpec) {
     default: return false;
   }
 }
-export type LessonMediaContext = { ongoingReview?: OngoingReviewSelection; lessonId: string; enrollmentId: string; revision: string };
+export type LessonMediaContext = { reviewCohortId?: string; reviewStudent?: boolean; ongoingReview?: OngoingReviewSelection; lessonId: string; enrollmentId: string; revision: string };
 // Stable same-origin endpoint; signed Storage URLs never enter lesson JSON.
 export function lessonMediaUrl(assetId: string, context?: LessonMediaContext, submissionId?: string) {
+  if (context?.reviewCohortId) return '/api/platform/curriculum-review?' + new URLSearchParams({ cohort: context.reviewCohortId, lesson: context.lessonId, asset: assetId, ...(context.reviewStudent ? { student: '1' } : {}) });
   if (context?.ongoingReview) return ongoingReviewFileUrl(context.lessonId, context.enrollmentId, context.ongoingReview, assetId, 'content');
   const params = new URLSearchParams({ asset: assetId });
   if (submissionId) params.set('submission', submissionId);
