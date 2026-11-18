@@ -62,7 +62,7 @@ export function crmDeliveryState() {
     configured: smsConfigured || emailConfigured,
     smsConfigured,
     emailConfigured,
-    retentionEnabled: process.env.CRM_RETENTION_ENABLED === 'true',
+    retentionEnabled: false,
   };
 }
 

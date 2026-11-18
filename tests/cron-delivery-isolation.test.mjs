@@ -72,3 +72,12 @@ test('buyer notices run independently without touching paused CRM campaigns or a
   assert.deepEqual(await result.json(), { ok: true, disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0, purchaseQueueOk: true });
   assert.deepEqual(h.calls, { crm: 0, purchase: 1, push: 0 });
 });
+
+test('old retention flags cannot start the former course-wide dispatcher while one-time requests are request-only', async () => {
+  const h = harness({ CRON_SECRET:'test-cron-secret', CRM_RETENTION_ENABLED:'true', CRM_AUTOMATIONS_ENABLED:'true',
+    CRM_DELIVERY_ENABLED:'true', SOLAPI_API_KEY:'synthetic', SOLAPI_API_SECRET:'synthetic' });
+  const result = await h.crm();
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { ok:true, sent:1, purchaseQueueOk:true });
+  assert.deepEqual(h.calls, { crm:1, purchase:0, push:0 });
+});

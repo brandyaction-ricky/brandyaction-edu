@@ -1,0 +1,16 @@
+.section { scroll-margin-top: 6rem; }
+.section > p { margin: .5rem 0 0; }
+.course { margin: 1rem 0 0; padding: 0 .75rem; min-width: 0; border: 1px solid #e5e7eb; border-radius: .5rem; }
+.course legend { padding: 0 .3rem; font-weight: 650; }
+.choice { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem 0; }
+.choice + .choice { border-top: 1px solid #e5e7eb; }
+.choice h4, .choice p { margin: 0; }
+.choice p { margin-top: .25rem; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.actions label { white-space: nowrap; }
+.actions input { width: 4rem; padding: .25rem; font: inherit; border: 1px solid #d1d5db; border-radius: .25rem; }
+.unavailable { color: #666; }
+.error { color: #a10d12; }
+@media (max-width: 640px) {
+  .choice { align-items: flex-start; flex-direction: column; }
+}

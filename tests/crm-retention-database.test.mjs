@@ -102,3 +102,105 @@ test('new visit and revoked access independently invalidate queued recipients',a
  assert.equal(await f.claim(runs.find(r=>r.automation_id===f.stalled).id),null);
  assert.equal((await f.db.query('select count(*)::int n from crm_retention_daily_receipts')).rows[0].n,0);
 });
+
+async function reminderSetup(t) {
+  const f = await setup(t);
+  await f.db.exec(`reset role;
+    alter table courses add column status text not null default 'published';
+    alter table cohorts add column archived_at timestamptz;
+    alter table cohorts add column price integer not null default 10000;
+  `);
+  await f.db.query("update profiles set role='student' where id=$1", [f.other]);
+  await f.db.exec(read('20261118135006_edu_learning_reminder_requests.sql'));
+  await f.db.exec('set role service_role');
+  f.reminder = async ({ user = f.student, action = 'list', request = null, enrollment = null, kind = null, days = null } = {}) =>
+    (await f.db.query('select edu_learning_reminders($1,$2,$3,$4,$5,$6) as info', [user,action,request,enrollment,kind,days])).rows[0].info;
+  return f;
+}
+
+test('students independently request each condition once, cancel, and explicitly request again without queuing messages', async t => {
+  const f = await reminderSetup(t);
+  const enrollment = f.enrollment;
+  const progress = { action:'request', request:id(), enrollment, kind:'learning_stalled', days:3 };
+  const visit = { action:'request', request:id(), enrollment, kind:'member_inactive', days:4 };
+  let settings = await f.reminder();
+  assert.equal(settings.maskedPhone, '010-****-1234');
+  assert.deepEqual(settings.courses[0].choices.map(choice => choice.eligible), [false, true]);
+  await assert.rejects(f.reminder(visit), /LEARNING_REMINDER_FORBIDDEN/);
+  await f.visit();
+  await Promise.all([f.reminder(progress), f.reminder({ ...progress, request:id() }), f.reminder(visit)]);
+  settings = await f.reminder();
+  const [visitChoice, progressChoice] = settings.courses[0].choices;
+  assert.equal(visitChoice.request.id, visit.request);
+  assert.equal(progressChoice.request.status, 'pending');
+  assert.equal(Date.parse(progressChoice.request.dueAt) - Date.parse(progressChoice.request.requestedAt), 3 * 86400000);
+  assert.equal((await f.db.query('select count(*)::int n from edu_learning_reminder_requests')).rows[0].n, 2);
+
+  await f.reminder({ action:'cancel', request:visit.request });
+  await f.reminder(visit);
+  settings = await f.reminder();
+  assert.deepEqual(settings.courses[0].choices.map(choice => choice.request.status), ['cancelled','pending']);
+  const fresh = id();
+  settings = await f.reminder({ ...visit, request:fresh, days:2 });
+  assert.equal(settings.courses[0].choices[0].request.id, fresh);
+  assert.equal(settings.courses[0].choices[0].request.days, 2);
+  await f.reminder({ action:'cancel', request:visit.request });
+  assert.equal((await f.reminder()).courses[0].choices[0].request.status, 'pending');
+  assert.equal((await f.runs()).length, 0);
+  assert.equal((await f.db.query('select count(*)::int n from crm_message_logs')).rows[0].n, 0);
+  assert.deepEqual((await f.db.query('select distinct consent_version from edu_learning_reminder_requests')).rows, [{ consent_version:'request-only-v1' }]);
+});
+
+test('role, ownership, active paid access, and database grants prevent requests from outside an eligible seat', async t => {
+  const f = await reminderSetup(t);
+  const data = { action:'request', request:id(), enrollment:f.enrollment, kind:'learning_stalled', days:3 };
+  await assert.rejects(f.reminder({ ...data, user:f.admin }), /LEARNING_REMINDER_FORBIDDEN/);
+  await assert.rejects(f.reminder({ ...data, user:f.other }), /LEARNING_REMINDER_FORBIDDEN/);
+  await assert.rejects(f.reminder({ ...data, days:0 }), /LEARNING_REMINDER_INVALID/);
+  await assert.rejects(f.reminder({ ...data, days:366 }), /LEARNING_REMINDER_INVALID/);
+  await f.reminder(data);
+  assert.deepEqual((await f.reminder({ user:f.other, action:'cancel', request:data.request })).courses, []);
+  assert.equal((await f.reminder()).courses[0].choices[1].request.status, 'pending');
+
+  for (const check of [
+    { change:'update cohorts set price=0', reset:'update cohorts set price=10000' },
+    { change:"update courses set category='free'", reset:"update courses set category='paid_class'" },
+    { change:'update cohorts set archived_at=now()', reset:'update cohorts set archived_at=null' },
+    { change:'update enrollments set revoked_at=now()', reset:'update enrollments set revoked_at=null' },
+    { change:"update enrollments set access_ends_at=now()-interval '1 minute'", reset:'update enrollments set access_ends_at=null' },
+  ]) {
+    await f.db.exec(check.change);
+    assert.deepEqual((await f.reminder()).courses, []);
+    await assert.rejects(f.reminder({ ...data, request:id() }), /LEARNING_REMINDER_FORBIDDEN/);
+    await f.db.exec(check.reset);
+  }
+  for (const role of ['anon','authenticated']) {
+    await f.db.exec('reset role; set role ' + role);
+    await assert.rejects(f.reminder(), /permission denied/);
+    await assert.rejects(f.db.query('select * from edu_learning_reminder_requests'), /permission denied/);
+  }
+});
+
+test('new visits and real normal completion close their own one-shot requests, and an elapsed request can be replaced', async t => {
+  const f = await reminderSetup(t);
+  await f.add('learning',2);
+  await f.visit();
+  const progress = { action:'request', request:id(), enrollment:f.enrollment, kind:'learning_stalled', days:3 };
+  const visit = { action:'request', request:id(), enrollment:f.enrollment, kind:'member_inactive', days:3 };
+  await f.reminder(progress);
+  await f.reminder(visit);
+  await f.db.query("insert into edu_member_visits(user_id,visit_day,first_seen_at,last_seen_at) values($1,(now() at time zone 'Asia/Seoul')::date,now(),now())", [f.student]);
+  assert.deepEqual((await f.reminder()).courses[0].choices.map(choice => choice.request.status), ['activity','pending']);
+  await f.complete(f.learning);
+  assert.deepEqual((await f.reminder()).courses[0].choices.map(choice => choice.request.status), ['activity','activity']);
+  const newId = id();
+  assert.equal((await f.reminder({ ...visit, request:newId })).courses[0].choices[0].request.id, newId);
+  await f.db.query(`update edu_learning_reminder_requests set
+    requested_at = now() - case when id=$1 then interval '4 days' else interval '6 days' end,
+    due_at = now() - case when id=$1 then interval '1 day' else interval '3 days' end
+    where id in ($1,$2)`, [newId, visit.request]);
+  await f.db.exec('reset role; delete from edu_member_visits where visit_day=(now() at time zone \'Asia/Seoul\')::date; set role service_role');
+  assert.equal((await f.reminder()).courses[0].choices[0].request.status, 'elapsed');
+  assert.equal((await f.reminder({ ...visit, request:id() })).courses[0].choices[0].request.status, 'pending');
+  assert.equal((await f.runs()).length, 0);
+});
