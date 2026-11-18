@@ -126,6 +126,17 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/staff-curriculum-review-20261118" ]; then
+            expected_main=295b6f13ce768d04c160ee5524b33d0c6b1fe57f
+            release_payload=7c009ed66ac225f43bdce466239d07a41a771d50
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json
+            echo 'Verified the pinned read-only curriculum review payload.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-signup-marketing-copy-20261104" ]; then
             expected_main=bb803efeeedea347e5cf6b283591f4053b5131de
             release_payload=aedfe204dabfcf3b5e54bcf04f6f7b2fa060f6cc
