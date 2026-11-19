@@ -6,7 +6,8 @@ export const WEBINAR_PREFIX = 'edu_campus_webinar_v1_';
 export const ARCHIVED_WEBINAR_PREFIX = 'edu_campus_archived_webinar_v1_';
 export const WEBINAR_TAG = 'edu-campus-webinars-v1';
 export const slugPattern = /^[a-z0-9][a-z0-9-]{2,59}$/;
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Any Postgres uuid: DEV demo cohorts use fixed ids (40000000-…-0001) without RFC version/variant bits.
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const uuid = (v: unknown): v is string => typeof v === 'string' && uuidPattern.test(v);
 export type Webinar = { slug: string; title: string; description: string; status: 'draft'|'published'|'paused'; startsAt: string; endsAt: string; cohortId: string; detailPath: string; kakaoUrl: string; youtubeId: string; revision: string; resources?:CampusResource[]; welcome?:WelcomeSettings; arrival?:ArrivalConfig; content?:CampusContent; ambientCount?:number };
 export type PublicWebinar = Pick<Webinar, 'slug'|'title'|'description'|'startsAt'|'endsAt'|'detailPath'|'kakaoUrl'|'youtubeId'> & { checkoutPath: string; content?:CampusContent; resources?:CampusResource[]; ambientCount?:number };
