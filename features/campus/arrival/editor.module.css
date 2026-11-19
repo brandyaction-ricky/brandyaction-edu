@@ -1,6 +1,6 @@
 .editor { min-width: 0; color: var(--adm-text, #161719); }
 .intro { max-width: 760px; margin-bottom: 20px; }
-.editor .intro h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.5; }
+.editor .intro h2 { margin: 0 0 8px; font-size: 20px; line-height: 1.5; }
 .editor .intro p, .scope { margin: 0; color: var(--adm-text-sub, #626770); font-size: 14px; line-height: 1.7; }
 .scope { margin: 12px 0 20px; }
 .previewActions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; }

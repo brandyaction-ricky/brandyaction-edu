@@ -69,14 +69,14 @@
 .bridge > div { flex: 1 0 auto; max-width: 100%; }
 .bridge p { margin: 0; color: var(--muted, #565e68); font-size: 13px; line-height: 1.45; }
 .bridge h3 { margin: 2px 0 0; font-size: 17px; letter-spacing: -.035em; line-height: 1.4; }
-.bridge .nextButton {
+.bridge .returnButton {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   max-width: 100%; min-height: 44px; margin-inline-start: auto; padding: 8px 12px;
   border: 0; border-radius: 8px; background: #173b69; color: #fff; font-size: 14px; font-weight: 700;
 }
-.bridge .nextButton:hover { background: #142b48; }
+.bridge .returnButton:hover { background: #142b48; }
 @media (max-width: 440px) {
-  .bridge .nextButton { width: 100%; }
+  .bridge .returnButton { width: 100%; }
   .station { gap: 20px; }
   .example { margin: -10px 0 0 0; }
   .film { width: min(100%, 205px); }

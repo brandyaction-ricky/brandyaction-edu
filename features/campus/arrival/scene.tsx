@@ -100,7 +100,7 @@ export function Scene({ room, officeIntro = false, demoPhase = 'result', demoTit
     key={bridge}
     ref={frame}
     className={className}
-    title="문샷 무료 체험 공간 · 웰컴존, 체험용 AI 사무실, 라이브 홀"
+    title="문샷 AI 직원 체험 공간"
     src={`/campus/world/tour/index.html#bridge=${bridge}`}
     sandbox="allow-scripts allow-same-origin"
     referrerPolicy="no-referrer"

@@ -2,6 +2,7 @@ import {useEffect, useId, useRef, useState} from 'react';
 import {ArrowRight, ArrowUp, Bot} from 'lucide-react';
 import {SPY_PHASES, type SpyPhase} from './model';
 import monitor from './office-demo.module.css';
+import progression from './progression.module.css';
 import styles from './spy-station.module.css';
 
 const replies = {
@@ -144,7 +145,7 @@ export function SpyStation({phase, onAdvance, onComplete}: {
             <ArrowUp size={17} aria-hidden="true"/><span aria-hidden="true">보내기</span>
           </button>
         </div>
-        : <button className={styles.action} type="button" onClick={onComplete}>콘텐츠 담당자 열기<ArrowRight size={17} aria-hidden="true"/></button>}
+        : <button className={progression.nextAction} type="button" onClick={onComplete}>콘텐츠 담당자 열기<ArrowRight size={16} aria-hidden="true"/></button>}
     </footer>
   </>;
 }

@@ -10,6 +10,7 @@ import {CorridorPanel} from './corridor-panel';
 import {reuseContentStationAnswers} from './content-station-prompt';
 import {TeamLeader} from './team-leader';
 import entryStyle from './office-entry.module.css';
+import progression from './progression.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
 import {LiveReminder} from './live-reminder';
 import {VisitorAvatar} from './visitor-avatar';
@@ -438,7 +439,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
 
   return <main className={`${theme.surface} ${s.root} ${embedded ? s.embedded : ''}`} data-room={room} data-office-entry={officeIntro || undefined} data-scene-status={sceneStatus}>
     <a href={officeIntro ? '#arrival-desk-button' : exploringHall ? '#arrival-hall-schedule' : '#arrival-content'} className={s.skip} inert={backgroundInert}>체험 안내로 바로가기</a>
-    <div className={s.world} aria-label="웰컴존에서 웰컴 라운지까지 이어지는 통로" inert={backgroundInert || choosingAudience}>
+    <div className={s.world} aria-label="AI 직원 체험에서 웰컴 라운지까지 이어지는 통로" inert={backgroundInert || choosingAudience}>
       {hydrated && <CorridorScene key={sceneVisit} frame={sceneFrame} station={station} label={destination}
         avatar={state.visitorAvatar}
         paused={deskOpen || Boolean(lobbyGuide) || revisitContent || introOpen || avatarOpen || showReset || (!officeIntro && !explore)}
@@ -450,7 +451,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <img src="/brandy-action-logo.png" alt="브랜디액션"/><small>EDU</small></div>
       <div className={entryStyle.progress} aria-live="polite" aria-atomic="true">
         {stopIndex < 0 ? <strong>내 AI 체험</strong> : <>
-          <ol className={entryStyle.route} aria-label="웰컴존 둘러보기 순서">{corridorStops.map(stop => <li
+          <ol className={entryStyle.route} aria-label="AI 직원 체험 순서">{corridorStops.map(stop => <li
             key={stop.station} aria-current={station === stop.station ? 'step' : undefined} data-complete={stop.station < state.officeStation}>
             {stop.station < state.officeStation && <Check size={13} aria-label="완료"/>}{stop.label}
           </li>)}</ol>
@@ -471,7 +472,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     {officeIntro && firstStop && sceneStatus === 'ready' && !teamLeaderOpen && <div className={entryStyle.avatarControl}>
       <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
     </div>}
-    {choosingAudience ? <section className={entryStyle.entryChoice} aria-label="문샷 웰컴존 소개">
+    {choosingAudience ? <section className={entryStyle.entryChoice} aria-label="문샷 AI 직원 체험 소개">
+      <p className={entryStyle.experienceName}>문샷 AI 직원 체험</p>
       <h1>{config.title}</h1>
       <p>지금 하는 일에 맞춰, AI에게 무엇을 어떻게 맡길 수 있는지 확인해 보세요.</p>
       <fieldset>
@@ -483,7 +485,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         })}</div>
       </fieldset>
       <div className={entryStyle.entryFooter}>
-        <button id="arrival-desk-button" type="button" ref={deskButton} disabled={!entryAudience} onClick={startEntry}>이 상황으로 시작<ArrowRight size={16} aria-hidden="true"/></button>
+        <button id="arrival-desk-button" type="button" ref={deskButton} className={progression.nextAction} disabled={!entryAudience} onClick={startEntry}>이 상황으로 시작<ArrowRight size={16} aria-hidden="true"/></button>
         <p><BookOpen size={15} aria-hidden="true"/>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
       </div>
     </section> : officeIntro ? <section className={entryStyle.wayfinding} aria-label="현재 목적지" data-walk-station={station} inert={backgroundInert} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
@@ -495,7 +497,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {station === 7 && <p className={entryStyle.nextReward}>AI팀 설계도와 회사 업무 기준표를 받아보세요.</p>}
       </div>
       <div className={entryStyle.wayfindingActions}>
-        <button id="arrival-desk-button" type="button" ref={deskButton} onClick={() => requestWalk(station)} disabled={walking}>
+        <button id="arrival-desk-button" type="button" ref={deskButton} className={progression.nextAction} onClick={() => requestWalk(station)} disabled={walking}>
           {walking ? '이동 중' : station === 7 ? '웰컴 라운지 입장하기' : '바로 열기'}<ArrowRight size={16} aria-hidden="true"/>
         </button>
         {sceneStatus === 'loading' ? <p role="status">공간을 준비하고 있어요.</p> : sceneStatus === 'ready' && nearStation !== station && <div className={entryStyle.movementHint}>
@@ -586,10 +588,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
       {step !== 8 && <footer className={s.dockFooter}>
-        {step === 1 && <button type="button" className={s.primary} onClick={personalStart}>내 상황으로 요청문 만들기<ArrowRight size={18}/></button>}
-        {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={s.primary} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
-        {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={s.primary} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
-        {step === 5 && <button type="button" className={s.primary} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={18}/></button>}
+        {step === 1 && <button type="button" className={progression.nextAction} onClick={personalStart}>내 상황으로 요청문 만들기<ArrowRight size={18}/></button>}
+        {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={progression.nextAction} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
+        {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={progression.nextAction} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
+        {step === 5 && <button type="button" className={progression.nextAction} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={18}/></button>}
         {step === 7 && <div className={s.calendarActions}>
           <p className={s.calendarHint}>캘린더에 일정 추가</p>
           <div className={s.calendarButtons}>
@@ -649,7 +651,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     <dialog ref={exampleDialog} className={s.exampleDialog} onCancel={() => setShowExample(false)} aria-labelledby="arrival-example-title">
       <header><div><span>미리 준비한 결과 예시</span><h2 id="arrival-example-title">{content.goal}</h2></div><button type="button" aria-label="결과 예시 닫기" onClick={() => setShowExample(false)}><X size={20}/></button></header>
       <div className={s.exampleBody}><ResultExample text={content.example.before}/></div>
-      <footer><button type="button" className={s.primary} onClick={() => {setShowExample(false); setExplore(false); personalStart();}}>내 상황으로 직접 해보기<ArrowRight size={17}/></button></footer>
+      <footer><button type="button" className={progression.nextAction} onClick={() => {setShowExample(false); setExplore(false); personalStart();}}>내 상황으로 직접 해보기<ArrowRight size={17}/></button></footer>
     </dialog>
     <dialog ref={resetDialog} className={s.dialog} onCancel={() => setShowReset(false)} aria-labelledby="arrival-reset-title"><button type="button" className={s.close} aria-label="닫기" onClick={() => setShowReset(false)}><X size={20}/></button><h2 id="arrival-reset-title">처음부터 다시 볼까요?</h2><p>이 브라우저에 적은 내용과 진행 위치를 지워요. 개인 AI의 대화는 그대로 남습니다.</p><div className={s.dialogActions}><button type="button" className={s.secondary} onClick={() => setShowReset(false)}>계속 체험하기</button><button type="button" className={s.primary} onClick={reset}>지우고 처음부터</button></div></dialog>
   </main>;

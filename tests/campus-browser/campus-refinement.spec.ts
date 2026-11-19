@@ -2,10 +2,10 @@ import {test,expect} from '@playwright/test';
 test.setTimeout(120000);
 test('operator without enrollment enters every room and keeps avatar controls',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/operator-tour');
- await expect(page.getByRole('banner').getByText('문샷 웰컴 존',{exact:true})).toBeVisible();
+ await expect(page.getByRole('banner').getByText('문샷 개강 준비실',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'공간 전체 보기',exact:true})).toBeEnabled({timeout:90000});
  await expect(page.getByLabel('입장 권한 체험',{exact:true})).toHaveCount(0);
- for(const room of ['문샷 공부방','내 AI 사무실','문샷 자료실','문샷 라이브홀','문샷 웰컴 존']){
+ for(const room of ['문샷 공부방','내 AI 사무실','문샷 자료실','문샷 라이브홀','문샷 개강 준비실']){
   await page.getByRole('button',{name:'공간 이동',exact:true}).click();await page.getByRole('button',{name:room+' 입장',exact:true}).click();
   await expect(page.getByRole('banner').getByText(room,{exact:true})).toBeVisible();await expect(page.getByRole('dialog',{name:'공간 입장 안내',exact:true})).toHaveCount(0);
  }

@@ -31,7 +31,7 @@ import {createFrameBudget} from '../office/frame-budget.mjs';
 // Synthetic preview host only. Only an explicitly enabled local fixture can connect preview peers; no real membership or bot commands.
 const root=document.getElementById('office'),layer=document.getElementById('hotspots'),status=document.getElementById('status');
 const token=new URLSearchParams(location.hash.slice(1)).get('bridge')||'';
-const names={library:'문샷 자료실',live:'문샷 라이브홀',welcome:'문샷 웰컴 존',study:'문샷 공부방',office:'내 AI 사무실'};
+const names={library:'문샷 자료실',live:'문샷 라이브홀',welcome:'문샷 개강 준비실',study:'문샷 공부방',office:'내 AI 사무실'};
 let started=false,publicVisitor=false,devPresence=false,qaCrowd=false,ambientCount=0,operatorReview=false,guidedPreview=false;
 let meetup,sceneBatch,meetupWanted=false,environment,mixer,interiors;
 let officeIntro=false;
@@ -64,7 +64,7 @@ function createScene(id){room=id;const group=new office.room.constructor();group
   for(let row=0;row<4;row++)for(const x of[-7,-4,3,6]){const y=7+row*2.6;box(group,x,y,.18,1.4,1.2,.4,0x425d80);box(group,x,y+1,.45,1.4,.2,.8,0x6389b6);}
   box(group,10,10,0,1.5,3,1.1,0x2e65a3);sign(group,'문샷 안내',10.75,10,2.1,2,1);
  }else{
-  box(group,-6,1,0,14,3,.3,0x35546e);box(group,-4.8,1.1,.3,11.5,.3,3.8,0x142e4c);sign(group,'',1,1.45,2.6,10.5,2.7,{eyebrow:'MOONSHOT · WELCOME',title:guidedPreview?'AI와 일하는 나의 첫 장면':'라이브 다시보기',subtitle:guidedPreview?'한 가지를 맡겨보면 달라져요':'함께 배우는 첫걸음',play:!guidedPreview});
+  box(group,-6,1,0,14,3,.3,0x35546e);box(group,-4.8,1.1,.3,11.5,.3,3.8,0x142e4c);sign(group,'',1,1.45,2.6,10.5,2.7,{eyebrow:guidedPreview?'MOONSHOT · WELCOME':names.welcome,title:guidedPreview?'AI와 일하는 나의 첫 장면':'라이브 다시보기',subtitle:guidedPreview?'한 가지를 맡겨보면 달라져요':'함께 배우는 첫걸음',play:!guidedPreview});
   for(const x of[-6,4]){box(group,x,11,0,3,2.2,.9,0x385b7e);box(group,x+.5,11.3,.9,2,.2,1.1,0x162b45);box(group,x+.6,11.51,1.2,1.8,.02,.65,0x409fff,false,true);}
   office.place('loungeSofa',-3,6,2.8,1,{group});office.place('loungeSofa',1,6,2.8,1,{group});
   for(const [x,y]of[[-8,5],[9,5],[-8,18],[9,18]])office.place('pottedPlant',x,y,1,1,{group});

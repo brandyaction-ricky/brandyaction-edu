@@ -3,6 +3,7 @@ import {ArrowLeft, ArrowRight, CalendarDays, Download, ExternalLink, LockKeyhole
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
 import monitor from './office-demo.module.css';
+import progression from './progression.module.css';
 import styles from './onboarding-program.module.css';
 
 export type OnboardingGuide = 'materials' | 'intro';
@@ -92,6 +93,6 @@ export function OnboardingProgram({guide, config, dateLabel, timeLabel, onConten
           aria-label="브랜디액션 팀의 AI 사무실 업무 화면" src="/campus/arrival/team-at-work.mp4"/>
       </section>}
     </div>
-    {!isMaterials && <footer className={monitor.footer}><button type="button" className={styles.guideButton} onClick={onOpenMaterials}>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></button></footer>}
+    {!isMaterials && <footer className={monitor.footer}><button type="button" className={progression.nextAction} onClick={onOpenMaterials}>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></button></footer>}
   </section>;
 }

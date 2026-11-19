@@ -1,5 +1,6 @@
 import {useEffect, useId, useRef, useState} from 'react';
-import {ArrowLeft, Maximize, Minimize, Pause, Play, RotateCcw} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Maximize, Minimize, Pause, Play, RotateCcw} from 'lucide-react';
+import progression from './progression.module.css';
 import styles from './team-leader.module.css';
 
 const VIDEO_SOURCE = '/campus/arrival/team-leader-telegram.mp4';
@@ -121,7 +122,7 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
             media.load();
             void media.play().catch(() => {});
           }}>다시 불러오기</button></p>}
-          <button type="button" className={styles.cta} onClick={() => leave(onComplete)}>경쟁사 스파이 만나기</button>
+          <button type="button" className={progression.nextAction} onClick={() => leave(onComplete)}>경쟁사 스파이 만나기<ArrowRight size={16} aria-hidden="true"/></button>
         </div>
       </div>}
     </div>

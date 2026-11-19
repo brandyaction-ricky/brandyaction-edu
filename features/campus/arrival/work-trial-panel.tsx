@@ -3,6 +3,7 @@
 import {useEffect, useId, useRef, useState} from 'react';
 import {ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Download, FileText, ListChecks, Plus, RefreshCw} from 'lucide-react';
 import {buildWorkManual, buildWorkPrompt, criteriaReady, DEFAULT_WORK_TRIAL, secondTaskReady, updateWorkTrial, workAnswerReady, workPromptCopyId, workReviewFeedback, WORK_TRIAL_ANSWER_EXAMPLES, WORK_TRIAL_FIRST_CHECKS, WORK_TRIAL_LIMITS, type WorkTrialConfig, type WorkTrialState} from './work-trial';
+import progression from './progression.module.css';
 import s from './work-trial-panel.module.css';
 
 const stages = ['업무 기준', '첫 업무', '피드백', '재사용'];
@@ -241,10 +242,10 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
       {storageBlocked && <p className={s.fieldError} role="status">이 브라우저에서는 진행 내용을 보관할 수 없습니다. 화면을 닫기 전에 업무 매뉴얼을 복사해두세요.</p>}
     </div>
     <footer className={s.footer}>
-      {state.step === 0 ? <><p>{firstReady ? '내 기준과 첫 업무를 함께 AI에 보냅니다.' : '맡길 일과 읽을 사람을 적고, 우선순위를 골라주세요.'}</p><button type="button" className={s.primary} disabled={!firstReady} onClick={() => go(1)}>이 기준으로 첫 업무 맡기기<ArrowRight size={17}/></button></> : state.step === 4 ? <button type="button" className={s.primary} onClick={onLive}>라이브에서 이어서 배우기<ArrowRight size={17}/></button> : <>
+      {state.step === 0 ? <><p>{firstReady ? '내 기준과 첫 업무를 함께 AI에 보냅니다.' : '맡길 일과 읽을 사람을 적고, 우선순위를 골라주세요.'}</p><button type="button" className={progression.nextAction} disabled={!firstReady} onClick={() => go(1)}>이 기준으로 첫 업무 맡기기<ArrowRight size={16} aria-hidden="true"/></button></> : state.step === 4 ? <button type="button" className={progression.nextAction} onClick={onLive}>라이브에서 이어서 배우기<ArrowRight size={16} aria-hidden="true"/></button> : <>
         {(!showReview || !answerReady) && <p>{showReview ? '받은 답변을 붙여넣거나 예시로 계속할 수 있어요.' : hasCopied ? '답변을 받으면 이 화면으로 돌아오세요.' : state.step === 2 ? '수정할 기준을 담아 첫 답변을 다시 요청합니다.' : state.step === 3 ? '수정한 기준과 새 메모를 함께 보냅니다.' : '내 업무 기준과 메모가 하나의 요청문으로 준비됩니다.'}</p>}
         <div className={s.footerActions}>
-          {showReview || (state.step === 2 && hasCopied) ? <><button type="button" className={s.primary} disabled={showReview && !answerReady} onClick={confirmResponse}>{state.step === 1 ? '이 답변으로 피드백하기' : state.step === 2 ? '수정한 답변을 확인했어요' : '답변 검토 마치기'}<ArrowRight size={17}/></button>{hasCopied && (!showReview || !answerReady) && <button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button>}</> : <button type="button" className={s.primary} disabled={!prompt || copying === 'prompt'} aria-busy={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={17}/>{copying === 'prompt' ? '복사 중…' : state.step === 2 ? '피드백 반영 요청 복사' : '기준과 자료 함께 복사'}</button>}
+          {showReview || (state.step === 2 && hasCopied) ? <><button type="button" className={progression.nextAction} disabled={showReview && !answerReady} onClick={confirmResponse}>{state.step === 1 ? '이 답변으로 피드백하기' : state.step === 2 ? '수정한 답변을 확인했어요' : '답변 검토 마치기'}<ArrowRight size={16} aria-hidden="true"/></button>{hasCopied && (!showReview || !answerReady) && <button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button>}</> : <button type="button" className={s.primary} disabled={!prompt || copying === 'prompt'} aria-busy={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={17}/>{copying === 'prompt' ? '복사 중…' : state.step === 2 ? '피드백 반영 요청 복사' : '기준과 자료 함께 복사'}</button>}
           {answerStage && (exampleAnswer ? <button type="button" className={s.textButton} onClick={startPasting}>내 답변 붙여넣기</button> : <button type="button" className={s.textButton} onClick={useExampleAnswer}>예시 답변으로 계속</button>)}
           {state.step === 2 && state.firstAnswerExample && prompt && <button type="button" className={s.textButton} onClick={confirmResponse}>예시로 다음 업무 계속하기<ArrowRight size={14}/></button>}
         </div>

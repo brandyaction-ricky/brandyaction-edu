@@ -9,7 +9,7 @@ import {slugPattern} from '@/features/campus/webinar/domain';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: '혼자 하던 일, AI에게 맡길 수 있을까요? · 문샷',
+  title: '문샷 AI 직원 체험 · 혼자 하던 일, AI에게 맡길 수 있을까요?',
   description: '회사 업무를 더 수월하게 하고 싶을 때도, 새로운 일을 준비할 때도. 내 상황에 맞는 AI 체험과 문샷 무료 라이브를 만나보세요.',
   robots: {index: false, follow: false},
 };

@@ -2,6 +2,7 @@ import {useEffect, useId, useRef, useState} from 'react';
 import {ArrowRight, ArrowUpRight, ChevronDown, Copy, MessageSquareText} from 'lucide-react';
 import {buildContentExperiencePrompt, buildContentStationPrompt, contentStationReady, CONTENT_EXPERIENCE_LIMIT, CONTENT_STATION_EXAMPLE, CONTENT_STATION_LIMITS, type ContentStationDraft, type ContentStationInputs} from './content-station-prompt';
 import monitor from './office-demo.module.css';
+import progression from './progression.module.css';
 import styles from './content-station.module.css';
 
 const captions = ['마스크팩, 붙이고 자도 될까요?', '우리 제품의 권장 사용 시간 10~15분', '사용 전, 제품의 사용 가이드를 확인하세요.'];
@@ -151,7 +152,7 @@ export function ContentStation({draft, onDraftChange, onComplete, revisit = fals
       <p>다음. 4번째 봇을 확인해보세요.</p>
       <h3>AI 직원들이 10배 더 똑똑해지는 법</h3>
     </div>}
-    <button className={styles.nextButton} type="button" onClick={onComplete}>{revisit ? '자료 목록으로 돌아가기' : '회사 업무 기준 보기'}<ArrowRight size={16} aria-hidden="true"/></button>
+    <button className={revisit ? styles.returnButton : progression.nextAction} type="button" onClick={onComplete}>{revisit ? '자료 목록으로 돌아가기' : '회사 업무 기준 보기'}<ArrowRight size={16} aria-hidden="true"/></button>
   </footer>
   </>;
 }

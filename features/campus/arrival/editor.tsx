@@ -43,11 +43,12 @@ function ArrivalDraftPreview({config, onClose}: {config: ArrivalConfig; onClose:
 }
 
 /** The parent webinar form owns persistence and its existing revision check. */
-export function ArrivalEditor({value: storedValue, onChange, disabled = false, savedSlug}: {
+export function ArrivalEditor({value: storedValue, onChange, disabled = false, savedSlug, draftOnly = false}: {
   value?: ArrivalConfig;
   onChange: (value: ArrivalConfig) => void;
   disabled?: boolean;
   savedSlug?: string;
+  draftOnly?: boolean;
 }) {
   // Old browser-only demo drafts may bypass the server's validation boundary.
   // Add only missing fields; keep every existing editorial value intact.
@@ -80,19 +81,21 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
     }
   }
 
-  if (!value) return <section className={styles.editor} aria-label="모집 무료 체험 설정">
-    <div className={styles.intro}><h3>카톡방 방문자가 만날 무료 체험</h3><p>환영 문구, 대상별 질문과 결과 예시, 라이브 일정을 이곳에서 편집합니다. 구매자 공지·기초 지식과는 별도로 관리합니다.</p></div>
+  if (!value) return <section className={styles.editor} aria-label="라이브 사전 체험 설정">
+    <div className={styles.intro}><h2>라이브 사전 체험</h2><p>카톡방 방문자가 ‘문샷 AI 직원 체험’에서 보는 안내와 라이브 일정을 관리합니다.</p></div>
     <AdminButton type="button" variant="primary" disabled={disabled} onClick={() => onChange(structuredClone(DEFAULT_ARRIVAL))}><Plus size={17} aria-hidden="true"/> 모집 체험 설정 추가</AdminButton>
     <p className={styles.scope}>설정을 추가해도 공개되지 않습니다. 현재는 검수용 미리보기만 제공합니다.</p>
   </section>;
 
-  return <section className={styles.editor} aria-label="모집 무료 체험 설정">
-    <div className={styles.intro}><h3>카톡방 방문자가 만날 무료 체험</h3><p>처음 보는 사람에게 보여줄 안내와 체험을 편집하세요. 구매자용 웰컴 콘텐츠는 기존 항목에서 관리합니다.</p></div>
+  return <section className={styles.editor} aria-label="라이브 사전 체험 설정">
+    <div className={styles.intro}><h2>라이브 사전 체험</h2><p>카톡방 방문자가 ‘문샷 AI 직원 체험’에서 보는 내용을 편집하세요.</p></div>
     <div className={styles.previewActions}>
       <AdminButton type="button" variant="primary" disabled={disabled} onClick={openPreview}><Eye size={17} aria-hidden="true"/> 현재 편집 내용 미리보기</AdminButton>
       {savedSlug && <a href={'/experience/moonshot?event=' + encodeURIComponent(savedSlug)} target="_blank" rel="noopener noreferrer">저장된 체험 미리보기 <ArrowUpRight size={16} aria-hidden="true"/></a>}
     </div>
-    <p className={styles.scope}>편집 후 하단 ‘설정 저장’을 눌러야 보관됩니다. 저장해도 모집 체험이 자동 공개되지 않습니다.</p>
+    <p className={styles.scope}>{draftOnly
+      ? '이 브랜치에서는 편집한 내용을 미리 볼 수 있어요. 설정 저장은 고정 DEV 통합 후 사용할 수 있습니다.'
+      : '편집 후 하단 ‘설정 저장’을 누르면 보관됩니다. 저장해도 모집 체험은 자동으로 공개되지 않습니다.'}</p>
     {error && <p ref={errorBox} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
 
     <EditorDisclosure title="사무실 직원 체험 · 회사 기준" initialOpen>

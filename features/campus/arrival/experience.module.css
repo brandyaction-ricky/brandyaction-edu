@@ -438,7 +438,6 @@
 .exampleDialog > header button { width: 44px; min-height: 44px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
 .exampleBody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
 .exampleDialog > footer { flex: none; border-top: 1px solid var(--line); padding: 16px 24px; }
-.exampleDialog > footer .primary { min-width: 0; width: auto; }
 
 /* Desktop and tablet retain one fixed-width guide beside the framed world. */
 @media (min-width: 1200px) and (min-height: 900px) {

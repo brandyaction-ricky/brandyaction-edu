@@ -23,7 +23,7 @@ for(const [name,viewport] of [['pc',{width:1440,height:723}],['mobile',{width:39
   const button = name => page.getByRole('button', {name, exact:true});
   const answerInput = page.getByRole('textbox', {name:'받은 답변을 여기에 붙여넣기', exact:true});
   async function startWork() {
-    const choices = page.getByRole('region', {name:'문샷 웰컴존 소개'}).getByRole('radio');
+    const choices = page.getByRole('region', {name:'문샷 AI 직원 체험 소개'}).getByRole('radio');
     await expect(choices).toHaveCount(4);
     await expect(button('이 상황으로 시작')).toBeDisabled();
     const workLabel = '회사 업무에 AI를 써보고 싶어요';

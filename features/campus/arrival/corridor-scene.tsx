@@ -69,7 +69,7 @@ export function CorridorScene({frame, station, label, avatar, paused, freeRoam, 
     lastWalk.current = walkRequest;
     if (bridge && !paused) frame.current?.contentWindow?.postMessage({source:'moonshot-walk-host', token:bridge, type:'walk', station}, location.origin);
   }, [walkRequest, bridge, frame, station, paused]);
-  return bridge ? <iframe ref={frame} title="문샷 웰컴존 · 직원 사무실과 웰컴 라운지" className={className}
+  return bridge ? <iframe ref={frame} title="문샷 AI 직원 체험 · 직원 사무실과 웰컴 라운지" className={className}
     sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer"
     src={'/campus/world/tour/welcome-walk.html#' + new URLSearchParams({bridge, avatar: firstAvatar})}/> : null;
 }

@@ -4,6 +4,7 @@ import {useEffect, useId, useRef} from 'react';
 import {ArrowRight, Bot, Check, Network, RotateCcw} from 'lucide-react';
 import type {CanonPhase} from './model';
 import monitor from './office-demo.module.css';
+import progression from './progression.module.css';
 import styles from './canon-station.module.css';
 
 const knowledge = [
@@ -88,7 +89,8 @@ export function CanonStation({phase, onAdvance, onHall}: {
     onAdvance(nextPhase);
   }
 
-  return <div className={`${monitor.body} ${styles.body}`}>
+  return <>
+  <div className={`${monitor.body} ${styles.body}`}>
     <header className={styles.intro}>
       <h1>AI들이 10배 더 똑똑하게 일할 수 있는 이유는 정본 때문이에요.</h1>
       <p>AI 직원이 각자 배운 내용은 서로 연결되어 있지 않아요. 정본을 쓰면 대화를 거듭할수록 지식이 연결되고, AI 직원들이 그 지식을 함께 활용할 수 있어요.</p>
@@ -166,14 +168,15 @@ export function CanonStation({phase, onAdvance, onHall}: {
       </section>
     </div>
     {phase === 3 && <p className={styles.takeaway}>이야기를 나눌수록 우리 회사에 더 잘 맞는 AI가 됩니다.</p>}
-    <footer className={styles.hall}>
-      <div>
-        <h2>12월 7일 라이브에서 이 전 과정을 알려드립니다.</h2>
-        <p>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
-      </div>
-      <button className={styles.hallLink} type="button" onClick={onHall}>
-        웰컴 라운지로 가기<ArrowRight size={17} aria-hidden="true"/>
-      </button>
-    </footer>
-  </div>;
+    <section className={styles.hall}>
+      <h2>12월 7일 라이브에서 이 전 과정을 알려드립니다.</h2>
+      <p>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
+    </section>
+  </div>
+  <footer className={monitor.footer}>
+    <button className={progression.nextAction} type="button" onClick={onHall}>
+      웰컴 라운지로 가기<ArrowRight size={16} aria-hidden="true"/>
+    </button>
+  </footer>
+  </>;
 }

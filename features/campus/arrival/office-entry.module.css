@@ -93,6 +93,7 @@
 }
 .entryChoice h1 { font-size: clamp(19px, 2vw, 24px); line-height: 1.35; margin: 0 0 6px; word-break: keep-all; }
 .entryChoice > p { color: #41556a; font-size: 14px; line-height: 1.5; word-break: keep-all; }
+.entryChoice > .experienceName { margin: 0 0 5px; color: #173b69; font-size: 13px; font-weight: 700; }
 .entryChoice fieldset { border: 0; margin: 14px 0; padding: 0; min-width: 0; }
 .entryChoice legend { padding: 0; margin-bottom: 7px; font-size: 14px; font-weight: 750; }
 .entryOptions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
@@ -106,15 +107,10 @@
 .entryOptions svg { flex-shrink: 0; }
 .entryOptions input:checked + span { border-color: #416da6; background: #edf4fc; color: #153c6b; }
 .entryOptions input:focus-visible + span { outline: 2px solid #3466ae; outline-offset: 2px; }
-.entryFooter { display: flex; align-items: center; gap: 10px 14px; }
-.entryFooter button {
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 8px; min-height: 44px;
-  padding: 8px 13px; border: 0; border-radius: 8px; background: #173b69; color: #fff; font-size: 14px; font-weight: 700;
-}
-.entryFooter button:disabled, .wayfindingActions button:disabled { background: #536b88; }
+.entryFooter { display: grid; gap: 10px; }
 .entryFooter p { display: flex; align-items: center; gap: 7px; color: #41556a; font-size: 13px; line-height: 1.45; word-break: keep-all; }
 .entryFooter svg { flex-shrink: 0; }
-.wayfinding { position: absolute; left: clamp(14px, 3vw, 40px); bottom: max(18px, env(safe-area-inset-bottom)); z-index: 2; display: flex; align-items: center; gap: 20px; width: fit-content; max-width: calc(100% - 28px); background: #fffffff5; border: 1px solid #d4dfed; color: #142b48; border-radius: 14px; box-shadow: 0 4px 24px #17304b24; padding: 13px 16px; }
+.wayfinding { position: absolute; left: clamp(14px, 3vw, 40px); bottom: max(18px, env(safe-area-inset-bottom)); z-index: 2; display: grid; gap: 8px; width: min(400px, calc(100% - 28px)); background: #fffffff5; border: 1px solid #d4dfed; color: #142b48; border-radius: 14px; box-shadow: 0 4px 24px #17304b24; padding: 13px 16px; }
 .wayfinding h1 { margin: 0; font-size: clamp(17px, 2vw, 22px); line-height: 1.45; }
 .wayfinding span { font-size: 12px; color: #516375; }
 .nextStationHint {
@@ -150,9 +146,8 @@
 }
 .stopCopy { min-width: 0; }
 .stopCopy h1 { word-break: keep-all; overflow-wrap: anywhere; }
-.wayfindingActions { display: grid; justify-items: start; gap: 4px; }
+.wayfindingActions { display: grid; gap: 4px; }
 .wayfindingActions p { font-size: 12px; line-height: 1.45; color: #41556a; }
-.wayfindingActions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; background: #173b69; color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 650; white-space: nowrap; }
 .wayfinding .nextReward { margin-top: 4px; color: #41556a; font-size: 13px; line-height: 1.5; word-break: keep-all; }
 .scheduleActions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
 .touchHint { display: none; }
@@ -248,10 +243,9 @@
   .hallControls { right: 12px; }
   .avatarControl { top: 76px; right: 12px; }
   .progress { margin-left: auto; margin-right: 10px; }
-  .wayfinding { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); max-width: none; width: auto; justify-content: space-between; gap: 8px; padding: 10px 12px; }
+  .wayfinding { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); width: auto; padding: 10px 12px; }
   .wayfinding h1 { font-size: 17px; }
   .entryChoice { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); width: auto; padding: 13px; }
-  .entryFooter { align-items: flex-start; flex-wrap: wrap; }
   .keyboardHint { display: none; }
   .touchHint { display: block; }
 }
