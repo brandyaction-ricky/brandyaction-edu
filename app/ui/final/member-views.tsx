@@ -9,6 +9,7 @@ import { ConsentSettings } from '../consent-settings';
 import { contentVisibility } from '@/lib/content-visibility';
 import { PushSettings } from './push-settings';
 import { LearningProgress } from './learning-progress';
+import { LearningReminderSettings } from './learning-reminder-settings';
 import { AppInstallCard } from './app-install';
 import { DiagnosisEntry } from './diagnosis-entry';
 import { QuestionImage } from './question-image';
@@ -1318,6 +1319,10 @@ export function MemberViews({
             title="내 클래스"
             description="나의 배움과 다음 일정을 확인하세요."
           />
+          {user.role === 'student' && active.some(enrollment => rows(data, 'courses').some(course =>
+            course.id === enrollment.course_id && course.category === 'paid_class')) && (
+            <Link className="btn small" href="/my/profile#learning-reminders">학습 알림 신청 내역</Link>
+          )}
           {enrollments.map((e) => (
             <div key={e.id}>
               <EnrolledCard data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
@@ -1355,7 +1360,7 @@ export function MemberViews({
       break;
     case "profile":
       content = (
-        <><Profile user={user} pending={pending} send={send} logout={logout} /><AppInstallCard settings/></>
+        <><Profile user={user} pending={pending} send={send} logout={logout} />{user.role === 'student' && <LearningReminderSettings key={user.id} />}<AppInstallCard settings/></>
       );
       break;
     case "reviews":

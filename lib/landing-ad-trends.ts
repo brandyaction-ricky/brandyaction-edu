@@ -18,11 +18,20 @@ export const AD_METRICS = [
   { key: 'cpm', label: 'CPM', unit: '원' },
 ] as const;
 export type AdMetric = typeof AD_METRICS[number]['key'];
-export function adMetric(row: AdDay, metric: AdMetric): number | null {
+export function adMetric(row: Omit<AdDay, 'day' | 'registration_state'>, metric: AdMetric): number | null {
   if (metric === 'cpa') return row.registrations != null && row.registrations > 0 ? row.spend / row.registrations : null;
   if (metric === 'ctr') return row.impressions > 0 ? row.link_clicks / row.impressions * 100 : null;
   if (metric === 'cpm') return row.impressions > 0 ? row.spend / row.impressions * 1000 : null;
   return row[metric];
+}
+export function formatAdMetric(row: AdDay | null, metric: AdMetric): string {
+  if (!row) return '기록 없음';
+  if ((metric === 'registrations' || metric === 'cpa') && row.registration_state !== 'ready') {
+    return row.registration_state === 'missing' ? '미수집' : '확인 필요';
+  }
+  const value = adMetric(row, metric);
+  const unit = AD_METRICS.find(item => item.key === metric)!.unit;
+  return value === null ? '계산 불가' : value.toLocaleString('ko-KR', { maximumFractionDigits: metric === 'ctr' ? 2 : 0 }) + unit;
 }
 export function aggregateAdDays(rows: StoredAdDay[]): AdDay[] {
   const days = new Map<string, AdDay>();

@@ -13,6 +13,7 @@ import type { Row } from '@/lib/platform';
 import { SMS_SETTINGS_KEY, validateSmsSettings } from '@/lib/crm-sms-settings';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
+import { retentionTrigger, retentionDays } from '@/lib/crm-retention';
 
 const reply = (value: unknown, status = 200) =>
     Response.json(value, {
@@ -217,11 +218,18 @@ export async function POST(request: Request) {
             } else if (kind === 'automation') {
                 const trigger = String(body.triggerType || '');
                 const delay = Number(body.delayMinutes);
-                if (!string(body.name, 100) || !uuid(body.templateId) || !['member_joined', 'marketing_consent', 'tag_assigned', 'purchase_completed'].includes(trigger) || !Number.isSafeInteger(delay) || delay < 0 || delay > 525600) fail('자동 메시지 조건을 확인해 주세요.');
+                if (!string(body.name, 100) || !uuid(body.templateId) || !['member_joined', 'marketing_consent', 'tag_assigned', 'purchase_completed','member_inactive','learning_stalled'].includes(trigger) || !Number.isSafeInteger(delay) || delay < 0 || delay > 525600) fail('자동 메시지 조건을 확인해 주세요.');
                 const selectedTemplate = await db.from('crm_templates').select('id,channel,purpose,alimtalk_template_id,is_active').eq('id', body.templateId).maybeSingle();
                 if (selectedTemplate.error) throw selectedTemplate.error;
                 if (!selectedTemplate.data?.is_active) fail('사용 가능한 템플릿만 자동 메시지에 연결할 수 있습니다.');
                 if (selectedTemplate.data.channel === 'alimtalk' && (selectedTemplate.data.purpose !== 'transactional' || !selectedTemplate.data.alimtalk_template_id)) fail('카카오에서 승인한 정보성 알림톡만 자동 메시지에 연결할 수 있습니다.');
+                if(retentionTrigger(trigger)) {
+                    if(!uuid(body.cohortId) || !retentionDays(body.thresholdDays)) fail('대상 기수와 기준 일수(1~365일)를 확인해 주세요.');
+                    if(selectedTemplate.data.channel!=='alimtalk' || selectedTemplate.data.purpose!=='transactional') fail('수강 독려는 승인된 정보성 알림톡만 선택할 수 있습니다.');
+                    const cohort=await db.from('cohorts').select('id,status,operation_start_at').eq('id',body.cohortId).maybeSingle();
+                    if(cohort.error)throw cohort.error;
+                    if(!cohort.data || ['cancelled','completed'].includes(cohort.data.status) || !cohort.data.operation_start_at) fail('수강 시작일이 설정된 진행 대상 기수를 선택해 주세요.');
+                }
                 if (trigger === 'tag_assigned' && body.tagId && !uuid(body.tagId)) fail('자동화 태그를 확인해 주세요.');
                 if (trigger === 'purchase_completed' && body.courseId && !uuid(body.courseId)) fail('자동화 상품을 확인해 주세요.');
                 const values = {
@@ -229,6 +237,8 @@ export async function POST(request: Request) {
                     trigger_type: trigger,
                     trigger_tag_id: trigger === 'tag_assigned' ? body.tagId || null : null,
                     trigger_course_id: trigger === 'purchase_completed' ? body.courseId || null : null,
+                    trigger_cohort_id: retentionTrigger(trigger) ? body.cohortId : null,
+                    threshold_days: retentionTrigger(trigger) ? body.thresholdDays : null,
                     template_id: body.templateId,
                     delay_minutes: delay,
                     is_active: body.isActive === true,

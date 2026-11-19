@@ -77,7 +77,7 @@ export const adminTables: Record<string, string[]> = {
   tags: ['crm_tags'], coupons: ['coupons', 'coupon_products', 'coupon_redemptions', 'courses', 'crm_tags'], 'product-reviews': ['courses', 'reviews', 'profiles'],
   banners: ['site_banners'], articles: ['articles', 'article_categories', 'site_settings'], testimonials: ['review_videos'],
   templates: ['crm_templates'], campaigns: ['crm_campaigns', 'crm_templates', 'crm_tags', 'crm_message_logs'],
-  automations: ['crm_automations', 'crm_automation_runs', 'crm_templates', 'crm_tags', 'courses'],
+  automations: ['crm_automations', 'crm_automation_runs', 'crm_templates', 'crm_tags', 'courses', 'cohorts'],
   orders: ['courses', 'cohorts', 'orders', 'order_items', 'payments', 'enrollments', 'edu_refund_requests'],
   landing: [], links: [], analytics: [], metrics: ['site_settings'], seo: ['site_settings'], settings: ['site_settings'],
 };

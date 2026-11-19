@@ -19,6 +19,8 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   try {
+    // Learning reminder requests are recorded while Kakao approval is pending.
+    // Keep the old course-wide retention dispatcher disconnected from this cron.
     const [crm, purchase] = await Promise.allSettled([
       crmEnabled ? dispatchDueCrm() : paused,
       purchaseEnabled ? dispatchPurchaseBuyerDelivery() : undefined,

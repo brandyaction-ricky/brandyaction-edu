@@ -37,6 +37,22 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-remaining-requests-20261118" ]; then
+            expected_main=b6667c4b4ea7cc88f3800787c7d8915d8fa904b3
+            release_payload=2e82940b306077f818535b38977715f1f140896c
+            restored_migration=supabase/migrations/20261112070212_retention_automation.sql
+            new_migration=supabase/migrations/20261118135006_edu_learning_reminder_requests.sql
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" HEAD
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase tools/release-guard .github/workflows/release-authorization.yml .github/workflows/release-coordinator.yml .github/workflows/release-db-contract.yml vercel.json .vercelignore package.json package-lock.json ":(exclude)$restored_migration" ":(exclude)$new_migration"
+            test "$(git show "HEAD:$restored_migration" | sha256sum | cut -d ' ' -f 1)" = faf4786bf221a0b5610e06b4e519c940fc47df15ca6fd75a8dff8d03bcb90662
+            test "$(git show "HEAD:$new_migration" | sha256sum | cut -d ' ' -f 1)" = b317841f153b6cb1916d65eb299125660c9ab6fc5d1a213fc3db3ba0ad63830b
+            echo 'Verified the pinned advertising and request-only learning reminder payload and exact migrations; central release controls are unchanged.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-preview-media-release-20261118" ]; then
             expected_main=10f5f7386f1c6f1b8265e81324f300b20a2188b6
             release_payload=f074ffe2c2c6924dc75cdcbfa3151915a3f20e70

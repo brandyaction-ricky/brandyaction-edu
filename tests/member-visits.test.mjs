@@ -11,7 +11,7 @@ function harness({user={id:id(1),role:'student'},operator=true,error=null}={}){
  const calls=[];
  const deps={'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'members');return operator;}},'@/lib/supabase/admin':{createAdminClient:()=>({rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:{rows:[],total:0},error})};}})},'@/lib/member-visits':rules,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[0-9a-f-]{36}$/i.test(v)}};
  const write=load('app/api/platform/member-visit/route.ts',deps),read=load('app/api/admin/member-visits/route.ts',deps);
- return {calls,post:(body,origin='https://edu.test')=>write.POST(new Request('https://edu.test/api/platform/member-visit',{method:'POST',headers:origin?{origin}:{},...(body!==undefined?{body}:{} )})),get:(query='')=>read.GET(new Request('https://edu.test/api/admin/member-visits'+query))};
+ return {calls,post:(body,origin='https://edu.test')=>write.POST(new Request('https://edu.test/api/platform/member-visit',{method:'POST',headers:origin?{origin}:{},...(body!==undefined?{body,duplex:'half'}:{} )})),get:(query='')=>read.GET(new Request('https://edu.test/api/admin/member-visits'+query))};
 }
 test('Korean day boundaries and real calendar validation',()=>{
  assert.equal(rules.koreanDay(Date.parse('2026-09-28T14:59:59Z')),'2026-09-28');assert.equal(rules.koreanDay(Date.parse('2026-09-28T15:00:00Z')),'2026-09-29');
@@ -24,8 +24,21 @@ test('recording uses authenticated identity only and forbids bodies, staff and f
  for(const body of ['{}',JSON.stringify({member:id(2),at:'2000-01-01'}),'x'.repeat(10000)])assert.equal((await h.post(body)).status,400);
  assert.equal(h.calls.length,0);const response=await h.post();assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.deepEqual(h.calls,[{name:'edu_record_member_visit',args:{p_member:id(1)}}]);
 });
-test('feature gate prevents every read/write while off',async()=>{
- const h=harness();process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='false';try{assert.equal((await h.post()).status,404);assert.equal((await h.get()).status,404);assert.equal(h.calls.length,0);}finally{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='true';}
+test('visit recording is independent of the lesson editor flag; the old admin read gate stays unchanged',async()=>{
+ const h=harness();process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='false';try{assert.equal((await h.post()).status,200);assert.equal((await h.get()).status,404);assert.equal(h.calls.length,1);}finally{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='true';}
+});
+test('deployed empty request streams record visits but nonempty or broken streams never write',async()=>{
+ const empty=()=>new ReadableStream({start(c){c.enqueue(new Uint8Array());c.close();}});
+ const h=harness();assert.equal((await h.post(empty())).status,200);assert.equal(h.calls.length,1);
+ assert.equal((await harness({user:null}).post(empty())).status,401);
+ for(const body of [
+  new ReadableStream({start(c){c.enqueue(new Uint8Array());c.enqueue(new TextEncoder().encode('{}'));c.close();}}),
+  new ReadableStream({start(c){c.error(new Error('untrusted stream detail'));}}),
+ ]){
+  const denied=harness(),response=await denied.post(body);
+  assert.equal(response.status,400);assert.equal(denied.calls.length,0);
+  assert.doesNotMatch(await response.text(),/untrusted stream detail/);
+ }
 });
 test('member read checks authorization and validates member, date, and page before RPC',async()=>{
  for(const [options,status] of [[{user:null},401],[{operator:false},403]]){const h=harness(options);assert.equal((await h.get()).status,status);assert.equal(h.calls.length,0);}

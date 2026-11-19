@@ -3,10 +3,11 @@ import { withExistingCohortVisibility } from './fixture/cohort-visibility';
 
 const id = (n: number) => `11111111-1111-4111-8111-${String(n).padStart(12, '0')}`;
 for (const width of [320, 390, 680, 1440]) {
-  test(`lesson diagnosis and menu remain usable at ${width}px without writes`, async ({ page }, info) => {
+  test(`lesson diagnosis and menu remain usable at ${width}px with visit recording only`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 844 });
-    const writes: string[] = [];
-    page.on('request', r => { if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method())) writes.push(r.url()); });
+    const writes: { path: string; method: string; body: string | null }[] = [];
+    page.on('request', r => { if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method())) writes.push({ path:new URL(r.url()).pathname, method:r.method(), body:r.postData() }); });
+    await page.route('**/api/platform/member-visit', route => route.fulfill({ json:{ ok:true } }));
     await page.route('**/api/platform?**', route => route.fulfill({ json: {
       user: { id: id(99), full_name: '검수 회원', role: 'student' }, support: {},
       data: withExistingCohortVisibility({ enrollments: [{ id: id(1), course_id: id(2), cohort_id: id(3), status: 'active' }], courses: [{ id: id(2), title: '합성 과정', category: 'paid_class' }], cohorts: [{ id: id(3), course_id: id(2), name: '4기', alumni_access_on_enroll: true }], curriculum_weeks: [{ id: id(5), course_id: id(2), week_number: 1, is_published: true }], curriculum_lessons: [{ id: id(4), week_id: id(5), day_number: 1, title: '광고 보고서를 읽고 소재 2차 피봇팅하기', is_published: true }], lesson_contents: [{ lesson_id: id(4), body_text: '학습 본문입니다.' }] })
@@ -44,7 +45,7 @@ for (const width of [320, 390, 680, 1440]) {
       await page.getByRole('button', { name: '학습 목록', exact: true }).click();
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(writes).toEqual([]);
+    await expect.poll(() => writes).toEqual([{ path:'/api/platform/member-visit', method:'POST', body:null }]);
     await page.screenshot({ path: info.outputPath(`lesson-${width}.png`), fullPage: true });
   });
 }
