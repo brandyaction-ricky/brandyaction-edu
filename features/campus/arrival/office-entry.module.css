@@ -132,13 +132,13 @@
 .ticketCountdown { background: #eef2f8; color: #173b69; }
 .hallActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .hallActions + .hallActions { margin-top: 8px; }
-.hallActions button {
+.hallControls .hallActions button {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   border: 1px solid #c7d5e5;
   border-radius: 8px;
   background: #fff;

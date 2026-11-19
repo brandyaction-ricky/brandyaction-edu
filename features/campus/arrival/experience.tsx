@@ -535,8 +535,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </div>
       <div className={entryStyle.hallCard}>
         <div>
-          <h2>AI 직원에게 내 일을 맡겨보세요</h2>
-          <p>첫 업무와 두 직원이 함께 지킬 기준을 적을 수 있는 양식을 준비했어요.</p>
+          <h2>AI팀 설계도와 업무 기준표</h2>
+          <p>AI 직원에게 맡길 첫 업무와 지킬 기준을 적어보세요.</p>
         </div>
         <div className={entryStyle.hallActions}>
           <button type="button" className={entryStyle.hallPrimary} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 열기</button>
