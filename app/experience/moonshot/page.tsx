@@ -1,6 +1,5 @@
 import type {Metadata} from 'next';
 import {notFound} from 'next/navigation';
-import {ARRIVAL_CALENDAR_FILE} from '@/features/campus/arrival/model';
 import {ArrivalExperience} from '@/features/campus/arrival/experience';
 import {DEFAULT_ARRIVAL} from '@/features/campus/arrival/config';
 import {arrivalLiveReminderEnabled, arrivalLiveReminderOpen} from '@/features/campus/arrival/live-reminder-server';
@@ -32,6 +31,6 @@ export default async function Page({searchParams}: {searchParams: Promise<Record
     return <ArrivalExperience config={webinar.arrival} persistenceKey={null} preview/>;
   }
   const publication = arrivalPublicationEnabled(process.env) ? await readPublishedArrival() : null;
-  return <ArrivalExperience config={publication?.config ?? DEFAULT_ARRIVAL} calendarFileHref={ARRIVAL_CALENDAR_FILE}
+  return <ArrivalExperience config={publication?.config ?? DEFAULT_ARRIVAL}
     liveReminderEnabled={arrivalLiveReminderEnabled() && arrivalLiveReminderOpen()}/>;
 }

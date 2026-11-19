@@ -228,7 +228,7 @@
   word-break: keep-all;
   pointer-events: auto;
 }
-.hallActions button + button { border-color: #c7d5e5; background: #fff; color: #173b69; }
+.hallActions > button:has(+ button) { border-color: #c7d5e5; background: #fff; color: #173b69; }
 .hallActions svg { flex-shrink: 0; }
 .avatarControl { position: absolute; top: 88px; right: clamp(14px, 3vw, 40px); z-index: 3; }
 @media (pointer: coarse) {

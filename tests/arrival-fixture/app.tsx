@@ -1,4 +1,3 @@
-import {ARRIVAL_CALENDAR_FILE} from '../../features/campus/arrival/model';
 import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {WebinarAdmin} from '../../features/campus/webinar/admin';
@@ -31,7 +30,7 @@ function StoredExperience({preview}: {preview: boolean}) {
   if (error) return <p role="alert" style={{padding: 32}}>{error}</p>;
   if (!config) return <p role="status" style={{padding: 32}}>로컬 메모리에 저장한 체험을 불러옵니다…</p>;
   return <ArrivalExperience config={config} persistenceKey={preview ? null : 'moonshot:arrival:synthetic-local-qa:v1'}
-    preview={preview} calendarFileHref={preview ? undefined : ARRIVAL_CALENDAR_FILE} liveReminderEnabled={!preview}/>;
+    preview={preview} liveReminderEnabled={!preview}/>;
 }
 
 function Frame() {
@@ -61,5 +60,5 @@ createRoot(document.getElementById('root')!).render(
   path === '/frame' ? <Frame/> :
   path === '/webinar-admin' || path === '/admin/campus/webinars' ? <><div style={{background: '#fff2d5', color: '#6c4a15', padding: 12, textAlign: 'center', fontFamily: 'var(--font-sans, sans-serif)'}}>로컬 합성 QA · 저장은 이 서버 메모리에만 반영됩니다. 실제 행사·수강생·DB는 변경하지 않습니다.</div><WebinarAdmin arrivalDraftOnly={params.get('draftOnly') === '1'} publicationEnabled={params.get('publication') === '1'}/></> :
   path === '/saved-preview' || path === '/experience/moonshot' ? <StoredExperience preview={path === '/saved-preview' || params.has('event')}/> :
-  <ArrivalExperience config={DEFAULT_ARRIVAL} persistenceKey="moonshot:arrival:synthetic-local-qa:v1" calendarFileHref={ARRIVAL_CALENDAR_FILE} liveReminderEnabled/>,
+  <ArrivalExperience config={DEFAULT_ARRIVAL} persistenceKey="moonshot:arrival:synthetic-local-qa:v1" liveReminderEnabled/>,
 );

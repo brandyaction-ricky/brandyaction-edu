@@ -73,9 +73,9 @@ export const DEFAULT_ARRIVAL: ArrivalConfig = {
   title: '혼자 하던 일,\nAI에게 맡길 수 있을까요?',
   description: defaultIntroDescription(new Date(liveEvent.startsAt!)),
   welcomeBenefits: [
-    '경쟁사 조사부터 광고 영상까지, AI 직원들의 업무 보기',
-    '정본에 우리 회사 기준을 알려주고 달라지는 답 보기',
-    '웰컴 라운지에서 무료 자료 받고 내 상황에 맞게 써보기',
+    'AI 직원들이 일하는 모습 보기',
+    '정본에 회사 기준 알려주기',
+    '웰컴 라운지에서 무료 자료 받기',
   ],
   workTrial: DEFAULT_WORK_TRIAL,
   officeDemo: DEFAULT_OFFICE_DEMO,
