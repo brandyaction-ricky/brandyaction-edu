@@ -308,6 +308,8 @@
 .disclosure > summary::-webkit-details-marker, .promptDetails > summary::-webkit-details-marker { display: none; }
 .disclosure[open] > summary > svg { transform: rotate(180deg); }
 .disclosure > div { padding: 0 0 20px; font-size: 16px; line-height: 1.85; color: var(--muted); }
+.liveAgenda { margin: 0; padding-inline-start: 1.2em; font-size: 15px; line-height: 1.65; color: var(--ink); word-break: keep-all; }
+.liveAgenda li + li { margin-top: 7px; }
 .disclosure p + p { margin-top: 14px; }
 .disclosure p > strong { display: block; font-size: 14px; color: var(--ink); margin-bottom: 3px; }
 .disclosure .secondary { margin-top: 14px; }
@@ -535,7 +537,7 @@
   .hallDock .intro h1 { font-size: 24px; }
   .ticket { padding: 9px 12px; }
   .calendarButtons > a, .calendarButtons > button { padding: 8px; gap: 5px; font-size: 14px; }
-  .calendarButtons > a > svg:first-child, .calendarButtons > button > svg:first-child { display: none; }
+  .calendarButtons > a > svg:first-child:not(:only-child) { display: none; }
   .root:has(.dockHidden) .world { height: calc(100dvh - 64px); }
   .root:has(.dockHidden) .place { top: auto; bottom: 25px; }
   .root:has(.questions) { --scene-height: 120px; }

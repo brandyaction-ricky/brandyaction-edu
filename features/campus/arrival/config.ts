@@ -48,6 +48,13 @@ const choiceLabels: Record<Audience, string> = {
   preparing: '창업을 준비하고 있어요',
   exploring: '아직 아이템이 없어요',
 };
+export const LIVE_AGENDA = [
+  'AI 마케팅 팀 만드는 법',
+  '흩어진 데이터를 한 곳에 모으는 법',
+  '반복 업무를 AI 직원에게 나눠 맡기는 법',
+  '광고비 250억을 쓰며 쌓은 판단 기준을 AI에 적용하는 법',
+] as const;
+
 function defaultAudience(id: Audience): ArrivalAudienceConfig {
   const source = audienceContent[id];
   return {

@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
-import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
+import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, Download, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
@@ -20,7 +20,7 @@ import {officeCaseContent, officeCaseRevision} from './office-demo-case';
 import {DEFAULT_OFFICE_DEMO} from './office-demo';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
-import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
+import {DEFAULT_ARRIVAL, LIVE_AGENDA, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
 const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
@@ -599,7 +599,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
           {showLiveReminder && <LiveReminder open={reminderOpen && !exploringHall} registered={reminderRegistered}
             onOpenChange={setReminderOpen} onRegistered={() => setReminderRegistered(true)}/>}
-          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p></div></details>
+          <details className={s.disclosure}>
+            <summary>라이브에서 배우는 내용<ChevronDown size={16} aria-hidden="true"/></summary>
+            <div><ul className={s.liveAgenda}>{LIVE_AGENDA.map(topic => <li key={topic}>{topic}</li>)}</ul></div>
+          </details>
           <div className={entryStyle.scheduleActions}>
             <button type="button" className={s.textButton} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={16} aria-hidden="true"/>무료 자료 열기</button>
             <button type="button" className={s.textButton} onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
@@ -621,10 +624,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
               <CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/>
             </a>}
             {calendarFileHref
-              ? <a href={calendarFileHref}><CalendarDays size={16} aria-hidden="true"/>아이폰 일정 파일<ArrowRight size={14} aria-hidden="true"/></a>
-              : <button type="button" onClick={saveCalendar}><CalendarDays size={16} aria-hidden="true"/>아이폰 일정 파일<ArrowRight size={14} aria-hidden="true"/></button>}
+              ? <a href={calendarFileHref}>일정 파일 받기<Download size={15} aria-hidden="true"/></a>
+              : <button type="button" onClick={saveCalendar}>일정 파일 받기<Download size={15} aria-hidden="true"/></button>}
           </div>
-          <p className={s.calendarInstruction}>Google에서는 ‘저장’, 아이폰에서는 받은 일정 파일을 열고 ‘추가’를 눌러주세요. Google 로그인이나 파일 열기가 막히면 Safari에서 이 페이지를 다시 열어주세요.</p>
+          <p className={s.calendarInstruction}>Google 캘린더에서 ‘저장’을 눌러주세요. 아이폰 카톡에서는 일정 파일(.ics)을 먼저 내려받아요. 받은 파일에서 ‘추가’가 안 보이면 Safari에서 이 페이지를 다시 열어주세요.</p>
         </div>}
       </footer>}
       </>}

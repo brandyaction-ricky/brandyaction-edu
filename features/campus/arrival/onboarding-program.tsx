@@ -1,7 +1,7 @@
 import {useId, useRef, useState, type SyntheticEvent} from 'react';
 import {ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Download, ExternalLink, LockKeyhole, MessageSquare, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
-import type {ArrivalConfig} from './config';
+import {LIVE_AGENDA, type ArrivalConfig} from './config';
 import {LIVE_REMINDER_LABEL} from './live-reminder';
 import monitor from './office-demo.module.css';
 import progression from './progression.module.css';
@@ -18,13 +18,6 @@ const instructorStats = [
   {value:'250억', label:'누적 광고비'},
   {value:'1,000명+', label:'누적 수강생'},
   {value:'3.6만', label:'SNS 팔로워'},
-] as const;
-
-const liveTopics = [
-  'AI 마케팅 팀 만드는 법',
-  '흩어진 데이터를 한 곳에 모으는 법',
-  '반복 업무를 AI 직원에게 나눠 맡기는 법',
-  '광고비 250억을 쓰며 쌓은 판단 기준을 AI에 적용하는 법',
 ] as const;
 
 const guides = [
@@ -146,7 +139,7 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
         </section>}
         <section className={styles.agenda}>
           <h3>{dateLabel} ({weekday.replace(/요일$/, '')}) {timeLabel} 무료 라이브에서 알려드려요</h3>
-          <ul>{liveTopics.map(topic => <li key={topic}>{topic}</li>)}</ul>
+          <ul>{LIVE_AGENDA.map(topic => <li key={topic}>{topic}</li>)}</ul>
         </section>
         <figure className={styles.mediaFigure}>
           <h3>브랜디액션 팀의 실제 AI 사무실</h3>

@@ -14,9 +14,9 @@ const officeCase = await moduleFrom('../features/campus/arrival/office-demo-case
 
 test('live countdown uses Seoul calendar days across midnight and follows a rescheduled date', () => {
   const {liveCountdownLabel} = model;
-  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-06T14:59:59Z')), '라이브까지 1일');
-  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-06T15:00:00Z')), '오늘 라이브');
-  assert.equal(liveCountdownLabel('2026-12-09', new Date('2026-12-06T15:00:00Z')), '라이브까지 2일');
+  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-06T14:59:59Z')), '라이브 D-1');
+  assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-06T15:00:00Z')), '라이브 D-DAY');
+  assert.equal(liveCountdownLabel('2026-12-09', new Date('2026-12-06T15:00:00Z')), '라이브 D-2');
   assert.equal(liveCountdownLabel('2026-12-07', new Date('2026-12-07T15:00:00Z')), '');
 });
 

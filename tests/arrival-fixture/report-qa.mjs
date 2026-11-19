@@ -97,7 +97,7 @@ for (const [engine, viewport] of devices) {
       const event = new URL(calendar.searchParams.get('continue'));
       expect(event.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
       if (!priorRoute) {
-        const file = page.getByRole('link', {name:'아이폰 일정 파일', exact:true});
+        const file = page.getByRole('link', {name:'일정 파일 받기', exact:true});
         await expect(file).toBeInViewport({ratio:.95});
         const [response, download] = await Promise.all([
           page.waitForResponse(response => new URL(response.url()).pathname === '/experience/moonshot/live.ics'),

@@ -168,12 +168,14 @@ async function start() {
     const focus = state.x + lead;
     const follow = 1 - Math.exp(-7 * dt);
     trackingX = trackingX == null ? focus : trackingX + (focus - trackingX) * follow;
-    // On narrow screens, frame the visitor and next desk together while there is still an aisle between them.
-    const desiredScale = narrow ? Math.max(1.24, gap / (5.8 * Math.max(.4, camera.aspect))) : 1;
+    // Keep the visitor inside the fog and clipping distance when they walk far back from the active desk.
+    const desiredScale = narrow ? Math.min(3.2, Math.max(1.24, gap / (5.8 * Math.max(.4, camera.aspect)))) : 1;
     trackingScale = trackingScale == null ? desiredScale : trackingScale + (desiredScale - trackingScale) * follow;
     // Keep the camera turn gradual as the corridor opens into the welcome lounge.
-    const hallEntrance = stations.at(-1).x - 6;
-    const progress = state.station === stations.length ? Math.max(0, Math.min(1, (state.x - hallEntrance) / 5.4)) : 0;
+    const hallStop = stations.at(-1).x;
+    const hallEntrance = hallStop - 6;
+    const progress = state.freeRoam ? 1 : state.station === stations.length
+      ? Math.max(0, Math.min(1, (state.x - hallEntrance) / 5.4)) : 0;
     const hall = progress * progress * (3 - 2 * progress);
     const blend = (from, to) => from + (to - from) * hall;
     camera.position.set(trackingX - blend(1.65 * trackingScale, narrow ? 5.6 : 4.4),
@@ -185,9 +187,13 @@ async function start() {
     if (roamCamera > 0.001) {
       const towards = (from, to) => from + (to - from) * roamCamera;
       camera.position.z = towards(camera.position.z, trackingZ + (narrow ? 8.8 : 8.3));
-      aim.z = towards(aim.z, trackingZ - 1.48);
+      // At the far wall, keep the camera looking back into the floor instead of out past the room.
+      aim.x = towards(aim.x, Math.min(trackingX + 2.28, hallStop + 7.8));
+      aim.z = towards(aim.z, Math.max(-3.4, Math.min(2.7, trackingZ - 1.48)));
     }
-    const fov = blend(43, narrow ? 49 : 43);
+    // On phones, make room for both the avatar at the right wall and the way back.
+    const atRightEdge = roamCamera * Math.max(0, Math.min(1, (trackingX - hallStop - 7.8) / 2.75));
+    const fov = blend(43, narrow ? 49 + 7 * atRightEdge : 43);
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     scene.background.copy(officeSky).lerp(lobbySky, hall);
     scene.fog.color.copy(scene.background);

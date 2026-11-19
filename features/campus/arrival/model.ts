@@ -192,8 +192,8 @@ const seoulDateFormat = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Asia/Seoul'
 export function liveCountdownLabel(eventDate: string, now: Date = new Date()): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !Number.isFinite(now.getTime())) return '';
   const days = (Date.parse(`${eventDate}T00:00:00Z`) - Date.parse(`${seoulDateFormat.format(now)}T00:00:00Z`)) / 86_400_000;
-  if (days > 0) return `라이브까지 ${days}일`;
-  return days === 0 ? '오늘 라이브' : '';
+  if (days > 0) return `라이브 D-${days}`;
+  return days === 0 ? '라이브 D-DAY' : '';
 }
 
 /** Start confirmed by the owner: Dec 7, 21:00 KST. End and YouTube URL remain pending. */
