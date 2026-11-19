@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
-import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
+import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
@@ -11,6 +11,7 @@ import {reuseContentStationAnswers} from './content-station-prompt';
 import {TeamLeader} from './team-leader';
 import entryStyle from './office-entry.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
+import {LiveReminder} from './live-reminder';
 import {VisitorAvatar} from './visitor-avatar';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
 import {officeCaseContent, officeCaseRevision} from './office-demo-case';
@@ -53,8 +54,8 @@ function LiveCountdown({date, className}: {date: string; className: string}) {
   return label ? <span className={className}>{label}</span> : null;
 }
 
-export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, calendarFileHref}: {
-  config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean; calendarFileHref?: string;
+export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, calendarFileHref, liveReminderEnabled = false}: {
+  config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean; calendarFileHref?: string; liveReminderEnabled?: boolean;
 }) {
   const [savedState, setState] = useState<ArrivalState>(initialArrivalState);
   const caseRevision = officeCaseRevision(config.officeDemo ?? DEFAULT_OFFICE_DEMO);
@@ -74,6 +75,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [guidedStation, setGuidedStation] = useState<keyof typeof nextStationHints>();
   const [sceneVisit, setSceneVisit] = useState(0);
   const [explore, setExplore] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderRegistered, setReminderRegistered] = useState(false);
   const [deskOpen, setDeskOpen] = useState(false);
   const [lobbyGuide, setLobbyGuide] = useState<OnboardingGuide | null>(null);
   const [revisitContent, setRevisitContent] = useState(false);
@@ -106,6 +109,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const teamLeaderOpen = officeIntro && firstStop && deskOpen;
   const backgroundInert = teamLeaderOpen || openDeskStation !== null;
   const exploringHall = step === 7 && explore;
+  const showLiveReminder = liveReminderEnabled && !preview && !embedded && Boolean(calendarFileHref);
   const destination = destinations[station - 1];
   const stopIndex = corridorStops.findIndex(stop => stop.station === station);
   const caseVisited = state.officeStation === 7;
@@ -310,6 +314,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function openHallSchedule() {
     focusHallSchedule.current = true;
+    setReminderOpen(false);
+    setExplore(false);
+  }
+  function openHallReminder() {
+    setReminderOpen(true);
     setExplore(false);
   }
   function requestWalk(at: CorridorStation) {
@@ -357,6 +366,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setCopyFallback('');
     setRevisitContent(false);
     setLobbyGuide(null);
+    setReminderOpen(false);
     setExplore(next === 7);
     update({...route, step: next});
   }
@@ -564,6 +574,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           </div>
           <p className={s.calendarIntro}>{config.liveUrl ? '캘린더에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 참여 링크는 카톡방에서 안내할 예정이에요.'}</p>
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
+          {showLiveReminder && <LiveReminder open={reminderOpen && !exploringHall} registered={reminderRegistered}
+            onOpenChange={setReminderOpen} onRegistered={() => setReminderRegistered(true)}/>}
           <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p></div></details>
           <div className={entryStyle.scheduleActions}>
             <button type="button" className={s.textButton} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={16} aria-hidden="true"/>무료 자료 열기</button>
@@ -605,7 +617,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </div>
       <div className={entryStyle.loungeCard}>
         <h1>{dateLabel} {timeLabel} · 무료 라이브</h1>
-        <p>AI 직원에게 업무를 맡기는 방법을 라이브에서 이어서 배워보세요.</p>
+        {showLiveReminder ? reminderRegistered
+          ? <p className={entryStyle.hallReminderDone}><Check size={15} aria-hidden="true"/>문자 알림을 신청했어요.</p>
+          : <button type="button" className={entryStyle.hallReminder} aria-controls="arrival-content" onClick={openHallReminder}>
+            <MessageSquare size={16} aria-hidden="true"/>라이브 당일 문자 받기<ArrowRight size={14} aria-hidden="true"/>
+          </button>
+          : <p>AI 직원에게 업무를 맡기는 방법을 라이브에서 이어서 배워보세요.</p>}
         <div className={entryStyle.hallActions}>
           <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>캘린더에 추가</button>
           <button type="button" onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 받기</button>

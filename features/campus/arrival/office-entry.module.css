@@ -200,6 +200,28 @@
 }
 .loungeCard h1 { margin: 0 0 3px; font-size: clamp(17px, 2vw, 21px); line-height: 1.4; word-break: keep-all; }
 .loungeCard > p { margin-bottom: 8px; color: #41556a; font-size: 13px; line-height: 1.45; word-break: keep-all; }
+.loungeCard .hallReminder {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #173b69;
+  font-size: 14px;
+  font-weight: 650;
+}
+.hallReminder:hover { text-decoration: underline; text-underline-offset: 3px; }
+.loungeCard .hallReminderDone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #23604c;
+  font-weight: 650;
+}
 .hallLinks { display: flex; flex-wrap: wrap; gap: 0 12px; margin-top: 3px; }
 .hallLinks button {
   display: inline-flex; align-items: center; gap: 4px; padding: 4px 0; border: 0; background: transparent;

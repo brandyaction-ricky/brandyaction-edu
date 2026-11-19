@@ -13,6 +13,7 @@ function fixture(env = {}) {
     'next/navigation': {notFound:() => {throw Error('404');}},
     '@/features/campus/arrival/experience': {ArrivalExperience:'arrival'},
     '@/features/campus/arrival/model': {ARRIVAL_CALENDAR_FILE:'/experience/moonshot/live.ics'},
+    '@/features/campus/arrival/live-reminder-server': {arrivalLiveReminderEnabled:() => env.reminder === true, arrivalLiveReminderOpen:() => true},
     '@/lib/operator-permissions': {getOperatorUser:async scope => {assert.equal(scope,'marketing'); authReads++; return allowed ? {id:'operator'} : null;}},
     '@/features/campus/webinar/server': {readWebinar:async () => {reads++; return {arrival,welcome:{notices:[{body:'구매자 전용 공지'}]}};}},
     '@/features/campus/webinar/domain': {slugPattern:/^[a-z0-9][a-z0-9-]{2,59}$/},
@@ -29,15 +30,17 @@ test('production never opens the preview or reads settings even for a permitted 
   }
 });
 test('anonymous preset never reads member settings and saved draft requires marketing access first', async () => {
-  const f=fixture();
+  const f=fixture({reminder:true});
   const publicPage = await f.render({});
   assert.equal(publicPage.type,'arrival');assert.equal(f.reads(),0);
   assert.equal(publicPage.props.calendarFileHref, '/experience/moonshot/live.ics');
+  assert.equal(publicPage.props.liveReminderEnabled, true);
   assert.notEqual((await f.render({event:'test-event'})).type,'arrival');assert.equal(f.reads(),0);
   f.allow();const result=await f.render({event:'test-event'});
   assert.equal(result.type,'arrival');assert.equal(result.props.config,f.arrival);
   assert.equal(result.props.persistenceKey,null);assert.equal(result.props.preview,true);
   assert.equal(result.props.calendarFileHref,undefined);
+  assert.equal(result.props.liveReminderEnabled,undefined);
   assert.equal(JSON.stringify(result).includes('구매자 전용 공지'),false);
   assert.equal(f.reads(),1);
 });

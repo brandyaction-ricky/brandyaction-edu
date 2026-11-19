@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import {notFound} from 'next/navigation';
 import {ARRIVAL_CALENDAR_FILE} from '@/features/campus/arrival/model';
 import {ArrivalExperience} from '@/features/campus/arrival/experience';
+import {arrivalLiveReminderEnabled, arrivalLiveReminderOpen} from '@/features/campus/arrival/live-reminder-server';
 import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {slugPattern} from '@/features/campus/webinar/domain';
@@ -28,5 +29,5 @@ export default async function Page({searchParams}: {searchParams: Promise<Record
     if (!webinar?.arrival) notFound();
     return <ArrivalExperience config={webinar.arrival} persistenceKey={null} preview/>;
   }
-  return <ArrivalExperience calendarFileHref={ARRIVAL_CALENDAR_FILE}/>;
+  return <ArrivalExperience calendarFileHref={ARRIVAL_CALENDAR_FILE} liveReminderEnabled={arrivalLiveReminderEnabled() && arrivalLiveReminderOpen()}/>;
 }

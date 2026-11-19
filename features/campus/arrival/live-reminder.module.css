@@ -1,0 +1,90 @@
+.section, .success {
+  margin: 12px 0;
+  border: 1px solid #c7d5e5;
+  border-radius: 8px;
+}
+
+.section .trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #173b69;
+  font-size: 15px;
+  font-weight: 650;
+  text-align: start;
+  scroll-margin-block-start: 6px;
+}
+
+.trigger:hover, .trigger[aria-expanded="true"] { background: #eef4fc; }
+.chevron { margin-inline-start: auto; }
+.trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
+.form { padding: 12px; }
+.form fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.phone { display: grid; gap: 4px; font-size: 14px; font-weight: 650; }
+.phone input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #aab7c8;
+  border-radius: 6px;
+  background: var(--paper, #fff);
+  color: var(--ink, #17283a);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+}
+.phone input[aria-invalid="true"] { border-color: #ad232b; }
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  color: var(--ink, #17283a);
+  font-size: 14px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.consent input { width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0; accent-color: #173b69; }
+.note, .error { font-size: 13px; line-height: 1.45; word-break: keep-all; }
+.note { color: var(--muted, #41556a); }
+.error { color: #ad232b; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
+.form .actions button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #173b69;
+  border-radius: 8px;
+  background: #173b69;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+}
+.form .actions a { color: #173b69; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+
+p.success {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-block: 12px;
+  padding: 9px 12px;
+  color: #23604c;
+  font-size: 14px;
+  font-weight: 650;
+}
