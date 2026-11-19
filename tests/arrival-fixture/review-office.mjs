@@ -5,8 +5,11 @@ export const arrivalStorageKeys = ['moonshot:arrival:synthetic-local-qa:v1', 'mo
 export async function resumeOfficeVisit(page, url, state) {
   await page.goto(url);
   await expect(page.getByRole('region', {name:'문샷 웰컴존 소개', exact:true})).toBeVisible();
+  await page.waitForFunction(keys => keys.some(key => sessionStorage.getItem(key)), arrivalStorageKeys);
   await page.evaluate(({keys, state}) => {
-    for (const key of keys) sessionStorage.setItem(key, JSON.stringify({version:1, ...state}));
+    for (const key of keys) {
+      if (sessionStorage.getItem(key)) sessionStorage.setItem(key, JSON.stringify({version:1, ...state}));
+    }
   }, {keys:arrivalStorageKeys, state});
   await page.reload({waitUntil:'domcontentloaded'});
 }
