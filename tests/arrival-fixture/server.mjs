@@ -27,16 +27,19 @@ await browserBuild.rebuild();
 await browserBuild.watch();
 
 const modules = await build({
-  stdin: {contents: `export {config as baseEvent} from './tests/webinar-fixture/data'; export {DEFAULT_WELCOME} from './features/campus/welcome/content'; export {DEFAULT_ARRIVAL,validateArrivalConfig} from './features/campus/arrival/config'; export {validateWebinar} from './features/campus/webinar/domain'; export {GET as downloadCalendar} from './app/experience/moonshot/live.ics/route'; export {ARRIVAL_CALENDAR_FILE} from './features/campus/arrival/model';`, resolveDir: root, loader: 'ts'},
+  stdin: {contents: `export {config as baseEvent} from './tests/webinar-fixture/data'; export {DEFAULT_WELCOME} from './features/campus/welcome/content'; export {DEFAULT_ARRIVAL,arrivalLiveEvent,validateArrivalConfig} from './features/campus/arrival/config'; export {validateWebinar} from './features/campus/webinar/domain'; export {readArrivalPublicationRequest} from './features/campus/arrival/publication'; export {ARRIVAL_CALENDAR_FILE,calendarIcs} from './features/campus/arrival/model';`, resolveDir: root, loader: 'ts'},
   bundle: true, write: false, format: 'esm', platform: 'node',
 });
-const {baseEvent, DEFAULT_WELCOME, DEFAULT_ARRIVAL, validateArrivalConfig, validateWebinar, downloadCalendar, ARRIVAL_CALENDAR_FILE} = await import('data:text/javascript;base64,' + Buffer.from(modules.outputFiles[0].contents).toString('base64'));
+const {baseEvent, DEFAULT_WELCOME, DEFAULT_ARRIVAL, validateArrivalConfig, validateWebinar, readArrivalPublicationRequest,
+  arrivalLiveEvent, calendarIcs, ARRIVAL_CALENDAR_FILE} = await import('data:text/javascript;base64,' + Buffer.from(modules.outputFiles[0].contents).toString('base64'));
 const seed = validateWebinar({
   ...baseEvent, slug: 'arrival-synthetic-qa', title: '[합성 QA] 모집 무료 체험', status: 'draft',
   startsAt: '2026-12-07T12:00:00.000Z', endsAt: '2026-12-07T14:00:00.000Z',
   welcome: structuredClone(DEFAULT_WELCOME), arrival: structuredClone(DEFAULT_ARRIVAL),
 });
 const events = new Map([[seed.slug, seed]]);
+let publication = null;
+let publishedConfig = null;
 const cohorts = [{id: seed.cohortId, name: '합성 QA 전용 기수', course_id: '00000000-0000-4000-8000-000000000003', courses: {title: '로컬 검수 과정', slug: 'moonshot'}}];
 const mime = {'.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.html': 'text/html; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.mp4': 'video/mp4'};
 function reply(res, status, value) {res.writeHead(status, {'Content-Type': 'application/json; charset=utf-8'}).end(JSON.stringify(value));}
@@ -66,6 +69,24 @@ const server = createServer(async (req, res) => {
       }
       return reply(res, 405, {error: '지원하지 않는 검수 요청입니다.'});
     }
+    if (url.pathname === '/api/admin/campus/webinars/arrival-publication') {
+      if (req.method === 'GET') return reply(res, 200, {publication});
+      if (req.method === 'POST') {
+        const input = readArrivalPublicationRequest(await body(req));
+        const event = events.get(input.slug);
+        if (!event?.arrival) return reply(res, 404, {error: '먼저 모집 설정을 저장해 주세요.'});
+        if (event.revision !== input.sourceRevision || (publication?.revision ?? null) !== input.expectedPublicationRevision) {
+          return reply(res, 409, {error: '저장된 설정이나 공개 상태가 변경됐습니다.'});
+        }
+        publication = {slug: event.slug, sourceRevision: event.revision, revision: crypto.randomUUID(), publishedAt: new Date().toISOString()};
+        publishedConfig = structuredClone(event.arrival);
+        return reply(res, 200, {publication});
+      }
+      return reply(res, 405, {error: '지원하지 않는 검수 요청입니다.'});
+    }
+    if (url.pathname === '/api/arrival-fixture/published' && req.method === 'GET') {
+      return reply(res, 200, {arrival: publishedConfig ?? DEFAULT_ARRIVAL});
+    }
     if (url.pathname === '/api/arrival-fixture/saved' && req.method === 'GET') {
       const event = events.get(url.searchParams.get('event') || seed.slug);
       if (!event?.arrival) return reply(res, 404, {error: '메모리에 저장된 체험이 없습니다.'});
@@ -74,9 +95,11 @@ const server = createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) return reply(res, 503, {error: '이 로컬 검수에는 실제 서버 연결이 없습니다.'});
     if (req.method !== 'GET' && req.method !== 'HEAD') return reply(res, 405, {error: '읽기 전용 검수 파일입니다.'});
     if (url.pathname === ARRIVAL_CALENDAR_FILE) {
-      const calendar = downloadCalendar();
-      res.writeHead(calendar.status, Object.fromEntries(calendar.headers));
-      res.end(req.method === 'HEAD' ? undefined : await calendar.text());
+      const event = arrivalLiveEvent(publishedConfig ?? DEFAULT_ARRIVAL);
+      const file = calendarIcs(event);
+      if (!file) return res.writeHead(404).end();
+      res.writeHead(200, {'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="${event.id}.ics"`});
+      res.end(req.method === 'HEAD' ? undefined : file);
       return;
     }
     if (assets.has(url.pathname)) {res.setHeader('Content-Type', mime[extname(url.pathname)] || 'application/octet-stream'); res.end(req.method === 'HEAD' ? undefined : assets.get(url.pathname)); return;}

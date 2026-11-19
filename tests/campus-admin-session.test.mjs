@@ -31,6 +31,7 @@ test('both admin entry pages reuse the verified session and apply their own menu
     '@/lib/operator-permissions': permissions,
   });
   const flag = process.env.EDU_CAMPUS_ENABLED;
+  const publicationGate = load('features/campus/arrival/preview-gate.ts');
   process.env.EDU_CAMPUS_ENABLED = 'true';
   try {
     for (const [path, component, module, scope, alternate] of [
@@ -38,7 +39,8 @@ test('both admin entry pages reuse the verified session and apply their own menu
       ['/admin/campus/webinars', 'WebinarAdmin', '@/features/campus/webinar/admin', 'marketing', 'members'],
     ]) {
       const page = load('app' + path + '/page.tsx', { 'react/jsx-runtime': react, 'next/navigation': nav,
-        '@/features/campus/admin-page-access': access, [module]: { [component]: component } }).default;
+        '@/features/campus/admin-page-access': access, [module]: { [component]: component },
+        '@/features/campus/arrival/preview-gate': publicationGate }).default;
       const render = () => page({ searchParams: Promise.resolve({ filter: ['a', 'b'] }) });
       current = null;
       await assert.rejects(render(), e => new URL(e.message, 'https://example.test').searchParams.get('next') === path + '?filter=a&filter=b');
