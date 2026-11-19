@@ -189,6 +189,8 @@ test('calendar uses edited Korean date and time, stable campaign UID and no made
   assert.equal(edited.infoUrl, 'https://example.com/live');
   assert.ok(!edited.description.includes('12월 7일'));
   assert.ok(edited.description.includes('1월 4일'));
+  assert.match(config.arrivalIntroDescription(config.validateArrivalConfig(changed)), /1월 4일 무료 라이브/);
+  assert.equal(config.arrivalIntroDescription({...changed, description: '관리자가 편집한 소개'}), '관리자가 편집한 소개');
   assert.equal(model.calendarReady(edited), true);
   const google = new URL(model.googleCalendarUrl(edited));
   assert.equal(google.searchParams.get('dates'), '20270103T163000Z/20270103T163100Z');

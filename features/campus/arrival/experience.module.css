@@ -433,11 +433,11 @@
 .exampleDialog { position: fixed; inset: 0; margin: auto; width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); color: var(--ink); overflow: hidden; box-shadow: 0 24px 80px #0003; }
 .exampleDialog[open] { display: flex; flex-direction: column; }
 .exampleDialog::backdrop { background: #071f2c99; backdrop-filter: blur(3px); }
-.exampleDialog > header { flex: none; display: flex; align-items: flex-start; gap: 16px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.exampleDialog > header { flex: none; display: flex; align-items: center; gap: 16px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
 .exampleDialog > header > div { flex: 1; min-width: 0; }
 .exampleDialog > header span { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
-.exampleDialog h2 { font-size: 22px; line-height: 1.45; margin: 0; word-break: keep-all; }
-.exampleDialog > header button { width: 44px; min-height: 44px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+.exampleDialog h2 { font-size: 22px; line-height: 1.45; margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.exampleDialog > header button { width: 44px; height: 44px; padding: 0; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
 .exampleBody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
 .exampleDialog > footer { flex: none; border-top: 1px solid var(--line); padding: 16px 24px; }
 
