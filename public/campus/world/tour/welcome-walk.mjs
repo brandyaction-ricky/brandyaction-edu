@@ -191,9 +191,10 @@ async function start() {
     projected.project(camera);
     const x = (projected.x + 1) * width / 2 - markerWidth / 2;
     const y = (1 - projected.y) * height / 2 - markerHeight;
-    const left = Math.max(10, Math.min(width - markerWidth - 10, x));
-    // The welcome card covers the lower scene on short mobile screens.
+    // On short mobile screens, the welcome card is below and the avatar control is to the right.
     const compactReception = atReception && width <= 700 && height <= 556;
+    const rightInset = compactReception ? 146 : 10;
+    const left = Math.max(10, Math.min(width - markerWidth - rightInset, x));
     const top = compactReception
       ? Math.max(18, Math.min(height - markerHeight - 304, y))
       : Math.max(72, Math.min(height - markerHeight - 96, y));

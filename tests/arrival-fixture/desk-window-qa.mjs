@@ -81,6 +81,14 @@ for (const {name, engine, viewport, mobile} of devices) {
     expect(requestedPaths.has(modelPath('female-c'))).toBe(true);
     expect(requestedPaths.has(modelPath('female-d'))).toBe(false);
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
+    if (mobile) {
+      await expect.poll(async () => {
+        const marker = await frame.getByRole('button', {name: /쪽으로 걷기/}).boundingBox();
+        const avatar = await button(page, '내 캐릭터').boundingBox();
+        const welcome = await page.getByRole('region', {name: '문샷 웰컴존 소개'}).boundingBox();
+        return Boolean(marker && avatar && welcome && marker.x + marker.width <= avatar.x && marker.y + marker.height <= welcome.y);
+      }).toBe(true);
+    }
     await capture('entry');
     await walkTo(1);
     const leader = teamLeaderGuide(page);
