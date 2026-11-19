@@ -39,6 +39,7 @@ for (const [device, engine, viewport] of [
   const marker = frame.getByRole('button', {name:/쪽으로 걷기/});
   const open = frame.getByRole('button', {name:/열기$|입장하기$/});
   const calendar = page.getByRole('link', {name:'Google 캘린더', exact:true});
+  const nextHint = page.getByRole('region', {name:'현재 목적지', exact:true}).getByRole('status').filter({hasText:/옆으로 이동해|옆자리에서|복도 끝/});
   const button = (root, name) => root.getByRole('button', {name, exact:true});
   const tap = locator => mobile ? locator.tap() : locator.click();
   const position = () => world.evaluate(element => [Number(element.dataset.playerX), Number(element.dataset.playerZ), Number(element.dataset.arrivals)]);
@@ -58,6 +59,7 @@ for (const [device, engine, viewport] of [
     expect(Math.abs(to - destinationX[station])).toBeLessThan(.8);
     if (station !== 1) {
       await expect(open).toBeVisible();
+      await expect(nextHint).toHaveCount(0);
       await expect(page.getByRole('dialog')).not.toBeVisible();
       await expect(calendar).not.toBeVisible();
       await tap(open);
@@ -85,6 +87,8 @@ for (const [device, engine, viewport] of [
     const connections = map.locator('li[data-connected="true"]');
     const status = map.getByRole('status');
     await expect(map.getByRole('listitem')).toHaveCount(12);
+    await expect(map.getByRole('button')).toHaveCount(0);
+    await expect(map.getByText(/고객부터 알려줘보기.*누르면/)).toBeVisible();
     await expect(connections).toHaveCount(0);
     await expect(status).toHaveText('아직 연결된 지식이 없어요.');
     await expect(button(dialog, '웰컴 라운지로 가기')).toBeEnabled();
@@ -146,6 +150,9 @@ for (const [device, engine, viewport] of [
         await expect(marker).toHaveCount(1);
         expect(await position()).toEqual(before);
         await expect(calendar).not.toBeVisible();
+        await expect(nextHint).toContainText(['경쟁사 스파이', '콘텐츠 담당자', '회사 업무 기준', '웰컴 라운지'][station - 1]);
+        await expect(nextHint).toBeInViewport({ratio:1});
+        if (station === 2) await capture('next-destination');
       },
     });
     expect(visited).toEqual([1, 2, 3, 4, 7]);

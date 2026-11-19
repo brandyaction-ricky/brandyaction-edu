@@ -22,6 +22,12 @@ import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConf
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
 const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
 const invitations = ['팀장 만나기', '경쟁사 스파이에게 가기', '콘텐츠 담당자에게 가기', '정본 보러 가기', '', '내 AI 체험 열기', '웰컴 라운지로 가기'] as const;
+const nextStationHints = {
+  2: '옆으로 이동해 경쟁사 스파이를 만나보세요.',
+  3: '옆으로 이동해 콘텐츠 담당자를 만나보세요.',
+  4: '옆자리에서 회사 업무 기준을 확인해 보세요.',
+  7: '복도 끝 웰컴 라운지로 이동해 보세요.',
+} satisfies Record<(typeof corridorNext)[keyof typeof corridorNext], string>;
 
 /** Optional [section] lines keep editable examples readable; other text stays literal. */
 function ResultExample({text}: {text: string}) {
@@ -62,6 +68,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [focusRequest, setFocusRequest] = useState(0);
   const [walkAssist, setWalkAssist] = useState<'idle' | 'moving' | 'open'>('idle');
   const [nearStation, setNearStation] = useState<CorridorStation>();
+  const [guidedStation, setGuidedStation] = useState<keyof typeof nextStationHints>();
   const [sceneVisit, setSceneVisit] = useState(0);
   const [explore, setExplore] = useState(false);
   const [deskOpen, setDeskOpen] = useState(false);
@@ -206,12 +213,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
 
   function updateProximity(at: CorridorStation, near: boolean) {
     if (at !== station || step !== 0 || deskOpen) return;
-    if (near) resetWalkAssist();
+    if (near) {
+      resetWalkAssist();
+      if (guidedStation === at) setGuidedStation(undefined);
+    }
     setNearStation(previous => near ? at : previous === at ? undefined : previous);
   }
   function arrive(at: CorridorStation) {
     if (at !== station || step !== 0 || deskOpen) return;
     resetWalkAssist();
+    setGuidedStation(undefined);
     if (at === 7) go(7);
     else {
       if (at === 1) {
@@ -224,9 +235,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function finishStation() {
     if (station === 5 || station === 6 || station === 7 || (station === 2 && state.spyPhase !== 'handed-off')) return;
+    const next = corridorNext[station];
     closeDesk(false);
     setNearStation(undefined);
-    update({station: corridorNext[station]});
+    setGuidedStation(next);
+    update({station: next});
   }
   function advanceSpy(next: SpyPhase) {
     setState(value => {
@@ -312,6 +325,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function update(patch: Partial<ArrivalState>) {setState(value => ({...reconcileArrivalOfficeCase(value, caseRevision), ...patch}));}
   function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station' | 'hallReturnStep'> = {}) {
     resetWalkAssist();
+    setGuidedStation(undefined);
     setDeskOpen(false);
     setIntroOpen(false);
     if (menu.current) menu.current.open = false;
@@ -371,6 +385,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     try {if (persistenceKey) localStorage.removeItem(persistenceKey);} catch {}
     resetWalkAssist();
     setNearStation(undefined);
+    setGuidedStation(undefined);
     setSceneVisit(value => value + 1); setSceneStatus('loading'); setWalkRequest(0);
     setState({...initialArrivalState(), visitorAvatar: state.visitorAvatar}); setDeskOpen(false); setLobbyGuide(null); setIntroOpen(false); setCopyFallback(''); setExplore(false); setShowReset(false); setNotice('');
   }
@@ -400,6 +415,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
     </div>}
     {officeIntro ? <section className={`${entryStyle.wayfinding} ${firstStop ? entryStyle.firstStop : ''}`} aria-label={firstStop ? '문샷 웰컴존 소개' : '현재 목적지'} data-walk-station={station} inert={backgroundInert} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
+      <p className={entryStyle.nextStationHint} role="status" aria-atomic="true">{guidedStation === station && nextStationHints[guidedStation]}</p>
       <div className={entryStyle.stopCopy}>
         {firstStop ? <>
           <h1>{config.title}</h1>

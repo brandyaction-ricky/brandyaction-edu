@@ -69,6 +69,7 @@ async function start() {
   scene.add(key);
   const loader = createCampusAssetLoader();
   const set = buildWelcomeWalkSet(THREE, scene, { loader });
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const { stations } = set;
   const motion = createWalkMotion(stations, set.isLobbyBlocked);
   const { state } = motion;
@@ -316,6 +317,7 @@ async function start() {
       activeAction = next;
     }
     footprint.visible = !state.paused && now < footprintUntil;
+    set.updateGuide(now, reducedMotion.matches);
     mixer.update(dt);
     placeCamera(dt); placeMarker(); placeLobbyGuides(); renderer.render(scene, camera);
     root.dataset.playerX = state.x.toFixed(2); root.dataset.playerZ = state.z.toFixed(2);

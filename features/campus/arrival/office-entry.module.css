@@ -77,6 +77,37 @@
 .wayfinding { position: absolute; left: clamp(14px, 3vw, 40px); bottom: max(18px, env(safe-area-inset-bottom)); z-index: 2; display: flex; align-items: center; gap: 20px; width: fit-content; max-width: calc(100% - 28px); background: #fffffff5; border: 1px solid #d4dfed; color: #142b48; border-radius: 14px; box-shadow: 0 4px 24px #17304b24; padding: 13px 16px; }
 .wayfinding h1 { margin: 0; font-size: clamp(17px, 2vw, 22px); line-height: 1.45; }
 .wayfinding span { font-size: 12px; color: #516375; }
+.nextStationHint {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  max-width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #d4dfed;
+  border-radius: 10px;
+  background: #fff;
+  color: #173b69;
+  box-shadow: 0 3px 12px #17304b24;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.45;
+  word-break: keep-all;
+  pointer-events: none;
+}
+.nextStationHint:empty { width: 1px; height: 1px; padding: 0; border: 0; clip-path: inset(50%); overflow: hidden; }
+.nextStationHint:not(:empty)::after {
+  position: absolute;
+  bottom: -5px;
+  left: 18px;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid #d4dfed;
+  border-bottom: 1px solid #d4dfed;
+  background: #fff;
+  transform: rotate(45deg);
+  content: '';
+}
 .stopCopy { min-width: 0; }
 .stopCopy h1 { word-break: keep-all; overflow-wrap: anywhere; }
 .wayfindingActions { display: grid; justify-items: start; gap: 4px; }

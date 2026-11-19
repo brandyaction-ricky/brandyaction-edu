@@ -66,6 +66,7 @@ export function CanonStation({phase, onAdvance, onHall}: {
   onHall: () => void;
 }) {
   const mapHeading = useId();
+  const mapHint = `${mapHeading}-hint`;
   const current = phase ? exchanges[phase - 1] : null;
   const next = phase === 3 ? null : exchanges[phase];
   const history = exchanges.slice(0, phase);
@@ -94,12 +95,17 @@ export function CanonStation({phase, onAdvance, onHall}: {
       <p>대화와 피드백으로 배우고, 바뀐 내용은 다음 업무의 기준이 됩니다.</p>
     </header>
     <div className={styles.layout}>
-      <section className={styles.map} aria-labelledby={mapHeading}>
+      <section className={styles.map} aria-labelledby={mapHeading} aria-describedby={mapHint}>
         <header className={styles.mapHeader}>
           <Network size={18} aria-hidden="true"/>
           <h2 id={mapHeading}>회사 지식 지도</h2>
           <span>{phase}/3</span>
         </header>
+        <p className={styles.mapHint} id={mapHint}>
+          {phase === 0
+            ? `‘${exchanges[0].action}’를 누르면 대화에서 배운 내용이 여기에 연결돼요.`
+            : '정본이 대화에서 배운 내용을 파란색으로 연결해요.'}
+        </p>
         <div className={styles.board}>
           <svg viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
             {connections.map(([from, to]) => <line key={`${from}-${to}`}
@@ -107,9 +113,12 @@ export function CanonStation({phase, onAdvance, onHall}: {
               x2={(to % 4) * 100 + 50} y2={Math.floor(to / 4) * 100 + 50}
               vectorEffect="non-scaling-stroke"/>)}
           </svg>
-          <ul className={styles.nodes}>
+          <ul className={styles.nodes} role="list">
             {knowledge.map((node, index) => <li key={node.name} data-connected={connected.has(index)}>
-              <span className={styles.node}>{node.name}{connected.has(index) && 'detail' in node && <small>{node.detail}</small>}</span>
+              <span className={styles.node}>
+                <span className={styles.nodeName}>{node.name}</span>
+                {connected.has(index) && 'detail' in node && <small>{node.detail}</small>}
+              </span>
             </li>)}
           </ul>
         </div>

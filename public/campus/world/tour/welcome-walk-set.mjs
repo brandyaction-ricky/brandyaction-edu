@@ -201,6 +201,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   const corridorCenter = corridorStart + corridorLength / 2;
   // One raised arrow points to the reachable floor position, not to a desk
   // behind glass. Reposition the same object as the visitor advances.
+  const arrow = new THREE.Group();
   const arrowTip = new THREE.ConeGeometry(.37,.46,4);
   const point = new THREE.Mesh(arrowTip,material(0x2254a4));
   point.position.y = .44;
@@ -208,7 +209,14 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   const stem = new THREE.Mesh(cube,material(0x3871c4));
   stem.position.y = .84;
   stem.scale.set(.22,.42,.22);
-  guide.add(point,stem);
+  // Cover the full vertical travel with a stationary tap target.
+  const hitMaterial = new THREE.MeshBasicMaterial({visible: false});
+  const arrowTarget = new THREE.Mesh(cube,hitMaterial);
+  arrowTarget.position.y = .75;
+  arrowTarget.scale.set(.58,1.1,.58);
+  point.raycast = stem.raycast = () => {};
+  arrow.add(point,stem);
+  guide.add(arrow,arrowTarget);
   // An open near edge leaves the path and avatar legible at a small screen width.
   box(root,corridorCenter,-.37,-1.9,corridorLength,.66,10.4,navy);
   box(root,corridorCenter,-.045,.70,corridorLength,.085,5.2,floor);
@@ -350,6 +358,10 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
     stations,
     lobbyGuidePoint(id, out) { return lobby?.guideWorldPoint(id, out); },
     isLobbyBlocked(x, z) { return lobby?.blockedAt(x, z) ?? true; },
+    updateGuide(now, reducedMotion) {
+      if (!guide.visible) return;
+      arrow.position.y = reducedMotion ? 0 : .12 * (1 - Math.cos(now * Math.PI / 900));
+    },
     setNext(index, stationIndex = index) {
       const loadActor = pendingDeskActors.get(stationIndex);
       if (loadActor) {
@@ -385,6 +397,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       root.removeFromParent();
       root.traverse(node=>{ if(node.isInstancedMesh) node.dispose(); });
       for(const geometry of [cube,cylinder,orb,plane,arrowTip]) geometry.dispose();
+      hitMaterial.dispose();
       for(const mat of materials.values()) mat.dispose();
       for(const texture of textures) texture.dispose();
       for(const model of models) releaseModel(model);
