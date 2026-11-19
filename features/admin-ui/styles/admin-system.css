@@ -861,7 +861,7 @@
   gap:4px 8px;min-height:0;padding:4px 8px 12px;margin:0;
 }
 .adm.edu-admin .adm-sidebar .brand-logo { width:124px;height:auto;max-width:100%;object-fit:contain; }
-.adm.edu-admin .adm-sidebar .brand small { display:block;margin:0;font-size:10px;line-height:16px;letter-spacing:0; }
+.adm.edu-admin .adm-sidebar .brand small { display:block;margin:0;font-size:11px;line-height:16px;letter-spacing:0; }
 .adm.edu-admin .adm-sidebar .admin-menu-search { margin:0 0 8px; }
 .adm.edu-admin .adm-sidebar nav { padding:0;gap:2px; }
 .adm.edu-admin .adm-sidebar .nav-link {
@@ -1058,3 +1058,17 @@
 }
 
 @media(max-width:720px){.adm.edu-admin .admin-mobile-cards .participant-member-link span{white-space:normal;overflow-wrap:anywhere;text-overflow:clip}.adm.edu-admin .admin-mobile-cards .participant-member-link{max-width:100%}}
+
+/* 2026-11-19 관리자 공통 일관성 — DEV 사용성 QA(G1~G4). 값은 위 .adm 토큰만 쓴다. */
+/* G1 숫자·동작 열 제목을 값과 같은 쪽에 정렬 */
+.adm.edu-admin :is(.admin-data-table,.adm-table) thead th:is([data-align=number],[data-align=action]){text-align:right}
+.adm.edu-admin :is(.admin-data-table,.adm-table) thead th[data-align=center]{text-align:center}
+/* G2 한 줄 입력칸과 선택칸 높이를 한 값(--adm-control)으로: 글자 줄 높이 20px + 위아래 7px + 테두리 */
+.adm.adm.edu-admin.edu-admin :is(.admin-input,.adm-input,.admin-select,.adm-select,:is(.admin-field,.adm-field,.field,.admin-search-field)>:is(input,select)):not([type=checkbox],[type=radio],[type=range],[type=color],[type=file],[type=hidden]){line-height:20px;padding-block:7px}
+.adm.adm.edu-admin.edu-admin :is(.admin-input,.admin-select).admin-control--sm:not([type=checkbox],[type=radio]){padding-block:4px}
+.adm.adm.edu-admin.edu-admin :is(.admin-field,.adm-field,.field)>input:is([type=date],[type=datetime-local],[type=time],[type=month]):not([type=checkbox]),.adm.adm.edu-admin.edu-admin input.admin-input:is([type=date],[type=datetime-local]):not([type=checkbox]){height:var(--adm-control);padding-block:0}
+/* G2b 검색칸 입력 글자는 다른 입력칸과 같은 400 (감싼 label의 600을 물려받지 않게) */
+.adm.edu-admin .admin-search-field input{font-weight:400}
+/* G3 구역 제목 한 단계: 16px / 600 (질문 상세 제목처럼 더 구체적인 규칙은 그대로) */
+.adm.edu-admin :is(.panel-head,.admin-section-header) h2,.adm.edu-admin .panel h2:not(.admin-metric h2,.admin-summary-card h2){font-size:var(--adm-font-16);line-height:24px;font-weight:600}
+/* G4 관리자 글자 하한 11px(--adm-font-11): 10px로 적힌 화면 규칙(learning-care·curriculum-editor·사이드바 표시)은 각 파일에서 11px로 올림 */

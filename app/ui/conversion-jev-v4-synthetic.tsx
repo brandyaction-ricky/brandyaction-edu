@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { JevV4BoundaryCaseId } from '@/lib/conversion-jev-v4-boundary-cases';
 import type { JevV4DecisionKey, JevV4Result, JevV4UncertaintyFlag } from '@/lib/conversion-jev-v4';
-import { AdminButton } from './final/admin-system';
+import { AdminButton } from '@/features/admin-ui';
 
 type SyntheticCaseResult = {
   case: { id: JevV4BoundaryCaseId; title: string; subject: string; content: string; reviewGuide: string };

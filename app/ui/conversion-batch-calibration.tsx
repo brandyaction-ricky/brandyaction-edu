@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { historicalCalibrationQueue, type ConversionSnapshot, type JevCalibration } from '@/lib/conversion-review';
-import { AdminButton, AdminEmptyState, AdminSection, AdminSelect } from './final/admin-system';
+import { AdminButton, AdminEmptyState, AdminSection, AdminSelect } from '@/features/admin-ui';
 
 type Draft = { purchase_intent: string; primary_barrier: string; purchase_readiness: string; next_action: string };
 export type BatchCalibrationSubmission = { caseId: string; runId: string; calibration: JevCalibration };

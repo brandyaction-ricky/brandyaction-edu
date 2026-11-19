@@ -1,5 +1,5 @@
 "use client";
-import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
+import { SiteAnalytics } from './site-analytics';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
 import { retentionTrigger } from "@/lib/crm-retention";
@@ -43,7 +43,6 @@ import {
   AdminDialogFooter,
   AdminDrawer,
   AdminEmptyState,
-  AdminErrorState,
   AdminFilterBar,
   AdminFormField,
   AdminLinkButton,
@@ -206,7 +205,7 @@ export function AdminWorkflows(props: Props) {
     );
   if (props.section === "landing" || props.section === "metrics") return <LandingAdmin />;
   if (props.section === "links") return <ShortLinks />;
-  if (props.section === "analytics") return <Analytics />;
+  if (props.section === "analytics") return <SiteAnalytics />;
   if (props.section === "orders") return <OrdersPanel {...p} />;
   return null;
 }
@@ -468,7 +467,7 @@ function CrmManager({ section, data, send, pending }: Props) {
   return (
     <>
       <div className="admin-crm-workspace-actions">
-        <label className="marketing-list-search"><input type="search" className="admin-input" aria-label={`${title} 검색`} placeholder="이름·내용 검색" value={listSearch} onChange={event => setListSearch(event.target.value)}/><span className="meta">{visibleItems.length}건</span></label>
+        <div className="marketing-list-search"><AdminSearchField label={`${title} 검색`} placeholder="이름·내용 검색" value={listSearch} onChange={event => setListSearch(event.target.value)}/><span className="meta" aria-live="polite">{visibleItems.length}건</span></div>
         <AdminButton type="button" tone="primary" onClick={focusEditor}>{editing ? "작성 중인 내용으로 이동" : section === "templates" ? "템플릿 만들기" : section === "campaigns" ? "발송 예약 만들기" : "자동 안내 만들기"}</AdminButton>
       </div>
       {section === "automations" && items.some(item => overlappingAutomations(item, items).length > 0) && <div className="notice mb24" role="alert"><strong>중복 발송 가능성이 있습니다</strong><p>같은 실행 조건에서 대상이 겹치는 자동 메시지를 확인해 주세요. 중지 상태는 발송하지 않습니다.</p></div>}
@@ -1871,91 +1870,6 @@ function SettingsForm({ section, data, send, pending }: Props) {
               {!metrics.length && <tr><td colSpan={9}><AdminEmptyState compact title="저장된 실측 기록이 없습니다." /></td></tr>}
             </tbody>
         </AdminDataTable>
-      )}
-    </>
-  );
-}
-function Analytics() {
-  const [analysisView,setAnalysisView]=useState<'site'|'campus'>('site');
-  const [today, setToday] = useState(() => new Date(Date.now()+9*3600000).toISOString().slice(0,10));
-  const [from, setFrom] = useState(() =>
-    new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
-  );
-  const [to, setTo] = useState(() => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10));
-  const end = Number.isFinite(Date.parse(to))
-    ? new Date(Date.parse(to) + 86400000).toISOString()
-    : "";
-  const dateError = !from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) ? '시작일과 종료일을 선택해 주세요.' : from > to ? '종료일은 시작일 이후로 선택해 주세요.' : Date.parse(to) - Date.parse(from) >= 366 * 86400000 ? '조회 기간은 1년 이내로 선택해 주세요.' : '';
-  const [pathSearch, setPathSearch] = useState('');
-  const { result, error, loading, retry } = useReport(
-    dateError || analysisView==='campus' ? null : "/api/platform/workflows?" +
-      new URLSearchParams({
-        kind: "analytics",
-        from: from ? from + "T00:00:00+09:00" : "",
-        to: end ? new Date(Date.parse(end) - 9 * 3600000).toISOString() : "",
-      }),
-  );
-  const stages = (result.stages || {}) as Record<string, number>;
-  const paths = (result.paths || []) as Row[];
-  const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
-  const analysisTabs=<div className="analytics-period-presets" role="group" aria-label="분석 화면 선택"><AdminButton variant={analysisView==='site'?'primary':'outline'} aria-pressed={analysisView==='site'} onClick={()=>setAnalysisView('site')}>사이트 유입·결제</AdminButton><AdminButton variant={analysisView==='campus'?'primary':'outline'} aria-pressed={analysisView==='campus'} onClick={()=>setAnalysisView('campus')}>문샷 캠퍼스 행동</AdminButton></div>;
-  if(analysisView==='campus')return <>{analysisTabs}<CampusAnalyticsPanel/></>;
-  return (
-    <>
-      {analysisTabs}
-      <div className="analytics-period-presets" role="group" aria-label="빠른 조회 기간">{[7,30,90].map(days => <AdminButton key={days} size="sm" aria-pressed={!dateError && to === today && Math.round((Date.parse(to)-Date.parse(from))/86400000)+1 === days} onClick={() => { const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10); setToday(today); setTo(today); setFrom(new Date(Date.parse(today)-(days-1)*86400000).toISOString().slice(0,10)); }}>{days}일</AdminButton>)}</div>
-      <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading || !!dateError}>새로고침</AdminButton>} />
-          <label className="marketing-list-search"><input type="search" className="admin-input" placeholder="페이지 주소 검색" aria-label="페이지 주소 검색" value={pathSearch} onChange={event => setPathSearch(event.target.value)}/></label>
-      {dateError ? <p role="alert" className="notice mt24">{dateError}</p> : loading ? (
-        <p className="notice mt24" role="status" aria-live="polite">선택한 기간의 유입 성과를 조회하고 있습니다.</p>
-      ) : error ? (
-        <AdminErrorState onRetry={retry}>{error}</AdminErrorState>
-      ) : (
-        <>
-          {empty && <div className="mt24" role="status"><AdminEmptyState compact title="기간 내 기록 없음">조회 기간과 운영·트래킹 설정을 확인해 주세요.</AdminEmptyState></div>}
-          <div className="admin-pilot-summary mt24">
-            {[
-              ["방문 세션", result.visitors || 0],
-              ["신청 버튼 클릭 세션", stages.application_click || 0],
-              ["기간 내 결제 완료", result.paidOrders || 0],
-              ["기간 내 결제 완료액", money(Number(result.revenue || 0))],
-            ].map(([label, value]) => (
-              <AdminSummaryCard compact key={String(label)} label={String(label)} value={String(value)} scope="선택한 기간" />
-            ))}
-          </div>
-          <p className="meta mb24">
-            조회한 기간의 방문 세션과 주문을 각각 집계합니다. 세션 수는 순방문자
-            수와 다르며, 결제액은 특정 유입 채널의 기여 매출을 뜻하지 않습니다.
-          </p>
-          <section className="panel mb24">
-            <div className="panel-head">
-              <h2>페이지별 참여 단계</h2>
-              <span className="meta">각 이벤트의 방문 세션 수</span>
-            </div>
-            <div className="funnel">
-              {[
-                ["article_view", "아티클 조회"],
-                ["class_view", "클래스 상세 조회"],
-                ["checkout_view", "신청 화면 조회"],
-                ["application_click", "신청 버튼 클릭"],
-              ].map(([key, label]) => (
-                <div className="funnel-step" key={key}>
-                  <span className="label">{label}</span>
-                  <div className="value">
-                    {stages[key] || 0}
-                    <small> 세션</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          <AdminDataTable label="페이지별 유입 성과" rows={paths.filter(row => t(row, 'path').toLowerCase().includes(pathSearch.toLowerCase()))} getRowId={row => t(row, "path")} loading={loading} columns={[
-            { id: "path", header: "페이지", value: row => t(row, "path") },
-            { id: "views", header: "조회 수", value: row => Number(row.views || 0), align: "number" },
-            { id: "visitors", header: "방문 세션", value: row => Number(row.visitors || 0), align: "number" },
-            { id: "clicks", header: "클릭 수", value: row => Number(row.clicks || 0), align: "number" },
-          ]} empty={<AdminEmptyState compact title="기간 내 페이지별 참여 기록이 없습니다." />} />
-        </>
       )}
     </>
   );
