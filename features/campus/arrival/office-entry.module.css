@@ -169,7 +169,7 @@
   .firstStop .wayfindingActions > :is(p, .movementHint) { flex: 1; min-width: 83px; }
 }
 
-@media (max-width: 380px) and (max-height: 620px) {
+@media (max-width: 700px) and (max-height: 620px) {
   .firstStop h1 { font-size: 18px; line-height: 1.35; }
   .firstStop .stopCopy > p { font-size: 13px; }
   .openingExample { margin-top: 7px; padding-block: 6px; }

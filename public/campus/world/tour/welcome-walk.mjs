@@ -192,7 +192,11 @@ async function start() {
     const x = (projected.x + 1) * width / 2 - markerWidth / 2;
     const y = (1 - projected.y) * height / 2 - markerHeight;
     const left = Math.max(10, Math.min(width - markerWidth - 10, x));
-    const top = Math.max(72, Math.min(height - markerHeight - 96, y));
+    // The welcome card covers the lower scene on short mobile screens.
+    const compactReception = atReception && width <= 700 && height <= 556;
+    const top = compactReception
+      ? Math.max(18, Math.min(height - markerHeight - 304, y))
+      : Math.max(72, Math.min(height - markerHeight - 96, y));
     marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
   }
