@@ -1,5 +1,5 @@
 import {chromium, expect, webkit} from '@playwright/test';
-import {loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
+import {loungeScheduleButton, openLoungeSchedule, openPersonalTrial} from './review-office.mjs';
 
 const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4535');
 for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
@@ -72,6 +72,13 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
       '광고비 250억을 쓰며 쌓은 판단 기준을 AI에 적용하는 법',
     ]);
     await expect(returnToCorridor).toBeVisible();
+    const returnToLounge = schedulePanel.getByRole('button',{name:'웰컴 라운지로 돌아가기',exact:true});
+    if (mobile) await returnToLounge.tap();
+    else await returnToLounge.press('Enter');
+    await expect(schedulePanel).toBeHidden();
+    await expect(schedule).toBeFocused();
+    await expect(world).toHaveAttribute('data-free-roam','true');
+    await openLoungeSchedule(page);
     if (mobile) await returnToCorridor.tap();
     else {
       await page.getByRole('button',{name:'공간 둘러보기',exact:true}).click();
@@ -93,8 +100,8 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     await expect(scheduleButton).toBeVisible({timeout:20000});
     await expect(world).toHaveAttribute('data-free-roam','true');
     await openLoungeSchedule(page);
-    await expect(personalTrial).toBeVisible();
-    await personalTrial.click();
+    await expect(personalTrial).toHaveCount(0);
+    await openPersonalTrial(page, '내 AI 체험으로 돌아가기');
     await expect(world).toHaveAttribute('data-station','6');
     const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('moonshot:arrival:synthetic-local-qa:v1')));
     expect(persisted).toMatchObject({canonPhase:3, hallReturnStep:8, answers:{business:{a:'브라우저에 남긴 연습 입력'}}});

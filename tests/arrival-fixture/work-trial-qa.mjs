@@ -1,4 +1,4 @@
-import {finishOfficeReview, openLoungeSchedule} from './review-office.mjs';
+import {finishOfficeReview, openLoungeSchedule, openPersonalTrial} from './review-office.mjs';
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -110,7 +110,7 @@ for(const [name,viewport] of [['pc',{width:1440,height:723}],['mobile',{width:39
     await page.getByRole('button',{name:'라이브에서 이어서 배우기',exact:true}).click();
     await openLoungeSchedule(page);
     expect(await page.getByRole('link',{name:/Google 캘린더/}).getAttribute('href')).toContain('20261207T120000Z');
-    await button('내 AI 체험으로 돌아가기').filter({visible:true}).first().click();await expect(step).toHaveAttribute('data-work-step','4');
+    await openPersonalTrial(page, '내 AI 체험으로 돌아가기');await expect(step).toHaveAttribute('data-work-step','4');
     await page.getByText('두 번째 답변에서 기준이 지켜졌는지 확인하기',{exact:true}).click();
     await page.getByRole('button',{name:'피드백을 보완하고 다시 해보기',exact:true}).click();await expect(step).toHaveAttribute('data-work-step','2');
     await page.getByRole('textbox',{name:'내 말로 수정하기',exact:true}).fill('불확실한 내용은 먼저 확인해줘.');
