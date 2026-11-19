@@ -1,3 +1,17 @@
+/** The guide robots face the open aisle in both stations. */
+export function buildWelcomeGuideRobot(part, rounded, { white, navy, face, accent }) {
+  rounded(white, 0, 1.04, -.50, .76, .84, .53);
+  rounded(white, 0, 1.71, -.48, 1.08, .86, .73);
+  rounded(navy, 0, 1.71, -.16, .81, .50, .19);
+  for (const side of [-1, 1]) {
+    rounded(face, side * .17, 1.73, -.07, .10, .15, .026);
+    rounded(accent, side * .51, 1.70, -.42, .21, .32, .30);
+    rounded(white, side * .40, 1.05, -.19, .27, .30, .42);
+  }
+  part(accent, .05, 2.14, -.48, .055, .18, .055);
+  rounded(face, .05, 2.24, -.48, .15, .15, .15);
+}
+
 /** A compact arrival lounge at the end of the welcome corridor. */
 export function mountWelcomeOnboardingLobby(THREE, parent) {
   const room = new THREE.Group();
@@ -84,20 +98,10 @@ export function mountWelcomeOnboardingLobby(THREE, parent) {
 
     const part = (color, x, y, z, w, h, d, solid = false) => box(color, x, y, z, w, h, d, solid, group);
     const rounded = (color, x, y, z, w, h, d) => shape(leaf, color, x, y, z, w, h, d, group);
-    // Both fixed guides face the open aisle, above the desk and explicitly named.
     part(accent, 0, .44, 0, 2.72, .88, .88, true);
     part(palette.white, 0, .91, 0, 2.90, .12, 1.01);
     sign(name, 0, .51, .453, 2.40, .51, signColor, group);
-    rounded(palette.white, 0, 1.04, -.50, .76, .84, .53);
-    rounded(palette.white, 0, 1.71, -.48, 1.08, .86, .73);
-    rounded(palette.navy, 0, 1.71, -.16, .81, .50, .19);
-    for (const side of [-1, 1]) {
-      rounded(palette.face, side * .17, 1.73, -.07, .10, .15, .026);
-      rounded(accent, side * .51, 1.70, -.42, .21, .32, .30);
-      rounded(palette.white, side * .40, 1.05, -.19, .27, .30, .42);
-    }
-    part(accent, .05, 2.14, -.48, .055, .18, .055);
-    rounded(palette.face, .05, 2.24, -.48, .15, .15, .15);
+    buildWelcomeGuideRobot(part, rounded, {...palette, accent});
   }
 
   // The same floor height carries the character from the corridor into the room.

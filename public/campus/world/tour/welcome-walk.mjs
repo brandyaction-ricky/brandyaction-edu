@@ -22,7 +22,7 @@ const greetingAnchors = {
   1: [-1.43, 2.12, -3.49],
   2: [-1.03, 2.25, -3.71],
   3: [-1.35, 2.25, -4.03],
-  4: [-.22, 1.75, -3.07],
+  4: [-1.02, 2.43, -3.55],
   7: [0, 2.30, -2.25],
 };
 const keys = new Set();
@@ -193,16 +193,16 @@ async function start() {
     scene.fog.color.copy(scene.background);
     camera.lookAt(aim); camera.updateMatrixWorld();
   }
-  function signBottom(station) {
-    // Use both lower corners of the bay sign so a slanted camera angle leaves the full sign visible.
+  function signEdge(station, top = false) {
+    // Project both corners to keep the full sign clear at a slanted camera angle.
     const lobby = station === stations.length;
     const center = stations[station - 1].x + (lobby ? .85 : 0);
     const halfWidth = lobby ? 2.76 : 2.37;
-    const y = lobby ? 2.3 : 2.45;
+    const y = top ? 3.11 : lobby ? 2.3 : 2.45;
     const z = lobby ? -5.01 : -6.35;
     const left = signPoint.set(center - halfWidth, y, z).project(camera).y;
     const right = signPoint.set(center + halfWidth, y, z).project(camera).y;
-    return (1 - Math.min(left, right)) * height / 2;
+    return (1 - (top ? Math.max(left, right) : Math.min(left, right))) * height / 2;
   }
   function placeMarker() {
     if (marker.hidden) return;
@@ -217,14 +217,16 @@ async function start() {
     const side = spaceRight ? 'left' : spaceLeft ? 'right' : '';
     const sideLeft = spaceRight ? x + 22 : x - 22 - markerWidth;
     const left = Math.max(10, Math.min(maxLeft, side ? sideLeft : x - markerWidth / 2));
-    const top = Math.max(72, Math.min(height - markerHeight - 96,
-      Math.max(signBottom(state.station) + 8, anchorY - (side ? markerHeight / 2 : markerHeight) - 8)));
+    // On narrow screens, leave the canon robot's face open for a direct tap.
+    const aboveSign = state.station === 4 && !side ? signEdge(state.station, true) - markerHeight - 10 : 0;
+    const top = aboveSign >= 10 ? aboveSign : Math.max(72, Math.min(height - markerHeight - 96,
+      Math.max(signEdge(state.station) + 8, anchorY - (side ? markerHeight / 2 : markerHeight) - 8)));
     marker.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
     marker.dataset.edge = side || (x > left + markerWidth + 6 ? 'right' : x < left - 6 ? 'left' : '');
   }
   function placeLobbyGuides() {
     const active = state.freeRoam && !state.paused;
-    const minTop = active ? Math.max(76, signBottom(state.station) + 8) : 0;
+    const minTop = active ? Math.max(76, signEdge(state.station) + 8) : 0;
     const safeBottom = height - Math.min(height * .46, width <= 700 ? 264 : 218);
     let previous;
     for (const [id, button] of lobbyGuides) {

@@ -105,8 +105,8 @@ async function fixture() {
     '@/features/campus/webinar/domain': domain,
     '@/features/campus/webinar/server': webinarServer,
   });
-  function saveDraft(revision, title, eventSlug = slug) {
-    const arrival = {...domain.DEFAULT_ARRIVAL, title};
+  function saveDraft(revision, title, eventSlug = slug, teamIntro = '') {
+    const arrival = {...domain.DEFAULT_ARRIVAL, title, teamIntro};
     const value = domain.validateWebinar({
       slug: eventSlug, title: '검수 행사', description: '', status: 'draft',
       startsAt: '2026-12-07T12:00:00Z', endsAt: '2026-12-07T13:00:00Z',
@@ -162,11 +162,14 @@ test('publication copies only the exact saved draft and requires the current pub
   assert.equal(initial.sourceRevision, first);
   assert.equal(Object.hasOwn(initial, 'config'), false);
   assert.equal((await f.read()).config.title, '첫 저장 초안');
+  assert.equal(Object.hasOwn((await f.read()).config, 'teamIntro'), false);
 
   assert.deepEqual(await (await f.post(requestBody())).json(), {publication: initial});
   assert.equal(f.settings.writes.length, 1);
-  f.saveDraft(second, '두 번째 저장 초안');
+  const teamIntro = '팀 소개 첫 문단\n\n팀 소개 두 번째 문단';
+  f.saveDraft(second, '두 번째 저장 초안', slug, teamIntro);
   assert.equal((await f.read()).config.title, '첫 저장 초안');
+  assert.equal(Object.hasOwn((await f.read()).config, 'teamIntro'), false);
   assert.equal((await f.post(requestBody(first, initial.revision))).status, 409);
   assert.equal((await f.post(requestBody(second))).status, 409);
   assert.equal(f.settings.writes.length, 1);
@@ -178,6 +181,7 @@ test('publication copies only the exact saved draft and requires the current pub
   assert.notEqual(current.revision, initial.revision);
   assert.deepEqual(await (await f.get()).json(), {publication: current});
   assert.equal((await f.read()).config.title, '두 번째 저장 초안');
+  assert.equal((await f.read()).config.teamIntro, teamIntro);
   assert.deepEqual(f.settings.writes.map(({command, updatedBy}) => ({command, updatedBy})), [
     {command: 'insert', updatedBy: operatorId}, {command: 'update', updatedBy: operatorId},
   ]);

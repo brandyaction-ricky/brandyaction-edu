@@ -195,12 +195,18 @@ for (const [device, engine, viewport] of [
     await tap(button(guide, '라운지로 돌아가기'));
     await expect(loungeScheduleButton(page)).toBeVisible();
 
-    await tap(frame.getByRole('button', {name: /퇴사선배 윤익 · 브랜디액션/}));
+    const intro = frame.getByRole('button', {name: /퇴사선배 윤익 · 브랜디액션/});
+    await expect(intro).toContainText('광고만 13년 했어요. 요즘은 AI 직원들이랑 일해요.');
+    await tap(intro);
     const team = page.getByRole('dialog', {name:'퇴사선배 윤익 · 브랜디액션 팀', exact:true});
     await expect(team).toBeVisible();
-    await expect(team.getByText('브랜디액션 팀이 AI와 일하는 모습')).toBeVisible();
+    await expect(team.getByRole('heading', {name:'퇴사선배 윤익 · 브랜디액션 팀', exact:true})).toBeVisible();
+    await expect(team.getByText('13년차 퍼포먼스 마케터 · 브랜디액션 CMO', {exact:true})).toBeVisible();
+    await expect(team.getByRole('heading', {name:'브랜디액션 팀의 실제 AI 사무실', exact:true})).toBeVisible();
+    const teamMaterials = button(team, '무료자료 확인하러 가기');
+    await expect(teamMaterials).toBeInViewport({ratio:.95});
     await capture('lounge-team');
-    await tap(button(team, '무료자료 확인하러 가기'));
+    await tap(teamMaterials);
     await expect(team).not.toBeVisible();
     await expect(guide).toBeVisible();
     await expect(guide.getByRole('heading', {name:'무료자료 · 라이브 특전', exact:true})).toBeFocused();
