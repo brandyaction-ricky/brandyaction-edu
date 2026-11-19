@@ -1,4 +1,5 @@
 import {readSpaceJson} from '@/features/campus/space/body';
+import {arrivalLiveReminderConsentVersion} from '@/features/campus/arrival/live-reminder-consent';
 import {
   arrivalLiveReminderEnabled, arrivalLiveReminderOpen, normalizeArrivalReminderPhone, registerArrivalLiveReminder,
 } from '@/features/campus/arrival/live-reminder-server';
@@ -20,7 +21,9 @@ export async function POST(request: Request) {
   }
 
   const phone = normalizeArrivalReminderPhone(body.phone);
-  if (!phone || body.consent !== true || Object.keys(body).length !== 2) return reply({error:'invalid'}, 400);
+  if (!phone || body.consent !== true) return reply({error:'invalid'}, 400);
+  if (body.consentVersion !== arrivalLiveReminderConsentVersion) return reply({error:'refresh'}, 409);
+  if (Object.keys(body).length !== 3) return reply({error:'invalid'}, 400);
   try {
     await registerArrivalLiveReminder(phone);
     return reply({registered:true});

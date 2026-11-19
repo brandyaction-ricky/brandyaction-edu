@@ -136,8 +136,9 @@ async function send(form, status) {
   ]);
   expect(response.status()).toBe(status);
   const payload = response.request().postDataJSON();
-  expect(Object.keys(payload).sort()).toEqual(['consent', 'phone']);
+  expect(Object.keys(payload).sort()).toEqual(['consent', 'consentVersion', 'phone']);
   expect(payload.consent).toBe(true);
+  expect(payload.consentVersion).toBe(2);
   expect(payload.phone.replace(/\D/g, '').replace(/^82/, '0')).toBe(enteredPhone.replace(/\D/g, '').replace(/^82/, '0'));
   if (status === 200) {
     expect(await response.json()).toEqual({registered: true});

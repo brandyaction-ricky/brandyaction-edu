@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../app/api/admin/crm/live-reminders/route.t
 const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
 const preview = {proposedSendAt:'2026-12-07T11:30:00.000Z',liveStartsAt:'2026-12-07T21:00:00+09:00',message:'안내 문자 초안'};
 
-function loadRoute({enabled = true, authorised = true, read}) {
+function loadRoute({enabled = true, authorised = true, read, readDelivery = async () => null}) {
   const permissions = [];
   const exports = {};
   const dependencies = {
@@ -16,6 +16,7 @@ function loadRoute({enabled = true, authorised = true, read}) {
       liveReminderPreview: preview,
       readArrivalLiveReminders: read,
     },
+    '@/features/campus/arrival/live-reminder-delivery': {readArrivalReminderDeliverySummary: readDelivery},
     '@/lib/operator-permissions': {
       getOperatorUser: async scope => {
         permissions.push(scope);

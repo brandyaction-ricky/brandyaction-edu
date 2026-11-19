@@ -106,8 +106,14 @@ test('the archived page keeps the original text after the active policy is repla
   };
   const current = copy(PrivacyPolicy({}));
   const archived = copy(PrivacyPolicy({ version: '2026-08-11' }));
+  const upcoming = copy(PrivacyPolicy({ version: '2026-10-20' }));
   assert.match(current, /새로 적용된 방침/);
+  assert.match(current, /12월 7일 문샷 무료 라이브 당일 안내 문자 1회 발송/);
+  assert.match(current, /라이브 종료 후 신청 정보를 지체 없이 파기/);
+  assert.match(current, /수신번호를 포함한 발송 기록을 발송일로부터 1년간 보관/);
   assert.doesNotMatch(archived, /새로 적용된 방침/);
+  assert.doesNotMatch(archived, /문샷 무료 라이브 문자 알림/);
+  assert.doesNotMatch(upcoming, /문샷 무료 라이브 문자 알림/);
   assert.match(archived, /시행일: 2026년 8월 11일/);
   assert.match(archived, /N6 진단 관련 추가 안내 \(2026년 10월 4일\)/);
 });
