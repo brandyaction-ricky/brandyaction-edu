@@ -1,6 +1,6 @@
 'use client';
 
-import {lazy, Suspense, useId, useRef, useState} from 'react';
+import {lazy, Suspense, useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowUpRight, Eye, Plus, X} from 'lucide-react';
 import {AdminButton, AdminInput, AdminTextarea, useAdminDialog} from '@/features/admin-ui/components/admin-system';
@@ -11,6 +11,7 @@ import {DEFAULT_WORK_TRIAL} from './work-trial';
 import {WorkTrialEditor} from './work-trial-editor';
 import {DEFAULT_OFFICE_DEMO} from './office-demo';
 import {OfficeDemoEditor} from './office-demo-editor';
+import {ArrivalPublicationControls, type ArrivalPublicationControlsProps} from './publication-controls';
 import styles from './editor.module.css';
 
 const Experience = lazy(() => import('./experience').then(module => ({default: module.ArrivalExperience})));
@@ -25,30 +26,41 @@ function fromKoreanDateTime(value: string): string {
   return Number.isFinite(date) ? new Date(date).toISOString() : '';
 }
 
-function ArrivalDraftPreview({config, onClose}: {config: ArrivalConfig; onClose: () => void}) {
+function PreviewReady({onReady}: {onReady: (ready: boolean) => void}) {
+  useEffect(() => onReady(true), [onReady]);
+  return null;
+}
+
+function ArrivalDraftPreview({config, onClose, onReview}: {config: ArrivalConfig; onClose: () => void; onReview?: () => void}) {
   const dialog = useAdminDialog(), titleId = useId();
+  const [ready, setReady] = useState(false);
   return createPortal(<dialog ref={dialog} className={styles.previewDialog} aria-labelledby={titleId}
     onCancel={event => {event.preventDefault(); event.stopPropagation(); onClose();}}
     onSubmit={event => event.stopPropagation()}>
     <header className={styles.previewHeader}>
-      <div><h2 id={titleId} data-admin-dialog-title tabIndex={-1}>현재 편집 내용 미리보기</h2><p>저장 전 내용입니다. 미리보기 입력은 저장하지 않습니다.</p></div>
-      <button type="button" onClick={onClose}><X size={18} aria-hidden="true"/> 미리보기 닫기</button>
+      <div><h2 id={titleId} data-admin-dialog-title tabIndex={-1}>{onReview ? '저장된 체험 미리보기' : '현재 편집 내용 미리보기'}</h2><p>{onReview ? '저장한 초안을 미리 보는 중입니다.' : '저장 전 내용입니다. 미리보기 입력은 저장하지 않습니다.'}</p></div>
+      <div className={styles.previewHeaderActions}>
+        <button type="button" onClick={onClose}><X size={18} aria-hidden="true"/> 미리보기 닫기</button>
+        {onReview && <button type="button" className={styles.reviewButton} disabled={!ready} onClick={onReview}>미리보기 확인</button>}
+      </div>
     </header>
     <div className={styles.previewBody}>
       <Suspense fallback={<p className={styles.previewLoading} role="status">체험 미리보기를 준비하고 있어요…</p>}>
         <Experience config={config} persistenceKey={null} preview embedded/>
+        {onReview && <PreviewReady onReady={setReady}/>}
       </Suspense>
     </div>
   </dialog>, document.body);
 }
 
 /** The parent webinar form owns persistence and its existing revision check. */
-export function ArrivalEditor({value: storedValue, onChange, disabled = false, savedSlug, draftOnly = false}: {
+export function ArrivalEditor({value: storedValue, onChange, disabled = false, savedSlug, draftOnly = false, publication}: {
   value?: ArrivalConfig;
   onChange: (value: ArrivalConfig) => void;
   disabled?: boolean;
   savedSlug?: string;
   draftOnly?: boolean;
+  publication?: ArrivalPublicationControlsProps;
 }) {
   // Old browser-only demo drafts may bypass the server's validation boundary.
   // Add only missing fields; keep every existing editorial value intact.
@@ -58,7 +70,8 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
     workTrial: storedValue.workTrial ?? DEFAULT_WORK_TRIAL,
     officeDemo: Object.hasOwn(storedValue, 'officeDemo') ? storedValue.officeDemo : DEFAULT_OFFICE_DEMO,
   } : undefined;
-  const [preview, setPreview] = useState<ArrivalConfig | null>(null);
+  const [preview, setPreview] = useState<{config: ArrivalConfig; revision?: string} | null>(null);
+  const [reviewedRevision, setReviewedRevision] = useState<string | null>(null);
   const [error, setError] = useState('');
   const errorBox = useRef<HTMLParagraphElement>(null);
   function patch<K extends keyof ArrivalConfig>(key: K, next: ArrivalConfig[K]) {
@@ -70,32 +83,36 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
     if (!value) return;
     patch('audiences', {...value.audiences, [id]: {...value.audiences[id], ...next}});
   }
-  function openPreview() {
+  function openPreview(revision?: string) {
     try {
       const checked = validateArrivalConfig(value);
       setError('');
-      setPreview(checked);
+      setPreview({config:checked, revision});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '미리볼 내용을 확인해 주세요.');
       requestAnimationFrame(() => errorBox.current?.focus());
     }
   }
 
+  const publicationControls = publication && <ArrivalPublicationControls {...publication}
+    hasConfig={!!value} disabled={disabled} reviewed={reviewedRevision === publication.savedRevision}
+    onPreview={openPreview}/>;
+
   if (!value) return <section className={styles.editor} aria-label="라이브 사전 체험 설정">
     <div className={styles.intro}><h2>라이브 사전 체험</h2><p>카톡방 방문자가 ‘문샷 AI 직원 체험’에서 보는 안내와 라이브 일정을 관리합니다.</p></div>
     <AdminButton type="button" variant="primary" disabled={disabled} onClick={() => onChange(structuredClone(DEFAULT_ARRIVAL))}><Plus size={17} aria-hidden="true"/> 모집 체험 설정 추가</AdminButton>
-    <p className={styles.scope}>설정을 추가해도 공개되지 않습니다. 현재는 검수용 미리보기만 제공합니다.</p>
+    {publicationControls || <p className={styles.scope}>설정을 추가해도 공개되지 않습니다. 현재는 검수용 미리보기만 제공합니다.</p>}
   </section>;
 
   return <section className={styles.editor} aria-label="라이브 사전 체험 설정">
     <div className={styles.intro}><h2>라이브 사전 체험</h2><p>카톡방 방문자가 ‘문샷 AI 직원 체험’에서 보는 내용을 편집하세요.</p></div>
-    <div className={styles.previewActions}>
-      <AdminButton type="button" variant="primary" disabled={disabled} onClick={openPreview}><Eye size={17} aria-hidden="true"/> 현재 편집 내용 미리보기</AdminButton>
+    {!publication && <><div className={styles.previewActions}>
+      <AdminButton type="button" variant="primary" disabled={disabled} onClick={() => openPreview()}><Eye size={17} aria-hidden="true"/> 현재 편집 내용 미리보기</AdminButton>
       {savedSlug && <a href={'/experience/moonshot?event=' + encodeURIComponent(savedSlug)} target="_blank" rel="noopener noreferrer">저장된 체험 미리보기 <ArrowUpRight size={16} aria-hidden="true"/></a>}
     </div>
     <p className={styles.scope}>{draftOnly
       ? '이 브랜치에서는 편집한 내용을 미리 볼 수 있어요. 설정 저장은 고정 DEV 통합 후 사용할 수 있습니다.'
-      : '편집 후 하단 ‘설정 저장’을 누르면 보관됩니다. 저장해도 모집 체험은 자동으로 공개되지 않습니다.'}</p>
+      : '편집 후 하단 ‘설정 저장’을 누르면 보관됩니다. 저장해도 모집 체험은 자동으로 공개되지 않습니다.'}</p></>}
     {error && <p ref={errorBox} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
 
     <EditorDisclosure title="사무실 직원 체험 · 회사 기준" initialOpen>
@@ -158,6 +175,8 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
         <p className={styles.scope}>무료 체험의 일정 안내에 사용합니다. 기존 행사 설정의 시작·종료 시간은 자동으로 바뀌지 않습니다.</p>
       </fieldset>
     </EditorDisclosure>
-    {preview && <ArrivalDraftPreview config={preview} onClose={() => setPreview(null)}/>}
+    {publicationControls}
+    {preview && <ArrivalDraftPreview config={preview.config} onClose={() => setPreview(null)}
+      onReview={preview.revision ? () => {setReviewedRevision(preview.revision ?? null); setPreview(null);} : undefined}/>}
   </section>;
 }

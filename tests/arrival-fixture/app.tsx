@@ -16,18 +16,22 @@ const targets = {arrival: '/arrival', 'webinar-admin': '/webinar-admin', 'saved-
 type Target = keyof typeof targets;
 const initialTarget = params.get('target') as Target;
 
-function SavedPreview() {
+function StoredExperience({preview}: {preview: boolean}) {
   const [config, setConfig] = useState<ArrivalConfig | null>(null), [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    void fetch('/api/arrival-fixture/saved?event=' + encodeURIComponent(params.get('event') || 'arrival-synthetic-qa'), {signal: controller.signal, cache: 'no-store'})
+    const url = preview
+      ? '/api/arrival-fixture/saved?event=' + encodeURIComponent(params.get('event') || 'arrival-synthetic-qa')
+      : '/api/arrival-fixture/published';
+    void fetch(url, {signal: controller.signal, cache: 'no-store'})
       .then(async response => {const data = await response.json(); if (!response.ok) throw Error(data.error); return validateArrivalConfig(data.arrival);})
       .then(setConfig).catch(cause => {if (cause.name !== 'AbortError') setError(cause.message);});
     return () => controller.abort();
-  }, []);
+  }, [preview]);
   if (error) return <p role="alert" style={{padding: 32}}>{error}</p>;
   if (!config) return <p role="status" style={{padding: 32}}>로컬 메모리에 저장한 체험을 불러옵니다…</p>;
-  return <ArrivalExperience config={config} persistenceKey={null} preview/>;
+  return <ArrivalExperience config={config} persistenceKey={preview ? null : 'moonshot:arrival:synthetic-local-qa:v1'}
+    preview={preview} calendarFileHref={preview ? undefined : ARRIVAL_CALENDAR_FILE} liveReminderEnabled={!preview}/>;
 }
 
 function Frame() {
@@ -55,7 +59,7 @@ function Frame() {
 const path = location.pathname;
 createRoot(document.getElementById('root')!).render(
   path === '/frame' ? <Frame/> :
-  path === '/webinar-admin' || path === '/admin/campus/webinars' ? <><div style={{background: '#fff2d5', color: '#6c4a15', padding: 12, textAlign: 'center', fontFamily: 'var(--font-sans, sans-serif)'}}>로컬 합성 QA · 저장은 이 서버 메모리에만 반영됩니다. 실제 행사·수강생·DB는 변경하지 않습니다.</div><WebinarAdmin arrivalDraftOnly={params.get('draftOnly') === '1'}/></> :
-  path === '/saved-preview' || path === '/experience/moonshot' && params.has('event') ? <SavedPreview/> :
+  path === '/webinar-admin' || path === '/admin/campus/webinars' ? <><div style={{background: '#fff2d5', color: '#6c4a15', padding: 12, textAlign: 'center', fontFamily: 'var(--font-sans, sans-serif)'}}>로컬 합성 QA · 저장은 이 서버 메모리에만 반영됩니다. 실제 행사·수강생·DB는 변경하지 않습니다.</div><WebinarAdmin arrivalDraftOnly={params.get('draftOnly') === '1'} publicationEnabled={params.get('publication') === '1'}/></> :
+  path === '/saved-preview' || path === '/experience/moonshot' ? <StoredExperience preview={path === '/saved-preview' || params.has('event')}/> :
   <ArrivalExperience config={DEFAULT_ARRIVAL} persistenceKey="moonshot:arrival:synthetic-local-qa:v1" calendarFileHref={ARRIVAL_CALENDAR_FILE} liveReminderEnabled/>,
 );

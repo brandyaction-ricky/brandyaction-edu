@@ -5,3 +5,7 @@ export function arrivalPreviewClosed(env: Record<string, string | undefined> = p
   if (env.NEXT_PUBLIC_APP_ENV === 'production') return true;
   return env.VERCEL_ENV === 'production' && env.NEXT_PUBLIC_APP_ENV !== 'development';
 }
+
+export function arrivalPublicationEnabled(env: Record<string, string | undefined> = process.env) {
+  return !arrivalPreviewClosed(env) && env.VERCEL_ENV !== 'preview';
+}

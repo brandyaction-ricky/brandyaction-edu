@@ -1,13 +1,17 @@
 import {arrivalLiveEvent, DEFAULT_ARRIVAL} from '@/features/campus/arrival/config';
-import {arrivalPreviewClosed} from '@/features/campus/arrival/preview-gate';
+import {arrivalPreviewClosed, arrivalPublicationEnabled} from '@/features/campus/arrival/preview-gate';
 import {calendarIcs} from '@/features/campus/arrival/model';
+import {readPublishedArrival} from '@/features/campus/arrival/publication-server';
 
-export function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET() {
   if (arrivalPreviewClosed(process.env)) {
     return new Response(null, {status: 404});
   }
 
-  const event = arrivalLiveEvent(DEFAULT_ARRIVAL);
+  const publication = arrivalPublicationEnabled(process.env) ? await readPublishedArrival() : null;
+  const event = arrivalLiveEvent(publication?.config ?? DEFAULT_ARRIVAL);
   const file = calendarIcs(event);
   if (!file) return new Response(null, {status: 404});
   return new Response(file, {headers: {
