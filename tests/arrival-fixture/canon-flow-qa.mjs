@@ -132,7 +132,8 @@ for (const [device, engine, viewport] of [
     await tap(dialog.getByText('이전 대화 보기', {exact:true}));
     await expect(dialog.getByText('우리 고객은 바쁜 직장인이야. 퇴근 후 쉬는 시간에 팩을 사용해.')).toBeVisible();
     await expect(dialog.getByText('팩 붙이고 자도 되냐고 자주 물어봐. 우리 제품은 10~15분 뒤 떼면 돼.')).toBeVisible();
-    await expect(dialog.getByText('라운지에서 내 일에 쓸 업무 기준표를 받아가세요.')).toBeVisible();
+      await expect(dialog.getByText('라운지에 업무 기준표를 준비했어요.')).toBeVisible();
+      await expect(button(dialog, '웰컴 라운지로 가기')).toBeInViewport({ratio:.95});
     await results.scrollIntoViewIfNeeded();
     await capture('canon-results');
     await page.reload({waitUntil:'domcontentloaded'});
