@@ -96,3 +96,32 @@
  .quickLinks{gap:8px}
  .saveBar strong{flex-basis:100%;overflow-wrap:anywhere}
 }
+
+.welcomeManagement {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.page .welcomeManagement button {
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 68px;
+  height: auto;
+  padding: 12px 16px;
+  text-align: left;
+  white-space: normal;
+  background: var(--adm-surface);
+  border-color: var(--adm-border);
+  color: var(--adm-text);
+}
+.page .welcomeManagement button:hover,
+.page .welcomeManagement button[aria-pressed="true"] {
+  background: var(--adm-primary-soft);
+  border-color: var(--adm-primary);
+}
+.welcomeManagement button > svg { flex-shrink: 0; color: var(--adm-primary); }
+.welcomeManagement button > span { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.welcomeManagement strong { font-size: var(--adm-font-14); }
+.welcomeManagement small { color: var(--adm-text-sub); font-size: var(--adm-font-12); line-height: 1.5; }

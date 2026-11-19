@@ -13,3 +13,7 @@ supabase/.temp/
 
 /test-results/
 /playwright-report/
+
+# Include the original media via scripts/package-moonshot-welcome-preview.sh for protected previews.
+/public/campus/arrival/team-leader-telegram.mp4
+/public/campus/arrival/mask-example-silent.mp4

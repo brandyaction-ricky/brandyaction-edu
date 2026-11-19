@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {tourTasks,retiredTasks,menuHidden} from '../../features/campus/tour/tasks';
-const names={live:'문샷 라이브홀',welcome:'문샷 웰컴 존',study:'문샷 공부방',office:'내 AI 사무실'};
+const names={live:'문샷 라이브홀',welcome:'문샷 개강 준비실',study:'문샷 공부방',office:'내 AI 사무실'};
 test.setTimeout(120000);
 async function room(page:Page,id:keyof typeof names){const map=page.getByRole('dialog',{name:'공간 이동',exact:true});if(!await map.isVisible())await page.getByRole('button',{name:'공간 이동',exact:true}).click();await map.getByRole('button',{name:names[id]+' 입장',exact:true}).click();}
 async function task(page:Page,title:string){await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();const menu=page.getByRole('region',{name:'이 공간에서 할 일',exact:true});await menu.getByLabel('할 일 검색').fill(title);await menu.getByRole('button',{name:title,exact:true}).click();}

@@ -7,5 +7,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<Pag
   const path = '/admin/campus/webinars';
   const operator = await campusAdminAccess(path, await searchParams);
   if (!operator) return <CampusAdminDenied path={path}/>;
-  return <WebinarAdmin studyPreview={operator.permissions?.products}/>;
+  return <WebinarAdmin studyPreview={operator.permissions?.products} arrivalDraftOnly={process.env.VERCEL_ENV === 'preview'}/>;
 }

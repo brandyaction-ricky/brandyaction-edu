@@ -4576,3 +4576,18 @@ three/build/three.module.js:
    *)
 */
 
+
+// Static welcome walks and the member office share this renderer and compressed GLB loader.
+export const CampusWalkThree = {
+  Scene: sr, Group: wt, Object3D: mt, Mesh: Ce, InstancedMesh: lr,
+  BoxGeometry: mn, SphereGeometry: vi, CylinderGeometry: en, ConeGeometry: yi,
+  PlaneGeometry: Kt, RingGeometry: mr, CircleGeometry: Hi,
+  MeshStandardMaterial: Ue, MeshBasicMaterial: Gt, CanvasTexture: Un,
+  DoubleSide: Vt, SRGBColorSpace: ct, Color: Se, Fog: ir, Matrix4: Fe,
+  Box3: Ot, Vector2: we, Vector3: P, Plane: on, Raycaster: Ps,
+  WebGLRenderer: Ho, PerspectiveCamera: Ft, HemisphereLight: xr, DirectionalLight: Wi,
+  AnimationMixer: Sr
+};
+export function createCampusAssetLoader() {
+  return new qo().setMeshoptDecoder(Ad);
+}
