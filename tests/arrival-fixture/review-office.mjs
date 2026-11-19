@@ -49,6 +49,11 @@ export async function openLoungeSchedule(page) {
   await expect(calendar).toBeVisible({timeout: 20000});
 }
 
+export async function openPersonalTrial(page, label = '내 AI 체험으로 가기') {
+  await page.getByLabel('체험 메뉴', {exact:true}).click();
+  await page.getByRole('button', {name:label, exact:true}).click();
+}
+
 // The desktop and mobile clipboard fixtures can use the equivalent HTML entry when WebGL is unavailable.
 export async function finishOfficeReview(page, {walk, audience, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}, enterPersonal = true} = {}) {
   const travel = walk ?? (async station => {
@@ -84,8 +89,5 @@ export async function finishOfficeReview(page, {walk, audience, inspect = async 
   }
   await travel(7);
   await expect(loungeScheduleButton(page)).toBeVisible({timeout:20000});
-  if (enterPersonal) {
-    await openLoungeSchedule(page);
-    await page.getByRole('button', {name:'내 AI 체험으로 가기', exact:true}).click();
-  }
+  if (enterPersonal) await openPersonalTrial(page);
 }

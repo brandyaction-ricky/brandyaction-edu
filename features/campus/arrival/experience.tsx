@@ -94,6 +94,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const resetDialog = useRef<HTMLDialogElement>(null);
   const exampleDialog = useRef<HTMLDialogElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
+  const hallScheduleButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
@@ -338,6 +339,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setReminderOpen(false);
     setExplore(false);
   }
+  function returnToLounge() {
+    setReminderOpen(false);
+    setExplore(true);
+    requestAnimationFrame(() => hallScheduleButton.current?.focus({preventScroll: true}));
+  }
   function openHallReminder() {
     setReminderOpen(true);
     setExplore(false);
@@ -488,6 +494,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <button type="button" onClick={openOfficeCase}><BriefcaseBusiness size={16}/>사무실 사례 둘러보기</button>
           <button type="button" onClick={headToHall}><CalendarDays size={16}/>웰컴 라운지로 이동</button>
         </>}
+        {step === 7 && <button type="button" onClick={openPersonalTrial}><ArrowRight size={16} aria-hidden="true"/>{state.hallReturnStep === null ? '내 AI 체험으로 가기' : '내 AI 체험으로 돌아가기'}</button>}
         {officeIntro && state.hallReturnStep !== null && <button type="button" onClick={() => go(state.hallReturnStep ?? 8, {station: 6})}><ArrowLeft size={16}/>내 AI 체험으로 돌아가기</button>}
         <button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button>
       </div></details>
@@ -532,8 +539,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
         onChange={workTrial => update({workTrial, mode: workTrial.secondConfirmed && workTrial.secondAnswerExample ? 'example' : 'personal', experience: workTrial.secondConfirmed ? workTrial.secondAnswerExample ? 'example-viewed' : 'self-reported' : 'none'})}
         onExit={() => go(8)} onLive={headToHall}/> : <>
-      <div className={s.dockTop}><span>{step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={step === 7 ? openPersonalTrial : () => go(arrivalBackStep(state), step === 8 ? {station: 7} : {})}>{step === 7 && state.hallReturnStep === null ? <ArrowRight size={14}/> : <ArrowLeft size={14}/>}
-        {step === 7 ? state.hallReturnStep === null ? '내 AI 체험으로 가기' : '내 AI 체험으로 돌아가기' : step === 8 ? '웰컴 라운지로 돌아가기' : '이전'}</button></div>
+      <div className={s.dockTop}><span>{step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={step === 7 ? returnToLounge : () => go(arrivalBackStep(state), step === 8 ? {station: 7} : {})}><ArrowLeft size={14} aria-hidden="true"/>
+        {step === 7 || step === 8 ? '웰컴 라운지로 돌아가기' : '이전'}</button></div>
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
         {step === 8 && <>
           {title(<>지금 어떤 상황이신가요?</>, '가장 가까운 상황을 골라주세요. 나에게 맞는 결과 예시부터 보여드릴게요.')}
@@ -644,7 +651,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         <h1>{dateLabel} {timeLabel} · 무료 라이브</h1>
         {!showLiveReminder && <p>AI 직원에게 업무를 맡기는 방법을 라이브에서 이어서 배워보세요.</p>}
         <div className={entryStyle.hallActions}>
-          <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>캘린더에 추가</button>
+          <button type="button" ref={hallScheduleButton} id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>캘린더에 추가</button>
           {showLiveReminder && (reminderRegistered
             ? <span className={entryStyle.hallReminderDone} role="status"><Check size={15} aria-hidden="true"/>문자 알림 신청 완료</span>
             : <button type="button" aria-controls="arrival-content" onClick={openHallReminder}><MessageSquare size={16} aria-hidden="true"/>{LIVE_REMINDER_LABEL}</button>)}

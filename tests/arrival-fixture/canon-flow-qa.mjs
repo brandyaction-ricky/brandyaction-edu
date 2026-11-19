@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, startOfficeCase, teamLeaderGuide} from './review-office.mjs';
+import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, openPersonalTrial, startOfficeCase, teamLeaderGuide} from './review-office.mjs';
 
 const linkFile = process.env.ARRIVAL_QA_LINK_FILE;
 const url = new URL(linkFile ? (await readFile(linkFile, 'utf8')).trim() : process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529/experience/moonshot');
@@ -218,12 +218,14 @@ for (const [device, engine, viewport] of [
     await openLoungeSchedule(page);
     await capture('lounge-schedule');
 
-    await tap(button(page, '내 AI 체험으로 가기'));
+    await tap(button(page, '웰컴 라운지로 돌아가기'));
+    await expect(loungeScheduleButton(page)).toBeVisible();
+    await openPersonalTrial(page);
     await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toBeVisible();
     await tap(button(page, '웰컴 라운지로 돌아가기'));
     await expect(loungeScheduleButton(page)).toBeVisible();
     await openLoungeSchedule(page);
-    await tap(button(page, '내 AI 체험으로 가기'));
+    await openPersonalTrial(page);
     await tap(page.getByRole('button', {name:/이미 사업을 하고 있어요/}));
     await tap(button(page, '내 상황으로 요청문 만들기'));
     const productAnswer = page.getByLabel(/무엇을 판매하고/);
