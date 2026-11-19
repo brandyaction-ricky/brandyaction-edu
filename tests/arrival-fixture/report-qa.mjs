@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, openLoungeSchedule, teamLeaderNext} from './review-office.mjs';
+import {firstSpyRequest, finishOfficeReview, openLoungeSchedule, teamLeaderNext} from './review-office.mjs';
 
 const linkFile = process.env.ARRIVAL_QA_LINK_FILE;
 const url = new URL(linkFile ? (await readFile(linkFile, 'utf8')).trim() : process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4497');
@@ -63,15 +63,24 @@ for (const [engine, viewport] of devices) {
           await capture(page, 'team-leader-video');
         }
         if (station === 2 && !priorRoute) {
-          const input = desk.getByLabel('경쟁사 스파이에게 보낼 첫 요청');
-          await expect(input).toBeInViewport({ratio:.95});
-          const edited = '경쟁사에서 배송에 관한 불편이 자주 나오는지 알려줘.';
-          await input.fill(edited);
-          await tap(action('첫 요청 보내기', desk));
-          await expect(desk.getByText('내 요청: ' + edited, {exact:true})).toBeVisible();
+          const firstSend = action('첫 요청 보내기', desk);
+          const messages = desk.getByRole('log', {name:'대화 메시지'});
+          await expect(desk.getByRole('textbox')).toHaveCount(0);
+          await expect(desk.getByText(firstSpyRequest, {exact:true})).toBeInViewport({ratio:.95});
+          await expect(firstSend).toBeInViewport({ratio:.95});
+          await tap(firstSend);
+          await expect(messages.getByText('내 요청: ' + firstSpyRequest, {exact:true})).toBeVisible();
+          await expect.poll(() => page.evaluate(key => JSON.parse(localStorage.getItem(key))?.spyPhase, storageKey)).toBe('reviews');
+          const oldRequest = '이전에 저장한 자유 입력 요청';
+          await page.evaluate(({storageKey, oldRequest}) => {
+            const visit = JSON.parse(localStorage.getItem(storageKey));
+            localStorage.setItem(storageKey, JSON.stringify({...visit, spyFirstRequest:oldRequest}));
+          }, {storageKey, oldRequest});
           await page.reload();
           await tap(action('바로 열기'));
-          await expect(desk.getByText('내 요청: ' + edited, {exact:true})).toBeVisible();
+          await expect(messages.getByText('내 요청: ' + firstSpyRequest, {exact:true})).toBeVisible();
+          await expect(messages.getByText(oldRequest, {exact:false})).toHaveCount(0);
+          await expect(action('응, 우리 상품도 확인해줘.', desk)).toBeVisible();
         }
         if (station === 3 && !priorRoute) await verifyPlayback(desk.locator('video'), 17);
       }});

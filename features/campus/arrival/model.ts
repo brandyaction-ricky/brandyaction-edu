@@ -12,7 +12,6 @@ export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export const SPY_PHASES = ['intro', 'reviews', 'guide', 'handed-off'] as const;
-export const SPY_REQUEST_LIMIT = 120;
 export type SpyPhase = typeof SPY_PHASES[number];
 export type CanonPhase = 0 | 1 | 2 | 3;
 export const corridorNext = {1: 2, 2: 3, 3: 4, 4: 7} as const;
@@ -20,7 +19,6 @@ export type ArrivalState = {
   station: CorridorStation;
   officeStation: keyof typeof corridorNext | 7;
   entryStarted: boolean;
-  spyFirstRequest: string;
   spyPhase: SpyPhase;
   canonPhase: CanonPhase;
   companyRule: OfficeDemoChoice | null;
@@ -43,7 +41,7 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', spyFirstRequest: '', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -88,7 +86,6 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       state.deskReview = {phase: desk.phase, choice: desk.choice};
     }
     state.spyPhase = SPY_PHASES.find(phase => phase === value.spyPhase) ?? 'intro';
-    if (state.spyPhase !== 'intro') state.spyFirstRequest = answer(value.spyFirstRequest).slice(0, SPY_REQUEST_LIMIT);
     if (value.canonPhase === 1 || value.canonPhase === 2 || value.canonPhase === 3) state.canonPhase = value.canonPhase;
     state.companyRule = value.companyRule === 0 || value.companyRule === 1 ? value.companyRule : null;
     if (state.companyRule !== null && state.audience !== 'work' && typeof value.consentedCompanyRule === 'string'
@@ -129,7 +126,7 @@ export function resumeArrivalRoute(state: ArrivalState): ArrivalState {
   if (onCorridor && state.hallReturnStep === null && state.experience === 'none' && !state.workTrial.secondConfirmed) return state;
   return {
     ...state,
-    ...(onCorridor ? {} : {step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', spyFirstRequest: '', canonPhase: 0} as const),
+    ...(onCorridor ? {} : {step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', canonPhase: 0} as const),
     hallReturnStep: null,
     mode: 'personal',
     experience: 'none',

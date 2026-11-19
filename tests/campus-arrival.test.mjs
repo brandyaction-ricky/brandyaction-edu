@@ -437,6 +437,10 @@ test('the competitor spy restores exactly one valid conversation phase alongside
   for (const spyPhase of [undefined, null, 'invalid', 2, ['guide']]) {
     assert.equal(model.parseArrivalState(JSON.stringify({...base, spyPhase})).spyPhase, 'intro');
   }
+  const legacy = model.parseArrivalState(JSON.stringify({...base, spyPhase: 'reviews', spyFirstRequest: 'old custom request'}));
+  assert.equal(legacy.spyPhase, 'reviews');
+  assert.equal(Object.hasOwn(legacy, 'spyFirstRequest'), false);
+  assert.equal(model.serializeArrivalState(legacy).includes('old custom request'), false);
 });
 
 test('removing a selected case rule rechecks only the personal prompt that used it', () => {

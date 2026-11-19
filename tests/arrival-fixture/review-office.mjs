@@ -2,6 +2,7 @@ import {expect} from '@playwright/test';
 
 const nextDesk = ['콘텐츠 담당자 열기', '회사 업무 기준 보기', '웰컴 라운지로 가기'];
 
+export const firstSpyRequest = '경쟁사 마스크팩 후기를 보고, 우리 상품 안내에서 보완할 점을 찾아줘.';
 export const spyActions = ['첫 요청 보내기', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 
 export async function finishSpyHandoff(dialog) {

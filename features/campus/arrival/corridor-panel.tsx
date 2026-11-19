@@ -10,8 +10,7 @@ import monitor from './office-demo.module.css';
 type Props = {
   station: 2 | 3 | 4;
   spyPhase: SpyPhase;
-  spyFirstRequest: string;
-  onSpyAdvance: (phase: SpyPhase, firstRequest?: string) => void;
+  onSpyAdvance: (phase: SpyPhase) => void;
   contentDraft: ContentStationDraft;
   onContentDraftChange: (draft: ContentStationDraft) => void;
   canonPhase: CanonPhase;
@@ -23,7 +22,7 @@ type Props = {
 
 const locations = {2: '경쟁사 스파이', 3: '콘텐츠 담당자', 4: '정본 · 회사 업무 기준'};
 
-export function CorridorPanel({station, spyPhase, spyFirstRequest, onSpyAdvance, contentDraft, onContentDraftChange, canonPhase, onCanonAdvance, onComplete, onClose, revisit = false}: Props) {
+export function CorridorPanel({station, spyPhase, onSpyAdvance, contentDraft, onContentDraftChange, canonPhase, onCanonAdvance, onComplete, onClose, revisit = false}: Props) {
   const labelId = useId();
   const label = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -51,7 +50,7 @@ export function CorridorPanel({station, spyPhase, spyFirstRequest, onSpyAdvance,
         <span id={labelId} ref={label} tabIndex={-1}>{locations[station]}</span>
         <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>{revisit ? '자료 목록으로 돌아가기' : '복도로 돌아가기'}</button>
       </header>
-      {station === 2 && <SpyStation phase={spyPhase} firstRequest={spyFirstRequest} onAdvance={onSpyAdvance} onComplete={onComplete}/>}
+      {station === 2 && <SpyStation phase={spyPhase} onAdvance={onSpyAdvance} onComplete={onComplete}/>}
       {station === 3 && <div className={monitor.body}><ContentStation draft={contentDraft} onDraftChange={onContentDraftChange} onComplete={onComplete} revisit={revisit}/></div>}
       {station === 4 && <CanonStation phase={canonPhase} onAdvance={onCanonAdvance} onHall={onComplete}/>}
     </section>

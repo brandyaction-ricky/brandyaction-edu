@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {firstSpyRequest, finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -139,7 +139,8 @@ try {
           await walk(2);
         }
         await expect(conversation).toContainText('우리 브랜드에 활용할 기회를 찾아드립니다.');
-        await expect(dialog.getByRole('textbox', {name:'경쟁사 스파이에게 보낼 첫 요청'})).toBeVisible();
+        await expect(dialog.getByRole('textbox')).toHaveCount(0);
+        await expect(dialog.getByText(firstSpyRequest, {exact:true})).toBeVisible();
         await expect(reviews).toHaveCount(0);
         // Dispatch a duplicate tap before React commits the next phase.
         await button(dialog, spyActions[0]).evaluate(element => {element.click(); element.click();});

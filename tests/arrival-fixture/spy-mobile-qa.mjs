@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {spyActions} from './review-office.mjs';
+import {firstSpyRequest, spyActions} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -28,8 +28,6 @@ for (const {name, engine, viewport, mobile} of devices) {
   const transcript = dialog.getByRole('region', {name: '경쟁사 스파이와 나눈 대화'});
   const reply = transcript.locator('[data-spy-reply]');
   const action = index => button(dialog, spyActions[index]);
-  const firstRequest = dialog.getByRole('textbox', {name: '경쟁사 스파이에게 보낼 첫 요청', exact: true});
-  const requestText = '내 상품인 여행용 물병을 비교해 고칠 점을 찾아줘.';
   const close = button(dialog, '복도로 돌아가기');
   const position = () => walk.evaluate(node => [Number(node.dataset.playerX), Number(node.dataset.playerZ)]);
   const distanceFrom = async ([oldX, oldZ]) => {
@@ -63,17 +61,11 @@ for (const {name, engine, viewport, mobile} of devices) {
     await expect(dialog).toBeVisible();
     await expect(close).toBeInViewport({ratio: 0.95});
     await expect(action(0)).toBeInViewport({ratio: 0.95});
-    await expect(firstRequest).toHaveAttribute('maxlength', '120');
-    await firstRequest.fill('');
-    await expect(action(0)).toBeDisabled();
-    await tap(button(dialog, '내 상품 이름 넣기'));
-    await expect(firstRequest).toHaveValue(/\[내 상품 이름\]/);
-    await expect(action(0)).toBeDisabled();
-    await tap(button(dialog, '다른 내용 요청하기'));
-    await expect(firstRequest).toHaveValue('경쟁사 리뷰에서 고객이 가장 불편해한 점을 찾아줘.');
-    await tap(button(dialog, '예시 그대로'));
-    await expect(firstRequest).toHaveValue('경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.');
-    await firstRequest.fill(requestText);
+    await expect(dialog.getByRole('textbox')).toHaveCount(0);
+    for (const label of ['예시 그대로', '내 상품 이름 넣기', '다른 내용 요청하기']) {
+      await expect(button(dialog, label)).toHaveCount(0);
+    }
+    await expect(dialog.getByText(firstSpyRequest, {exact: true})).toBeInViewport({ratio: 0.95});
     const panel = await dialog.boundingBox();
     expect(panel.height).toBeGreaterThan(250);
     expect(panel.y).toBeGreaterThanOrEqual(0);
@@ -97,8 +89,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     await tap(action(0));
     await expect(reply).toHaveCount(3);
     await expect(reply.nth(0)).toContainText('경쟁사 리뷰를 살펴봤어요.');
-    await expect(reply.nth(0)).toContainText('답변은 마스크팩 예시로 보여드려요.');
-    await expect(transcript).toContainText(requestText);
+    await expect(transcript).toContainText(firstSpyRequest);
     await expect(reply.nth(1).getByRole('article')).toHaveCount(2);
     await expect(reply.nth(2)).toContainText('두 리뷰에');
     const batches = await page.evaluate(() => window.spyReplyBatches);
@@ -148,7 +139,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     await tap(openSpy);
     await expect(dialog).toBeVisible();
     await expect(action(0)).toHaveCount(0);
-    await expect(transcript).toContainText(requestText);
+    await expect(transcript).toContainText(firstSpyRequest);
     await expect(action(2)).toBeInViewport({ratio: 0.95});
     await expect.poll(async () => (await scrollPosition()).remaining).toBeLessThan(16);
     if (!mobile) {

@@ -3,7 +3,7 @@
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, SPY_REQUEST_LIMIT, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {guideTitles, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
@@ -252,12 +252,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     update({station: next, officeStation: next > state.officeStation ? next : state.officeStation});
     requestWalk(next);
   }
-  function advanceSpy(next: SpyPhase, firstRequest?: string) {
+  function advanceSpy(next: SpyPhase) {
     setState(value => {
       const current = reconcileArrivalOfficeCase(value, caseRevision);
       const expected = SPY_PHASES[SPY_PHASES.indexOf(current.spyPhase) + 1];
       return current.station === 2 && next === expected
-        ? {...current, spyPhase: next, spyFirstRequest: firstRequest?.trim().slice(0, SPY_REQUEST_LIMIT) ?? current.spyFirstRequest} : current;
+        ? {...current, spyPhase: next} : current;
     });
   }
   function advanceCanon(next: CanonPhase) {
@@ -615,7 +615,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     </section>}
     {teamLeaderOpen && <TeamLeader greeting={officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting} onClose={closeDesk} onComplete={finishStation}/>}
     {openDeskStation && <CorridorPanel station={openDeskStation}
-      spyPhase={state.spyPhase} spyFirstRequest={state.spyFirstRequest} onSpyAdvance={advanceSpy} canonPhase={state.canonPhase} onCanonAdvance={advanceCanon}
+      spyPhase={state.spyPhase} onSpyAdvance={advanceSpy} canonPhase={state.canonPhase} onCanonAdvance={advanceCanon}
       contentDraft={state.contentDraft} onContentDraftChange={contentDraft => update({contentDraft})}
       revisit={revisitContent} onClose={revisitContent ? closeContentReplay : closeDesk}
       onComplete={revisitContent ? closeContentReplay : finishStation}/>}
