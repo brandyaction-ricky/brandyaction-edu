@@ -92,6 +92,7 @@ async function checkOpenForm(visit) {
   await expect(phone).toBeVisible();
   await expect(phone).toHaveAttribute('type', 'tel');
   await expect(phone).toHaveAccessibleDescription('010-0000-0000과 01000000000 모두 가능해요.');
+  await expect(page.getByText(/2026년 12월 10일 오후 11시 59분\(한국 시간\)까지 보관한 뒤 삭제해요/)).toBeVisible();
   await expect(phone).toHaveValue('');
   await expect(consent).not.toBeChecked();
   await expect(page.getByRole('checkbox')).toHaveCount(1);

@@ -96,6 +96,7 @@ test('the archived page keeps the original text after the active policy is repla
   const jsx = (type, props) => ({ type, props });
   const { PrivacyPolicy } = load('app/ui/privacy-policy.tsx', {
     'react/jsx-runtime': { jsx, jsxs: jsx }, 'next/link': 'link',
+    '@/features/campus/arrival/live-reminder-consent': load('features/campus/arrival/live-reminder-consent.ts'),
     '@/lib/legal-policies': { ...policies, POLICY_VERSION: '2026-10-20', defaultPolicies: { privacy: '새로 적용된 방침' } },
     './ad-preferences': {}, './privacy-policy.css': {},
   });
@@ -109,7 +110,7 @@ test('the archived page keeps the original text after the active policy is repla
   const upcoming = copy(PrivacyPolicy({ version: '2026-10-20' }));
   assert.match(current, /새로 적용된 방침/);
   assert.match(current, /12월 7일 문샷 무료 라이브 당일 안내 문자 1회 발송/);
-  assert.match(current, /라이브 종료 후 신청 정보를 지체 없이 파기/);
+  assert.match(current, /2026년 12월 10일 오후 11시 59분\(한국 시간\)\s*까지 보관한 뒤 파기/);
   assert.match(current, /수신번호를 포함한 발송 기록을 발송일로부터 1년간 보관/);
   assert.doesNotMatch(archived, /새로 적용된 방침/);
   assert.doesNotMatch(archived, /문샷 무료 라이브 문자 알림/);

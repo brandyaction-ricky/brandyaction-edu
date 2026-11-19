@@ -1,7 +1,7 @@
 import {createHmac, randomBytes, randomUUID} from 'node:crypto';
 import {loadSmsSettings} from '@/lib/crm-sms-settings';
 import {createAdminClient} from '@/lib/supabase/admin';
-import {arrivalLiveReminderConsentVersion} from './live-reminder-consent';
+import {arrivalLiveReminderConsentVersion, arrivalLiveReminderRetentionAt} from './live-reminder-consent';
 import {
   arrivalLiveReminderEvent, arrivalLiveReminderProduction, liveReminderPreview,
 } from './live-reminder-server';
@@ -13,7 +13,8 @@ const start = Date.parse(liveReminderPreview.liveStartsAt);
 const sendAt = Date.parse(liveReminderPreview.proposedSendAt);
 // The final cron invocation includes consent submitted just before the live.
 const sendUntil = start + 60_000;
-const lastScheduledPurge = Date.parse('2026-12-08T08:59:00+09:00');
+const receiptWindowEnd = Date.parse('2026-12-08T01:00:00+09:00');
+const retentionDeadline = Date.parse(arrivalLiveReminderRetentionAt);
 const {id: eventId} = arrivalLiveReminderEvent;
 const solapiOrigin = 'https://api.solapi.com';
 const groupId = /^G4V[A-Za-z0-9]{29}$/;
@@ -22,7 +23,7 @@ function purgeAt(env = process.env) {
   const date = env.EDU_CAMPUS_ARRIVAL_REMINDER_PURGE_AT || '';
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/.test(date)) return NaN;
   const time = Date.parse(date);
-  return time > sendUntil && time <= lastScheduledPurge ? time : NaN;
+  return time === retentionDeadline ? time : NaN;
 }
 
 function sendEnabled(env = process.env) {
@@ -138,7 +139,7 @@ export async function runArrivalLiveReminderDelivery(now: () => number = Date.no
     if (error) throw Error('Live reminder deletion failed');
     return {state: 'purged', removed: data.removed_count, unclaimed: data.eligible_unsent_count};
   }
-  if (recoverPurge || started < sendAt || !sendEnabled()) return {state: 'waiting'};
+  if (recoverPurge || started < sendAt || started >= receiptWindowEnd || !sendEnabled()) return {state: 'waiting'};
 
   const key = process.env.SOLAPI_API_KEY;
   const secret = process.env.SOLAPI_API_SECRET;

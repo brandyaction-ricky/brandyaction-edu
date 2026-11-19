@@ -1,6 +1,6 @@
 import {useEffect, useId, useRef, useState, type FormEvent} from 'react';
 import {Check, ChevronDown, MessageSquare} from 'lucide-react';
-import {arrivalLiveReminderConsentVersion} from './live-reminder-consent';
+import {arrivalLiveReminderConsentVersion, arrivalLiveReminderRetentionLabel} from './live-reminder-consent';
 import styles from './live-reminder.module.css';
 
 export const LIVE_REMINDER_LABEL = '강의 알림 받기';
@@ -99,7 +99,7 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
             <input name="consent" type="checkbox" required/>
             라이브 당일 안내 문자 1회 수신에 동의합니다.
           </label>
-          <p className={styles.note}>휴대폰 번호는 12월 7일 문샷 무료 라이브 당일 안내 문자 1회 발송에 사용해요. 브랜디액션은 라이브 종료 후 신청 정보를 지체 없이 파기해요. 문자를 발송하면 솔라피는 수신번호를 포함한 발송 기록을 발송일로부터 1년간 보관해요. 동의하지 않으면 문자 알림을 받을 수 없어요.</p>
+          <p className={styles.note}>휴대폰 번호는 12월 7일 문샷 무료 라이브 당일 안내 문자 1회 발송에 사용해요. 브랜디액션은 신청 정보를 {arrivalLiveReminderRetentionLabel}까지 보관한 뒤 삭제해요. 문자를 발송하면 솔라피는 수신번호를 포함한 발송 기록을 발송일로부터 1년간 보관해요. 동의하지 않으면 문자 알림을 받을 수 없어요.</p>
           {message && <p id={errorId} className={styles.error} role="alert">{message}</p>}
           <div className={styles.actions}>
             <button type="submit">{submission === 'pending' ? '신청 중…' : '문자 알림 신청'}</button>

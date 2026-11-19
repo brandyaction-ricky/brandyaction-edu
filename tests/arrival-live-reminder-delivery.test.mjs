@@ -8,7 +8,7 @@ import ts from 'typescript';
 const event = 'moonshot-live-20261207';
 const startsAt = '2026-12-07T12:00:00Z';
 const proposedSendAt = '2026-12-07T11:30:00Z';
-const purgeAt = '2026-12-07T23:30:00+09:00';
+const purgeAt = '2026-12-10T23:59:00+09:00';
 const message = '검수 메시지';
 const consentVersion = 2;
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -100,7 +100,7 @@ function harness({recipientCount = 0, outcome = 'accepted', env = {}, publicatio
   };
   const modules = {
     'node:crypto': {createHmac, randomBytes, randomUUID},
-    './live-reminder-consent': {arrivalLiveReminderConsentVersion: consentVersion},
+    './live-reminder-consent': {arrivalLiveReminderConsentVersion: consentVersion, arrivalLiveReminderRetentionAt: purgeAt},
     './live-reminder-server': {
       arrivalLiveReminderEvent: {id: event},
       arrivalLiveReminderProduction: () => env.production !== false,
@@ -201,9 +201,11 @@ test('calling before the window, with production mismatch or with sending paused
   const wrongDate = harness({recipientCount: 2, publicationStarts: '2026-12-08T12:00:00Z'});
   await assert.rejects(wrongDate.runArrivalLiveReminderDelivery(() => Date.parse(proposedSendAt)), /time mismatch/);
   assert.equal(wrongDate.posts.length, 0);
-  const outsideCron = harness({env: {EDU_CAMPUS_ARRIVAL_REMINDER_PURGE_AT: '2026-12-08T09:00:00+09:00'}});
-  await assert.rejects(outsideCron.runArrivalLiveReminderDelivery(() => Date.parse(proposedSendAt)), /deletion time is not configured/);
-  assert.equal(outsideCron.calls.length, 0);
+  for (const invalidTime of ['', '2026-12-07T23:30:00+09:00', '2026-12-10T23:59:59+09:00', '2026-12-11T00:00:00+09:00']) {
+    const wrongDeadline = harness({env: {EDU_CAMPUS_ARRIVAL_REMINDER_PURGE_AT: invalidTime}});
+    await assert.rejects(wrongDeadline.runArrivalLiveReminderDelivery(() => Date.parse(proposedSendAt)), /deletion time is not configured/);
+    assert.equal(wrongDeadline.calls.length, 0);
+  }
   const wrongEnvironment = harness({recipientCount: 2, env: {production: false}});
   assert.deepEqual(await wrongEnvironment.runArrivalLiveReminderDelivery(() => Date.parse(proposedSendAt)), {state: 'disabled'});
   assert.equal(wrongEnvironment.calls.length, 0);
@@ -214,6 +216,19 @@ test('calling before the window, with production mismatch or with sending paused
   assert.deepEqual(await paused.runArrivalLiveReminderDelivery(() => followingYear), {state: 'disabled'});
   assert.deepEqual(await paused.runArrivalLiveReminderDelivery(() => followingYear, true), {state: 'purged', removed: 4, unclaimed: 0});
   assert.equal(paused.posts.length, 0);
+});
+
+test('the second cron date only purges once the approved retention deadline arrives', async () => {
+  const cron = JSON.parse(read('vercel.json')).crons.find(job => job.path === '/api/cron/moonshot-live-reminder');
+  assert.equal(cron.schedule, '* 11-15 7,10 12 *');
+  const h = harness({recipientCount: 3});
+  for (const time of ['2026-12-08T01:00:00+09:00', '2026-12-10T20:00:00+09:00', '2026-12-10T23:58:59+09:00']) {
+    assert.deepEqual(await h.runArrivalLiveReminderDelivery(() => Date.parse(time)), {state: 'waiting'});
+  }
+  assert.equal(h.calls.length, 0);
+  assert.deepEqual(await h.runArrivalLiveReminderDelivery(() => Date.parse(purgeAt)), {state: 'purged', removed: 4, unclaimed: 0});
+  assert.deepEqual(h.calls, ['edu_purge_campus_arrival_reminders']);
+  assert.equal(h.posts.length, 0);
 });
 
 test('the scheduled route checks CRON_SECRET and HEAD cannot dispatch', async () => {
