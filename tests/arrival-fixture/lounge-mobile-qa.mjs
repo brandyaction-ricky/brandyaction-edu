@@ -53,7 +53,7 @@ try {
       await expect(page.getByRole('dialog')).toHaveCount(0);
       const calendar = await hitTarget(loungeScheduleButton(page));
       const reminder = await hitTarget(page.getByRole('region', {name:'웰컴 라운지에서 할 수 있는 일'})
-        .getByRole('button', {name:'라이브 당일 문자 받기', exact:true}));
+        .getByRole('button', {name:'강의 알림 받기', exact:true}));
       expect(reminder.x).toBeGreaterThanOrEqual(calendar.x + calendar.width);
       expect(reminder.y).toBe(calendar.y);
       await expect(intro).toContainText('광고만 13년 했어요. 요즘은 AI 직원들이랑 일해요.');

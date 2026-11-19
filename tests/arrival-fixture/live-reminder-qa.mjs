@@ -26,11 +26,13 @@ if (preview) {
 
 const national = `010-0000-00${suffix}`;
 const digits = national.replace(/\D/g, '');
-const actions = ['캘린더에 추가', '라이브 당일 문자 받기'];
+const reminderLabel = '강의 알림 받기';
 const viewport = {width: 390, height: 690};
 const browser = await webkit.launch();
 
-async function openForm() {
+const action = (scope, name) => scope.getByRole('button', {name, exact: true});
+
+async function openLounge() {
   const page = await browser.newPage({...devices['iPhone 15'], viewport, locale: 'ko-KR'});
   const writes = [];
   const errors = [];
@@ -68,19 +70,25 @@ async function openForm() {
   expect(new URL(page.url()).origin).toBe(url.origin);
   const lounge = page.getByRole('region', {name: '웰컴 라운지에서 할 수 있는 일'});
   await expect(lounge.getByRole('button', {name: /무료 자료 받기|내 AI 체험으로/})).toHaveCount(0);
-  for (const name of actions) {
-    await expect(lounge.getByRole('button', {name, exact: true})).toBeInViewport({ratio: .95});
-  }
-  const calendar = lounge.getByRole('button', {name: actions[0], exact: true});
-  const reminder = lounge.getByRole('button', {name: actions[1], exact: true});
+  const calendar = action(lounge, '캘린더에 추가');
+  const reminder = action(lounge, reminderLabel);
+  await expect(calendar).toBeInViewport({ratio: .95});
+  await expect(reminder).toBeInViewport({ratio: .95});
   const [calendarBox, reminderBox] = await Promise.all([calendar.boundingBox(), reminder.boundingBox()]);
   expect(reminderBox.x).toBeGreaterThanOrEqual(calendarBox.x + calendarBox.width);
   expect(reminderBox.y).toBe(calendarBox.y);
   expect(reminderBox.height).toBeGreaterThanOrEqual(44);
-  await reminder.tap();
+  const schedule = page.getByRole('region', {name: '캠퍼스 체험 안내'});
+  return {page, lounge, schedule, calendar, reminder, writes, errors};
+}
+
+async function checkOpenForm(visit) {
+  const {page, schedule} = visit;
+  await expect(schedule.getByRole('link', {name: 'Google 캘린더', exact: true})).toBeVisible();
+  await expect(action(schedule, reminderLabel)).toHaveAttribute('aria-expanded', 'true');
   const phone = page.getByRole('textbox', {name: '휴대폰 번호', exact: true});
   const consent = page.getByRole('checkbox', {name: '라이브 당일 안내 문자 1회 수신에 동의합니다.', exact: true});
-  const submit = page.getByRole('button', {name: '문자 알림 신청', exact: true});
+  const submit = action(page, '문자 알림 신청');
   await expect(phone).toBeVisible();
   await expect(phone).toHaveAttribute('type', 'tel');
   await expect(phone).toHaveAccessibleDescription('010-0000-0000과 01000000000 모두 가능해요.');
@@ -88,7 +96,36 @@ async function openForm() {
   await expect(consent).not.toBeChecked();
   await expect(page.getByRole('checkbox')).toHaveCount(1);
   await expect(submit).toBeVisible();
-  return {page, phone, consent, submit, writes, errors};
+  return {...visit, phone, consent, submit};
+}
+
+async function returnToLounge({page, lounge}) {
+  await action(page, '공간 둘러보기').tap();
+  await expect(lounge).toBeVisible();
+}
+
+async function openTeam({page}) {
+  const world = page.frameLocator('iframe[title*="직원 사무실"]');
+  await world.getByRole('button', {name: /퇴사선배 윤익 · 브랜디액션/}).tap();
+  const team = page.getByRole('dialog', {name: '퇴사선배 윤익 · 브랜디액션 팀', exact: true});
+  await expect(team).toBeVisible();
+  return team;
+}
+
+async function openPerks({page}) {
+  const world = page.frameLocator('iframe[title*="직원 사무실"]');
+  await world.getByRole('button', {name: /자료 안내/}).tap();
+  const perks = page.getByRole('dialog', {name: '무료자료 · 라이브 특전', exact: true});
+  await action(perks, '라이브 특전').tap();
+  await expect(perks.getByText(/라이브에서 비밀번호를 공개합니다/)).toBeVisible();
+  return perks;
+}
+
+async function openReminderFromGuide(visit, openGuide) {
+  const guide = await openGuide(visit);
+  await action(guide, reminderLabel).tap();
+  await expect(guide).toBeHidden();
+  return checkOpenForm(visit);
 }
 
 async function send(form, status) {
@@ -118,7 +155,22 @@ function verifyWrites(form, expectedPosts) {
 }
 
 try {
-  const first = await openForm();
+  const visit = await openLounge();
+  await visit.reminder.tap();
+  await checkOpenForm(visit);
+  await returnToLounge(visit);
+
+  await visit.calendar.tap();
+  await expect(visit.schedule.getByRole('link', {name: 'Google 캘린더', exact: true})).toBeVisible();
+  const inline = action(visit.schedule, reminderLabel);
+  await expect(inline).toHaveAttribute('aria-expanded', 'false');
+  await inline.tap();
+  await checkOpenForm(visit);
+  await returnToLounge(visit);
+
+  await openReminderFromGuide(visit, openTeam);
+  await returnToLounge(visit);
+  const first = await openReminderFromGuide(visit, openPerks);
   if (await first.submit.isEnabled()) await first.submit.tap();
   expect(first.writes).toEqual([]);
   await first.phone.fill(preview ? national : '123');
@@ -135,11 +187,27 @@ try {
     await expect(first.consent).toBeChecked();
   }
   await send(first, 200);
+  await expect(action(first.schedule, reminderLabel)).toHaveCount(0);
+  await returnToLounge(first);
+  await expect(first.lounge.getByRole('status').filter({hasText: '문자 알림 신청 완료'})).toBeVisible();
+  await expect(first.reminder).toHaveCount(0);
+  for (const openGuide of [openTeam, openPerks]) {
+    const guide = await openGuide(first);
+    await expect(guide.getByText('알림 신청 완료', {exact: true})).toBeVisible();
+    await expect(action(guide, reminderLabel)).toHaveCount(0);
+    await action(guide, '라운지로 돌아가기').tap();
+    await expect(guide).toBeHidden();
+  }
+  await first.calendar.tap();
+  await expect(first.schedule.getByRole('status').filter({hasText: successMessage})).toBeVisible();
+  await expect(action(first.schedule, reminderLabel)).toHaveCount(0);
   verifyWrites(first, preview ? 1 : 3);
   await first.page.close();
 
   if (preview) {
-    const repeated = await openForm();
+    const repeatVisit = await openLounge();
+    await repeatVisit.reminder.tap();
+    const repeated = await checkOpenForm(repeatVisit);
     await repeated.phone.fill(digits);
     await repeated.consent.check();
     await send(repeated, 200);
@@ -147,7 +215,7 @@ try {
     await repeated.page.close();
   }
 
-  console.log(JSON.stringify({engine: browser.browserType().name(), viewport, mode: preview ? 'preview API' : 'mocked fixture', consentDefaultsOff: true, missingFieldsBlocked: true, freshContexts: preview ? 2 : 1, successPosts: preview ? 2 : 1, invalidAndRetry: !preview, clientWritesOnlyReminder: true}));
+  console.log(JSON.stringify({engine: browser.browserType().name(), viewport, mode: preview ? 'preview API' : 'mocked fixture', entryPoints: ['lounge', 'calendar', 'team', 'perks'], sharedCompletion: true, consentDefaultsOff: true, missingFieldsBlocked: true, freshContexts: preview ? 2 : 1, successPosts: preview ? 2 : 1, invalidAndRetry: !preview, clientWritesOnlyReminder: true}));
 } finally {
   await browser.close();
 }

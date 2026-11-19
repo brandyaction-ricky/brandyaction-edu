@@ -12,7 +12,7 @@ import {TeamLeader} from './team-leader';
 import entryStyle from './office-entry.module.css';
 import progression from './progression.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
-import {LiveReminder} from './live-reminder';
+import {LIVE_REMINDER_LABEL, LiveReminder} from './live-reminder';
 import {VisitorAvatar} from './visitor-avatar';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
 import {officeCaseContent, officeCaseRevision} from './office-demo-case';
@@ -299,7 +299,14 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function openLobbyGuide(guide: OnboardingGuide, trigger: HTMLButtonElement | null = null) {
     lobbyGuideTrigger.current = trigger;
+    setReminderOpen(false);
     setLobbyGuide(guide);
+  }
+  function leaveGuideForLive(action: () => void) {
+    lobbyDialog.current?.close();
+    lobbyGuideTrigger.current = null;
+    setLobbyGuide(null);
+    action();
   }
   function closeLobbyGuide() {
     lobbyDialog.current?.close();
@@ -313,7 +320,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     });
   }
   function openHallSchedule() {
-    focusHallSchedule.current = true;
+    if (exploringHall) focusHallSchedule.current = true;
+    else heading.current?.focus({preventScroll: true});
     setReminderOpen(false);
     setExplore(false);
   }
@@ -623,7 +631,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>캘린더에 추가</button>
           {showLiveReminder && (reminderRegistered
             ? <span className={entryStyle.hallReminderDone} role="status"><Check size={15} aria-hidden="true"/>문자 알림 신청 완료</span>
-            : <button type="button" aria-controls="arrival-content" onClick={openHallReminder}><MessageSquare size={16} aria-hidden="true"/>라이브 당일 문자 받기</button>)}
+            : <button type="button" aria-controls="arrival-content" onClick={openHallReminder}><MessageSquare size={16} aria-hidden="true"/>{LIVE_REMINDER_LABEL}</button>)}
         </div>
         <div className={entryStyle.hallLinks}>
           {caseVisited ? <button type="button" onClick={returnToCorridor}><ArrowLeft size={15} aria-hidden="true"/>복도로 돌아가기</button>
@@ -641,7 +649,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? onboardingGuideTitle(lobbyGuide, config) : undefined}
       onCancel={event => {event.preventDefault(); closeLobbyGuide();}}>
       {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} weekday={weekday} timeLabel={timeLabel} onContentReplay={openContentReplay}
-        onOpenSchedule={() => {lobbyDialog.current?.close(); lobbyGuideTrigger.current = null; setLobbyGuide(null); openHallSchedule();}}
+        onOpenSchedule={() => leaveGuideForLive(openHallSchedule)}
+        reminder={showLiveReminder ? {registered: reminderRegistered, open: () => leaveGuideForLive(openHallReminder)} : undefined}
         onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')}/>}
     </dialog>
     <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>

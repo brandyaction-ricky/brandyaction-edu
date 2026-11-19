@@ -1,4 +1,4 @@
-import {mountWelcomeOnboardingLobby} from './welcome-onboarding-lobby.mjs';
+import {buildWelcomeGuideRobot, mountWelcomeOnboardingLobby} from './welcome-onboarding-lobby.mjs';
 
 /** Four stops line the corridor to the welcome lounge. */
 const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '', '내 AI 체험', '웰컴 라운지'];
@@ -313,18 +313,24 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       // Mounted colour samples make this the production studio.
       for(let i=0;i<4;i++) box(g,-2.20+i*.4,1.54,-6.46,.34,.53,.035,[sand,red,green,blue][i]);
       round(g,1.4,1.1,-2.93,.25,.12,.25,red);
-    }else if(index===3){
+    }else if(index===canonIndex){
       shelf(g,-1.42,-5.46);
       shelf(g,1.10,-5.46);
       box(g,-.22,.68,-3.07,2.42,.12,.82,wood);
       for(const x of [-1.14,.70]) box(g,x,.33,-3.07,.12,.65,.67,steel,'metal');
+      const guideRobot = groupAt(g,-1.02,0,-3.30);
+      guideRobot.name = 'canon-guide';
+      buildWelcomeGuideRobot(
+        (color,x,y,z,w,h,d) => box(guideRobot,x,y,z,w,h,d,color),
+        (color,x,y,z,w,h,d) => ball(guideRobot,x,y,z,w,h,d,color),
+        {white:0xf4f4ed, navy, face:0xc3edf0, accent:blue},
+      );
       // Open source binder and upright original-materials sign on the reading table.
       box(g,-.49,.77,-3.02,.91,.055,.52,blue,'matte',-.06);
       for (const x of [-.71,-.28]) box(g,x,.808,-3.01,.42,.018,.48,pearl);
       for (let row=0;row<3;row++) box(g,-.69,.822,-3.12+row*.072,.25,.012,.017,steel);
       box(g,.55,.98,-3.17,.84,.53,.06,navy);
       label(g,'원본 자료',.55,.98,-3.129,.78,.45,'#263f56','#ffffff');
-
     }
   }
 

@@ -1,7 +1,8 @@
 import {useId, useRef, useState, type SyntheticEvent} from 'react';
-import {ArrowLeft, ArrowRight, CalendarDays, ChevronDown, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
+import {ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Download, ExternalLink, LockKeyhole, MessageSquare, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
+import {LIVE_REMINDER_LABEL} from './live-reminder';
 import monitor from './office-demo.module.css';
 import progression from './progression.module.css';
 import styles from './onboarding-program.module.css';
@@ -31,6 +32,21 @@ const guides = [
   {id:'guide', title:'작업별 AI 활용 가이드', description:'지금 맡기고 싶은 일부터 골라 AI 쓰는 방법을 확인해보세요.', href:'https://edu.brandyaction.com/guide'},
 ] as const;
 
+const liveBonuses = [
+  {
+    title: 'YC 대표 Garry Tan의 AI 개발팀 플레이북',
+    description: 'Claude Code 하나로 기획자, 설계자, 코드 리뷰어, QA 담당자의 역할을 나누는 법. 아이디어 검토부터 출시까지 Garry Tan이 공개한 작업 순서를 살펴보세요.',
+  },
+  {
+    title: '내 사업에서 AI에게 처음 맡길 일을 찾는 리포트',
+    description: '지금 하는 일 중 AI로 덜어낼 업무를 찾고, 어디서부터 시작할지 정리해 보세요.',
+  },
+  {
+    title: '메타 광고에 Claude를 연결하는 실전 가이드',
+    description: '메타 광고 업무에 Claude를 쓰려면 무엇을 연결하고 어떻게 설정해야 하는지 순서대로 확인하세요.',
+  },
+] as const;
+
 function toggleMeetupVideo(event: SyntheticEvent<HTMLDetailsElement>) {
   const details = event.currentTarget;
   const video = details.querySelector('video');
@@ -43,7 +59,7 @@ function MaterialCover({id}: {id: 'ad' | 'guide' | 'blueprint'}) {
   return <img className={styles.cover} src={`/campus/arrival/material-${id}.webp`} width={480} height={270} alt="" loading={id === 'blueprint' ? 'eager' : 'lazy'} decoding="async"/>;
 }
 
-export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel, onContentReplay, onClose, onOpenMaterials, onOpenSchedule}: {
+export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel, onContentReplay, onClose, onOpenMaterials, onOpenSchedule, reminder}: {
   guide: OnboardingGuide;
   config: ArrivalConfig;
   dateLabel: string;
@@ -53,6 +69,7 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
   onClose: () => void;
   onOpenMaterials: () => void;
   onOpenSchedule: () => void;
+  reminder?: {registered: boolean; open: () => void};
 }) {
   const [materialsTab, setMaterialsTab] = useState<'free' | 'bonus'>('free');
   const [playGreeting, setPlayGreeting] = useState(false);
@@ -60,6 +77,7 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
   const titleId = useId();
   const greeting = youtubeVideoId(config.videoUrl);
   const isMaterials = guide === 'materials';
+  const isBonus = isMaterials && materialsTab === 'bonus';
   const [teamLead, ...teamParagraphs] = config.teamIntro?.split(/\n\s*\n/) ?? [];
 
   function selectMaterials(tab: 'free' | 'bonus') {
@@ -98,14 +116,12 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
           </div>
           {config.handoutLabel && config.handoutUrl && <div className={styles.more}><a href={config.handoutUrl} target="_blank" rel="noopener noreferrer">{config.handoutLabel}<ExternalLink size={15} aria-hidden="true"/></a></div>}
         </> : <>
-          <p className={styles.lockNote}><LockKeyhole size={17} aria-hidden="true"/>{dateLabel} {timeLabel} 라이브에서 비밀번호를 공개합니다.</p>
-          <ul className={styles.bonuses}>
-            <li>내 사업에 딱 맞춘 AI 활용 리포트</li>
-            <li>메타 × 클로드 세팅 가이드</li>
-            <li>Garry Tan Skills 자료</li>
+          <h3>라이브에서 받는 AI 실전 자료 3종</h3>
+          <ul className={styles.bonuses} role="list">
+            {liveBonuses.map(({title, description}) => <li key={title}><h4>{title}</h4><p>{description}</p></li>)}
           </ul>
+          <p className={styles.lockNote}><LockKeyhole size={17} aria-hidden="true"/>{dateLabel} {timeLabel} 라이브에서 비밀번호를 공개합니다.</p>
           {config.bonusPreview && <p>{config.bonusPreview}</p>}
-          <button type="button" className={styles.guideButton} onClick={onOpenSchedule}><CalendarDays size={16} aria-hidden="true"/>캘린더에 추가</button>
         </>}
       </section> : <section className={styles.profile}>
         <p className={styles.role}>13년차 퍼포먼스 마케터 · 브랜디액션 CMO</p>
@@ -149,6 +165,13 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
         </section>}
       </section>}
     </div>
-    {!isMaterials && <footer className={monitor.footer}><button type="button" className={progression.nextAction} onClick={onOpenMaterials}>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></button></footer>}
+    {(!isMaterials || isBonus) && <footer className={`${monitor.footer} ${styles.footer}`}>
+      {reminder && (reminder.registered
+        ? <span className={styles.reminderDone} role="status"><Check size={16} aria-hidden="true"/>알림 신청 완료</span>
+        : <button type="button" className={progression.nextAction} onClick={reminder.open}><MessageSquare size={16} aria-hidden="true"/>{LIVE_REMINDER_LABEL}</button>)}
+      <button type="button" className={reminder ? styles.footerSecondary : progression.nextAction} onClick={isBonus ? onOpenSchedule : onOpenMaterials}>
+        {isBonus ? <><CalendarDays size={16} aria-hidden="true"/>캘린더에 추가</> : <>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></>}
+      </button>
+    </footer>}
   </section>;
 }

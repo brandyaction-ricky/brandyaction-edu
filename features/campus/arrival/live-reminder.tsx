@@ -2,6 +2,8 @@ import {useEffect, useId, useRef, useState, type FormEvent} from 'react';
 import {Check, ChevronDown, MessageSquare} from 'lucide-react';
 import styles from './live-reminder.module.css';
 
+export const LIVE_REMINDER_LABEL = '강의 알림 받기';
+
 const errors = {
   invalid: '휴대폰 번호를 확인해 주세요.',
   closed: '라이브 문자 알림 신청이 마감됐어요.',
@@ -75,7 +77,7 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
         onOpenChange(!open);
       }}>
       <MessageSquare size={17} aria-hidden="true"/>
-      라이브 당일 문자 받기
+      {LIVE_REMINDER_LABEL}
       <ChevronDown className={styles.chevron} size={16} aria-hidden="true"/>
     </button>
     <div id={panelId} hidden={!open}>
