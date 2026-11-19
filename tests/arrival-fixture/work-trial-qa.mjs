@@ -49,7 +49,7 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
     await page.getByRole('button',{name:'첫 답변을 받았어요',exact:true}).click();
     await page.getByRole('textbox',{name:'내 말로 수정하기',exact:true}).fill('결정할 사항마다 선택지와 추가로 확인할 정보를 함께 보여줘. 확정된 사실과 제안을 구분해줘.');
     await capture('feedback');
-    await page.getByRole('button',{name:'피드백 반영 요청 복사',exact:true}).click();
+    await page.getByRole('button',{name:'고쳐 달라는 말 복사',exact:true}).click();
     const updated=await page.evaluate(()=>navigator.clipboard.readText());
     expect(updated).toContain('[피드백으로 보완한 기준]');expect(updated).toContain('선택지와 추가로 확인할 정보');expect(updated).toContain('신입 동료 안내자료');
     await page.getByRole('button',{name:'수정한 답변을 확인했어요',exact:true}).click();

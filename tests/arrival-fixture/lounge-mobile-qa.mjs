@@ -45,18 +45,49 @@ try {
       await expect(world).toHaveAttribute('data-free-roam', 'true');
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(loungeScheduleButton(page)).toBeInViewport({ratio:.95});
+      const freeButton = page.getByRole('button', {name:'무료 자료 열기', exact:true});
+      const confirmed = page.getByRole('button', {name:'일정 저장했어요 · 무료 자료 보기', exact:true});
+      const calendar = page.getByRole('link', {name:'Google 캘린더', exact:true});
+      await expect(freeButton).toHaveCount(0);
       const [a, b] = await Promise.all([hitTarget(materials), hitTarget(intro)]);
       const overlap = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
         Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
       expect(overlap).toBe(0);
       await capture('lounge');
 
-      if (viewport.width === 390) {
+      if (viewport.width === 430) {
+        await press(intro);
+        await press(team.getByRole('button', {name:'라이브 일정 저장', exact:true}));
+      } else if (viewport.width === 390) {
         // Touch the 3D materials guide's head through the canvas, below its speech bubble.
         const box = await floor.boundingBox();
         await page.touchscreen.tap(box.x + box.width * .25, box.y + box.height * .48);
       } else await press(materials);
+      await expect(guide).not.toBeVisible();
+      await expect(calendar).toBeVisible();
+      await expect(confirmed).toHaveCount(0);
+      await capture('calendar-choice');
+
+      if (desktop) {
+        await page.context().route('https://calendar.google.com/**', route => route.fulfill({body:'Calendar test'}));
+        const popup = page.waitForEvent('popup');
+        await press(calendar);
+        const external = await popup;
+        await expect(external).toHaveURL(/calendar\.google\.com\/calendar\/r\/eventedit/);
+        await external.close();
+      } else {
+        const pendingSchedule = page.waitForEvent('download');
+        await press(page.getByRole('button', {name:'아이폰·기타 캘린더', exact:true}));
+        const schedule = await pendingSchedule;
+        const content = await readFile(await schedule.path(), 'utf8');
+        expect(content).toContain('DTSTART:20261207T120000Z');
+      }
+      await expect(freeButton).toHaveCount(0);
+      await expect(confirmed).toBeInViewport({ratio:.95});
+      await capture('calendar-confirm');
+      await press(confirmed);
       await expect(guide).toBeVisible();
+      await expect(guide.getByRole('button', {name:'라이브 특전', exact:true})).toBeInViewport({ratio:.95});
       await expect.poll(() => guide.locator('img').first().evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
       await capture('materials');
       await expect(guide.getByRole('link', {name:/작업별 AI 활용 가이드/})).toHaveAttribute('href', 'https://edu.brandyaction.com/guide');
@@ -73,6 +104,7 @@ try {
       await expect(guide).toBeVisible();
       await press(guide.getByRole('button', {name:'라이브 특전', exact:true}));
       await expect(guide.getByText(/라이브에서 비밀번호를 공개합니다/)).toBeVisible();
+      await expect(guide.getByRole('link', {name:'회사 업무 기준표 받기', exact:true})).toHaveCount(0);
       await expect(guide.getByRole('listitem')).toHaveCount(3);
       await press(guide.getByRole('button', {name:'라운지로 돌아가기', exact:true}));
       await expect(guide).not.toBeVisible();
@@ -91,7 +123,7 @@ try {
         catch {return false;}
       });
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
-      await press(team.getByRole('button', {name:'무료자료 확인하러 가기', exact:true}));
+      await press(team.getByRole('button', {name:'무료 자료 보기', exact:true}));
       await expect(team).not.toBeVisible();
       await expect(guide.getByRole('heading', {name:'무료자료 · 라이브 특전', exact:true})).toBeFocused();
       await expect(guide.getByRole('button', {name:'무료자료', exact:true})).toHaveAttribute('aria-pressed', 'true');
@@ -102,6 +134,9 @@ try {
       await capture('materials-from-team');
       await press(guide.getByRole('button', {name:'라운지로 돌아가기', exact:true}));
       await expect(world).toHaveAttribute('data-paused', 'false');
+      await page.reload();
+      await expect(freeButton).toBeVisible();
+      await expect(loungeScheduleButton(page)).toHaveText('일정 다시 보기');
       await openLoungeSchedule(page);
       expect(errors).toEqual([]);
       console.log(JSON.stringify({viewport, overlap, pick3d:viewport.width===390, videoPlayed, errors}));

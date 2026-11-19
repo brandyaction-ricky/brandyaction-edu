@@ -7,7 +7,12 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
   try {
     const size = mobile ? {width: 393, height: 852} : {width: 1280, height: 820};
     const page = await browser.newPage({viewport:size, isMobile:mobile, hasTouch:mobile});
-    await page.clock.setFixedTime(new Date('2026-11-18T12:00:00Z'));
+    await page.addInitScript(() => {
+      const NativeDate = Date;
+      window.Date = class extends NativeDate {
+        constructor(...args) {super(...(args.length ? args : ['2026-11-18T12:00:00Z']));}
+      };
+    });
     await page.route('**/welcome-walk.mjs', async route => {
       const response = await route.fetch();
       const script = await response.text();
@@ -74,7 +79,7 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     if (mobile) await desk.tap();
     else await desk.click();
     const canon = page.getByRole('dialog');
-    await expect(canon.getByRole('heading',{name:'같은 기준을 읽은 두 직원의 결과'})).toBeVisible();
+    await expect(canon.getByRole('heading',{name:'두 직원이 이렇게 다시 썼어요'})).toBeVisible();
     await canon.getByRole('button',{name:'웰컴 라운지로 가기',exact:true}).click();
     const hallTravel = page.locator('#arrival-desk-button');
     await hallTravel.click();

@@ -194,8 +194,9 @@ test('leaving for personal AI restores the real drafts and self-reported checks 
     allMax.companyRule = 0;
     allMax.consentedCompanyRule = unit.repeat(240);
     allMax.extra = unit.repeat(300);
-    allMax.contentDraft = {inputs: {product: unit.repeat(300), competitor: unit.repeat(1200), customer: unit.repeat(400), facts: unit.repeat(1800)}, requestReady: true};
-    assert.ok(JSON.stringify(allMax).length < model.ARRIVAL_STORAGE_LIMIT);
+    allMax.contentDraft = {path:'experience', inputs:{product:unit.repeat(300), competitor:unit.repeat(1200), customer:unit.repeat(400), facts:unit.repeat(1800)}, requestReady:true, experience:unit.repeat(800), experienceRequestReady:true};
+    const storedLength = JSON.stringify(allMax).length;
+    assert.ok(storedLength < model.ARRIVAL_STORAGE_LIMIT, `browser snapshot ${storedLength} exceeds ${model.ARRIVAL_STORAGE_LIMIT}`);
     assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(allMax)), allMax, 'maximum valid state fits the browser storage boundary');
   }
 });

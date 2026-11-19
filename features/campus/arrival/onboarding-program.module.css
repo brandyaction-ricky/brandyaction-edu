@@ -2,7 +2,7 @@
 .title:focus { outline: none; }
 .body { overflow-anchor: none; -webkit-overflow-scrolling: touch; }
 .body h3 { margin: 0 0 16px; font-size: 20px; line-height: 1.4; letter-spacing: -.02em; }
-.switcher { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0 12px; border-bottom: 1px solid var(--line, #e2e5e9); }
+.switcher { display: flex; flex-wrap: wrap; flex: 0 0 auto; gap: 14px; padding-inline: 20px; border-bottom: 1px solid var(--line, #e2e5e9); }
 .switcher button {
   min-height: 44px; padding: 0 5px; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
   background: transparent; color: var(--muted, #565e68); font-size: 14px; font-weight: 650;
@@ -11,20 +11,21 @@
 .worksheet { padding: 18px; border: 1px solid #d9e1eb; border-radius: 10px; background: #f5f8fc; }
 .worksheet h4 { margin: 0 0 4px; font-size: 18px; line-height: 1.45; letter-spacing: -.025em; }
 .body .worksheet p, .body .next p, .body .teamExample p { color: var(--muted, #565e68); font-size: 14px; line-height: 1.55; }
-.body .worksheet .sampleLabel { margin-top: 13px; color: #294769; font-size: 12px; font-weight: 700; }
-.sample { display: grid; margin: 4px 0 14px; padding: 0 12px; border: 1px solid #dce4ee; border-radius: 8px; background: #fff; }
+.worksheetExample { margin-top: 6px; }
+.worksheetExample summary { min-height: 44px; padding-block: 11px; color: #294769; font-size: 14px; font-weight: 650; cursor: pointer; }
+.sample { display: grid; margin: 0; padding: 0 12px; border: 1px solid #dce4ee; border-radius: 8px; background: #fff; }
 .sample div { padding: 9px 0; }
 .sample div + div { border-top: 1px solid #e2e7ee; }
 .sample dt { color: #294769; font-size: 12px; font-weight: 700; }
 .sample dd { margin: 2px 0 0; font-size: 14px; line-height: 1.5; }
 .body .worksheet a {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 7px 13px;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 10px; padding: 7px 13px;
   border: 1px solid transparent; border-radius: 7px; background: #173b69; color: #fff; font-size: 14px; font-weight: 650; text-decoration: none;
 }
 .body .worksheet a:hover { background: #102c4f; color: #fff; }
 .worksheet a:focus-visible { outline: 3px solid var(--ba-info, #315e8b); outline-offset: 3px; }
 .next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 15px; margin: 11px 0 0; }
-.cards { display: grid; gap: 12px; }
+.cards { display: grid; gap: 12px; margin-top: 16px; }
 .card {
   display: grid; grid-template-columns: minmax(0, 32%) minmax(0, 1fr); align-items: center; gap: 16px;
   padding: 12px; border: 1px solid var(--line, #e2e5e9); border-radius: 10px;
@@ -56,5 +57,5 @@
   .title { font-size: 15px; }
   .worksheet { padding: 14px; }
   .teamExample { grid-template-columns: minmax(0, 1fr); }
-  .teamVideo { justify-self: center; width: min(100%, 210px, 25vh); }
+  .teamVideo { justify-self: center; width: min(100%, 224px, 38dvh); }
 }

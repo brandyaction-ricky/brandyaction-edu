@@ -67,7 +67,7 @@ try {
     }
     async function inspectLeader(guide) {
       const intro = guide.getByRole('heading', {name:'팀장의 첫 업무 보고', exact:true});
-      const start = button(guide,'텔레그램 시연 보기');
+      const start = button(guide,'텔레그램 영상 보기');
       const next = teamLeaderNext(guide);
       const video = guide.locator('video');
       const fullscreen = button(guide,'전체 화면');
@@ -170,7 +170,7 @@ try {
           await expect(dialog).not.toBeVisible();
           await walk(2);
         }
-        await expect(conversation).toContainText('우리 브랜드에 활용할 기회를 찾아드립니다.');
+        await expect(conversation).toContainText('우리 광고에서 고객에게 더 알려줄 점을 찾아요.');
         await expect(dialog.getByRole('textbox')).toHaveCount(0);
         await expect(reviews).toHaveCount(0);
         // Dispatch a duplicate tap before React commits the next phase.
@@ -213,14 +213,14 @@ try {
         await video.evaluate(element => {element.currentTime = 9.2;});
         await expect(film.getByText('사용 전, 제품의 사용 가이드를 확인하세요.', {exact:true})).toBeVisible();
 
-        await dialog.getByText('내 상품으로도 해보기', {exact:true}).click();
-        const create = button(dialog,'프롬프트 만들기');
-        const copy = button(dialog,'프롬프트 복사');
+        await expect(button(dialog,'소개할 상품이 있어요')).toHaveAttribute('aria-pressed', 'true');
+        const create = button(dialog,'AI에 보낼 말 만들기');
+        const copy = button(dialog,'보낼 말 복사');
         const ownInputs = [
           [/상품·서비스/, '검수용 반려동물 방문 사진'],
           [/비교할 경쟁사/, '검수용 A 사진팀'],
           [/어떤 고객/, '낯선 스튜디오에서 긴장하는 반려견 보호자'],
-          [/고객 질문과 실제 상품/, '예약 전 실제 포트폴리오를 보여드립니다.'],
+          [/고객이 자주 묻는 것과 우리 상품의 특징/, '예약 전 실제 포트폴리오를 보여드립니다.'],
         ];
         await expect(create).toBeDisabled();
         const firstField = dialog.getByRole('textbox', {name:ownInputs[0][0]});
@@ -228,8 +228,8 @@ try {
         await expect(create).toBeDisabled();
         for (const [name, value] of ownInputs) await dialog.getByRole('textbox', {name}).fill(value);
         await create.click();
-        await dialog.getByText('프롬프트 보기', {exact:true}).click();
-        const prompt = dialog.getByRole('textbox', {name:'생성한 프롬프트'});
+        await dialog.getByText('보낼 말 보기', {exact:true}).click();
+        const prompt = dialog.getByRole('textbox', {name:'AI에 보낼 말'});
         const generated = await prompt.inputValue();
         for (const [, value] of ownInputs) expect(generated).toContain(value);
         for (const requirement of ['실제로 읽은 자료의 URL', '웹이나 일부 자료를 열 수 없으면', '첫 3초', '장면표', '공개 전에 검수']) expect(generated).toContain(requirement);
@@ -244,15 +244,15 @@ try {
         await expect(copy).toHaveCount(0);
         await button(dialog,'마스크팩 예시 넣기').click();
         await create.click();
-        await dialog.getByText('프롬프트 보기', {exact:true}).click();
+        await dialog.getByText('보낼 말 보기', {exact:true}).click();
         await expect(prompt).toHaveValue(/검색하거나 실제 조사처럼 설명하지 말고/);
         expect(await prompt.inputValue()).not.toContain(ownInputs[0][1]);
       }
       if (station === 4) {
-        await dialog.getByText('회사 지식 지도와 대화 보기', {exact:true}).click();
-        const map = dialog.getByRole('region',{name:'회사 지식 지도'});
+        await dialog.getByText('직원들이 참고한 자료와 대화 보기', {exact:true}).click();
+        const map = dialog.getByRole('region',{name:'직원들이 함께 보는 자료'});
         await expect(map.getByRole('listitem')).toHaveCount(12);
-        await expect(map.getByRole('status')).toHaveText('아직 연결된 지식이 없어요.');
+        await expect(map.getByRole('status')).toHaveText('아직 직원들에게 알려준 내용이 없어요.');
         await capture('principle');
       }
     }
@@ -280,7 +280,7 @@ try {
         await button(page,'첫 답변을 받았어요').click();
         const note='결정이 필요한 내용을 먼저 보여주세요.';
         await page.getByRole('textbox',{name:'내 말로 수정하기'}).fill(note);
-        await button(page,'피드백 반영 요청 복사').click();
+        await button(page,'고쳐 달라는 말 복사').click();
         await button(page,'수정한 답변을 확인했어요').click();
         await button(page,'예시 메모 넣기').click();
         await page.reload();
@@ -305,7 +305,7 @@ try {
       const file=await readFile(await download.path(),'utf8');
       expect(download.suggestedFilename()).toMatch(/20261207\.ics$/);
       expect(file).toMatch(/DTSTART:20261207T120000Z/);
-      await expect(page.getByRole('status').filter({hasText:'일정 파일을 열고'})).toBeInViewport({ratio: 0.95});
+      await expect(page.getByRole('status').filter({hasText:'받은 파일을 열어'})).toBeInViewport({ratio: 0.95});
       await capture('hall');
       expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(errors).toEqual([]);

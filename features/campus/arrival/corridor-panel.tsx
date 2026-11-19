@@ -20,7 +20,7 @@ type Props = {
   revisit?: boolean;
 };
 
-const locations = {2: '경쟁사 스파이', 3: '콘텐츠 담당자', 4: '정본 · 회사 업무 기준'};
+const locations = {2: '경쟁사 스파이', 3: '콘텐츠 담당자', 4: '회사 업무 기준'};
 
 export function CorridorPanel({station, spyPhase, onSpyAdvance, contentDraft, onContentDraftChange, canonPhase, onCanonAdvance, onComplete, onClose, revisit = false}: Props) {
   const labelId = useId();

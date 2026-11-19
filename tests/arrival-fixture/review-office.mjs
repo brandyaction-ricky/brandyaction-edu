@@ -14,7 +14,7 @@ export async function resumeOfficeVisit(page, url, state) {
   await page.reload({waitUntil:'domcontentloaded'});
 }
 
-const nextDesk = ['이 질문을 광고에 반영하기', '정본에서 두 직원의 답 바꿔보기', '웰컴 라운지로 가기'];
+const nextDesk = ['이 질문을 광고에 반영하기', 'AI가 내 일을 기억하는 방법 보기', '웰컴 라운지로 가기'];
 
 export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 
@@ -45,7 +45,7 @@ export async function finishTeamLeaderVideo(guide) {
 }
 
 export function loungeScheduleButton(page) {
-  return page.getByRole('button', {name: /일정 저장$/});
+  return page.locator('#arrival-hall-schedule');
 }
 
 export async function openLoungeSchedule(page) {

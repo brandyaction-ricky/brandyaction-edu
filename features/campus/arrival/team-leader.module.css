@@ -141,6 +141,19 @@
   font-weight: 700;
 }
 .scene .cta:hover { filter: brightness(.92); }
+.scene .videoToggle[aria-expanded="false"] {
+  border-color: var(--ba-red, #bc2535);
+  background: var(--ba-red, #bc2535);
+  color: #fff;
+  font-weight: 700;
+}
+.scene .videoToggle[aria-expanded="false"]:hover { filter: brightness(.92); }
+.scene .videoToggle[aria-expanded="false"] + .cta {
+  border-color: var(--line, #e2e5e9);
+  background: var(--paper, #fff);
+  color: var(--ink, #161719);
+}
+.scene .videoToggle[aria-expanded="false"] + .cta:hover { background: var(--surface-subtle, #f5f6f7); filter: none; }
 .screening { margin-inline: auto; max-inline-size: 440px; }
 .screening h3 {
   margin: 0;

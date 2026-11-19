@@ -8,11 +8,15 @@ export type ContentStationInputs = {
 };
 
 export type ContentStationDraft = {
+  path: 'product' | 'experience';
   inputs: ContentStationInputs;
   requestReady: boolean;
+  experience: string;
+  experienceRequestReady: boolean;
 };
 
 export const CONTENT_STATION_LIMITS = {product: 300, competitor: 1200, customer: 400, facts: 1800} as const;
+export const CONTENT_EXPERIENCE_LIMIT = 800;
 
 const exampleSource = '가상 리뷰:';
 
@@ -26,14 +30,38 @@ export const CONTENT_STATION_EXAMPLE: ContentStationInputs = {
 export function parseContentStationDraft(value: unknown): ContentStationDraft {
   const draft = value && typeof value === 'object' && !Array.isArray(value) ? value as Partial<ContentStationDraft> : {};
   const source = draft.inputs;
-  const field = (key: keyof ContentStationInputs) => {
-    const value = source?.[key];
-    return typeof value === 'string'
-      ? value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, CONTENT_STATION_LIMITS[key])
-      : '';
-  };
+  const field = (key: keyof ContentStationInputs) => draftText(source?.[key], CONTENT_STATION_LIMITS[key]);
   const inputs = {product: field('product'), competitor: field('competitor'), customer: field('customer'), facts: field('facts')};
-  return {inputs, requestReady: draft.requestReady === true && contentStationReady(inputs)};
+  const experience = draftText(draft.experience, CONTENT_EXPERIENCE_LIMIT);
+  return {
+    path: draft.path === 'experience' ? 'experience' : 'product',
+    inputs,
+    requestReady: draft.requestReady === true && contentStationReady(inputs),
+    experience,
+    experienceRequestReady: draft.experienceRequestReady === true && Boolean(experience.trim()),
+  };
+}
+
+function draftText(value: unknown, limit: number): string {
+  return typeof value === 'string'
+    ? value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, limit)
+    : '';
+}
+
+export function buildContentExperiencePrompt(experience: string): string {
+  const subject = draftText(experience, CONTENT_EXPERIENCE_LIMIT).trim();
+  if (!subject) return '';
+
+  return `아직 팔 상품은 없고, 내가 해본 일로 첫 콘텐츠를 기획하고 싶어.
+
+[내가 해본 일]
+${subject}
+
+1. 내 경험과 비슷한 주제로 콘텐츠를 만드는 사람 2~3명을 찾아줘. 웹 검색이 가능하면 직접 확인한 게시물 링크와 제목을 적고, 각 게시물이 어떤 질문에 답하는지 짚어줘. 확인할 수 없는 이름이나 링크는 지어내지 말고 검색어와 찾아볼 곳을 알려줘.
+
+2. 실제로 확인한 사례에서 사람들이 궁금해할 질문을 뽑아줘. 사례를 볼 수 없었다면 추정이라고 표시하고, 내가 겪은 일로 직접 답할 수 있는 질문 하나를 골라줘.
+
+3. 그 질문으로 첫 콘텐츠를 기획해줘. 제목 하나, 첫 문장 하나, 본문에 담을 내용 세 가지를 순서대로 써줘. 내가 알려주지 않은 경험이나 성과는 만들지 말아줘. 꼭 필요한 정보가 빠졌다면 질문을 하나만 해줘.`;
 }
 
 export function contentStationReady(inputs: ContentStationInputs): boolean {

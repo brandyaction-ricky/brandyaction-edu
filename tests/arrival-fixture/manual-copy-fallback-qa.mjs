@@ -37,12 +37,12 @@ try {
       await page.goto(base + path, {waitUntil: 'domcontentloaded'});
       await finishOfficeReview(page, {inspect: async (station, dialog) => {
         if (station !== 3) return;
-        await dialog.getByText('내 상품으로도 해보기', {exact:true}).click();
+        await expect(dialog.getByRole('button', {name:'소개할 상품이 있어요', exact:true})).toHaveAttribute('aria-pressed', 'true');
         await dialog.getByRole('button', {name:'마스크팩 예시 넣기', exact:true}).click();
-        await dialog.getByRole('button', {name:'프롬프트 만들기', exact:true}).click();
-        await dialog.getByRole('button', {name:'프롬프트 복사', exact:true}).click();
-        await expect(dialog.getByRole('status')).toContainText('아래 요청문을 직접 복사해 주세요.');
-        const manualPrompt = dialog.getByRole('textbox', {name:'생성한 프롬프트', exact:true});
+        await dialog.getByRole('button', {name:'AI에 보낼 말 만들기', exact:true}).click();
+        await dialog.getByRole('button', {name:'보낼 말 복사', exact:true}).click();
+        await expect(dialog.getByRole('status')).toContainText('아래 내용을 직접 복사해 주세요.');
+        const manualPrompt = dialog.getByRole('textbox', {name:'AI에 보낼 말', exact:true});
         await expect(manualPrompt).toBeVisible();
         await expect(manualPrompt).toBeFocused();
         expect(await manualPrompt.evaluate(element => element.value.length > 0 && element.selectionStart === 0 && element.selectionEnd === element.value.length)).toBe(true);
@@ -56,7 +56,7 @@ try {
       await expect(step).toHaveAttribute('data-work-step', '2');
       const feedback = '확인된 사실과 제안을 구분하고, 결정할 사항마다 필요한 정보를 함께 보여줘.';
       await page.getByRole('textbox', {name: '내 말로 수정하기', exact: true}).fill(feedback);
-      await copyPromptAndConfirm('피드백 반영 요청 복사', '수정한 답변을 확인했어요');
+      await copyPromptAndConfirm('고쳐 달라는 말 복사', '수정한 답변을 확인했어요');
       await expect(step).toHaveAttribute('data-work-step', '3');
       await page.getByRole('button', {name: '예시 메모 넣기', exact: true}).click();
       await copyPromptAndConfirm('기준과 자료 함께 복사', '두 번째 답변을 받았어요');

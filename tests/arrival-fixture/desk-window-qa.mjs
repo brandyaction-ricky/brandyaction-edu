@@ -149,10 +149,9 @@ for (const {name, engine, viewport, mobile} of devices) {
     await capture('content-open');
     if (mobile) await page.setViewportSize({width: viewport.width, height: 380});
     const resizedContentHeight = await expectDeskVisible();
-    await expect(button(desk, '정본에서 두 직원의 답 바꿔보기')).toBeInViewport({ratio: .95});
+    await expect(button(desk, 'AI가 내 일을 기억하는 방법 보기')).toBeInViewport({ratio: .95});
     const product = desk.getByLabel(/^상품·서비스/);
-    await expect(product).toBeHidden();
-    await tap(desk.getByText('내 상품으로도 해보기', {exact: true}));
+    await expect(button(desk, '소개할 상품이 있어요')).toHaveAttribute('aria-pressed', 'true');
     const draft = '웰컴존 테스트용 노트북 거치대';
     await tap(product);
     await page.keyboard.insertText(draft);
@@ -174,7 +173,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     await openFromHost();
     await expectDeskVisible();
     await expect(product).toHaveValue(draft);
-    await tap(button(desk, '정본에서 두 직원의 답 바꿔보기'));
+    await tap(button(desk, 'AI가 내 일을 기억하는 방법 보기'));
     await expect(desk).not.toBeVisible();
     await walkTo(4);
     expect([...requestedPaths].some(path => path.includes('/vendor/assets/agents/'))).toBe(false);

@@ -155,7 +155,7 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
       </div>
       <footer className={styles.actions}>
         <button className={styles.videoToggle} type="button" aria-expanded={showVideo} aria-controls={bodyId} onClick={toggleVideo}>
-          {showVideo ? <><ArrowLeft size={16} aria-hidden="true"/>업무 보고로 돌아가기</> : <><Play size={16} aria-hidden="true"/>텔레그램 시연 보기</>}
+          {showVideo ? <><ArrowLeft size={16} aria-hidden="true"/>업무 보고로 돌아가기</> : <><Play size={16} aria-hidden="true"/>텔레그램 영상 보기</>}
         </button>
         <button type="button" className={styles.cta} onClick={() => leave(onComplete)}>경쟁사 스파이 만나기<ArrowRight size={17} aria-hidden="true"/></button>
       </footer>

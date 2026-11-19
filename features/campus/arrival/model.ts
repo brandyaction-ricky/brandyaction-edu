@@ -7,7 +7,7 @@ import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from '.
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
 // JSON can use six characters to escape one stored UTF-16 code unit.
-export const ARRIVAL_STORAGE_LIMIT = 100_000;
+export const ARRIVAL_STORAGE_LIMIT = 110_000;
 export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -24,6 +24,7 @@ export type ArrivalState = {
   visitorAvatar: VisitorAvatarId;
   proposalSent: boolean;
   hallReturnStep: PersonalTrialStep | null;
+  liveSchedule: {startsAt: string; phase: 'opened' | 'confirmed'} | null;
   version: 1;
   step: ArrivalStep;
   audience: Audience;
@@ -39,10 +40,10 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, liveSchedule: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
-export function startArrivalVisit({visitorAvatar, answers, revision, extra, contentDraft, workTrial}: ArrivalState): ArrivalState {
-  return {...initialArrivalState(), visitorAvatar, answers, revision, extra, contentDraft, workTrial};
+export function startArrivalVisit({visitorAvatar, answers, revision, extra, contentDraft, workTrial, liveSchedule}: ArrivalState): ArrivalState {
+  return {...initialArrivalState(), visitorAvatar, answers, revision, extra, contentDraft, workTrial, liveSchedule};
 }
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
@@ -94,6 +95,11 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     if (isVisitorAvatarId(value.visitorAvatar)) state.visitorAvatar = value.visitorAvatar;
     state.proposalSent = value.proposalSent === true;
     if (isPersonalTrialStep(value.hallReturnStep)) state.hallReturnStep = value.hallReturnStep;
+    const schedule = value.liveSchedule;
+    if (object(schedule) && (schedule.phase === 'opened' || schedule.phase === 'confirmed')
+      && typeof schedule.startsAt === 'string' && schedule.startsAt.length <= 35 && Number.isFinite(Date.parse(schedule.startsAt))) {
+      state.liveSchedule = {startsAt: schedule.startsAt, phase: schedule.phase};
+    }
     // Existing personal exercises and calendar drafts reopen at their own destination.
     if (state.step === 7) state.station = 7;
     else if (state.step !== 0) state.station = 6;

@@ -5,7 +5,7 @@ import {build} from 'esbuild';
 
 const entry = fileURLToPath(new URL('../features/campus/arrival/content-station-prompt.ts', import.meta.url));
 const {outputFiles} = await build({entryPoints: [entry], bundle: true, platform: 'node', format: 'esm', write: false});
-const {buildContentStationPrompt, parseContentStationDraft, reuseContentStationAnswers, CONTENT_STATION_EXAMPLE, CONTENT_STATION_LIMITS} =
+const {buildContentExperiencePrompt, buildContentStationPrompt, parseContentStationDraft, reuseContentStationAnswers, CONTENT_EXPERIENCE_LIMIT, CONTENT_STATION_EXAMPLE, CONTENT_STATION_LIMITS} =
   await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].contents).toString('base64'));
 
 const realInputs = {
@@ -38,16 +38,40 @@ test('fictional materials stay fictional after editing a different field', () =>
 
 test('content draft restores typed data and only resumes a generated request with all required inputs', () => {
   for (const requestReady of [true, false]) {
-    assert.deepEqual(parseContentStationDraft({inputs: realInputs, requestReady}), {inputs: realInputs, requestReady});
+    assert.deepEqual(parseContentStationDraft({inputs: realInputs, requestReady}), {
+      path:'product', inputs:realInputs, requestReady, experience:'', experienceRequestReady:false,
+    });
   }
   assert.deepEqual(parseContentStationDraft({
     inputs: {product: '  입력 중 ', competitor: null, customer: '고객'.repeat(240), facts: '두 줄\r\n이어서\u0000'},
     requestReady: true,
   }), {
     inputs: {product: '  입력 중 ', competitor: '', customer: '고객'.repeat(CONTENT_STATION_LIMITS.customer / 2), facts: '두 줄\n이어서'},
-    requestReady: false,
+    path: 'product', requestReady: false, experience: '', experienceRequestReady: false,
   });
   assert.equal(parseContentStationDraft({inputs: realInputs, requestReady: 'true'}).requestReady, false);
+});
+
+test('the first content plan only requires past experience and asks for examples with real sources', () => {
+  assert.equal(buildContentExperiencePrompt(' \n\t'), '');
+  const prompt = buildContentExperiencePrompt('  신규 입사자에게 업무를 알려줬어요.  ');
+  assert.match(prompt, /\[내가 해본 일\]\n신규 입사자에게 업무를 알려줬어요\./);
+  for (const instruction of ['2~3명', '직접 확인한 게시물 링크와 제목', '지어내지 말고 검색어', '추정이라고 표시', '제목 하나, 첫 문장 하나, 본문에 담을 내용 세 가지', '경험이나 성과는 만들지 말아줘']) {
+    assert.ok(prompt.includes(instruction));
+  }
+  assert.doesNotMatch(prompt, /반려동물 출장 사진 촬영|마스크팩/);
+});
+
+test('both content drafts survive with separate readiness and selection', () => {
+  assert.deepEqual(parseContentStationDraft({path:'experience', inputs:realInputs, requestReady:true,
+    experience:'했던 일\r\n정리\u0000', experienceRequestReady:true}), {
+    path:'experience', inputs:realInputs, requestReady:true, experience:'했던 일\n정리', experienceRequestReady:true,
+  });
+  assert.equal(parseContentStationDraft({experience:'경'.repeat(CONTENT_EXPERIENCE_LIMIT + 10)}).experience.length, CONTENT_EXPERIENCE_LIMIT);
+  assert.equal(parseContentStationDraft({path:'unknown'}).path, 'product');
+  for (const state of [{experience:'  \n', experienceRequestReady:true}, {experience:'경험', experienceRequestReady:'true'}]) {
+    assert.equal(parseContentStationDraft(state).experienceRequestReady, false);
+  }
 });
 
 test('business exercise can reuse relevant content fields without changing existing work or using sample research', () => {

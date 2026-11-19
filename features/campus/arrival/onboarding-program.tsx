@@ -1,4 +1,4 @@
-import {useId, useState} from 'react';
+import {useId, useRef, useState} from 'react';
 import {ArrowLeft, ArrowRight, CalendarDays, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
@@ -18,48 +18,57 @@ function MaterialCover({id}: {id: 'ad' | 'guide' | 'blueprint'}) {
   return <img className={styles.cover} src={`/campus/arrival/material-${id}.webp`} width={480} height={270} alt="" loading={id === 'blueprint' ? 'eager' : 'lazy'} decoding="async"/>;
 }
 
-export function OnboardingProgram({guide, config, dateLabel, onContentReplay, onClose, onOpenMaterials, onShowSchedule}: {
+export function OnboardingProgram({guide, config, dateLabel, materialsReady, onContentReplay, onClose, onContinue, onShowSchedule}: {
   guide: OnboardingGuide;
   config: ArrivalConfig;
   dateLabel: string;
+  materialsReady: boolean;
   onContentReplay: () => void;
   onClose: () => void;
-  onOpenMaterials: () => void;
+  onContinue: () => void;
   onShowSchedule?: () => void;
 }) {
   const [materialsTab, setMaterialsTab] = useState<'free' | 'bonus'>('free');
   const [playGreeting, setPlayGreeting] = useState(false);
+  const body = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const greeting = youtubeVideoId(config.videoUrl);
   const isMaterials = guide === 'materials';
+
+  function selectMaterials(tab: 'free' | 'bonus') {
+    setMaterialsTab(tab);
+    if (body.current) body.current.scrollTop = 0;
+  }
 
   return <section className={monitor.monitor} aria-labelledby={titleId}>
     <header className={monitor.header}>
       <h2 id={titleId} className={styles.title} tabIndex={-1}>{isMaterials ? guideTitles.materials : '강사와 팀 소개'}</h2>
       <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>라운지로 돌아가기</button>
     </header>
-    <div className={`${monitor.body} ${styles.body}`}>
+    {isMaterials && <div className={styles.switcher} role="group" aria-label="자료 유형">
+      <button type="button" aria-pressed={materialsTab === 'free'} onClick={() => selectMaterials('free')}>무료자료</button>
+      <button type="button" aria-pressed={materialsTab === 'bonus'} onClick={() => selectMaterials('bonus')}>라이브 특전</button>
+    </div>}
+    <div className={`${monitor.body} ${styles.body}`} ref={body}>
       {isMaterials ? <section aria-label="웰컴 라운지 안내">
-        <h3>라이브 전에 볼 자료</h3>
-        <article className={styles.worksheet}>
-          <h4>우리 회사 업무 기준표</h4>
-          <p>AI에게 맡길 일과 결과를 판단할 기준을 적어보세요. 소개글과 문의 답변에 같은 기준을 적용해볼 수 있어요.</p>
-          <p className={styles.sampleLabel}>작성 예시</p>
-          <dl className={styles.sample}>
-            <div><dt>오늘 AI에게 맡길 일 한 가지</dt><dd>다음 라이브를 소개하는 첫 문장과 신청 문의 답변 초안을 준비한다.</dd></div>
-            <div><dt>함께 지킬 기준 한 줄</dt><dd>기능 이름보다 고객이 받아볼 결과물을 먼저 보여준다.</dd></div>
-          </dl>
-          <a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16} aria-hidden="true"/>회사 업무 기준표 받기</a>
-        </article>
-        {onShowSchedule && <div className={styles.next}>
-          <p>{dateLabel} 라이브에서 이 기준을 AI 직원에게 적용하는 방법을 배워요.</p>
-          <button type="button" onClick={onShowSchedule}><CalendarDays size={16} aria-hidden="true"/>라이브 일정 저장하기</button>
-        </div>}
-        <div className={styles.switcher} role="group" aria-label="추가 자료 유형">
-          <button type="button" aria-pressed={materialsTab === 'free'} onClick={() => setMaterialsTab('free')}>무료자료</button>
-          <button type="button" aria-pressed={materialsTab === 'bonus'} onClick={() => setMaterialsTab('bonus')}>라이브 특전</button>
-        </div>
         {materialsTab === 'free' ? <>
+          <h3>라이브 전에 볼 자료</h3>
+          <article className={styles.worksheet}>
+            <h4>우리 회사 업무 기준표</h4>
+            <p>AI에게 맡길 일과 결과를 판단할 기준을 적어보세요. 소개글과 문의 답변에 같은 기준을 적용해볼 수 있어요.</p>
+            <a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16} aria-hidden="true"/>회사 업무 기준표 받기</a>
+            <details className={styles.worksheetExample}>
+              <summary>작성 예시 보기</summary>
+              <dl className={styles.sample}>
+                <div><dt>오늘 AI에게 맡길 일 한 가지</dt><dd>다음 라이브를 소개하는 첫 문장과 신청 문의 답변 초안을 준비한다.</dd></div>
+                <div><dt>함께 지킬 기준 한 줄</dt><dd>기능 이름보다 고객이 받아볼 결과물을 먼저 보여준다.</dd></div>
+              </dl>
+            </details>
+          </article>
+          {onShowSchedule && <div className={styles.next}>
+            <p>{dateLabel} 라이브에서 이 기준을 AI 직원에게 적용하는 방법을 배워요.</p>
+            <button type="button" onClick={onShowSchedule}><CalendarDays size={16} aria-hidden="true"/>일정 다시 보기</button>
+          </div>}
           <div className={styles.cards}>
             {guides.map(item => <article className={styles.card} key={item.id}>
               <MaterialCover id={item.id}/>
@@ -100,6 +109,6 @@ export function OnboardingProgram({guide, config, dateLabel, onContentReplay, on
         </section>}
       </section>}
     </div>
-    {!isMaterials && <footer className={monitor.footer}><button type="button" className={styles.guideButton} onClick={onOpenMaterials}>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></button></footer>}
+    {!isMaterials && <footer className={monitor.footer}><button type="button" className={styles.guideButton} onClick={onContinue}>{materialsReady ? '무료 자료 보기' : '라이브 일정 저장'}<ArrowRight size={16} aria-hidden="true"/></button></footer>}
   </section>;
 }

@@ -20,8 +20,8 @@ import theme from '../ui/theme.module.css';
 import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
-const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
-const invitations = ['팀장의 첫 업무 보고 보기', '경쟁사 스파이에게 가기', '콘텐츠 담당자에게 가기', '정본 보러 가기', '', '내 AI 체험 열기', '웰컴 라운지로 가기'] as const;
+const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
+const invitations = ['팀장의 첫 업무 보고 보기', '경쟁사 스파이에게 가기', '콘텐츠 담당자에게 가기', '회사 업무 기준 보러 가기', '', '내 AI 체험 열기', '웰컴 라운지로 가기'] as const;
 
 /** Optional [section] lines keep editable examples readable; other text stays literal. */
 function ResultExample({text}: {text: string}) {
@@ -114,6 +114,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   if (appliedRule) criteria.push({label: '내가 선택한 작성 기준', value: appliedRule});
   const event = arrivalLiveEvent(config);
   const calendarLink = googleCalendarUrl(event);
+  const schedulePhase = state.liveSchedule?.startsAt === event.startsAt ? state.liveSchedule.phase : null;
+  const materialsReady = !calendarLink || schedulePhase === 'confirmed';
   const date = new Date(config.startsAt);
   const dateLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',month:'long',day:'numeric'}).format(date);
   const timeLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',hour:'numeric',minute:'2-digit',hour12:true}).format(date).replace(/:(\d{2})$/, (_, minutes: string) => minutes === '00' ? '시' : `시 ${Number(minutes)}분`);
@@ -274,6 +276,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setRevisitContent(true);
   }
   function openLobbyGuide(guide: OnboardingGuide, trigger: HTMLButtonElement | null = null) {
+    if (guide === 'materials' && !materialsReady) {
+      showScheduleFromGuide();
+      return;
+    }
     lobbyGuideTrigger.current = trigger;
     setLobbyGuide(guide);
   }
@@ -382,7 +388,18 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     const url = URL.createObjectURL(new Blob([text], {type: 'text/calendar;charset=utf-8'}));
     const a = document.createElement('a'); a.href = url; a.download = `moonshot-live-${event.date.replaceAll('-', '')}.ics`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    setNotice('일정 파일을 열고 ‘추가’를 누르세요. 카톡에서 파일이 안 열리면 Safari로 이 페이지를 열어주세요.');
+    calendarOpened('받은 파일을 열어 ‘추가’를 누르세요. 카톡에서 파일이 안 열리면 Safari에서 열어보세요.');
+  }
+  function calendarOpened(instruction: string) {
+    if (event.startsAt && !materialsReady) update({liveSchedule: {startsAt: event.startsAt, phase: 'opened'}});
+    setNotice(instruction);
+  }
+  function confirmSchedule() {
+    if (!event.startsAt || schedulePhase !== 'opened') return;
+    update({liveSchedule: {startsAt: event.startsAt, phase: 'confirmed'}});
+    setNotice('');
+    setExplore(true);
+    setLobbyGuide('materials');
   }
   function reset() {
     if (menu.current) menu.current.open = false;
@@ -427,7 +444,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
             <p><strong>업무 기준</strong> 설명서에 적힌 사용 시간만 안내</p>
             <p><strong>광고·문의 답변</strong> “10~15분 뒤에 떼어 주세요.”</p>
           </div>
-          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>라운지에서 <strong>AI팀 설계도와 업무 기준표</strong>를 받아보세요.</span></p>
+          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>라운지에서 라이브 일정을 담고 <strong>AI팀 설계도와 업무 기준표</strong>를 받아보세요.</span></p>
         </> : <>
           <span>{nearStation === station ? '도착했어요' : '다음 목적지'}</span>
           <h1>{destination}</h1>
@@ -511,11 +528,14 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
             <p><strong>{dateLabel} {weekday}</strong><br/>{timeLabel} <small>한국 시간</small></p>
             {!exploringHall && event.startsAt && <LiveCountdown date={event.date} className={entryStyle.ticketCountdown}/>}
           </div>
-          <p className={s.calendarIntro}>내 자료로 업무 기준을 정하고, AI 직원에게 역할을 나눈 뒤 텔레그램으로 첫 업무를 맡기는 과정을 보여드립니다.</p>
           <p className={s.calendarIntro}>{config.liveUrl ? '캘린더에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 참여 링크는 카톡방에서 안내할 예정이에요.'}</p>
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
+          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div>
+            <p>내 자료로 업무 기준을 정하고, 텔레그램으로 AI 직원에게 첫 일을 맡기는 과정을 보여드려요.</p>
+            <p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p>
+          </div></details>
           <div className={entryStyle.scheduleActions}>
-            <button type="button" className={s.textButton} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={16} aria-hidden="true"/>무료 자료 열기</button>
+            {materialsReady && <button type="button" className={s.textButton} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={16} aria-hidden="true"/>무료 자료 열기</button>}
             <button type="button" className={s.textButton} onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
           </div>
         </>}
@@ -529,9 +549,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={s.primary} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
         {step === 5 && <button type="button" className={s.primary} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={18}/></button>}
         {step === 7 && <div className={s.calendarActions}>
-          <p className={s.calendarHint}>캘린더에 일정 추가</p>
-          <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => setNotice('Google 캘린더에서 ‘저장’을 눌러주세요.')}><CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={16} aria-hidden="true"/>아이폰·기타 캘린더<ArrowRight size={14} aria-hidden="true"/></button></div>
-          <p className={s.calendarInstruction} role="status">{notice || (config.endsAt ? '캘린더에서 ‘저장’ 또는 ‘추가’를 누르면 완료돼요.' : '시작 시각을 담았어요. 캘린더에서 ‘저장’ 또는 ‘추가’를 눌러주세요.')}</p>
+          <p className={s.calendarHint}>어떤 캘린더를 쓰세요?</p>
+          <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => calendarOpened('Google 캘린더에서 ‘저장’을 누른 뒤 이 화면으로 돌아오세요.')}><CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={16} aria-hidden="true"/>아이폰·기타 캘린더<ArrowRight size={14} aria-hidden="true"/></button></div>
+          <p className={s.calendarInstruction} role="status">{notice || (schedulePhase === 'opened' ? '캘린더에 일정을 추가했다면 아래 버튼을 눌러주세요.' : materialsReady ? '필요하면 일정을 다시 추가할 수 있어요.' : '일정을 추가하면 AI팀 설계도와 업무 기준표를 바로 볼 수 있어요.')}</p>
+          {schedulePhase === 'opened' && <button type="button" className={`${s.primary} ${s.confirmSchedule}`} onClick={confirmSchedule}>일정 저장했어요 · 무료 자료 보기<ArrowRight size={16} aria-hidden="true"/></button>}
         </div>}
       </footer>}
       </>}
@@ -547,12 +568,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </div>
       <div className={entryStyle.hallCard}>
         <div>
-          <h2>AI팀 설계도와 업무 기준표</h2>
-          <p>AI 직원에게 맡길 첫 업무와 지킬 기준을 적어보세요.</p>
+          <h2>{materialsReady ? 'AI팀 설계도와 업무 기준표' : `${dateLabel} ${timeLabel}, 무료 라이브`}</h2>
+          <p>{materialsReady ? 'AI 직원에게 맡길 첫 일과 지킬 기준을 적어보세요.' : '일정을 캘린더에 담고, AI팀 설계도와 업무 기준표를 받아보세요.'}</p>
         </div>
         <div className={entryStyle.hallActions}>
-          <button type="button" className={entryStyle.hallPrimary} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 열기</button>
-          <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>{dateLabel} {timeLabel} 일정 저장</button>
+          {materialsReady && <button type="button" className={entryStyle.hallPrimary} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 열기</button>}
+          {calendarLink && <button type="button" className={materialsReady ? undefined : entryStyle.hallPrimary} id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>{materialsReady ? '일정 다시 보기' : '라이브 일정 저장'}</button>}
         </div>
       </div>
       <div className={entryStyle.hallActions}>
@@ -575,7 +596,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? guideTitles[lobbyGuide] : undefined}
       onCancel={event => {event.preventDefault(); closeLobbyGuide();}}>
       {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} onContentReplay={openContentReplay}
-        onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')} onShowSchedule={showScheduleFromGuide}/>}
+        materialsReady={materialsReady} onClose={closeLobbyGuide} onContinue={() => openLobbyGuide('materials', lobbyGuideTrigger.current)}
+        onShowSchedule={calendarLink ? showScheduleFromGuide : undefined}/>}
     </dialog>
     <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>
       <header><h2>{config.title}</h2><button type="button" aria-label="소개 닫기" onClick={() => setIntroOpen(false)}><X size={20}/></button></header>
