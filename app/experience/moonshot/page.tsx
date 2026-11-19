@@ -6,6 +6,7 @@ import {arrivalLiveReminderEnabled, arrivalLiveReminderOpen} from '@/features/ca
 import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {slugPattern} from '@/features/campus/webinar/domain';
+import {arrivalPreviewClosed} from '@/features/campus/arrival/preview-gate';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic';
 export default async function Page({searchParams}: {searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   // This recruitment journey is approved for branch preview only. Merging it
   // must not silently open a new public route on the production site.
-  if (process.env.VERCEL_ENV === 'production' || process.env.NEXT_PUBLIC_APP_ENV === 'production') notFound();
+  if (arrivalPreviewClosed(process.env)) notFound();
   const {event} = await searchParams;
   if (event !== undefined) {
     if (typeof event !== 'string' || !slugPattern.test(event)) notFound();

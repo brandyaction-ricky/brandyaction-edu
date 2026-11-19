@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import * as previewGate from '../features/campus/arrival/preview-gate.ts';
 import ts from 'typescript';
 
 const source = await readFile('app/experience/moonshot/page.tsx', 'utf8');
@@ -9,6 +10,7 @@ function fixture(env = {}) {
   const arrival = {title:'관리자 모집 초안'};
   const jsx = (type, props) => ({type, props});
   const mocks = {
+    '@/features/campus/arrival/preview-gate': previewGate,
     'react/jsx-runtime': {jsx, jsxs:jsx}, 'next/link': {default:'link'},
     'next/navigation': {notFound:() => {throw Error('404');}},
     '@/features/campus/arrival/experience': {ArrivalExperience:'arrival'},
@@ -56,6 +58,7 @@ test('the calendar attachment is also closed in both production environments', a
   const compiled = ts.transpileModule(route, {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
   const evaluate = new Function('exports', 'require', 'process', compiled);
   const mocks = {
+    '@/features/campus/arrival/preview-gate': previewGate,
     '@/features/campus/arrival/config': {arrivalLiveEvent:() => assert.fail('production must exit before reading event settings')},
     '@/features/campus/arrival/model': {calendarIcs:() => assert.fail('production must exit before making a file')},
   };

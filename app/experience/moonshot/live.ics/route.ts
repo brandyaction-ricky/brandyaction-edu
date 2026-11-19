@@ -1,8 +1,9 @@
 import {arrivalLiveEvent, DEFAULT_ARRIVAL} from '@/features/campus/arrival/config';
+import {arrivalPreviewClosed} from '@/features/campus/arrival/preview-gate';
 import {calendarIcs} from '@/features/campus/arrival/model';
 
 export function GET() {
-  if (process.env.VERCEL_ENV === 'production' || process.env.NEXT_PUBLIC_APP_ENV === 'production') {
+  if (arrivalPreviewClosed(process.env)) {
     return new Response(null, {status: 404});
   }
 
