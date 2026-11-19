@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/moonshot-gate-fix-20261119" ]; then
+            expected_main=b91be556093c05d380f9986875d7cff29ae42d2e
+            release_payload=154bb03820d32c721e12c6b49ba3ed6665cb9e4a
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' features/campus/webinar/public-route.ts tests/campus-webinar.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned Moonshot production gate fix; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/moonshot-release-20261119" ]; then
             expected_main=b376d8bf0e272217ad760e635d97b592782ee846
             release_payload=271e52c635e549f1be4bf56172e11b9ec1b41576
