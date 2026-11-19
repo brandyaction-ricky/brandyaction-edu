@@ -1,4 +1,4 @@
-import {openLoungeSchedule} from './review-office.mjs';
+import {finishOfficeReview, openLoungeSchedule} from './review-office.mjs';
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -26,8 +26,9 @@ for(const [name,viewport] of [['pc',{width:1440,height:723}],['mobile',{width:39
     const choices = page.getByRole('region', {name:'문샷 웰컴존 소개'}).getByRole('radio');
     await expect(choices).toHaveCount(4);
     await expect(button('이 상황으로 시작')).toBeDisabled();
-    await page.getByText('회사 업무에 AI를 써보고 싶어요',{exact:true}).click();
-    await button('이 상황으로 시작').click();
+    const workLabel = '회사 업무에 AI를 써보고 싶어요';
+    await finishOfficeReview(page, {audience: workLabel});
+    await page.getByRole('button', {name: new RegExp(workLabel)}).click();
     await expect(page.getByRole('textbox', {name:'AI 직원에게 어떤 일을 맡길까요?',exact:true})).toBeVisible();
   }
   async function capture(stage){

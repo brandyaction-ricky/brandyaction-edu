@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startBusinessCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -24,7 +24,7 @@ try {
       if (output) await page.screenshot({path:resolve(output, device+'-'+stage+'.png'), animations:'disabled'});
     }
     async function walk(station) {
-      if (station === 1) await startBusinessCase(page);
+      if (station === 1) await startOfficeCase(page);
       else {
         const target = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true});
         if (!await target.isVisible() && await page.locator('#arrival-desk-button').isEnabled()) {

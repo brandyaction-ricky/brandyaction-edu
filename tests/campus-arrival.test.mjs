@@ -227,6 +227,33 @@ test('example viewing and self-reported AI completion stay separate on restorati
   assert.equal(model.parseArrivalState(JSON.stringify({...initial, mode: 'personal', experience: 'example-viewed'})).experience, 'none');
 });
 
+test('returning to the welcome zone restarts the old shortcuts before the office case', () => {
+  const initial = model.initialArrivalState();
+  const stored = {...initial, entryStarted:true, visitorAvatar:'male-d', spyPhase:'handed-off',
+    audience:'preparing', hallReturnStep:5, handoff:'copied', experience:'self-reported'};
+  stored.answers.preparing = {a:'저장한 연습 입력', b:''};
+  for (const step of [1, 2, 3, 5, 7, 8]) {
+    const restored = model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({...stored, step})));
+    assert.deepEqual([restored.step, restored.station, restored.officeStation, restored.entryStarted], [0, 1, 1, false]);
+    assert.deepEqual([restored.experience, restored.handoff, restored.hallReturnStep], ['none', 'ready', null]);
+    assert.deepEqual(restored.answers, stored.answers);
+    assert.equal(restored.visitorAvatar, stored.visitorAvatar);
+  }
+  assert.equal(model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({version:1, spyPhase:'handed-off', step:7}))).step, 0);
+});
+
+test('the current office route and a deliberate personal trial from the lounge still resume', () => {
+  const initial = model.initialArrivalState();
+  for (const state of [
+    {...initial, station:2, officeStation:2, entryStarted:true, spyPhase:'reviews'},
+    {...initial, station:7, officeStation:7, entryStarted:true, spyPhase:'handed-off', step:7},
+    {...initial, station:6, officeStation:7, entryStarted:true, spyPhase:'handed-off', step:3},
+  ]) {
+    const restored = model.parseArrivalState(model.serializeArrivalState(state));
+    assert.equal(model.resumeArrivalRoute(restored), restored);
+  }
+});
+
 test('old, malformed and oversized browser state has a safe fresh start', () => {
   for (const raw of [null, '', '{', 'null', '[]', '{"version":99,"step":7}', 'x'.repeat(16001)]) {
     assert.deepEqual(model.parseArrivalState(raw), model.initialArrivalState());

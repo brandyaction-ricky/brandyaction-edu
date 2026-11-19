@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {spyActions, startBusinessCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4560/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -74,7 +74,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     expect(requestedPaths.has(modelPath('female-d'))).toBe(false);
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
     await capture('entry');
-    await startBusinessCase(page);
+    await startOfficeCase(page);
     const leader = teamLeaderGuide(page);
     await expect(leader).toBeVisible();
     await tap(button(leader, '지금 확인하기'));

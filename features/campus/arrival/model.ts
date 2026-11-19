@@ -108,7 +108,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       state.officeStation = officeStation;
     } else if (state.step === 0 && state.station !== 5 && state.station !== 6) {
       state.officeStation = state.station;
-    } else if (state.spyPhase === 'handed-off') state.officeStation = 7;
+    } else if (state.spyPhase === 'handed-off') state.officeStation = 3;
     else if (state.spyPhase !== 'intro') state.officeStation = 2;
     state.entryStarted = value.entryStarted === true || state.step !== 0 || state.station !== 1;
     state.contentDraft = parseContentStationDraft(value.contentDraft);
@@ -120,6 +120,22 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
 }
 export function serializeArrivalState(state: ArrivalState): string {
   return JSON.stringify(parseArrivalState(JSON.stringify(state)));
+}
+
+/** Resume the corridor, even for visitors whose previous entry opened the personal trial first. */
+export function resumeArrivalRoute(state: ArrivalState): ArrivalState {
+  if (state.officeStation === 7 && state.spyPhase === 'handed-off') return state;
+  const onCorridor = state.step === 0 && state.station <= 4 && state.officeStation !== 7;
+  if (onCorridor && state.hallReturnStep === null && state.experience === 'none' && !state.workTrial.secondConfirmed) return state;
+  return {
+    ...state,
+    ...(onCorridor ? {} : {step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', spyFirstRequest: '', canonPhase: 0} as const),
+    hallReturnStep: null,
+    mode: 'personal',
+    experience: 'none',
+    handoff: 'ready',
+    workTrial: parseWorkTrialState({...state.workTrial, secondConfirmed: false}),
+  };
 }
 
 /** A changed example invalidates the selected rule and any prompt that used it. */

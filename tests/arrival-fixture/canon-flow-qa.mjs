@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, startBusinessCase, teamLeaderGuide} from './review-office.mjs';
+import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, startOfficeCase, teamLeaderGuide} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -46,7 +46,7 @@ for (const [device, engine, viewport] of [
   async function walk(station) {
     if (station === 1) {
       await expect(world).toHaveAttribute('data-ready', 'true', {timeout:30000});
-      await startBusinessCase(page);
+      await startOfficeCase(page);
       await expect(teamLeaderGuide(page)).toBeVisible();
     } else {
       const destination = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true});

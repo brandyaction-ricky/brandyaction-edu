@@ -3,7 +3,7 @@
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, SPY_REQUEST_LIMIT, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, SPY_REQUEST_LIMIT, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {guideTitles, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
@@ -136,7 +136,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     queueMicrotask(() => {
       if (!active) return;
       try {
-        const restored = persistenceKey ? parseArrivalState(localStorage.getItem(persistenceKey)) : initialArrivalState();
+        const restored = persistenceKey ? resumeArrivalRoute(parseArrivalState(localStorage.getItem(persistenceKey))) : initialArrivalState();
         setState(restored);
         setExplore(restored.step === 7);
       }
@@ -345,7 +345,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
 
   function update(patch: Partial<ArrivalState>) {setState(value => ({...reconcileArrivalOfficeCase(value, caseRevision), ...patch}));}
-  function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station' | 'hallReturnStep' | 'entryStarted' | 'audience'> = {}) {
+  function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station' | 'hallReturnStep'> = {}) {
     resetWalkAssist();
     setGuidedStation(undefined);
     setDeskOpen(false);
@@ -360,13 +360,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function startEntry() {
     if (!entryAudience) return;
-    if (entryAudience === 'business') {
-      update({entryStarted: true, audience: entryAudience});
-      requestWalk(1);
-    } else {
-      const next = entryAudience === 'work' ? 1 : 2;
-      go(next, {audience: entryAudience, entryStarted: true, station: 6});
-    }
+    update({entryStarted: true, audience: entryAudience});
+    requestWalk(1);
   }
   function selectAudience(audience: Audience) {
     update({audience, consentedCompanyRule: audience === state.audience ? state.consentedCompanyRule : '',
