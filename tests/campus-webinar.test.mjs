@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 const load=async p=>{const r=await build({entryPoints:[p],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(r.outputFiles[0].text).toString('base64'));};
-const d=await load('features/campus/webinar/domain.ts'),{config}=await load('tests/webinar-fixture/data.ts'),{isAnonymousWebinarRoute}=await load('features/campus/webinar/public-route.ts');
+const d=await load('features/campus/webinar/domain.ts'),{config}=await load('tests/webinar-fixture/data.ts'),{isAnonymousWebinarRoute,isPublicWebinarAsset}=await load('features/campus/webinar/public-route.ts');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 test('event configuration restricts public output, embed IDs, redirects, time windows and unknown fields',()=>{
  const parsed=d.validateWebinar(config);assert.equal(parsed.slug,config.slug);const pub=d.projectWebinar(parsed);assert.equal(pub.revision,undefined);assert.equal(pub.status,undefined);assert.equal(pub.cohortId,undefined);assert.match(pub.checkoutPath,/utm_campaign=moonshot-open/);
@@ -25,6 +25,11 @@ test('member access rejects foreign, refunded, expired, malformed windows and re
 test('anonymous session refresh exemption never includes private access, admins, other campus routes or malformed paths',()=>{
  for(const method of ['GET','HEAD'])assert.equal(isAnonymousWebinarRoute('/campus/live/moonshot-open',method),true);
  assert.equal(isAnonymousWebinarRoute('/api/campus/webinar/moonshot-open/events','POST'),true);
+ // Moonshot visitor journey (production private-release gate): corridor page, lounge media and anonymous visit analytics only.
+ assert.equal(isAnonymousWebinarRoute('/api/campus/arrival/events','POST'),true);
+ for(const [path,method] of [['/api/campus/arrival/events','GET'],['/api/campus/arrival/live-reminder','POST'],['/api/admin/campus/arrival-analytics','GET']])assert.equal(isAnonymousWebinarRoute(path,method),false);
+ for(const path of ['/campus/world/tour/welcome-walk.html','/campus/arrival/team-leader-telegram.mp4','/campus/arrival/mask-example-silent.mp4','/campus/arrival/brandyaction-meetup.mp4','/campus/arrival/avatars/female-a.webp'])assert.equal(isPublicWebinarAsset(path,'GET'),true,path);
+ for(const [path,method] of [['/campus/arrival/company-rule-worksheet.txt','GET'],['/campus/arrival/../workspace','GET'],['/campus/arrival/team-at-work.mp4','POST'],['/campus/world/tour/other.html','GET'],['/campus/arrival/x/y.mp4','GET']])assert.equal(isPublicWebinarAsset(path,method),false,path);
  for(const [path,method] of [['/api/campus/webinar/moonshot-open/access','GET'],['/admin/campus/webinars','GET'],['/campus/workspace','GET'],['/campus/live/moonshot-open','POST'],['/campus/live/a/../../workspace','GET'],['/api/campus/webinar/moonshot-open/events','GET']])assert.equal(isAnonymousWebinarRoute(path,method),false);
 });
 test('scheduled phase boundaries are deterministic',()=>{assert.equal(d.phase(config,Date.parse(config.startsAt)-1),'upcoming');assert.equal(d.phase(config,Date.parse(config.startsAt)),'live');assert.equal(d.phase(config,Date.parse(config.endsAt)),'ended');});
