@@ -172,6 +172,9 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
     <details className={s.disclosure}><summary>AI에게 함께 보낼 업무 기준{state.step === 3 ? '·피드백' : ''}<ChevronDown size={16}/></summary><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}{state.step === 3 && <p><strong>이번 업무에도 적용할 피드백</strong>{state.feedback}</p>}</div></details>
   </>;
   const requestPreview = prompt && <details className={s.disclosure}><summary>복사할 전체 요청문 미리보기<ChevronDown size={16}/></summary><div><p className={s.packageHint}>내 업무 기준{state.step > 1 ? '과 피드백' : ''}에 {state.step === 2 ? '첫 업무 자료' : '위에 입력한 자료'}를 합쳤어요. 아래 내용 전체가 복사됩니다.</p><textarea className={s.promptText} aria-label="개인 AI에게 보낼 요청문" readOnly value={prompt}/></div></details>;
+  const alternateAnswer = answerStage && (exampleAnswer
+    ? <button type="button" className={s.textButton} onClick={startPasting}>내 답변 붙여넣기</button>
+    : <button type="button" className={s.textButton} onClick={useExampleAnswer}>예시 답변으로 계속</button>);
 
   return <div className={s.panel} data-work-step={state.step}>
     <div className={s.top}><span>내 AI 직원 · 회사 업무 체험</span><button type="button" onClick={back}><ArrowLeft size={15}/>이전</button></div>
@@ -206,6 +209,7 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
         {exampleAnswer ? <article className={s.answerExample}><h2>체험용 예시 답변</h2><p>{WORK_TRIAL_ANSWER_EXAMPLES[answerKind]}</p></article> : <label className={s.answerField}><span>받은 답변을 여기에 붙여넣기</span><textarea rows={3} maxLength={WORK_TRIAL_LIMITS.answer} aria-describedby={responseHint} value={answer ?? ''} onChange={event => patch(state.step === 1 ? {firstAnswer: event.target.value} : {secondAnswer: event.target.value})}/></label>}
         <p className={s.fieldHint} id={responseHint}>{exampleAnswer ? '준비된 업무 예시를 보고 답변을 검토하는 법을 익혀보세요.' : persistenceEnabled && !storageBlocked ? '답변은 이 브라우저에만 보관돼요. 개인정보나 회사 기밀은 빼고 붙여넣어 주세요.' : '이 화면에서만 답변을 확인해요. 개인정보나 회사 기밀은 빼고 붙여넣어 주세요.'}</p>
         {answerReady && <div className={s.answerChecks}><AnswerChecklist items={state.step === 1 ? WORK_TRIAL_FIRST_CHECKS.map(item => item.label) : config.checks} checked={state.step === 1 ? state.firstChecks : state.checks} onChange={checks => patch(state.step === 1 ? {firstChecks: checks} : {checks})}/>{state.step === 1 && <p className={s.fieldHint}>체크하지 않은 항목은 다음 단계의 피드백으로 제안해요.</p>}</div>}
+        {answerReady && alternateAnswer}
         <details className={s.disclosure}><summary>업무 자료·요청문 다시 보기<ChevronDown size={16}/></summary><div>
           {answerReady && <>{aiLinks}<button type="button" className={s.textButton} disabled={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={16}/>요청문 다시 복사</button></>}
           {taskFields}{requestPreview}
@@ -246,7 +250,7 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
         {(!showReview || !answerReady) && <p>{showReview ? '받은 답변을 붙여넣거나 예시로 계속할 수 있어요.' : hasCopied ? '답변을 받으면 이 화면으로 돌아오세요.' : state.step === 2 ? '수정할 기준을 담아 첫 답변을 다시 요청합니다.' : state.step === 3 ? '수정한 기준과 새 메모를 함께 보냅니다.' : '내 업무 기준과 메모가 하나의 요청문으로 준비됩니다.'}</p>}
         <div className={s.footerActions}>
           {showReview || (state.step === 2 && hasCopied) ? <><button type="button" className={progression.nextAction} disabled={showReview && !answerReady} onClick={confirmResponse}>{state.step === 1 ? '이 답변으로 피드백하기' : state.step === 2 ? '수정한 답변을 확인했어요' : '답변 검토 마치기'}<ArrowRight size={16} aria-hidden="true"/></button>{hasCopied && (!showReview || !answerReady) && <button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button>}</> : <button type="button" className={s.primary} disabled={!prompt || copying === 'prompt'} aria-busy={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={17}/>{copying === 'prompt' ? '복사 중…' : state.step === 2 ? '피드백 반영 요청 복사' : '기준과 자료 함께 복사'}</button>}
-          {answerStage && (exampleAnswer ? <button type="button" className={s.textButton} onClick={startPasting}>내 답변 붙여넣기</button> : <button type="button" className={s.textButton} onClick={useExampleAnswer}>예시 답변으로 계속</button>)}
+          {(!showReview || !answerReady) && alternateAnswer}
           {state.step === 2 && state.firstAnswerExample && prompt && <button type="button" className={s.textButton} onClick={confirmResponse}>예시로 다음 업무 계속하기<ArrowRight size={14}/></button>}
         </div>
       </>}
