@@ -48,6 +48,7 @@
 | F7 | P2 | B2 | 도움말 "새로고침을 눌러 숫자를 불러오세요" — 실제는 기간을 바꾸면 바로 다시 집계 | [코드] `marketing-workspace-nav.tsx` | S4 |
 | F8 | P2 | B9 | 숫자 열 제목은 왼쪽, 값은 오른쪽(데이터 모드 표 전부) | [확인·합성 화면] `th[data-align=number]` 계산값 left | G1 |
 | F9 | P2 | B9 | 같은 폼 안 입력칸 38px · 선택칸 36px · 날짜시간 40px | [확인·합성 화면] 28메뉴 데스크톱 38px 25개 | G2 |
+| F9b | P2 | B9 | 검색칸만 입력 글자 굵기 600(선택칸 400) — 주문 등 전 메뉴 | [확인·합성 화면] 계산값 | G2b |
 | F10 | P2 | B4 | 구역 제목 굵기·크기 7종(16/600·16/650·16/700·16.8/700·18·20) | [확인·합성 화면] | G3 |
 | F11 | P2 | B9 | 정본 하한(11px) 아래 10px 글자 — 학습 관리 범례·카드, 커리큘럼 주차, 사이드바 표시 | [코드] learning-care.css, curriculum-editor.css:44, admin-system.css:864 | G4 |
 | F12 | P2 | 일관성 | 모집·문의 검토 하위 3파일이 옛 부품(`app/ui/final/admin-system`) 사용 | [코드] 10/27 지시서 PR-3 항목 | S7 |
@@ -71,6 +72,7 @@
 | S8 | 캠페인·템플릿·자동 안내 목록 검색칸 → `AdminSearchField`(이름 동일) | `app/ui/admin-workflows.tsx` | 접근 이름 `${title} 검색` 유지 |
 | G1 | 숫자·동작 열 제목 오른쪽 정렬 | `features/admin-ui/styles/admin-system.css` 끝 | `.adm` 범위만 |
 | G2 | 한 줄 입력칸 line-height 20px + 위아래 7px → 36px, 날짜칸 height 36px | 같은 파일 | 휴대폰 44px 최소 높이 규칙은 그대로 이김 |
+| G2b | 검색칸(`AdminSearchField`) 입력 글자 600 → 400(선택칸과 같게) | 같은 파일 | 전 메뉴 검색칸 |
 | G3 | `.panel-head`·`.admin-section-header`·`.panel` 안 h2 = 16px/24px/600 (요약 카드 h2 제외), 사용성 범위 제목·마케팅 도움말 제목 600 | 같은 파일, `final/usability.module.css`, `marketing-workspace.css` | 더 구체적 규칙(질문 상세 18px)은 유지 |
 | G4 | 10px → 11px | `final/learning-care.css`, `final/curriculum-editor.css:44`, `admin-system.css` 사이드바 표시 | — |
 
