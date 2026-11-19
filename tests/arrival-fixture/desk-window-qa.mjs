@@ -27,6 +27,17 @@ for (const {name, engine, viewport, mobile} of devices) {
   const hostOpen = page.locator('#arrival-desk-button');
   const frameOpen = frame.getByRole('button', {name: /열기$/});
   const desk = page.getByRole('dialog');
+  const requestedPaths = new Set();
+  page.on('request', request => requestedPaths.add(new URL(request.url()).pathname));
+  const modelPath = id => `/campus/world/office/vendor/assets/kenney/characters/character-${id}.glb`;
+  const releaseModels = new Map();
+  for (const id of ['female-d', 'male-b']) {
+    const pending = new Promise(resolve => releaseModels.set(id, resolve));
+    await page.route(`**${modelPath(id)}`, async route => {
+      await pending;
+      await route.continue();
+    });
+  }
 
   async function walkTo(station) {
     await expect(world).toHaveAttribute('data-station', String(station));
@@ -66,18 +77,25 @@ for (const {name, engine, viewport, mobile} of devices) {
   try {
     await page.goto(url.href);
     await expect(world).toHaveAttribute('data-ready', 'true', {timeout: 30_000});
+    expect(requestedPaths.has(modelPath('male-a'))).toBe(true);
+    expect(requestedPaths.has(modelPath('female-c'))).toBe(true);
+    expect(requestedPaths.has(modelPath('female-d'))).toBe(false);
+    expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
     await capture('entry');
     await walkTo(1);
     const leader = teamLeaderGuide(page);
     await expect(leader).toBeVisible();
     await tap(button(leader, '지금 확인하기'));
     if (!await teamLeaderNext(leader).isVisible()) await finishTeamLeaderVideo(leader);
+    const spyModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('female-d'));
     await tap(teamLeaderNext(leader));
+    await spyModel;
 
     await walkTo(2);
     await openFromHost();
     await expect(desk).toHaveAccessibleName('경쟁사 스파이');
     const spyHeight = await expectDeskVisible();
+    releaseModels.get('female-d')();
     await capture('spy-open');
     if (mobile) await page.setViewportSize({width: viewport.width, height: 380});
     const resizedSpyHeight = await expectDeskVisible();
@@ -109,13 +127,17 @@ for (const {name, engine, viewport, mobile} of devices) {
         await expectDeskVisible();
       }
     }
+    expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
+    const contentModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('male-b'));
     await tap(button(desk, '콘텐츠 실제 제작해보기'));
+    await contentModel;
     await expect(desk).not.toBeVisible();
 
     await walkTo(3);
     await tap(frameOpen);
     await expect(desk).toHaveAccessibleName('콘텐츠 담당자');
     const contentHeight = await expectDeskVisible();
+    releaseModels.get('male-b')();
     await capture('content-open');
     if (mobile) await page.setViewportSize({width: viewport.width, height: 380});
     const resizedContentHeight = await expectDeskVisible();
@@ -144,11 +166,13 @@ for (const {name, engine, viewport, mobile} of devices) {
     await tap(button(desk, '내 사업을 아는 AI는 어떻게 만들까요?'));
     await expect(desk).not.toBeVisible();
     await walkTo(4);
+    expect([...requestedPaths].some(path => path.includes('/vendor/assets/agents/'))).toBe(false);
     console.log(JSON.stringify({name, viewport, spyHeight, resizedSpyHeight, contentHeight, resizedContentHeight, reachedStation: 4}));
   } catch (error) {
     await capture('failure').catch(() => {});
     throw error;
   } finally {
+    for (const release of releaseModels.values()) release();
     await browser.close();
   }
 }

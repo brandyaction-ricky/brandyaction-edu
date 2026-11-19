@@ -23,7 +23,7 @@
     antigravity: ['#0ea5e9', '#38bdf8', '#0284c7', '#7dd3fc'],
   };
   // Official product icons, shared by both renderers and the page UI (OMP: a neutral monogram).
-  // Load once per page from the same origin so video capture stays readable.
+  // Load from the same origin on first use so scenes without badges fetch no icons.
   // Initials remain a fallback if an image cannot be loaded.
   const AGENT_BADGES = {
     claude: { label: 'Claude', short: 'Cl', color: '#c96442', logo: '/campus/world/office/vendor/assets/agents/claude.png' },
@@ -37,8 +37,14 @@
     antigravity: { label: 'Antigravity', short: 'Ag', color: '#0ea5e9', logo: '/campus/world/office/vendor/assets/agents/antigravity.png' },
   };
   for (const badge of Object.values(AGENT_BADGES)) {
-    badge.image = new Image();
-    badge.image.src = badge.logo;
+    let image;
+    Object.defineProperty(badge, 'image', {enumerable: true, get() {
+      if (!image) {
+        image = new Image();
+        image.src = badge.logo;
+      }
+      return image;
+    }});
   }
   const PANTS = ['#34405a', '#2c2c34', '#4a3f35', '#3b4a3f'];
   const PANEL = ['#7194a4', '#829da4', '#668ca1', '#80969d'];
@@ -1557,13 +1563,14 @@
 
     agentBadge(badge, x, y) {
       const c = this.ctx;
+      const image = badge.image;
       c.save();
       c.globalAlpha = 1;
-      if (badge.image.complete && badge.image.naturalWidth > 0) {
+      if (image.complete && image.naturalWidth > 0) {
         if (badge.mono && this.pal.dark) c.filter = 'invert(1)';
         c.imageSmoothingEnabled = true;
         c.imageSmoothingQuality = 'high';
-        c.drawImage(badge.image, x - 9, y - 9, 18, 18);
+        c.drawImage(image, x - 9, y - 9, 18, 18);
       } else {
         c.fillStyle = this.pal.text;
         c.font = '800 10px ui-sans-serif, system-ui, sans-serif';

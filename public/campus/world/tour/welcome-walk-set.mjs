@@ -19,6 +19,7 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
   const orb = new THREE.SphereGeometry(.5, 12, 10);
   const plane = new THREE.PlaneGeometry(1, 1);
   const materials = new Map(), textures = new Set(), models = new Set(), batches = new Map();
+  const pendingDeskActors = new Map();
   const scratch = new THREE.Object3D();
   const {navy, deep, steel, frost, pearl, floor, edge, ink, wood, blue, sand, green, red} = PALETTE;
   const guide = new THREE.Group();
@@ -162,7 +163,10 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
       box(f,dx,.1,seated ? .4:.07,.23,.15,.34,deep);
       ball(f,sign*.30,hip+.28,.08,.17,.5,.20,seated?blue:navy);
     }
-    asset(g,'characters/character-'+CHARACTERS[g.userData.welcomeStation],x,seated ? .72 : 0,z,2.01,.08,f,seated?'sit':'idle');
+    const station = g.userData.welcomeStation;
+    const loadActor = () => asset(g,'characters/character-'+CHARACTERS[station],x,seated ? .72 : 0,z,2.01,.08,f,seated?'sit':'idle');
+    if (station === 0) loadActor();
+    else pendingDeskActors.set(station, loadActor);
   }
   function desk(g,x,z,width=2.8) {
     box(g,x,.96,z,width,.14,1.15,wood);
@@ -347,6 +351,11 @@ export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
     lobbyGuidePoint(id, out) { return lobby?.guideWorldPoint(id, out); },
     isLobbyBlocked(x, z) { return lobby?.blockedAt(x, z) ?? true; },
     setNext(index, stationIndex = index) {
+      const loadActor = pendingDeskActors.get(stationIndex);
+      if (loadActor) {
+        pendingDeskActors.delete(stationIndex);
+        loadActor();
+      }
       guide.visible = Boolean(stations[index]);
       if (guide.visible) {
         const stop = stations[index];
