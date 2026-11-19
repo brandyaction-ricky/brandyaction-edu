@@ -59,7 +59,7 @@ function defaultAudience(id: Audience): ArrivalAudienceConfig {
 /** Editorial defaults only. Saving the settings never executes an AI request. */
 export const DEFAULT_ARRIVAL: ArrivalConfig = {
   version: 1,
-  title: '혼자 하던 일,\nAI에게 맡길 수 있을까요?',
+  title: '한 번 알려준 기준으로, AI 직원들이 다음 일도 해냅니다',
   description: '회사 업무를 더 수월하게 하고 싶을 때도, 새로운 일을 준비할 때도. 문샷 무료 라이브 전에 AI를 내 상황에 맞게 써보는 공간입니다.',
   welcomeBenefits: ['흩어진 업무 메모를 보고할 초안으로 정리하기', '막연한 아이디어에서 다음에 할 일 찾기', '내가 원하는 형식과 기준으로 AI 답변 다듬기'],
   workTrial: DEFAULT_WORK_TRIAL,

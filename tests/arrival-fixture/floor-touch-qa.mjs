@@ -1,5 +1,5 @@
 import {chromium, webkit, expect} from '@playwright/test';
-import {finishTeamLeaderVideo, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4533');
 
@@ -19,11 +19,8 @@ for (const engine of [chromium, webkit]) {
     await page.touchscreen.tap(354, 515);
     await expect(walk).not.toHaveAttribute('data-player-x', start);
     const guide = teamLeaderGuide(page);
-    const startVideo = guide.getByRole('button', {name:'지금 확인하기', exact:true});
-    await expect(startVideo).toBeVisible();
+    await expect(guide.getByRole('heading', {name:'팀장의 첫 업무 보고', exact:true})).toBeVisible();
     await expect(walk).toHaveAttribute('data-arrivals', '1');
-    await startVideo.click();
-    await finishTeamLeaderVideo(guide);
     await teamLeaderNext(guide).click();
     await expect(walk).toHaveAttribute('data-station', '2');
 

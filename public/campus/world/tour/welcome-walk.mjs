@@ -13,7 +13,7 @@ const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get('bridge');
 const avatars = ['female-c', 'female-a', 'male-c', 'male-d'];
 const greetings = {
-  1: '첫 업무 보고를 준비했어요.\n여기를 눌러 확인해보세요.',
+  1: '고객이 남긴 질문 하나,\n저희 팀이 같이 풀어봤어요.',
   2: '경쟁사 고객들의 속마음, 제가 찾아왔어요. 저를 눌러 확인해보세요.',
   3: '경쟁사 조사에서 찾은 내용을 콘텐츠로 만들었어요. 한번 보실래요?',
   4: 'AI가 우리 회사를 알아가는 방법, 여기서 확인해보세요.',

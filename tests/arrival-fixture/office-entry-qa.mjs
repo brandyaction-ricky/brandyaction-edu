@@ -66,10 +66,9 @@ try {
       if (station === 2) expect(maskVideoRequests).toEqual([]);
     }
     async function inspectLeader(guide) {
-      const intro = guide.getByRole('heading', {name:'AI봇들과 함께 일하면 어떻게 될까요?', exact:true});
-      const start = button(guide,'지금 확인하기');
+      const intro = guide.getByRole('heading', {name:'팀장의 첫 업무 보고', exact:true});
+      const start = button(guide,'텔레그램 시연 보기');
       const next = teamLeaderNext(guide);
-      const invitation = guide.getByText('각 담당자들이 어떻게 일하는지 직접 확인해보실까요?', {exact:true});
       const video = guide.locator('video');
       const fullscreen = button(guide,'전체 화면');
       const seek = guide.getByRole('slider', {name:'재생 위치', exact:true});
@@ -77,8 +76,8 @@ try {
       await expect(intro).toBeVisible();
       await expect(start).toBeInViewport({ratio:0.95});
       await expect(video).toHaveCount(0);
-      await expect(next).toHaveCount(0);
-      await expect(guide.getByText('담당자들의 책상에 놓인 일')).toHaveCount(0);
+      await expect(next).toBeInViewport({ratio:0.95});
+      await expect(guide.getByText('마스크팩을 붙이고 자도 될까요?', {exact:true})).toBeVisible();
       await capture('leader-intro');
       if (device === 'small-mobile') {
         await page.evaluate(() => {
@@ -97,8 +96,7 @@ try {
       await expect(fullscreen).toBeInViewport({ratio:0.95});
       await expect(seek).toBeInViewport({ratio:0.95});
       expect(await guide.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-      await expect(invitation).toBeHidden();
-      await expect(next).toHaveCount(0);
+      await expect(next).toBeInViewport({ratio:0.95});
       if (device === 'small-mobile') {
         await expect.poll(() => page.evaluate(() => window.__leaderAutoplayBlocked)).toBe(true);
         await button(guide,'재생').click();
@@ -133,7 +131,7 @@ try {
       await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
       await video.evaluate(element => {element.pause(); element.currentTime = 4.5;});
       await expect.poll(async () => Number(await seek.inputValue())).toBe(4.5);
-      await expect(next).toHaveCount(0);
+      await expect(next).toBeInViewport({ratio:0.95});
       await video.evaluate(element => {element.currentTime = 5;});
       await expect(next).toBeVisible();
       expect(await video.evaluate(element => element.ended)).toBe(false);
@@ -141,11 +139,10 @@ try {
       await expect.poll(async () => Number(await seek.inputValue())).toBe(1);
       await expect(next).toBeVisible();
       await expect(next).toBeInViewport({ratio:0.95});
-      await capture('leader-continue-at-five-seconds');
+      await capture('leader-next-during-video');
       await button(guide,'재생').click();
       await finishTeamLeaderVideo(guide);
       await expect.poll(() => video.evaluate(element => element.ended)).toBe(true);
-      await expect(invitation).toBeVisible();
       await next.scrollIntoViewIfNeeded();
       await expect(next).toBeInViewport({ratio:0.95});
       await capture('leader-complete');
@@ -185,7 +182,7 @@ try {
         await expect(reviews.getByText('별점 3점', {exact:true})).toHaveCount(1);
         await expect(reviews.getByRole('heading', {name:'오래 붙이면 더 좋은 줄 알았어요'})).toBeVisible();
         await expect(reviews.getByRole('heading', {name:'붙이고 자도 되나요?'})).toBeVisible();
-        await expect(conversation).toContainText('얼마나 붙여야 하는지 모르겠다');
+        await expect(conversation).toContainText('팩을 붙이고 얼마나 기다려야 하죠?');
         await capture('spy-reviews');
         await page.reload({waitUntil:'domcontentloaded'});
         await walk(2);
@@ -216,6 +213,7 @@ try {
         await video.evaluate(element => {element.currentTime = 9.2;});
         await expect(film.getByText('사용 전, 제품의 사용 가이드를 확인하세요.', {exact:true})).toBeVisible();
 
+        await dialog.getByText('내 상품으로도 해보기', {exact:true}).click();
         const create = button(dialog,'프롬프트 만들기');
         const copy = button(dialog,'프롬프트 복사');
         const ownInputs = [
@@ -251,6 +249,7 @@ try {
         expect(await prompt.inputValue()).not.toContain(ownInputs[0][1]);
       }
       if (station === 4) {
+        await dialog.getByText('회사 지식 지도와 대화 보기', {exact:true}).click();
         const map = dialog.getByRole('region',{name:'회사 지식 지도'});
         await expect(map.getByRole('listitem')).toHaveCount(12);
         await expect(map.getByRole('status')).toHaveText('아직 연결된 지식이 없어요.');
@@ -260,7 +259,7 @@ try {
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
       await expect(marker).toBeVisible({timeout:60000});
-      await expect(marker).toContainText('첫 업무 보고를 준비했어요.');
+      await expect(marker).toContainText('고객이 남긴 질문 하나');
       await expect(teamLeaderGuide(page)).toHaveCount(0);
       await expect(page.locator('video')).toHaveCount(0);
       await page.evaluate(()=>document.fonts.ready);

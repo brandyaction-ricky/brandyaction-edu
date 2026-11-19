@@ -68,6 +68,7 @@ for (const [device, engine, viewport] of [
 
   async function inspect(station, dialog) {
     if (station === 3) {
+      await tap(dialog.getByText('내 상품으로도 해보기', {exact:true}));
       await dialog.getByLabel(/^상품·서비스/).fill(contentDraft.product);
       await dialog.getByLabel(/^비교할 경쟁사 이름이나 링크/).fill(contentDraft.competitor);
       await dialog.getByLabel(/^어떤 고객에게 필요한가요/).fill(contentDraft.customer);
@@ -81,6 +82,11 @@ for (const [device, engine, viewport] of [
       return;
     }
     if (station !== 4) return;
+    const details = dialog.getByText('회사 지식 지도와 대화 보기', {exact:true});
+    await tap(button(dialog, '두 직원에게 기준 적용하기'));
+    await expect(dialog.getByText('기준 적용 후', {exact:true})).toHaveCount(2);
+    await capture('canon-two-employees');
+    await tap(details);
     const map = dialog.getByRole('region', {name:'회사 지식 지도'});
     const connections = map.locator('li[data-connected="true"]');
     const status = map.getByRole('status');
@@ -101,25 +107,27 @@ for (const [device, engine, viewport] of [
         await expect(open).toBeVisible();
         expect(await position()).toEqual(before);
         await tap(open);
+        await tap(details);
         await expect(status).toHaveText(exchange.status);
         expect(await position()).toEqual(before);
       }
     }
-    const results = dialog.getByRole('region', {name:'같은 기준을 활용한 업무 결과'});
+    const results = dialog.getByRole('region', {name:'광고 문구와 고객 답변 비교'});
     const staff = results.getByRole('article');
     await expect(staff).toHaveCount(2);
-    for (const name of ['콘텐츠 AI', '고객응대 AI']) {
+    for (const name of ['광고 문구', '고객 문의 답변']) {
       await expect(staff.filter({has:page.getByRole('heading', {name, exact:true})})).toContainText('10~15분 뒤 떼어내 주세요.');
     }
     await tap(dialog.getByText('이전 대화 보기', {exact:true}));
     await expect(dialog.getByText('우리 고객은 바쁜 직장인이야. 퇴근 후 쉬는 시간에 팩을 사용해.')).toBeVisible();
     await expect(dialog.getByText('팩 붙이고 자도 되냐고 자주 물어봐. 우리 제품은 10~15분 뒤 떼면 돼.')).toBeVisible();
-    await expect(dialog.getByRole('heading', {name:'12월 7일 라이브에서 이 전 과정을 알려드립니다.'})).toBeVisible();
+    await expect(dialog.getByRole('heading', {name:'내 일에도 쓸 업무 기준표를 받아가세요'})).toBeVisible();
     await results.scrollIntoViewIfNeeded();
     await capture('canon-results');
     await page.reload({waitUntil:'domcontentloaded'});
     await walk(4);
     visited.pop();
+    await tap(details);
     await expect(status).toHaveText(exchanges.at(-1).status);
     await expect(staff).toHaveCount(2);
   }

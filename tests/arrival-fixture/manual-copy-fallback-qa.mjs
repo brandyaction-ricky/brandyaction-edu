@@ -37,6 +37,7 @@ try {
       await page.goto(base + path, {waitUntil: 'domcontentloaded'});
       await finishOfficeReview(page, {inspect: async (station, dialog) => {
         if (station !== 3) return;
+        await dialog.getByText('내 상품으로도 해보기', {exact:true}).click();
         await dialog.getByRole('button', {name:'마스크팩 예시 넣기', exact:true}).click();
         await dialog.getByRole('button', {name:'프롬프트 만들기', exact:true}).click();
         await dialog.getByRole('button', {name:'프롬프트 복사', exact:true}).click();

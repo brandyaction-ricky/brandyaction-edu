@@ -1,6 +1,6 @@
 import {expect} from '@playwright/test';
 
-const nextDesk = ['콘텐츠 실제 제작해보기', '내 사업을 아는 AI는 어떻게 만들까요?', '웰컴 라운지로 가기'];
+const nextDesk = ['이 질문을 광고에 반영하기', '정본에서 두 직원의 답 바꿔보기', '웰컴 라운지로 가기'];
 
 export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 
@@ -31,7 +31,7 @@ export async function finishTeamLeaderVideo(guide) {
 }
 
 export function loungeScheduleButton(page) {
-  return page.getByRole('button', {name: '라이브 일정 보기', exact: true});
+  return page.getByRole('button', {name: /일정 저장$/});
 }
 
 export async function openLoungeSchedule(page) {
@@ -58,11 +58,8 @@ export async function finishOfficeReview(page, {walk, inspect = async () => {}, 
       const guide = teamLeaderGuide(page);
       await expect(guide).toBeVisible({timeout: 20000});
       await inspect(station, guide);
-      if (await guide.locator('video').count() === 0) {
-        await guide.getByRole('button', {name:'지금 확인하기', exact: true}).click();
-      }
       const next = teamLeaderNext(guide);
-      if (!await next.isVisible()) await finishTeamLeaderVideo(guide);
+      await expect(next).toBeEnabled();
       await beforeLeave(station);
       await next.click();
       await expect(guide).toHaveCount(0);

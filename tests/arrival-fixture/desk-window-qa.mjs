@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishTeamLeaderVideo, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4560/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -85,8 +85,8 @@ for (const {name, engine, viewport, mobile} of devices) {
     await walkTo(1);
     const leader = teamLeaderGuide(page);
     await expect(leader).toBeVisible();
-    await tap(button(leader, '지금 확인하기'));
-    if (!await teamLeaderNext(leader).isVisible()) await finishTeamLeaderVideo(leader);
+    await expect(leader.locator('video')).toHaveCount(0);
+    await expect(teamLeaderNext(leader)).toBeInViewport({ratio: .95});
     const spyModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('female-d'));
     await tap(teamLeaderNext(leader));
     await spyModel;
@@ -129,7 +129,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     }
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
     const contentModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('male-b'));
-    await tap(button(desk, '콘텐츠 실제 제작해보기'));
+    await tap(button(desk, '이 질문을 광고에 반영하기'));
     await contentModel;
     await expect(desk).not.toBeVisible();
 
@@ -141,7 +141,10 @@ for (const {name, engine, viewport, mobile} of devices) {
     await capture('content-open');
     if (mobile) await page.setViewportSize({width: viewport.width, height: 380});
     const resizedContentHeight = await expectDeskVisible();
+    await expect(button(desk, '정본에서 두 직원의 답 바꿔보기')).toBeInViewport({ratio: .95});
     const product = desk.getByLabel(/^상품·서비스/);
+    await expect(product).toBeHidden();
+    await tap(desk.getByText('내 상품으로도 해보기', {exact: true}));
     const draft = '웰컴존 테스트용 노트북 거치대';
     await tap(product);
     await page.keyboard.insertText(draft);
@@ -163,7 +166,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     await openFromHost();
     await expectDeskVisible();
     await expect(product).toHaveValue(draft);
-    await tap(button(desk, '내 사업을 아는 AI는 어떻게 만들까요?'));
+    await tap(button(desk, '정본에서 두 직원의 답 바꿔보기'));
     await expect(desk).not.toBeVisible();
     await walkTo(4);
     expect([...requestedPaths].some(path => path.includes('/vendor/assets/agents/'))).toBe(false);

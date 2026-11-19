@@ -85,13 +85,14 @@ for (const {name, engine, viewport, mobile} of devices) {
     await expect(reply).toHaveCount(3);
     await expect(reply.nth(0)).toContainText('경쟁사 3곳을 조사했어요!');
     await expect(reply.nth(1).getByRole('article')).toHaveCount(2);
-    await expect(reply.nth(2)).toContainText('두 리뷰에');
+    await expect(reply.nth(2)).toContainText('두 예시 후기에 같은 질문이 있었어요');
     const batches = await page.evaluate(() => window.spyReplyBatches);
     expect(batches).toEqual(['summary', 'summary,reviews', 'summary,reviews,analysis']);
     await expect.poll(async () => (await scrollPosition()).remaining).toBeLessThan(16);
     const afterReviews = await scrollPosition();
     if (mobile) expect(afterReviews.top).toBeGreaterThan(0);
     await expect(action(1)).toBeInViewport({ratio: 0.95});
+    await expect(button(dialog, '이 질문을 광고에 반영하기')).toBeInViewport({ratio: 0.95});
     await capture('spy-replies');
 
     if (mobile) {
@@ -143,6 +144,10 @@ for (const {name, engine, viewport, mobile} of devices) {
       await clickBehindDesk();
       await expect.poll(() => distanceFrom(next)).toBeGreaterThan(.75);
       await expect(walk).toHaveAttribute('data-near-desk', 'false');
+    } else {
+      await tap(button(dialog, '이 질문을 광고에 반영하기'));
+      await expect(dialog).not.toBeVisible();
+      await expect(walk).toHaveAttribute('data-station', '3');
     }
     console.log(JSON.stringify({name, viewport, replies: batches.length, panelHeight: panel.height, afterReviews, corridorInput: mobile ? 'touch' : 'keyboard and mouse'}));
   } catch (error) {

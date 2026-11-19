@@ -21,7 +21,7 @@ import {DEFAULT_ARRIVAL, buildManagedRequest, arrivalLiveEvent, type ArrivalConf
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
 const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
-const invitations = ['팀장 만나기', '경쟁사 스파이에게 가기', '콘텐츠 담당자에게 가기', '정본 보러 가기', '', '내 AI 체험 열기', '웰컴 라운지로 가기'] as const;
+const invitations = ['팀장의 첫 업무 보고 보기', '경쟁사 스파이에게 가기', '콘텐츠 담당자에게 가기', '정본 보러 가기', '', '내 AI 체험 열기', '웰컴 라운지로 가기'] as const;
 
 /** Optional [section] lines keep editable examples readable; other text stays literal. */
 function ResultExample({text}: {text: string}) {
@@ -223,10 +223,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     }
   }
   function finishStation() {
-    if (station === 5 || station === 6 || station === 7 || (station === 2 && state.spyPhase !== 'handed-off')) return;
+    if (station === 5 || station === 6 || station === 7 || (station === 2 && state.spyPhase === 'intro')) return;
     closeDesk(false);
     setNearStation(undefined);
-    update({station: corridorNext[station]});
+    update({station: corridorNext[station], ...(station === 2 ? {spyPhase: 'handed-off'} : {})});
   }
   function advanceSpy(next: SpyPhase) {
     setState(value => {
@@ -280,6 +280,13 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function openHallSchedule() {
     focusHallSchedule.current = true;
     setExplore(false);
+  }
+  function showScheduleFromGuide() {
+    lobbyDialog.current?.close();
+    lobbyGuideTrigger.current = null;
+    setLobbyGuide(null);
+    if (exploringHall) openHallSchedule();
+    else heading.current?.focus({preventScroll: true});
   }
   function walkToStation() {
     if (canOpenStation) arrive(station);
@@ -403,8 +410,12 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <div className={entryStyle.stopCopy}>
         {firstStop ? <>
           <h1>{config.title}</h1>
-          <p>고객 후기 분석부터 광고 영상 제작까지, AI 직원들의 업무를 차례로 확인해보세요.</p>
-          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>라운지에서 받는 무료 자료<strong>AI팀 설계도와 회사 업무 기준표</strong></span></p>
+          <p>보고서든 광고든, AI가 내 기준에 맞춰 일하는 과정을 따라가 보세요.</p>
+          <div className={entryStyle.openingExample}>
+            <p><strong>업무 기준</strong> 설명서에 적힌 사용 시간만 안내</p>
+            <p><strong>광고·문의 답변</strong> “10~15분 뒤에 떼어 주세요.”</p>
+          </div>
+          <p className={entryStyle.materialsPreview}><BookOpen size={17} aria-hidden="true"/><span>라운지에서 <strong>AI팀 설계도와 업무 기준표</strong>를 받아보세요.</span></p>
         </> : <>
           <span>{nearStation === station ? '도착했어요' : '다음 목적지'}</span>
           <h1>{destination}</h1>
@@ -414,7 +425,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </div>
       <div className={entryStyle.wayfindingActions}>
         <button id="arrival-desk-button" type="button" ref={deskButton} onClick={walkToStation} disabled={!canOpenStation && walkAssist === 'moving'}>
-          {sceneStatus === 'loading' && firstStop ? '팀장 안내 보기' : canOpenStation ? station === 7 ? '웰컴 라운지 입장하기' : '내용 열기' : walkAssist === 'moving' ? '이동 중' : invitations[station - 1]}<ArrowRight size={16}/>
+          {!canOpenStation && walkAssist === 'moving' ? '이동 중' : firstStop ? invitations[0] : canOpenStation ? station === 7 ? '웰컴 라운지 입장하기' : '내용 열기' : invitations[station - 1]}<ArrowRight size={16}/>
         </button>
         {sceneStatus === 'loading' ? <p role="status">공간을 준비하고 있어요.</p> : !canOpenStation && <div className={entryStyle.movementHint}>
           <p className={entryStyle.keyboardHint}>스페이스바로 다음 목적지에 갈 수 있어요.</p>
@@ -488,9 +499,9 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
             <p><strong>{dateLabel} {weekday}</strong><br/>{timeLabel} <small>한국 시간</small></p>
             {!exploringHall && event.startsAt && <LiveCountdown date={event.date} className={entryStyle.ticketCountdown}/>}
           </div>
+          <p className={s.calendarIntro}>내 자료로 업무 기준을 정하고, AI 직원에게 역할을 나눈 뒤 텔레그램으로 첫 업무를 맡기는 과정을 보여드립니다.</p>
           <p className={s.calendarIntro}>{config.liveUrl ? '캘린더에서도 라이브 링크를 확인할 수 있어요.' : '유튜브 참여 링크는 카톡방에서 안내할 예정이에요.'}</p>
           {config.liveUrl && <a className={s.textButton} href={config.liveUrl} target="_blank" rel="noreferrer">라이브 참여 링크<ArrowUpRight size={16}/></a>}
-          <details className={s.disclosure}><summary>라이브에서 배우는 내용<ChevronDown size={16}/></summary><div><p>{state.audience === 'work' ? workConfig.liveBridge : content.bridge}</p></div></details>
           <div className={entryStyle.scheduleActions}>
             <button type="button" className={s.textButton} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={16} aria-hidden="true"/>무료 자료 열기</button>
             <button type="button" className={s.textButton} onClick={returnToCorridor}><ArrowLeft size={16} aria-hidden="true"/>복도로 돌아가기</button>
@@ -522,9 +533,17 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <p className={entryStyle.touchHint}>가고 싶은 바닥을 터치하세요.</p>
         </>}
       </div>
+      <div className={entryStyle.hallCard}>
+        <div>
+          <h2>AI 직원에게 내 일을 맡겨보세요</h2>
+          <p>첫 업무와 두 직원이 함께 지킬 기준을 적을 수 있는 양식을 준비했어요.</p>
+        </div>
+        <div className={entryStyle.hallActions}>
+          <button type="button" className={entryStyle.hallPrimary} onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 열기</button>
+          <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>{dateLabel} {timeLabel} 일정 저장</button>
+        </div>
+      </div>
       <div className={entryStyle.hallActions}>
-        <button type="button" onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 열기</button>
-        <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>라이브 일정 보기</button>
         <button type="button" onClick={openPersonalTrial}>
           {state.hallReturnStep === null ? <ArrowRight size={16} aria-hidden="true"/> : <ArrowLeft size={16} aria-hidden="true"/>}
           {state.hallReturnStep === null ? '내 AI 체험으로 가기' : '내 AI 체험으로 돌아가기'}
@@ -544,7 +563,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? guideTitles[lobbyGuide] : undefined}
       onCancel={event => {event.preventDefault(); closeLobbyGuide();}}>
       {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} onContentReplay={openContentReplay}
-        onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')}/>}
+        onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')} onShowSchedule={showScheduleFromGuide}/>}
     </dialog>
     <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>
       <header><h2>{config.title}</h2><button type="button" aria-label="소개 닫기" onClick={() => setIntroOpen(false)}><X size={20}/></button></header>
