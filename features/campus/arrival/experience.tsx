@@ -8,6 +8,7 @@ import {CorridorScene} from './corridor-scene';
 import {guideTitles, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
 import {reuseContentStationAnswers} from './content-station-prompt';
+import {startArrivalTracking} from './analytics';
 import {TeamLeader} from './team-leader';
 import entryStyle from './office-entry.module.css';
 import progression from './progression.module.css';
@@ -113,6 +114,18 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const showLiveReminder = liveReminderEnabled && !preview && !embedded && Boolean(calendarFileHref);
   const destination = destinations[station - 1];
   const stopIndex = corridorStops.findIndex(stop => stop.station === station);
+  // Visit analytics on the public page only (not admin previews or embedded copies).
+  const tracking = useRef<ReturnType<typeof startArrivalTracking> | null>(null), trackedStation = useRef(0);
+  useEffect(() => {
+    if (preview || embedded || !hydrated) return;
+    const tracker = startArrivalTracking(() => trackedStation.current);
+    tracking.current = tracker;
+    return () => { tracker.stop(); tracking.current = null; };
+  }, [preview, embedded, hydrated]);
+  useEffect(() => {
+    trackedStation.current = state.entryStarted ? station : 0;
+    if (hydrated && state.entryStarted) tracking.current?.track({kind: 'step', station});
+  }, [hydrated, state.entryStarted, station]);
   const caseVisited = state.officeStation === 7;
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
   const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
@@ -372,6 +385,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
   function startEntry() {
     if (!entryAudience) return;
+    tracking.current?.track({kind: 'click', station: 0, target: `audience:${entryAudience}`});
     update({entryStarted: true, audience: entryAudience});
     requestWalk(1);
   }

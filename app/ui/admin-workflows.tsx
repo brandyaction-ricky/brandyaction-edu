@@ -1,5 +1,6 @@
 "use client";
 import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
+import {ArrivalAnalyticsPanel} from '@/features/campus/arrival/analytics-panel';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
 import { retentionTrigger } from "@/lib/crm-retention";
@@ -1878,7 +1879,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
 }
 function Analytics() {
-  const [analysisView,setAnalysisView]=useState<'site'|'campus'>('site');
+  const [analysisView,setAnalysisView]=useState<'site'|'campus'|'arrival'>('site');
   const [today, setToday] = useState(() => new Date(Date.now()+9*3600000).toISOString().slice(0,10));
   const [from, setFrom] = useState(() =>
     new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
@@ -1890,7 +1891,7 @@ function Analytics() {
   const dateError = !from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) ? '시작일과 종료일을 선택해 주세요.' : from > to ? '종료일은 시작일 이후로 선택해 주세요.' : Date.parse(to) - Date.parse(from) >= 366 * 86400000 ? '조회 기간은 1년 이내로 선택해 주세요.' : '';
   const [pathSearch, setPathSearch] = useState('');
   const { result, error, loading, retry } = useReport(
-    dateError || analysisView==='campus' ? null : "/api/platform/workflows?" +
+    dateError || analysisView!=='site' ? null : "/api/platform/workflows?" +
       new URLSearchParams({
         kind: "analytics",
         from: from ? from + "T00:00:00+09:00" : "",
@@ -1900,8 +1901,9 @@ function Analytics() {
   const stages = (result.stages || {}) as Record<string, number>;
   const paths = (result.paths || []) as Row[];
   const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
-  const analysisTabs=<div className="analytics-period-presets" role="group" aria-label="분석 화면 선택"><AdminButton variant={analysisView==='site'?'primary':'outline'} aria-pressed={analysisView==='site'} onClick={()=>setAnalysisView('site')}>사이트 유입·결제</AdminButton><AdminButton variant={analysisView==='campus'?'primary':'outline'} aria-pressed={analysisView==='campus'} onClick={()=>setAnalysisView('campus')}>문샷 캠퍼스 행동</AdminButton></div>;
+  const analysisTabs=<div className="analytics-period-presets" role="group" aria-label="분석 화면 선택"><AdminButton variant={analysisView==='site'?'primary':'outline'} aria-pressed={analysisView==='site'} onClick={()=>setAnalysisView('site')}>사이트 유입·결제</AdminButton><AdminButton variant={analysisView==='campus'?'primary':'outline'} aria-pressed={analysisView==='campus'} onClick={()=>setAnalysisView('campus')}>문샷 캠퍼스 행동</AdminButton><AdminButton variant={analysisView==='arrival'?'primary':'outline'} aria-pressed={analysisView==='arrival'} onClick={()=>setAnalysisView('arrival')}>문샷 체험존</AdminButton></div>;
   if(analysisView==='campus')return <>{analysisTabs}<CampusAnalyticsPanel/></>;
+  if(analysisView==='arrival')return <>{analysisTabs}<ArrivalAnalyticsPanel/></>;
   return (
     <>
       {analysisTabs}
