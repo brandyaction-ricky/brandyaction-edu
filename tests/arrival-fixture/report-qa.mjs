@@ -87,9 +87,10 @@ for (const [engine, viewport] of devices) {
       expect(visited).toEqual([1, 2, 3, 4]);
       await expect(page.getByRole('heading', {name:'오늘 해본 것', exact:true})).toHaveCount(0);
       await expect(page.getByText('내 AI 체험을 마쳤어요.', {exact:true})).toHaveCount(0);
-      await expect(action('무료 자료 받기')).toBeVisible();
+      await expect(action('무료 자료 받기')).toHaveCount(0);
       if (!priorRoute) await capture(page, 'lounge');
       await openLoungeSchedule(page);
+      await expect(action('무료 자료 열기')).toBeVisible();
       const google = page.getByRole('link', {name:'Google 캘린더', exact:true});
       const calendar = new URL(await google.getAttribute('href'));
       expect(calendar.origin + calendar.pathname).toBe('https://accounts.google.com/AccountChooser');

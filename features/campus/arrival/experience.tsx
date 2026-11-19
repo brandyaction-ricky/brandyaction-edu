@@ -113,7 +113,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const destination = destinations[station - 1];
   const stopIndex = corridorStops.findIndex(stop => stop.station === station);
   const caseVisited = state.officeStation === 7;
-  const personalFinished = state.audience === 'work' ? state.workTrial.secondConfirmed : state.experience !== 'none';
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
   const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
   const room = step === 7 ? 'live' : 'office';
@@ -617,21 +616,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </div>
       <div className={entryStyle.loungeCard}>
         <h1>{dateLabel} {timeLabel} · 무료 라이브</h1>
-        {showLiveReminder ? reminderRegistered
-          ? <p className={entryStyle.hallReminderDone}><Check size={15} aria-hidden="true"/>문자 알림을 신청했어요.</p>
-          : <button type="button" className={entryStyle.hallReminder} aria-controls="arrival-content" onClick={openHallReminder}>
-            <MessageSquare size={16} aria-hidden="true"/>라이브 당일 문자 받기<ArrowRight size={14} aria-hidden="true"/>
-          </button>
-          : <p>AI 직원에게 업무를 맡기는 방법을 라이브에서 이어서 배워보세요.</p>}
+        {!showLiveReminder && <p>AI 직원에게 업무를 맡기는 방법을 라이브에서 이어서 배워보세요.</p>}
         <div className={entryStyle.hallActions}>
           <button type="button" id="arrival-hall-schedule" aria-controls="arrival-content" onClick={openHallSchedule}><CalendarDays size={17} aria-hidden="true"/>캘린더에 추가</button>
-          <button type="button" onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 받기</button>
+          {showLiveReminder && (reminderRegistered
+            ? <span className={entryStyle.hallReminderDone} role="status"><Check size={15} aria-hidden="true"/>문자 알림 신청 완료</span>
+            : <button type="button" aria-controls="arrival-content" onClick={openHallReminder}><MessageSquare size={16} aria-hidden="true"/>라이브 당일 문자 받기</button>)}
         </div>
         <div className={entryStyle.hallLinks}>
           {caseVisited ? <button type="button" onClick={returnToCorridor}><ArrowLeft size={15} aria-hidden="true"/>복도로 돌아가기</button>
             : <button type="button" onClick={openOfficeCase}>사무실 사례 둘러보기<ArrowRight size={14} aria-hidden="true"/></button>}
-          <button type="button" onClick={openPersonalTrial}>{personalFinished || state.hallReturnStep !== null
-            ? '내 AI 체험으로 돌아가기' : '내 AI 체험으로 가기'}</button>
           {sceneStatus !== 'ready' && <button type="button" onClick={event => openLobbyGuide('intro', event.currentTarget)}>퇴사선배 윤익 소개</button>}
         </div>
       </div>

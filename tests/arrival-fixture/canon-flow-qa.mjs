@@ -167,9 +167,10 @@ for (const [device, engine, viewport] of [
     await expect(calendar).toHaveCount(0);
     await expect(page.getByRole('heading', {name:'오늘 해본 것', exact:true})).toHaveCount(0);
     const lounge = page.getByRole('region', {name:'웰컴 라운지에서 할 수 있는 일', exact:true});
-    for (const label of ['캘린더에 추가', '무료 자료 받기', '복도로 돌아가기', '내 AI 체험으로 가기']) {
+    for (const label of ['캘린더에 추가', '복도로 돌아가기']) {
       await expect(button(lounge, label)).toBeInViewport({ratio:.95});
     }
+    await expect(lounge.getByRole('button', {name:/무료 자료 받기|내 AI 체험으로/})).toHaveCount(0);
     await capture('lounge-entry');
 
     await tap(frame.getByRole('button', {name: /자료 안내/}));

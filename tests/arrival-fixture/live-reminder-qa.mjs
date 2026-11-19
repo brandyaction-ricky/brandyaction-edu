@@ -26,7 +26,7 @@ if (preview) {
 
 const national = `010-0000-00${suffix}`;
 const digits = national.replace(/\D/g, '');
-const actions = ['캘린더에 추가', '무료 자료 받기', '라이브 당일 문자 받기'];
+const actions = ['캘린더에 추가', '라이브 당일 문자 받기'];
 const viewport = {width: 390, height: 690};
 const browser = await webkit.launch();
 
@@ -67,10 +67,17 @@ async function openForm() {
   expect((await page.goto(url.href))?.status()).toBe(200);
   expect(new URL(page.url()).origin).toBe(url.origin);
   const lounge = page.getByRole('region', {name: '웰컴 라운지에서 할 수 있는 일'});
+  await expect(lounge.getByRole('button', {name: /무료 자료 받기|내 AI 체험으로/})).toHaveCount(0);
   for (const name of actions) {
     await expect(lounge.getByRole('button', {name, exact: true})).toBeInViewport({ratio: .95});
   }
-  await lounge.getByRole('button', {name: '라이브 당일 문자 받기', exact: true}).tap();
+  const calendar = lounge.getByRole('button', {name: actions[0], exact: true});
+  const reminder = lounge.getByRole('button', {name: actions[1], exact: true});
+  const [calendarBox, reminderBox] = await Promise.all([calendar.boundingBox(), reminder.boundingBox()]);
+  expect(reminderBox.x).toBeGreaterThanOrEqual(calendarBox.x + calendarBox.width);
+  expect(reminderBox.y).toBe(calendarBox.y);
+  expect(reminderBox.height).toBeGreaterThanOrEqual(44);
+  await reminder.tap();
   const phone = page.getByRole('textbox', {name: '휴대폰 번호', exact: true});
   const consent = page.getByRole('checkbox', {name: '라이브 당일 안내 문자 1회 수신에 동의합니다.', exact: true});
   const submit = page.getByRole('button', {name: '문자 알림 신청', exact: true});

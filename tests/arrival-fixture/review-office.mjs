@@ -84,5 +84,8 @@ export async function finishOfficeReview(page, {walk, audience, inspect = async 
   }
   await travel(7);
   await expect(loungeScheduleButton(page)).toBeVisible({timeout:20000});
-  if (enterPersonal) await page.getByRole('button', {name:'내 AI 체험으로 가기', exact:true}).click();
+  if (enterPersonal) {
+    await openLoungeSchedule(page);
+    await page.getByRole('button', {name:'내 AI 체험으로 가기', exact:true}).click();
+  }
 }

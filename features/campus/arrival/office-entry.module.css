@@ -200,27 +200,16 @@
 }
 .loungeCard h1 { margin: 0 0 3px; font-size: clamp(17px, 2vw, 21px); line-height: 1.4; word-break: keep-all; }
 .loungeCard > p { margin-bottom: 8px; color: #41556a; font-size: 13px; line-height: 1.45; word-break: keep-all; }
-.loungeCard .hallReminder {
-  display: inline-flex;
-  min-height: 36px;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-  padding: 2px 0;
-  border: 0;
-  background: transparent;
-  color: #173b69;
-  font-size: 14px;
-  font-weight: 650;
-}
-.hallReminder:hover { text-decoration: underline; text-underline-offset: 3px; }
-.loungeCard .hallReminderDone {
+.hallReminderDone {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  margin-bottom: 8px;
   color: #23604c;
+  font-size: 13px;
   font-weight: 650;
+  text-align: center;
+  word-break: keep-all;
 }
 .hallLinks { display: flex; flex-wrap: wrap; gap: 0 12px; margin-top: 3px; }
 .hallLinks button {
@@ -241,10 +230,11 @@
   color: #fff;
   font-size: 13px;
   font-weight: 700;
+  word-break: keep-all;
   pointer-events: auto;
 }
 .hallActions button + button { border-color: #c7d5e5; background: #fff; color: #173b69; }
-.hallActions button svg { flex-shrink: 0; }
+.hallActions svg { flex-shrink: 0; }
 .avatarControl { position: absolute; top: 88px; right: clamp(14px, 3vw, 40px); z-index: 3; }
 @media (pointer: coarse) {
   .keyboardHint { display: none; }
@@ -267,6 +257,6 @@
 }
 
 @media (max-width: 360px) {
-  .hallActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .hallActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); gap: 6px; }
   .loungeCard .hallActions button { gap: 5px; padding-inline: 7px; font-size: 14px; }
 }

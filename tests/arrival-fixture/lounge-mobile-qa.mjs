@@ -42,7 +42,7 @@ try {
     try {
       await page.addInitScript(() => {
         if (window === window.top) {
-          const visit = JSON.stringify({version:1, step:7, station:7});
+          const visit = JSON.stringify({version:1, step:7, station:7, officeStation:7, entryStarted:true, spyPhase:'handed-off', canonPhase:3});
           localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', visit);
           localStorage.setItem('moonshot:arrival:2026-12-07:v1', visit);
         }
@@ -51,7 +51,11 @@ try {
       await expect(world).toHaveAttribute('data-ready', 'true', {timeout:30_000});
       await expect(world).toHaveAttribute('data-free-roam', 'true');
       await expect(page.getByRole('dialog')).toHaveCount(0);
-      await expect(loungeScheduleButton(page)).toBeInViewport({ratio:.95});
+      const calendar = await hitTarget(loungeScheduleButton(page));
+      const reminder = await hitTarget(page.getByRole('region', {name:'웰컴 라운지에서 할 수 있는 일'})
+        .getByRole('button', {name:'라이브 당일 문자 받기', exact:true}));
+      expect(reminder.x).toBeGreaterThanOrEqual(calendar.x + calendar.width);
+      expect(reminder.y).toBe(calendar.y);
       const [a, b] = await Promise.all([hitTarget(materials), hitTarget(intro)]);
       const overlap = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
         Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
