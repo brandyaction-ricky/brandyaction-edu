@@ -6,7 +6,7 @@ import {arrivalLiveReminderEnabled, arrivalLiveReminderOpen} from '@/features/ca
 import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {slugPattern, uuid} from '@/features/campus/webinar/domain';
-import {arrivalPreviewClosed, arrivalPublicationEnabled} from '@/features/campus/arrival/preview-gate';
+import {arrivalPublicationEnabled} from '@/features/campus/arrival/preview-gate';
 import {readPublishedArrival} from '@/features/campus/arrival/publication-server';
 import Link from 'next/link';
 
@@ -18,7 +18,6 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function Page({searchParams}: {searchParams: Promise<Record<string, string | string[] | undefined>>}) {
-  if (arrivalPreviewClosed(process.env)) notFound();
   const {event, revision} = await searchParams;
   if (event !== undefined) {
     if (typeof event !== 'string' || !slugPattern.test(event) || (revision !== undefined && !uuid(revision))) notFound();

@@ -70,16 +70,14 @@ function fixture(env = {}) {
   };
 }
 
-test('production never reads drafts or publications for the experience or calendar', async () => {
-  for (const env of [{VERCEL_ENV: 'production'}, {NEXT_PUBLIC_APP_ENV: 'production'}]) {
-    const f = fixture(env);
-    f.allow();
-    for (const query of [{}, {event: 'test-event'}]) await assert.rejects(f.render(query), /404/);
-    assert.equal((await f.calendar()).status, 404);
-    assert.equal(f.reads(), 0);
-    assert.equal(f.publicReads(), 0);
-    assert.equal(f.authReads(), 0);
-  }
+test('production serves the visitor journey and calendar without member reads or SMS reminders', async () => {
+  const f = fixture({VERCEL_ENV: 'production', NEXT_PUBLIC_APP_ENV: 'production'});
+  const page = await f.render({});
+  assert.equal(page.type, 'arrival');
+  assert.notEqual(page.props.liveReminderEnabled, true);
+  assert.equal((await f.calendar()).status, 200);
+  assert.equal(f.reads(), 0);
+  assert.equal(f.authReads(), 0);
 });
 
 test('anonymous preset never reads member settings and saved draft requires marketing access first', async () => {

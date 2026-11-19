@@ -130,7 +130,7 @@ const requestBody = (sourceRevision = first, expectedPublicationRevision = null,
   slug: eventSlug, sourceRevision, expectedPublicationRevision,
 });
 
-test('publication requires same origin, marketing permission and the fixed DEV environment', async () => {
+test('publication requires same origin, marketing permission and a non-preview environment', async () => {
   const f = await fixture();
   f.setAllowed(false);
   assert.equal((await f.get()).status, 403);
@@ -138,14 +138,9 @@ test('publication requires same origin, marketing permission and the fixed DEV e
   f.setAllowed(true);
   assert.equal((await f.post(requestBody(), 'https://other.example.com')).status, 403);
   assert.equal((await f.post({...requestBody(), config: domain.DEFAULT_ARRIVAL})).status, 400);
-  for (const env of [
-    {VERCEL_ENV: 'preview', NEXT_PUBLIC_APP_ENV: 'development'},
-    {VERCEL_ENV: 'production', NEXT_PUBLIC_APP_ENV: 'production'},
-  ]) {
-    f.setEnv(env);
-    assert.equal((await f.get()).status, 404);
-    assert.equal((await f.post(requestBody())).status, 404);
-  }
+  f.setEnv({VERCEL_ENV: 'preview', NEXT_PUBLIC_APP_ENV: 'development'});
+  assert.equal((await f.get()).status, 404);
+  assert.equal((await f.post(requestBody())).status, 404);
   assert.deepEqual(f.settings.reads, []);
   assert.deepEqual(f.settings.writes, []);
 });
