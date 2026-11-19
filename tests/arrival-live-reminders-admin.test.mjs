@@ -31,7 +31,12 @@ function loadRoute({enabled = true, authorised = true, read, readDelivery = asyn
   return {GET: exports.GET, permissions};
 }
 
-test('live reminder CRM checks the preview flag and marketing access before reading', async () => {
+test('CRM campaigns can show the reminder panel in both production and DEV', () => {
+  const workflows = readFileSync(new URL('../app/ui/admin-workflows.tsx', import.meta.url), 'utf8');
+  assert.match(workflows, /\{section === "campaigns" && <LiveReminderIntake\s*\/>\}/);
+});
+
+test('live reminder CRM checks the environment and marketing access before reading', async () => {
   let reads = 0;
   const read = async () => { reads += 1; };
   const disabled = loadRoute({enabled: false, read});

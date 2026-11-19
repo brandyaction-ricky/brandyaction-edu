@@ -83,7 +83,7 @@ export function LiveReminderIntake() {
             발송 업체 접수 {delivery.accepted.toLocaleString('ko-KR')}건 · 전송 성공 {delivery.delivered.toLocaleString('ko-KR')}건 · 실패 {delivery.failed.toLocaleString('ko-KR')}건 · 결과 대기 {delivery.pending.toLocaleString('ko-KR')}건 · 결과 미확인 {delivery.unconfirmed.toLocaleString('ko-KR')}건 · 발송 시간 만료 {(delivery.skipped + (delivery.cleanup?.eligible_unsent_count ?? 0)).toLocaleString('ko-KR')}건
           </p> : <p className="meta mt8 mb24">발송 시각과 문구를 확인할 수 있어요. 자동 발송은 꺼져 있습니다.</p>}
           <h3>발송 대상</h3>
-          <p className="meta mt8 mb24">웰컴 라운지에서 이번 라이브 안내 문자 1회 수신에 동의한 번호만 포함됩니다. 같은 번호는 한 번만 집계하며 표에는 최근 50건까지 표시합니다.</p>
+          <p className="meta mt8 mb24">웰컴 라운지에서 문샷 라이브 안내 문자 수신에 동의한 번호만 포함됩니다. 같은 번호는 한 번만 집계하며 표에는 최근 50건까지 표시합니다.</p>
           <AdminDataTable label="라이브 안내 문자 발송 대상" sticky={false}>
             <thead><tr><th scope="col">휴대폰 번호</th><th scope="col">동의 시각</th></tr></thead>
             <tbody>
