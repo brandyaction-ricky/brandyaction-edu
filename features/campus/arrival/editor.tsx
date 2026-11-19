@@ -119,13 +119,14 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
       <OfficeDemoEditor disabled={disabled} value={value.officeDemo} onChange={next => patch('officeDemo', next)}/>
     </EditorDisclosure>
 
-    <EditorDisclosure title="체험 소개 · 강사 소개">
+    <EditorDisclosure title="체험 소개 · 강사와 팀 소개">
       <fieldset disabled={disabled} className={styles.fields}>
         <AdminTextarea label="체험 소개 제목" helper="첫 화면 메뉴에서 ‘체험 소개’를 열면 표시됩니다." required maxLength={limits.title} rows={2} value={value.title} onChange={event => patch('title', event.target.value)}/>
         <AdminTextarea label="체험 소개 본문" required maxLength={limits.description} rows={3} value={value.description} onChange={event => patch('description', event.target.value)}/>
         {value.welcomeBenefits.map((benefit, index) => <AdminInput key={index} label={`체험 소개 · 해볼 수 있는 일 ${index + 1}`} required maxLength={limits.welcomeBenefit} value={benefit} onChange={event => patch('welcomeBenefits', value.welcomeBenefits.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}/>)}
         <AdminInput label="강사 이름" required maxLength={limits.instructorName} value={value.instructorName} onChange={event => patch('instructorName', event.target.value)}/>
-        <AdminTextarea label="강사·팀 소개" required maxLength={limits.instructorIntro} rows={3} value={value.instructorIntro} onChange={event => patch('instructorIntro', event.target.value)}/>
+        <AdminTextarea label="강사 소개" required maxLength={limits.instructorIntro} rows={3} value={value.instructorIntro} onChange={event => patch('instructorIntro', event.target.value)}/>
+        <AdminTextarea label="브랜디액션 팀 소개" helper="빈 줄로 문단을 나누면 방문자 화면에서도 그대로 나뉩니다." maxLength={limits.teamIntro} rows={10} value={value.teamIntro ?? ''} onChange={event => patch('teamIntro', event.target.value)}/>
         <AdminInput label="소개 영상 주소 · 선택" type="url" maxLength={limits.url} placeholder="https://www.youtube.com/watch?v=…" helper="영상이 없으면 비워두세요. 방문자가 직접 눌러서 시청합니다." value={value.videoUrl} onChange={event => patch('videoUrl', event.target.value)}/>
       </fieldset>
     </EditorDisclosure>

@@ -56,6 +56,7 @@ try {
         .getByRole('button', {name:'라이브 당일 문자 받기', exact:true}));
       expect(reminder.x).toBeGreaterThanOrEqual(calendar.x + calendar.width);
       expect(reminder.y).toBe(calendar.y);
+      await expect(intro).toContainText('광고만 13년 했어요. 요즘은 AI 직원들이랑 일해요.');
       const [a, b] = await Promise.all([hitTarget(materials), hitTarget(intro)]);
       const overlap = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
         Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
@@ -91,18 +92,49 @@ try {
 
       await press(intro);
       await expect(team).toBeVisible();
-      await expect(team.getByText(/퇴사선배 윤익과 브랜디액션 팀이 AI 직원에게 일을 맡기고/)).toBeVisible();
+      await expect(team.getByRole('heading', {name:'퇴사선배 윤익 · 브랜디액션 팀', exact:true})).toBeVisible();
+      await expect(team.getByText('13년차 퍼포먼스 마케터 · 브랜디액션 CMO', {exact:true})).toBeVisible();
+      await expect(team.getByText(/^13년 동안 250억의 광고비를 직접 집행했고/)).toBeVisible();
+      for (const metric of ['13년', '250억', '1,000명+', '3.6만']) {
+        await expect(team.getByText(metric, {exact:true})).toBeVisible();
+      }
+      await expect(team.getByRole('heading', {name:'브랜디액션이 일하는 방식', exact:true})).toBeVisible();
+      await expect(team.getByText(/^지난 4년 동안 브랜디액션은 5,000명이 넘는/)).toBeVisible();
+      await expect(team.getByRole('heading', {name:'12월 7일 (월) 오후 9시 무료 라이브에서 알려드려요', exact:true})).toBeVisible();
+      const agenda = [
+        'AI 마케팅 팀 만드는 법',
+        '흩어진 데이터를 한 곳에 모으는 법',
+        '반복 업무를 AI 직원에게 나눠 맡기는 법',
+        '광고비 250억을 쓰며 쌓은 판단 기준을 AI에 적용하는 법',
+      ];
+      await expect(team.getByRole('listitem')).toHaveText(agenda);
+      const freeMaterials = team.getByRole('button', {name:'무료자료 확인하러 가기', exact:true});
+      await hitTarget(freeMaterials);
+      await capture('team');
+
+      await expect(team.getByRole('heading', {name:'브랜디액션 팀의 실제 AI 사무실', exact:true})).toBeVisible();
+      const photo = team.locator('img[src="/campus/showcase/ai-office-real-enhanced-v3.webp"]');
+      const caption = team.locator('figcaption');
+      await expect(caption).toHaveText('직원마다 맡은 일이 있어요. 사람은 확인하고 승인만 해요.');
+      await caption.scrollIntoViewIfNeeded();
+      await expect(photo).toBeInViewport({ratio:.95});
+      await expect.poll(() => photo.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+      await hitTarget(freeMaterials);
+      await capture('team-office-photo');
+
+      await expect(team.locator('video')).toBeHidden();
+      await press(team.getByText('AI 사무실 영상 보기', {exact:true}));
+      await expect(team.locator('video')).toBeVisible();
       const video = await team.locator('video').elementHandle();
       await expect(team.locator('video')).toHaveAttribute('src','/campus/arrival/team-at-work.mp4');
       expect(await video.evaluate(element => element.clientHeight > element.clientWidth)).toBe(true);
-      await capture('team');
       videoPlayed = await video.evaluate(async element => {
         element.muted = true;
         try {await element.play(); return !element.paused;}
         catch {return false;}
       });
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
-      await press(team.getByRole('button', {name:'무료자료 확인하러 가기', exact:true}));
+      await press(freeMaterials);
       await expect(team).not.toBeVisible();
       await expect(guide.getByRole('heading', {name:'무료자료 · 라이브 특전', exact:true})).toBeFocused();
       await expect(guide.getByRole('button', {name:'무료자료', exact:true})).toHaveAttribute('aria-pressed', 'true');

@@ -5,7 +5,7 @@ import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
-import {guideTitles, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
+import {onboardingGuideTitle, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
 import {reuseContentStationAnswers} from './content-station-prompt';
 import {TeamLeader} from './team-leader';
@@ -638,9 +638,9 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       contentDraft={state.contentDraft} onContentDraftChange={contentDraft => update({contentDraft})}
       revisit={revisitContent} onClose={revisitContent ? closeContentReplay : closeDesk}
       onComplete={revisitContent ? closeContentReplay : finishStation}/>}
-    <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? guideTitles[lobbyGuide] : undefined}
+    <dialog ref={lobbyDialog} className={entryStyle.monitor} data-scroll-panel aria-label={lobbyGuide ? onboardingGuideTitle(lobbyGuide, config) : undefined}
       onCancel={event => {event.preventDefault(); closeLobbyGuide();}}>
-      {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} timeLabel={timeLabel} onContentReplay={openContentReplay}
+      {lobbyGuide && <OnboardingProgram key={lobbyGuide} guide={lobbyGuide} config={config} dateLabel={dateLabel} weekday={weekday} timeLabel={timeLabel} onContentReplay={openContentReplay}
         onOpenSchedule={() => {lobbyDialog.current?.close(); lobbyGuideTrigger.current = null; setLobbyGuide(null); openHallSchedule();}}
         onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')}/>}
     </dialog>

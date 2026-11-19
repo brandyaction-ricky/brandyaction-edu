@@ -1,5 +1,5 @@
 import {useId, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, CalendarDays, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
+import {ArrowLeft, ArrowRight, CalendarDays, ChevronDown, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
 import monitor from './office-demo.module.css';
@@ -7,7 +7,24 @@ import progression from './progression.module.css';
 import styles from './onboarding-program.module.css';
 
 export type OnboardingGuide = 'materials' | 'intro';
-export const guideTitles = {'materials': '무료자료 · 라이브 특전', 'intro': '퇴사선배 윤익 · 브랜디액션 팀'};
+
+export function onboardingGuideTitle(guide: OnboardingGuide, config: ArrivalConfig) {
+  return guide === 'materials' ? '무료자료 · 라이브 특전' : config.instructorName;
+}
+
+const instructorStats = [
+  {value:'13년', label:'광고 집행'},
+  {value:'250억', label:'누적 광고비'},
+  {value:'1,000명+', label:'누적 수강생'},
+  {value:'3.6만', label:'SNS 팔로워'},
+] as const;
+
+const liveTopics = [
+  'AI 마케팅 팀 만드는 법',
+  '흩어진 데이터를 한 곳에 모으는 법',
+  '반복 업무를 AI 직원에게 나눠 맡기는 법',
+  '광고비 250억을 쓰며 쌓은 판단 기준을 AI에 적용하는 법',
+] as const;
 
 const guides = [
   {id:'blueprint', title:'AI팀 설계도', description:'결제가 줄었을 때, AI 직원들이 원인을 찾고 상품 안내를 고치는 과정을 살펴보세요.', href:'https://edu.brandyaction.com/ai-team-blueprint'},
@@ -19,10 +36,11 @@ function MaterialCover({id}: {id: 'ad' | 'guide' | 'blueprint'}) {
   return <img className={styles.cover} src={`/campus/arrival/material-${id}.webp`} width={480} height={270} alt="" loading={id === 'blueprint' ? 'eager' : 'lazy'} decoding="async"/>;
 }
 
-export function OnboardingProgram({guide, config, dateLabel, timeLabel, onContentReplay, onClose, onOpenMaterials, onOpenSchedule}: {
+export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel, onContentReplay, onClose, onOpenMaterials, onOpenSchedule}: {
   guide: OnboardingGuide;
   config: ArrivalConfig;
   dateLabel: string;
+  weekday: string;
   timeLabel: string;
   onContentReplay: () => void;
   onClose: () => void;
@@ -42,8 +60,8 @@ export function OnboardingProgram({guide, config, dateLabel, timeLabel, onConten
   }
 
   return <section className={monitor.monitor} aria-labelledby={titleId}>
-    <header className={monitor.header}>
-      <h2 id={titleId} className={styles.title} tabIndex={-1}>{isMaterials ? guideTitles.materials : '강사와 팀 소개'}</h2>
+    <header className={`${monitor.header} ${styles.header}`}>
+      <h2 id={titleId} className={styles.title} tabIndex={-1}>{onboardingGuideTitle(guide, config)}</h2>
       <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>라운지로 돌아가기</button>
     </header>
     {isMaterials && <div className={styles.switcher} role="group" aria-label="자료 유형">
@@ -81,16 +99,35 @@ export function OnboardingProgram({guide, config, dateLabel, timeLabel, onConten
           {config.bonusPreview && <p>{config.bonusPreview}</p>}
           <button type="button" className={styles.guideButton} onClick={onOpenSchedule}><CalendarDays size={16} aria-hidden="true"/>캘린더에 추가</button>
         </>}
-      </section> : <section>
+      </section> : <section className={styles.profile}>
+        <p className={styles.role}>13년차 퍼포먼스 마케터 · 브랜디액션 CMO</p>
+        <p>{config.instructorIntro}</p>
+        <dl className={styles.stats}>
+          {instructorStats.map(({label, value}) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        </dl>
+        {config.teamIntro && <section className={styles.story}>
+          <h3>브랜디액션이 일하는 방식</h3>
+          {config.teamIntro.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+        </section>}
+        <section className={styles.agenda}>
+          <h3>{dateLabel} ({weekday.replace(/요일$/, '')}) {timeLabel} 무료 라이브에서 알려드려요</h3>
+          <ul>{liveTopics.map(topic => <li key={topic}>{topic}</li>)}</ul>
+        </section>
+        <figure className={styles.officePhoto}>
+          <h3>브랜디액션 팀의 실제 AI 사무실</h3>
+          {/* eslint-disable-next-line @next/next/no-img-element -- Local, pre-sized WebP used in the campus showcase. */}
+          <img src="/campus/showcase/ai-office-real-enhanced-v3.webp" width={1473} height={1068} alt="AI 직원들이 각자 맡은 일을 하는 브랜디액션의 3D 사무실 화면" loading="lazy" decoding="async"/>
+          <figcaption>직원마다 맡은 일이 있어요. 사람은 확인하고 승인만 해요.</figcaption>
+        </figure>
+        <details className={styles.officeVideo}>
+          <summary>AI 사무실 영상 보기 <ChevronDown size={16} aria-hidden="true"/></summary>
+          <video className={styles.teamVideo} controls playsInline preload="none" poster="/campus/showcase/ai-office-real-enhanced-v3.webp"
+            aria-label="브랜디액션 팀의 AI 사무실 업무 화면" src="/campus/arrival/team-at-work.mp4"/>
+        </details>
         {greeting && <section className={styles.greeting} aria-label="퇴사선배 윤익의 인사 영상">
           {playGreeting ? <iframe title="퇴사선배 윤익의 인사 영상" src={`https://www.youtube-nocookie.com/embed/${greeting}?autoplay=1`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen/>
             : <button type="button" style={{backgroundImage: `url(https://i.ytimg.com/vi/${greeting}/hqdefault.jpg)`}} onClick={() => setPlayGreeting(true)}><span><Play size={22} aria-hidden="true"/>퇴사선배 윤익의 인사 영상 재생</span></button>}
         </section>}
-        <h3>{config.instructorName}</h3>
-        <p>{config.instructorIntro}</p>
-        <h4 className={styles.teamTitle}>브랜디액션 팀이 AI와 일하는 모습</h4>
-        <video className={styles.teamVideo} controls playsInline preload="none" poster="/campus/showcase/ai-office-real-enhanced-v3.webp"
-          aria-label="브랜디액션 팀의 AI 사무실 업무 화면" src="/campus/arrival/team-at-work.mp4"/>
       </section>}
     </div>
     {!isMaterials && <footer className={monitor.footer}><button type="button" className={progression.nextAction} onClick={onOpenMaterials}>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></button></footer>}

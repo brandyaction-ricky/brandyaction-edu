@@ -1,5 +1,6 @@
 .title { margin: 0; font-size: 16px; line-height: 1.4; }
 .title:focus { outline: none; }
+.header > button { flex-shrink: 0; }
 .body { overflow-anchor: none; -webkit-overflow-scrolling: touch; }
 .body h3 { margin: 0 0 16px; font-size: 20px; line-height: 1.4; letter-spacing: -.02em; }
 .switcher { display: flex; flex: 0 0 auto; gap: 14px; padding: 0 28px; border-bottom: 1px solid var(--line, #e2e5e9); }
@@ -26,14 +27,35 @@
 .body .lockNote { display: flex; gap: 7px; align-items: center; color: #2b4565; font-weight: 650; }
 .bonuses { margin: 16px 0; padding-left: 22px; }
 .bonuses li + li { margin-top: 7px; }
-.greeting { margin-bottom: 20px; }
+.profile { display: grid; gap: 22px; }
+.profile > .role { margin-bottom: -14px; color: #263d59; font-weight: 700; }
+.profile > p, .story p { line-height: 1.75; }
+.profile h3 { margin-bottom: 10px; }
+.stats {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+  margin: 0; overflow: hidden; border: 1px solid #dce5ef; border-radius: 10px; background: #dce5ef;
+}
+.stats > div { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: #f6f8fb; }
+.stats dt { color: #495b72; font-size: 13px; }
+.stats dd { order: -1; margin: 0; color: #15365f; font-size: 21px; font-weight: 750; line-height: 1.24; }
+.story p + p { margin-top: 12px; }
+.agenda { padding: 16px 18px; border: 1px solid #dce5ef; border-radius: 10px; background: #f0f5fb; }
+.agenda h3 { color: #173b69; font-size: 17px; }
+.agenda ul { margin: 0; padding-inline-start: 20px; }
+.agenda li + li { margin-top: 5px; }
+.officePhoto { margin: 0; }
+.officePhoto img { display: block; width: 100%; height: auto; border: 1px solid #dce5ef; border-radius: 8px; }
+.officePhoto figcaption { margin-top: 8px; color: var(--muted, #565e68); font-size: 14px; line-height: 1.6; }
+.officeVideo { border-top: 1px solid var(--line, #e2e5e9); }
+.officeVideo[open] summary svg { transform: rotate(180deg); }
 .greeting :is(button, iframe) { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #17304b; color: #fff; }
 .greeting button { background-size: cover; background-position: center; }
 .greeting button span { display: flex; align-items: center; gap: 8px; background: #142b48e8; padding: 10px 13px; border-radius: 7px; }
-.teamTitle { margin: 19px 0 7px; font-size: 15px; }
 .teamVideo { display: block; width: min(100%, 300px); aspect-ratio: 9 / 16; object-fit: contain; background: #17304b; border-radius: 8px; }
 @media (max-width: 600px) {
   .switcher { padding-inline: 18px; }
   .card { grid-template-columns: 1fr; gap: 8px; }
   .title { font-size: 15px; }
+  .header { gap: 8px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
