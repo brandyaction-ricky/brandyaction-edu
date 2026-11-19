@@ -41,6 +41,9 @@ export type ArrivalState = {
 export function initialArrivalState(): ArrivalState {
   return {version: 1, step: 0, station: 1, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
+export function startArrivalVisit({visitorAvatar, answers, revision, extra, contentDraft, workTrial}: ArrivalState): ArrivalState {
+  return {...initialArrivalState(), visitorAvatar, answers, revision, extra, contentDraft, workTrial};
+}
 export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
 }

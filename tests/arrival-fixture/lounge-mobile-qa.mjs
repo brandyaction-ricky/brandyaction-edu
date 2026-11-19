@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
+import {loungeScheduleButton, openLoungeSchedule, resumeOfficeVisit} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -40,14 +40,7 @@ try {
     }
 
     try {
-      await page.addInitScript(() => {
-        if (window === window.top) {
-          const visit = JSON.stringify({version:1, step:7, station:7});
-          localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', visit);
-          localStorage.setItem('moonshot:arrival:2026-12-07:v1', visit);
-        }
-      });
-      await page.goto(url.href);
+      await resumeOfficeVisit(page, url.href, {step:7, station:7});
       await expect(world).toHaveAttribute('data-ready', 'true', {timeout:30_000});
       await expect(world).toHaveAttribute('data-free-roam', 'true');
       await expect(page.getByRole('dialog')).toHaveCount(0);

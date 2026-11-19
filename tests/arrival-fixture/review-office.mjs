@@ -1,5 +1,16 @@
 import {expect} from '@playwright/test';
 
+export const arrivalStorageKeys = ['moonshot:arrival:synthetic-local-qa:v1', 'moonshot:arrival:2026-12-07:v1'];
+
+export async function resumeOfficeVisit(page, url, state) {
+  await page.goto(url);
+  await expect(page.getByRole('region', {name:'문샷 웰컴존 소개', exact:true})).toBeVisible();
+  await page.evaluate(({keys, state}) => {
+    for (const key of keys) sessionStorage.setItem(key, JSON.stringify({version:1, ...state}));
+  }, {keys:arrivalStorageKeys, state});
+  await page.reload({waitUntil:'domcontentloaded'});
+}
+
 const nextDesk = ['이 질문을 광고에 반영하기', '정본에서 두 직원의 답 바꿔보기', '웰컴 라운지로 가기'];
 
 export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];

@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {spyActions} from './review-office.mjs';
+import {resumeOfficeVisit, spyActions} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -47,13 +47,7 @@ for (const {name, engine, viewport, mobile} of devices) {
   }));
 
   try {
-    await page.addInitScript(() => {
-      if (window !== window.top) return;
-      const visit = JSON.stringify({version: 1, step: 0, station: 2, spyPhase: 'intro'});
-      localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', visit);
-      localStorage.setItem('moonshot:arrival:2026-12-07:v1', visit);
-    });
-    await page.goto(url.href);
+    await resumeOfficeVisit(page, url.href, {step:0, station:2, spyPhase:'intro'});
     await expect(walk).toHaveAttribute('data-ready', 'true', {timeout: 30_000});
     await expect(walk).toHaveAttribute('data-station', '2');
     await tap(frame.getByRole('button', {name: /쪽으로 걷기/}));

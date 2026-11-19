@@ -3,7 +3,7 @@
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {initialArrivalState, startArrivalVisit, parseArrivalState, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {guideTitles, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
@@ -123,19 +123,30 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      try {
-        const restored = persistenceKey ? parseArrivalState(localStorage.getItem(persistenceKey)) : initialArrivalState();
+      if (persistenceKey) {
+        let restored = initialArrivalState();
+        try {restored = startArrivalVisit(parseArrivalState(localStorage.getItem(persistenceKey)));}
+        catch {setStorageBlocked(true);}
+        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+        if (navigation?.type === 'reload' || navigation?.type === 'back_forward') {
+          try {
+            const visit = sessionStorage.getItem(persistenceKey);
+            if (visit) restored = parseArrivalState(visit);
+          } catch { /* Continue with the saved drafts if tab storage is blocked. */ }
+        }
         setState(restored);
         setExplore(restored.step === 7);
       }
-      catch {setStorageBlocked(true);}
       setHydrated(true);
     });
     return () => {active = false;};
   }, [persistenceKey]);
   useEffect(() => {
     if (!hydrated || !persistenceKey) return;
-    try {localStorage.setItem(persistenceKey, serializeArrivalState(state));}
+    const visit = serializeArrivalState(state);
+    try {sessionStorage.setItem(persistenceKey, visit);}
+    catch { /* Tab storage is only needed to resume the route. */ }
+    try {localStorage.setItem(persistenceKey, visit);}
     catch {queueMicrotask(() => setStorageBlocked(true));}
   }, [state, hydrated, persistenceKey]);
   useEffect(() => {
@@ -376,6 +387,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function reset() {
     if (menu.current) menu.current.open = false;
     try {if (persistenceKey) localStorage.removeItem(persistenceKey);} catch {}
+    try {if (persistenceKey) sessionStorage.removeItem(persistenceKey);} catch {}
     resetWalkAssist();
     setNearStation(undefined);
     setSceneVisit(value => value + 1); setSceneStatus('loading'); setWalkRequest(0);
