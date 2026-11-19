@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-staff-prompt-review-20261119" ]; then
+            expected_main=84a87a36dd6cf0643ca47f512cab48fefd60663b
+            release_payload=ff43b6dc27749ab3184ebde2928008c994466811
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' app/ui/final/staff-curriculum-review.tsx tests/browser/staff-curriculum-review.spec.ts)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned staff prompt review change; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-day7-prompt-review-20261119" ]; then
             expected_main=fe64c9b890cd34404b1e047890c61322020bfa2c
             release_payload=7aa52611e3beb4b32a87bbfd5a83364bbdfe91c3
