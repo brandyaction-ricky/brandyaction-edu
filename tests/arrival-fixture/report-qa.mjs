@@ -97,16 +97,15 @@ for (const [engine, viewport] of devices) {
       const event = new URL(calendar.searchParams.get('continue'));
       expect(event.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
       if (!priorRoute) {
-        const file = page.getByRole('link', {name:'일정 파일 받기', exact:true});
+        const file = action('일정 파일 받기');
         await expect(file).toBeInViewport({ratio:.95});
-        const [response, download] = await Promise.all([
-          page.waitForResponse(response => new URL(response.url()).pathname === '/experience/moonshot/live.ics'),
+        const entryUrl = page.url();
+        const [download] = await Promise.all([
           page.waitForEvent('download'),
           tap(file),
         ]);
-        expect(response.status()).toBe(200);
-        expect(response.headers()['content-type']).toContain('text/calendar');
-        expect(response.headers()['content-disposition']).toBe('attachment; filename="moonshot-live-20261207.ics"');
+        expect(download.url()).toMatch(/^blob:/);
+        expect(page.url()).toBe(entryUrl);
         expect(download.suggestedFilename()).toBe('moonshot-live-20261207.ics');
         expect(await readFile(await download.path(), 'utf8')).toMatch(/DTSTART:20261207T120000Z/);
         await page.route('https://accounts.google.com/AccountChooser?**', route => route.fulfill({contentType:'text/html',body:'<title>Google Calendar test sign-in</title>'}));

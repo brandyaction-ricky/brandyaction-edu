@@ -37,7 +37,6 @@ function fixture(env = {}) {
     },
     '@/features/campus/arrival/experience': {ArrivalExperience: 'arrival'},
     '@/features/campus/arrival/model': {
-      ARRIVAL_CALENDAR_FILE: '/experience/moonshot/live.ics',
       calendarIcs: event => `SUMMARY:${event.title}`,
     },
     '@/features/campus/arrival/live-reminder-server': {
@@ -89,7 +88,6 @@ test('anonymous preset never reads member settings and saved draft requires mark
   assert.equal(publicPage.type, 'arrival');
   assert.equal(f.reads(), 0);
   assert.equal(f.authReads(), 0);
-  assert.equal(publicPage.props.calendarFileHref, '/experience/moonshot/live.ics');
   assert.equal(publicPage.props.liveReminderEnabled, true);
   assert.notEqual((await f.render({event: 'test-event'})).type, 'arrival');
   assert.equal(f.reads(), 0);
@@ -99,7 +97,6 @@ test('anonymous preset never reads member settings and saved draft requires mark
   assert.equal(result.props.config, f.draft());
   assert.equal(result.props.persistenceKey, null);
   assert.equal(result.props.preview, true);
-  assert.equal(result.props.calendarFileHref, undefined);
   assert.equal(result.props.liveReminderEnabled, undefined);
   assert.equal(JSON.stringify(result).includes('구매자 전용 공지'), false);
   assert.equal(f.reads(), 1);

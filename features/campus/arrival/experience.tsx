@@ -56,8 +56,8 @@ function LiveCountdown({date, className}: {date: string; className: string}) {
   return label ? <span className={className}>{label}</span> : null;
 }
 
-export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, calendarFileHref, liveReminderEnabled = false}: {
-  config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean; calendarFileHref?: string; liveReminderEnabled?: boolean;
+export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, liveReminderEnabled = false}: {
+  config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean; liveReminderEnabled?: boolean;
 }) {
   const [savedState, setState] = useState<ArrivalState>(initialArrivalState);
   const caseRevision = officeCaseRevision(config.officeDemo ?? DEFAULT_OFFICE_DEMO);
@@ -111,7 +111,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const teamLeaderOpen = officeIntro && firstStop && deskOpen;
   const backgroundInert = teamLeaderOpen || openDeskStation !== null;
   const exploringHall = step === 7 && explore;
-  const showLiveReminder = liveReminderEnabled && !preview && !embedded && Boolean(calendarFileHref);
+  const showLiveReminder = liveReminderEnabled && !preview && !embedded;
   const destination = destinations[station - 1];
   const stopIndex = corridorStops.findIndex(stop => stop.station === station);
   // Visit analytics on the public page only (not admin previews or embedded copies).
@@ -436,14 +436,15 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function saveCalendar() {
     const text = calendarIcs(event);
     if (!text) return;
+    // Native download managers can reopen an HTTP URL without the preview browser's cookies.
     const url = URL.createObjectURL(new Blob([text], {type: 'text/calendar;charset=utf-8'}));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `moonshot-live-${event.date.replaceAll('-', '')}.ics`;
+    a.download = `${event.id}.ics`;
     document.body.append(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
   }
   function reset() {
     if (menu.current) menu.current.open = false;
@@ -623,11 +624,9 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
             {calendarLink && <a href={calendarLink} target={preview || embedded ? '_blank' : undefined} rel="noreferrer">
               <CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/>
             </a>}
-            {calendarFileHref
-              ? <a href={calendarFileHref}>일정 파일 받기<Download size={15} aria-hidden="true"/></a>
-              : <button type="button" onClick={saveCalendar}>일정 파일 받기<Download size={15} aria-hidden="true"/></button>}
+            {calendarLink && <button type="button" onClick={saveCalendar}>일정 파일 받기<Download size={15} aria-hidden="true"/></button>}
           </div>
-          <p className={s.calendarInstruction}>Google 캘린더에서 ‘저장’을 눌러주세요. 아이폰 카톡에서는 일정 파일(.ics)을 먼저 내려받아요. 받은 파일에서 ‘추가’가 안 보이면 Safari에서 이 페이지를 다시 열어주세요.</p>
+          <p className={s.calendarInstruction}>Google 캘린더에서는 ‘저장’을 눌러주세요. 일정 파일(.ics)을 받았다면 파일을 열어 캘린더에 추가해 주세요.</p>
         </div>}
       </footer>}
       </>}

@@ -439,6 +439,7 @@
 .exampleDialog h2 { font-size: 22px; line-height: 1.45; margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
 .exampleDialog > header button { width: 44px; height: 44px; padding: 0; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
 .exampleBody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
+.exampleBody > :is(p, ul) { word-break: keep-all; overflow-wrap: anywhere; }
 .exampleDialog > footer { flex: none; border-top: 1px solid var(--line); padding: 16px 24px; }
 
 /* Desktop and tablet retain one fixed-width guide beside the framed world. */

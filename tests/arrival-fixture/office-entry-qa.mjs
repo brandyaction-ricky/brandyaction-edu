@@ -270,12 +270,12 @@ try {
       expect(google.hostname).toBe('calendar.google.com');
       expect(google.searchParams.get('dates')).toContain('20261207T120000Z');
       const saved=page.waitForEvent('download');
-      await page.getByRole('link', {name:'일정 파일 받기', exact:true}).click();
+      await button(page,'일정 파일 받기').click();
       const download=await saved;
       const file=await readFile(await download.path(),'utf8');
       expect(download.suggestedFilename()).toMatch(/20261207\.ics$/);
       expect(file).toMatch(/DTSTART:20261207T120000Z/);
-      await expect(page.getByText(/Safari에서 이 페이지를 다시 열어주세요/)).toBeInViewport({ratio: 0.95});
+      await expect(page.getByText(/파일을 열어 캘린더에 추가/)).toBeInViewport({ratio: 0.95});
       await capture('hall');
       expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(errors).toEqual([]);
