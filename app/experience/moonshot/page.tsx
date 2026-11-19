@@ -6,7 +6,7 @@ import {arrivalLiveReminderEnabled, arrivalLiveReminderOpen} from '@/features/ca
 import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {slugPattern, uuid} from '@/features/campus/webinar/domain';
-import {arrivalPublicationEnabled} from '@/features/campus/arrival/preview-gate';
+import {arrivalPublicationEnabled, arrivalRequiresPublication} from '@/features/campus/arrival/preview-gate';
 import {readPublishedArrival} from '@/features/campus/arrival/publication-server';
 import Link from 'next/link';
 
@@ -30,6 +30,7 @@ export default async function Page({searchParams}: {searchParams: Promise<Record
     return <ArrivalExperience config={webinar.arrival} persistenceKey={null} preview/>;
   }
   const publication = arrivalPublicationEnabled(process.env) ? await readPublishedArrival() : null;
+  if (!publication && arrivalRequiresPublication(process.env)) notFound();
   return <ArrivalExperience config={publication?.config ?? DEFAULT_ARRIVAL}
     liveReminderEnabled={arrivalLiveReminderEnabled() && arrivalLiveReminderOpen()}/>;
 }
