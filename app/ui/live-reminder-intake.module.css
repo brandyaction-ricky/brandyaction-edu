@@ -1,0 +1,48 @@
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.header h2 {
+  margin: 0;
+}
+
+.header button {
+  margin-inline-start: auto;
+}
+
+.schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin: 0 0 16px;
+}
+
+.schedule dt {
+  color: var(--adm-text-sub, #626770);
+  font-size: 13px;
+}
+
+.schedule dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.message {
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--adm-bg, #f5f6f8);
+}
+
+.message h3 {
+  margin: 0 0 6px;
+}
+
+.message p {
+  margin: 0;
+  line-height: 1.65;
+  white-space: pre-line;
+}

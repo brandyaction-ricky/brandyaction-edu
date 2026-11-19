@@ -4,13 +4,14 @@
     {
       "path": "office.js",
       "sourceSha256": "7ff3083b68ae0c623fd62ddb1940c440e6ebb48c216d8d499c300ed76a727d77",
-      "importSha256": "9251a124d04bc1d7738facd8400a0a8bbca8a553bf32b77383baca43e7f27a53"
+      "importSha256": "53b5220fbb046b1abb4c182e426120affd388e08910dfcc7f394c02a33d911e7",
+      "localPatch": "Load agent badge images when a renderer first needs them, so the welcome corridor does not request unused icons."
     },
     {
       "path": "office3d.js",
       "sourceSha256": "b45dd4c5cba821669a53bdb666b0ea6b21ca8b16a163a7a1c5c6e6bb9b7ab748",
-      "importSha256": "3033de614326bfa4eff642bb283f14ebff03f261be05f02db124180399adcadd",
-      "localPatch": "Export existing bundled MeshBasicMaterial, InstancedMesh and SphereGeometry classes for the campus adapter. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
+      "importSha256": "caaca46b0f0c97c68acfb5e458169a7eb0d3212f4f0eebde3d300db65a215336",
+      "localPatch": "Export existing bundled geometry, rendering and asset-loading classes for the campus adapter and welcome corridor. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
     },
     {
       "path": "campus-plan.js",

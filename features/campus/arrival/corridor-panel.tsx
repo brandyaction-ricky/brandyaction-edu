@@ -1,0 +1,58 @@
+import {useEffect, useId, useRef} from 'react';
+import {ArrowLeft} from 'lucide-react';
+import type {CanonPhase, SpyPhase} from './model';
+import {SpyStation} from './spy-station';
+import {ContentStation} from './content-station';
+import type {ContentStationDraft} from './content-station-prompt';
+import {CanonStation} from './canon-station';
+import monitor from './office-demo.module.css';
+
+type Props = {
+  station: 2 | 3 | 4;
+  spyPhase: SpyPhase;
+  onSpyAdvance: (phase: SpyPhase) => void;
+  contentDraft: ContentStationDraft;
+  onContentDraftChange: (draft: ContentStationDraft) => void;
+  canonPhase: CanonPhase;
+  onCanonAdvance: (phase: CanonPhase) => void;
+  onComplete: () => void;
+  onClose: () => void;
+  revisit?: boolean;
+};
+
+const locations = {2: '경쟁사 스파이', 3: '콘텐츠 담당자', 4: '정본 · 회사 업무 기준'};
+
+export function CorridorPanel({station, spyPhase, onSpyAdvance, contentDraft, onContentDraftChange, canonPhase, onCanonAdvance, onComplete, onClose, revisit = false}: Props) {
+  const labelId = useId();
+  const label = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => label.current?.focus({preventScroll: true}));
+    return () => cancelAnimationFrame(frame);
+  }, [station]);
+
+  return <div className={monitor.deskLayer}>
+    <section className={`${monitor.monitor} ${monitor.deskWindow}`} data-canon={station === 4 || undefined} role="dialog" aria-modal="true"
+      aria-label={revisit ? '콘텐츠 제작 다시 보기' : undefined} aria-labelledby={revisit ? undefined : labelId} onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+        if (event.key !== 'Tab') return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, summary, video[controls], [tabindex]'))
+          .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+        const boundary = event.shiftKey ? controls[0] : controls.at(-1);
+        if (document.activeElement !== boundary && !(event.shiftKey && document.activeElement === label.current)) return;
+        event.preventDefault();
+        (event.shiftKey ? controls.at(-1) : controls[0])?.focus();
+      }}>
+      <header className={monitor.header}>
+        <span id={labelId} ref={label} tabIndex={-1}>{locations[station]}</span>
+        <button type="button" className={monitor.leave} onClick={onClose}><ArrowLeft size={15} aria-hidden="true"/>{revisit ? '자료 목록으로 돌아가기' : '복도로 돌아가기'}</button>
+      </header>
+      {station === 2 && <SpyStation phase={spyPhase} onAdvance={onSpyAdvance} onComplete={onComplete}/>}
+      {station === 3 && <ContentStation draft={contentDraft} onDraftChange={onContentDraftChange} onComplete={onComplete} revisit={revisit}/>}
+      {station === 4 && <CanonStation phase={canonPhase} onAdvance={onCanonAdvance} onHall={onComplete}/>}
+    </section>
+  </div>;
+}

@@ -1,0 +1,412 @@
+import {buildWelcomeGuideRobot, mountWelcomeOnboardingLobby} from './welcome-onboarding-lobby.mjs';
+
+/** Four stops line the corridor to the welcome lounge. */
+const TITLES = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본', '', '내 AI 체험', '웰컴 라운지'];
+const PALETTE = {
+  navy: 0x213951, deep: 0x142d45, steel: 0x678298, frost: 0xdfeaf0,
+  pearl: 0xf0f2ee, floor: 0xc5d9e5, edge: 0x92abba, ink: 0x334950,
+  wood: 0xc8a176, blue: 0x456c9e, sand: 0xdfc8a6, green: 0x638879, red: 0xb93846,
+};
+const CHARACTERS = ['male-a','female-d','male-b',null,'female-f','male-e'];
+const KENNEY = '/campus/world/office/vendor/assets/kenney/';
+
+export function buildWelcomeWalkSet(THREE, scene, {loader} = {}) {
+  const root = new THREE.Group();
+  root.name = 'Moonshot campus walkway';
+  scene.add(root);
+  const cube = new THREE.BoxGeometry(1, 1, 1);
+  const cylinder = new THREE.CylinderGeometry(.5, .5, 1, 20);
+  const orb = new THREE.SphereGeometry(.5, 12, 10);
+  const plane = new THREE.PlaneGeometry(1, 1);
+  const materials = new Map(), textures = new Set(), models = new Set(), batches = new Map();
+  const pendingDeskActors = new Map();
+  const scratch = new THREE.Object3D();
+  const {navy, deep, steel, frost, pearl, floor, edge, ink, wood, blue, sand, green, red} = PALETTE;
+  const guide = new THREE.Group();
+  guide.name = 'walk-next-stop';
+  guide.visible = false;
+  root.add(guide);
+  let lobbyEntrance, lobby, preloadLobby;
+  let disposed = false;
+
+  function material(color, kind = 'matte') {
+    const key = color + ':' + kind;
+    if (!materials.has(key)) {
+      const result = kind === 'light' ? new THREE.MeshBasicMaterial({color})
+        : new THREE.MeshStandardMaterial({
+          color, roughness: kind === 'metal' ? .48 : .82, metalness: kind === 'metal' ? .35 : 0,
+          ...(kind === 'glass' ? {transparent: true, opacity: .18, depthWrite: false, side: THREE.DoubleSide} : {}),
+        });
+      materials.set(key, result);
+    }
+    return materials.get(key);
+  }
+
+  // Batch the repeating parts by bay. Ray hits still identify the correct desk.
+  function shape(group, geometry, x, y, z, width, height, depth, color, kind, turn = 0) {
+    const mat = material(color, kind);
+    const key = group.uuid + geometry.uuid + mat.uuid;
+    let batch = batches.get(key);
+    if (!batch) {
+      batch = {group, geometry, mat, matrices: []};
+      batches.set(key, batch);
+    }
+    scratch.position.set(x, y, z);
+    scratch.rotation.set(0, turn, 0);
+    scratch.scale.set(width, height, depth);
+    scratch.updateMatrix();
+    batch.matrices.push(scratch.matrix.clone());
+  }
+  const box = (g,x,y,z,w,h,d,c,k,r) => shape(g,cube,x,y,z,w,h,d,c,k,r);
+  const round = (g,x,y,z,w,h,d,c,k) => shape(g,cylinder,x,y,z,w,h,d,c,k);
+  const ball = (g,x,y,z,w,h,d,c) => shape(g,orb,x,y,z,w,h,d,c);
+  const groupAt = (g,x,y,z) => {
+    const group = new THREE.Group();
+    group.position.set(x,y,z);
+    group.userData.welcomeStation = g.userData.welcomeStation;
+    g.add(group);
+    return group;
+  };
+
+  function label(g, text, x, y, z, width, height, background, foreground) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 768;
+    canvas.height = Math.round(canvas.width * height / width);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = foreground;
+    ctx.font = '650 ' + Math.floor(canvas.height * .53) + 'px Pretendard, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 1, canvas.width - 40);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    textures.add(texture);
+    const mat = new THREE.MeshBasicMaterial({map: texture, toneMapped: false});
+    materials.set('text:' + mat.uuid, mat);
+    const sign = new THREE.Mesh(plane, mat);
+    sign.position.set(x,y,z);
+    sign.scale.set(width,height,1);
+    sign.userData.welcomeStation = g.userData.welcomeStation;
+    g.add(sign);
+  }
+
+  // Place existing campus assets without delaying movement while a model downloads.
+  // The synchronous furniture/actor remains usable if WebGL model decoding fails.
+  function asset(g, path, x, y, z, height, rotation, fallback, animation) {
+    if (!loader) return;
+    loader.loadAsync(KENNEY + path + '.glb').then(gltf => {
+      const model = gltf.scene;
+      if (disposed) { releaseModel(model); return; }
+      models.add(model);
+      const bounds = new THREE.Box3().setFromObject(model);
+      const originalHeight = bounds.max.y - bounds.min.y;
+      if (!Number.isFinite(originalHeight) || originalHeight < .001) return;
+      const scale = height / originalHeight;
+      const rig = groupAt(g,x,y,z);
+      rig.rotation.y = rotation;
+      model.scale.multiplyScalar(scale);
+      model.position.set(-(bounds.min.x + bounds.max.x)*scale/2, -bounds.min.y*scale, -(bounds.min.z + bounds.max.z)*scale/2);
+      rig.add(model);
+      if (animation) {
+        const clip = gltf.animations?.find(item => item.name === animation);
+        if (clip) {
+          const mixer = new THREE.AnimationMixer(model);
+          mixer.clipAction(clip).play();
+          mixer.setTime(clip.duration * .8);
+        }
+      }
+      model.traverse(item => { item.userData.welcomeStation = g.userData.welcomeStation; });
+      if (fallback) fallback.visible = false;
+    }).catch(() => { /* Keep the visible fallback. */ });
+  }
+
+  function plant(g, x, z, size = 1) {
+    round(g, x, .24*size, z, .69*size, .48*size, .69*size, pearl);
+    round(g, x, .48*size, z, .57*size, .035*size, .57*size, ink);
+    for (const [dx,dy,dz,w,h] of [[0,1.05,0,.35,1.14],[.17,.86,.02,.34,.8],[-.19,.8,.08,.32,.71],[.03,.76,-.18,.3,.6]]) {
+      ball(g,x+dx*size,dy*size,z+dz*size,w*size,h*size,w*size,dy>.9?0x527b69:0x769b80);
+    }
+  }
+  function screen(g,x,y,z,width,style='document') {
+    const h = width * .57;
+    box(g,x,y,z,width+.12,h+.12,.1,deep,'metal');
+    box(g,x,y,z+.06,width,h,.025,style==='dark'?0x15384f:0xd9e5e8);
+    const colors = style==='dark' ? [0x91cadb,0x70a1c2] : [blue,steel];
+    for (let i=0;i<3;i++) {
+      const w=width*[.55,.75,.4][i];
+      box(g,x-width*.38+w*.5,y+h*.20-i*h*.19,z+.08,w,h*.075,.012,colors[i?1:0],'light');
+    }
+  }
+  function chair(g,x,z) {
+    round(g,x,.08,z,.87,.08,.87,steel,'metal');
+    round(g,x,.39,z,.13,.65,.13,steel,'metal');
+    box(g,x,.74,z,1.27,.14,.94,blue);
+    box(g,x,1.15,z-.41,1.25,.85,.15,navy);
+    for (const dx of [-.62,.62]) {
+      box(g,x+dx,.87,z,.07,.3,.11,steel,'metal');
+      box(g,x+dx,1.03,z,.13,.09,.51,blue);
+    }
+  }
+  function person(g,x,z,seated=false) {
+    const f = groupAt(g,x,0,z);
+    const hip=seated ? .7:.92;
+    ball(f,0,hip+.31,0,.61,.70,.42,seated?blue:navy);
+    ball(f,0,hip+.89,0,.45,.49,.42,0xe7b995);
+    ball(f,0,hip+1.04,-.025,.47,.25,.45,0x453e37);
+    for(const sign of [-1,1]) {
+      const dx=sign*.155;
+      if(seated) box(f,dx,.71,.18,.23,.2,.49,navy);
+      box(f,dx,seated ? .38:.49,seated ? .35:0,.22,seated ? .57:.9,.2,navy);
+      box(f,dx,.1,seated ? .4:.07,.23,.15,.34,deep);
+      ball(f,sign*.30,hip+.28,.08,.17,.5,.20,seated?blue:navy);
+    }
+    const station = g.userData.welcomeStation;
+    const loadActor = () => asset(g,'characters/character-'+CHARACTERS[station],x,seated ? .72 : 0,z,2.01,.08,f,seated?'sit':'idle');
+    if (station === 0) loadActor();
+    else pendingDeskActors.set(station, loadActor);
+  }
+  function desk(g,x,z,width=2.8) {
+    box(g,x,.96,z,width,.14,1.15,wood);
+    box(g,x,.7,z+.49,width-.18,.39,.10,frost);
+    for (const dx of [-width*.39,width*.39]) box(g,x+dx,.47,z,.12,.91,.97,navy,'metal');
+  }
+  function desktop(g,x,z) {
+    box(g,x,1.06,z,.48,.06,.3,steel,'metal');
+    box(g,x,1.27,z,.09,.42,.10,steel,'metal');
+    screen(g,x,1.64,z,1.24);
+    box(g,x,1.05,z+.32,.68,.035,.20,navy);
+  }
+  function shelf(g,x,z) {
+    const f = groupAt(g,x,0,z);
+    box(f,0,1.0,0,2.22,2.0,.12,navy);
+    for(const dx of [-1.1,1.1]) box(f,dx,1.05,.17,.09,2.1,.57,wood);
+    for(const y of [.13,.76,1.39,2.03]) box(f,0,y,.17,2.28,.09,.6,wood);
+    const spines=[blue,pearl,green,sand,red,navy];
+    for(let row=0;row<3;row++) for(let i=0;i<8-row;i++){
+      const h=.30+((i+row)%3)*.07;
+      box(f,-.89+i*.235,.20+row*.63+h/2,.23,.16,h,.38,spines[(i+row)%spines.length]);
+    }
+  }
+
+  const stops = [0, 8, 16, 24, 24, 32, 32];
+  const stations = TITLES.map((title, index) => ({x: stops[index], z: 0, title}));
+  const lobbyIndex = stations.length - 1;
+  const canonIndex = 3;
+  const corridorEnd = stations[lobbyIndex].x - 3.25;
+  const corridorStart = -5.25;
+  const corridorLength = corridorEnd - corridorStart;
+  const corridorCenter = corridorStart + corridorLength / 2;
+  // One raised arrow points to the reachable floor position, not to a desk
+  // behind glass. Reposition the same object as the visitor advances.
+  const arrow = new THREE.Group();
+  const arrowTip = new THREE.ConeGeometry(.37,.46,4);
+  const point = new THREE.Mesh(arrowTip,material(0x2254a4));
+  point.position.y = .44;
+  point.rotation.set(0,Math.PI/4,Math.PI);
+  const stem = new THREE.Mesh(cube,material(0x3871c4));
+  stem.position.y = .84;
+  stem.scale.set(.22,.42,.22);
+  // Cover the full vertical travel with a stationary tap target.
+  const hitMaterial = new THREE.MeshBasicMaterial({visible: false});
+  const arrowTarget = new THREE.Mesh(cube,hitMaterial);
+  arrowTarget.position.y = .75;
+  arrowTarget.scale.set(.58,1.1,.58);
+  point.raycast = stem.raycast = () => {};
+  arrow.add(point,stem);
+  guide.add(arrow,arrowTarget);
+  // An open near edge leaves the path and avatar legible at a small screen width.
+  box(root,corridorCenter,-.37,-1.9,corridorLength,.66,10.4,navy);
+  box(root,corridorCenter,-.045,.70,corridorLength,.085,5.2,floor);
+  box(root,corridorCenter,-.047,-4.50,corridorLength,.08,5.2,0xdee7e8);
+  box(root,corridorCenter,-.013,3.24,corridorLength,.025,.09,steel);
+  box(root,corridorCenter,-.013,-1.71,corridorLength,.023,.13,edge);
+  box(root,corridorCenter,-.33,3.31,corridorLength,.045,.045,0xa7c4d7);
+  for(let x=-4;x<=corridorEnd;x+=2) box(root,x,-.001,.77,.022,.009,4.96,0xb0c7d6);
+  // The entrance has its own short vestibule, visible before the visitor takes a step.
+  box(root,-6.9,-.37,-1.90,3.35,.66,10.4,navy);
+  box(root,-6.9,-.045,.70,3.35,.085,5.2,floor);
+  box(root,-6.9,-.047,-4.50,3.35,.08,5.2,0xdee7e8);
+  // The vestibule's doorway is a real gap in the back wall; its sidelight
+  // stays in the wall plane, separate from the office and walking aisle.
+  const doorX = -5.53;
+  box(root,-7.59,1.74,-6.61,2.02,3.48,.18,frost);
+  box(root,-4.24,1.74,-6.61,.48,3.48,.18,frost);
+  box(root,doorX,3.03,-6.61,2.10,.90,.18,frost);
+  box(root,-6.30,3.46,-6.43,4.60,.21,.61,navy,'metal');
+  box(root,-8.52,1.72,-4.83,.21,3.45,3.61,frost);
+  for(let i=0;i<9;i++) box(root,-8.05+i*.16,1.58,-6.44,.08,2.77,.11,wood);
+  box(root,doorX,2.98,-6.44,2.28,.53,.09,deep);
+  label(root,'문샷 캠퍼스',doorX,2.98,-6.37,2.18,.47,'#263f56','#ffffff');
+  plant(root,-7.10,-3.72,1.23);
+  for(const x of [doorX-1.03,doorX+1.03]) box(root,x,1.28,-6.54,.09,2.56,.14,navy,'metal');
+  box(root,doorX,2.57,-6.54,2.15,.08,.14,navy,'metal');
+  box(root,doorX-.82,1.28,-6.54,.34,2.49,.035,0x9dbecc,'glass');
+  box(root,doorX-.63,1.28,-6.54,.045,2.50,.06,steel,'metal');
+  box(root,doorX,-.037,-7.27,2.1,.07,1.31,floor);
+  box(root,doorX,1.37,-7.93,2.36,2.76,.12,0x788f9a);
+
+  for (const index of [0, 1, 2, canonIndex, lobbyIndex]) {
+    const g=groupAt(root,stations[index].x,0,0);
+    g.userData.welcomeStation=index;
+    if (index === lobbyIndex) {
+      lobbyEntrance = g;
+      // Floor lighting marks the passage without screening the visitor or
+      // the lounge as the visitor approaches.
+      for (const z of [-1.8, 2.65]) {
+        box(g,-4.10,.075,z,.9,.15,.19,deep,'metal');
+        box(g,-4.10,.16,z,.77,.025,.09,0xffdfa9,'light');
+      }
+      continue;
+    }
+    const back = -6.62;
+    box(g,0,1.78,back,7.98,3.56,.18,frost);
+    box(g,0,3.46,back+.19,7.98,.21,.61,navy,'metal');
+    box(g,0,.14,back+.18,7.88,.25,.22,edge);
+    box(g,0,3.31,back+.43,7.03,.045,.09,0xffdfa9,'light');
+    // A felt panel, skirting and a small working rug give the bays depth on mobile.
+    box(g,-2.76,1.55,back+.14,1.03,2.73,.06,0xb6c9cd);
+    for (const dx of [-.36,-.12,.12,.36]) box(g,-2.76+dx,1.55,back+.18,.027,2.69,.02,0x9bb4b9);
+    box(g,.10,.003,-3.93,5.16,.012,2.55,0xc6d4d3);
+    // The first two desks are on a continuous reception floor.
+    if (index >= 2) {
+      box(g,-3.52,1.05,-5.42,.055,2.06,2.10,0x97bbcb,'glass');
+      for (const z of [-6.43,-4.41]) box(g,-3.52,1.04,z,.08,2.08,.08,steel,'metal');
+      box(g,-3.52,2.08,-5.42,.09,.075,2.10,steel,'metal');
+    }
+    box(g,0,2.78,back+.18,4.8,.71,.15,navy);
+    label(g,TITLES[index],0,2.78,back+.27,4.74,.66,'#263f56','#ffffff');
+
+    if(index===0){
+      const f=groupAt(g,.76,0,-3.37);
+      f.rotation.y=-.08;
+      box(f,0,.6,0,3.06,1.18,.85,navy);
+      box(f,0,1.23,0,3.21,.13,1.05,wood);
+      for(let i=0;i<10;i++) box(f,-1.28+i*.28,.57,.44,.038,.87,.025,steel);
+      person(g,-1.43,-3.49);
+      box(g,1.3,1.4,-3.27,.47,.29,.07,deep);
+      plant(g,2.57,-4.2,.87);
+    }else if(index===1){
+      // Place the screen to the side so the seated employee is visible from the walkway.
+      chair(g,-1.03,-3.71);
+      person(g,-1.03,-3.71,true);
+      desk(g,.52,-3.08,2.53);
+      desktop(g,.87,-3.11);
+      // Research samples and a chart occupy the analyst's end of the desk.
+      for(let i=0;i<3;i++) box(g,-.15,1.045+i*.017,-3.02,.49,.014,.45,[sand,pearl,frost][i],null,i*.07);
+      box(g,-1.89,1.61,-6.38,1.40,1.05,.07,pearl);
+      for (let i=0;i<4;i++) {
+        const h=[.21,.4,.31,.61][i];
+        box(g,-2.33+i*.28,1.24+h/2,-6.33,.17,h,.024,[steel,blue,green,red][i]);
+      }
+      plant(g,2.12,-4.48,.76);
+    }else if(index===2){
+      desk(g,.60,-3.22,3.2);
+      for(const x of [-.17,1.36]) {
+        box(g,x,1.28,-3.42,.11,.5,.11,steel,'metal');
+        screen(g,x,1.82,-3.42,1.37,x>0?'dark':'document');
+      }
+      chair(g,-1.35,-4.03);
+      person(g,-1.35,-4.03,true);
+      // Mounted colour samples make this the production studio.
+      for(let i=0;i<4;i++) box(g,-2.20+i*.4,1.54,-6.46,.34,.53,.035,[sand,red,green,blue][i]);
+      round(g,1.4,1.1,-2.93,.25,.12,.25,red);
+    }else if(index===canonIndex){
+      shelf(g,-1.42,-5.46);
+      shelf(g,1.10,-5.46);
+      box(g,-.22,.68,-3.07,2.42,.12,.82,wood);
+      for(const x of [-1.14,.70]) box(g,x,.33,-3.07,.12,.65,.67,steel,'metal');
+      const guideRobot = groupAt(g,-1.02,0,-3.30);
+      guideRobot.name = 'canon-guide';
+      buildWelcomeGuideRobot(
+        (color,x,y,z,w,h,d) => box(guideRobot,x,y,z,w,h,d,color),
+        (color,x,y,z,w,h,d) => ball(guideRobot,x,y,z,w,h,d,color),
+        {white:0xf4f4ed, navy, face:0xc3edf0, accent:blue},
+      );
+      // Open source binder and upright original-materials sign on the reading table.
+      box(g,-.49,.77,-3.02,.91,.055,.52,blue,'matte',-.06);
+      for (const x of [-.71,-.28]) box(g,x,.808,-3.01,.42,.018,.48,pearl);
+      for (let row=0;row<3;row++) box(g,-.69,.822,-3.12+row*.072,.25,.012,.017,steel);
+      box(g,.55,.98,-3.17,.84,.53,.06,navy);
+      label(g,'원본 자료',.55,.98,-3.129,.78,.45,'#263f56','#ffffff');
+    }
+  }
+
+  for(const {group,geometry,mat,matrices} of batches.values()){
+    const mesh=new THREE.InstancedMesh(geometry,mat,matrices.length);
+    matrices.forEach((matrix,index)=>mesh.setMatrixAt(index,matrix));
+    mesh.userData.welcomeStation=group.userData.welcomeStation;
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+  }
+  batches.clear();
+
+  function releaseModel(model) {
+    const resources=new Set();
+    model.traverse(node=>{
+      if (node.geometry) resources.add(node.geometry);
+      for(const mat of Array.isArray(node.material)?node.material:[node.material]) {
+        if(!mat) continue;
+        resources.add(mat);
+        for(const val of Object.values(mat)) if(val?.isTexture) resources.add(val);
+      }
+    });
+    for(const resource of resources) resource.dispose?.();
+  }
+  function prepareLobby() {
+    preloadLobby = undefined;
+    if (!disposed && !lobby) lobby = mountWelcomeOnboardingLobby(THREE, lobbyEntrance);
+  }
+
+  return {
+    stations,
+    lobbyGuidePoint(id, out) { return lobby?.guideWorldPoint(id, out); },
+    isLobbyBlocked(x, z) { return lobby?.blockedAt(x, z) ?? true; },
+    updateGuide(now, reducedMotion) {
+      if (!guide.visible) return;
+      arrow.position.y = reducedMotion ? 0 : .12 * (1 - Math.cos(now * Math.PI / 900));
+    },
+    setNext(index, stationIndex = index) {
+      const loadActor = pendingDeskActors.get(stationIndex);
+      if (loadActor) {
+        pendingDeskActors.delete(stationIndex);
+        loadActor();
+      }
+      guide.visible = Boolean(stations[index]);
+      if (guide.visible) {
+        const stop = stations[index];
+        // Mark the near edge of the arrival radius so it also fits the first portrait view.
+        guide.position.set(stop.x - .56, 0, stop.z);
+        guide.userData.welcomeStation = index;
+      }
+      if (stationIndex >= 0 && stationIndex < canonIndex && preloadLobby !== undefined) {
+        window.clearTimeout(preloadLobby);
+        preloadLobby = undefined;
+      }
+      if (stationIndex === canonIndex && !lobby && preloadLobby === undefined) {
+        // Build while the visitor is at the company knowledge desk, ahead of the walk.
+        preloadLobby = window.setTimeout(prepareLobby, 0);
+      }
+      if (stationIndex >= lobbyIndex - 1 && !lobby) {
+        window.clearTimeout(preloadLobby);
+        prepareLobby();
+      }
+      if (lobby && stationIndex >= 0) lobby.room.visible = stationIndex >= lobbyIndex - 1;
+    },
+    dispose() {
+      if(disposed) return;
+      disposed=true;
+      window.clearTimeout(preloadLobby);
+      lobby?.dispose();
+      root.removeFromParent();
+      root.traverse(node=>{ if(node.isInstancedMesh) node.dispose(); });
+      for(const geometry of [cube,cylinder,orb,plane,arrowTip]) geometry.dispose();
+      hitMaterial.dispose();
+      for(const mat of materials.values()) mat.dispose();
+      for(const texture of textures) texture.dispose();
+      for(const model of models) releaseModel(model);
+    },
+  };
+}

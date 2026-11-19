@@ -14,14 +14,14 @@ export const DEFAULT_WELCOME:WelcomeSettings={title:'문샷에 오신 것을 환
  lesson('first-step','내 일에는 어디부터 쓰면 좋을까요?','매일 반복하지만 잘못되어도 쉽게 고칠 수 있는 작은 일 하나를 골라요.\n예를 들어 회의 메모 정리, 소개 글 제목 만들기, 공개된 자료 요약부터 시작할 수 있어요.\n오늘 해보기: 반복하는 일 3개를 적고, 그중 AI에게 초안을 맡길 일 하나에 동그라미를 쳐 보세요.')
 ]};
 function fail(message:string):never{throw Object.assign(Error(message),{status:400});}
-function text(value:unknown,max:number,label:string,required=false){if(typeof value!=='string'||value.length>max||required&&!value.trim())fail(`웰컴 존 ${label}을 확인해 주세요.`);return value.trim();}
-export function welcomeLink(value:unknown){const s=text(value,1200,'링크');if(!s)return '';let u:URL;try{u=new URL(s);}catch{return fail('웰컴 존 링크는 https://로 시작하는 전체 주소를 넣어 주세요.');}if(u.protocol!=='https:'||u.username||u.password||u.port||u.hostname==='localhost'||/^[\d.]+$/.test(u.hostname)||u.hostname.includes(':')||u.hostname.endsWith('.local'))fail('웰컴 존 링크는 공개된 HTTPS 주소를 사용해 주세요.');return u.href;}
+function text(value:unknown,max:number,label:string,required=false){if(typeof value!=='string'||value.length>max||required&&!value.trim())fail(`개강 준비실 ${label}을 확인해 주세요.`);return value.trim();}
+export function welcomeLink(value:unknown){const s=text(value,1200,'링크');if(!s)return '';let u:URL;try{u=new URL(s);}catch{return fail('개강 준비실 링크는 https://로 시작하는 전체 주소를 넣어 주세요.');}if(u.protocol!=='https:'||u.username||u.password||u.port||u.hostname==='localhost'||/^[\d.]+$/.test(u.hostname)||u.hostname.includes(':')||u.hostname.endsWith('.local'))fail('개강 준비실 링크는 공개된 HTTPS 주소를 사용해 주세요.');return u.href;}
 export function validateWelcome(value:unknown):WelcomeSettings{
- if(!value||typeof value!=='object'||Array.isArray(value))fail('웰컴 존 설정을 확인해 주세요.');const v=value as Record<string,unknown>;
- if(Object.keys(v).some(k=>!['title','description','videoTitle','videoDescription','videoUrl','notices','lessons','assessment','autoWelcome'].includes(k)))fail('알 수 없는 웰컴 존 설정입니다.');
+ if(!value||typeof value!=='object'||Array.isArray(value))fail('개강 준비실 설정을 확인해 주세요.');const v=value as Record<string,unknown>;
+ if(Object.keys(v).some(k=>!['title','description','videoTitle','videoDescription','videoUrl','notices','lessons','assessment','autoWelcome'].includes(k)))fail('알 수 없는 개강 준비실 설정입니다.');
  const articles=(items:unknown,label:string,max:number)=>{if(!Array.isArray(items)||items.length>max)fail(`${label}은 최대 ${max}개까지 등록할 수 있어요.`);const seen=new Set<string>();return items.map((a):WelcomeArticle=>{if(!a||typeof a!=='object'||Object.keys(a).some(k=>!['id','title','body','url','linkLabel','published','pinned','image','imageAlt'].includes(k))||typeof a.id!=='string'||!/^[-\w]{1,60}$/.test(a.id)||seen.has(a.id)||typeof a.published!=='boolean'||typeof a.pinned!=='boolean')fail(`${label} 설정을 확인해 주세요.`);seen.add(a.id);const url=welcomeLink(a.url);return{id:a.id,title:text(a.title,80,`${label} 제목`,true),body:articleBody(a.body),url,linkLabel:text(a.linkLabel,40,`${label} 버튼 이름`,!!url),published:a.published,pinned:a.pinned,...(a.image?{image:welcomeImage(a.image),imageAlt:text(a.imageAlt||a.title,200,'이미지 설명')}:{} )};});};
- if(new TextEncoder().encode(JSON.stringify(value)).length>260000)fail('웰컴 존 내용이 너무 큽니다. 긴 본문을 나누거나 줄여 주세요.');
- const videoUrl=text(v.videoUrl,1200,'영상 주소');if(videoUrl&&!youtubeVideoId(videoUrl))fail('웰컴 존 영상은 유튜브 전체 주소를 넣어 주세요.');
+ if(new TextEncoder().encode(JSON.stringify(value)).length>260000)fail('개강 준비실 내용이 너무 큽니다. 긴 본문을 나누거나 줄여 주세요.');
+ const videoUrl=text(v.videoUrl,1200,'영상 주소');if(videoUrl&&!youtubeVideoId(videoUrl))fail('개강 준비실 영상은 유튜브 전체 주소를 넣어 주세요.');
  if(v.autoWelcome!==undefined&&typeof v.autoWelcome!=='boolean')fail('첫 입장 설정을 확인해 주세요.');
  return{...(v.assessment?{assessment:validateAssessment(v.assessment)}:{}),...(v.autoWelcome!==undefined?{autoWelcome:v.autoWelcome}:{}),title:text(v.title,80,'제목',true),description:text(v.description,400,'소개'),videoTitle:text(v.videoTitle,80,'다시보기 제목',true),videoDescription:text(v.videoDescription,400,'다시보기 소개'),videoUrl,notices:articles(v.notices,'공지',12),lessons:articles(v.lessons,'AI 기초',12)};
 }

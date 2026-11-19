@@ -1,0 +1,116 @@
+.scene {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #111b2dbd;
+  color: #fff;
+  animation: fade-in .55s ease-out both;
+  color-scheme: dark;
+}
+.content {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  block-size: 100%;
+  min-block-size: 320px;
+  padding: max(72px, calc(env(safe-area-inset-top) + 54px)) 16px max(18px, env(safe-area-inset-bottom));
+}
+.scene .back {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 7px 13px;
+  border: 1px solid #ffffff66;
+  border-radius: 8px;
+  background: #0d1a2be0;
+  color: inherit;
+}
+.intro, .next { text-align: center; }
+.intro h2 {
+  max-inline-size: 24ch;
+  margin: 0 0 24px;
+  color: #fff;
+  font-size: clamp(28px, 5vw, 52px);
+  font-weight: 750;
+  line-height: 1.24;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  text-shadow: 0 2px 16px #06101fcc;
+  outline: none;
+}
+.scene .cta {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 17px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--ba-red, #ba2639);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+.screening {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 9px;
+  inline-size: min(100%, 420px);
+  block-size: 100%;
+  max-block-size: 680px;
+  min-inline-size: 0;
+  animation: fade-in .55s ease-out both;
+}
+.player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0a101b;
+}
+.picture { position: relative; min-block-size: 0; overflow: hidden; }
+.picture video { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+@supports (width: 1cqh) {
+  .picture { container-type: size; }
+  /* The recording includes black margins. Keep the visible conversation legible as the player shrinks. */
+  .picture video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    inline-size: min(100%, 88cqh);
+    block-size: auto;
+    transform: translate(-50%, -47%);
+  }
+}
+.controls { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 2px 4px; }
+.controls button { flex: 0 0 44px; display: grid; place-items: center; block-size: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #fff; }
+.controls button:hover { background: #ffffff24; }
+.controls button:focus-visible { outline-offset: -3px; }
+.controls input { flex: 1 1 0; min-width: 32px; block-size: 44px; margin: 0 4px; accent-color: #ff666e; }
+.controls span { color: #d9e2ef; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.player:fullscreen { border-radius: 0; background: #000; }
+.player:fullscreen video { inset: 0; inline-size: 100%; block-size: 100%; transform: none; }
+.player:fullscreen .controls { width: min(100%, 680px); margin-inline: auto; }
+.scene .next p { margin: 0 0 8px; color: #e4ebf5; font-size: 14px; line-height: 1.45; word-break: keep-all; }
+.error button { min-height: 44px; padding: 0 8px; border: 0; background: none; color: inherit; text-decoration: underline; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 700px) {
+  .screening { inline-size: min(100%, 390px); max-block-size: min(580px, calc(100vw + 160px)); }
+  .scene .back { top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene, .screening { animation: none; }
+}
