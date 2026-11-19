@@ -10,13 +10,13 @@ const compileOptions = {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.Co
 const defaultArrival = {title: '기본 체험', liveTitle: '문샷 무료 라이브', startsAt: '2026-12-07T12:00:00.000Z', endsAt: null, liveUrl: ''};
 
 function loadModule(source, mocks, env) {
-  const module = {};
+  const exports = {};
   const compiled = ts.transpileModule(source, {compilerOptions: compileOptions}).outputText;
-  new Function('exports', 'require', 'process', compiled)(module, name => {
+  new Function('exports', 'require', 'process', compiled)(exports, name => {
     assert.ok(name in mocks, name);
     return mocks[name];
   }, {env});
-  return module;
+  return exports;
 }
 
 function fixture(env = {}) {
