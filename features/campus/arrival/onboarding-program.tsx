@@ -1,5 +1,5 @@
 import {useId, useRef, useState, type SyntheticEvent} from 'react';
-import {ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Download, ExternalLink, LockKeyhole, MessageSquare, Play} from 'lucide-react';
+import {ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, ExternalLink, LockKeyhole, MessageSquare, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import {LIVE_AGENDA, type ArrivalConfig} from './config';
 import {LIVE_REMINDER_LABEL} from './live-reminder';
@@ -91,10 +91,6 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
       {isMaterials ? <section aria-label="웰컴 라운지 안내">
         {materialsTab === 'free' ? <>
           <h3>라이브 전에 볼 자료</h3>
-          <div className={styles.worksheet}>
-            <p>AI 직원에게 맡길 일과 결과를 확인할 기준을 적어보세요.</p>
-            <a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16} aria-hidden="true"/>회사 업무 기준표 받기</a>
-          </div>
           <div className={styles.cards}>
             {guides.map(item => <article className={styles.card} key={item.id}>
               <MaterialCover id={item.id}/>

@@ -37,7 +37,7 @@ for (const [device, engine, viewport] of [
   const frame = page.frameLocator('iframe[title*="직원 사무실"]');
   const world = frame.locator('#walk');
   const open = page.locator('#arrival-desk-button');
-  const calendar = page.getByRole('link', {name:'Google 캘린더', exact:true});
+  const calendar = page.getByRole('link', {name:'Google 캘린더에 추가', exact:true});
   const nextHint = page.getByRole('region', {name:'현재 목적지', exact:true}).getByRole('status').filter({hasText:/옆으로 이동해|옆자리에서|복도 끝/});
   const button = (root, name) => root.getByRole('button', {name, exact:true});
   const tap = locator => mobile ? locator.tap() : locator.click();
@@ -177,7 +177,7 @@ for (const [device, engine, viewport] of [
     const guide = page.getByRole('dialog', {name: '무료자료 · 라이브 특전', exact: true});
     const resources = guide.getByRole('region', {name:'웰컴 라운지 안내'});
     await expect(resources.getByRole('heading', {name:'라이브 전에 볼 자료', exact:true})).toBeVisible();
-    await expect(resources.getByRole('link', {name:'회사 업무 기준표 받기', exact:true})).toHaveAttribute('download', /업무-기준표\.txt$/);
+    await expect(resources.getByRole('link', {name:'회사 업무 기준표 받기', exact:true})).toHaveCount(0);
     await capture('lounge-materials');
     await tap(button(guide, '라이브 특전'));
     await expect(resources.getByText(/12월 7일 오후 9시 라이브에서 비밀번호를 공개합니다/)).toBeVisible();

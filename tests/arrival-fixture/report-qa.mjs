@@ -91,26 +91,20 @@ for (const [engine, viewport] of devices) {
       if (!priorRoute) await capture(page, 'lounge');
       await openLoungeSchedule(page);
       await expect(action('무료 자료 열기')).toBeVisible();
-      const google = page.getByRole('link', {name:'Google 캘린더', exact:true});
+      const google = page.getByRole('link', {name:'Google 캘린더에 추가', exact:true});
       const calendar = new URL(await google.getAttribute('href'));
       expect(calendar.origin + calendar.pathname).toBe('https://accounts.google.com/AccountChooser');
       const event = new URL(calendar.searchParams.get('continue'));
       expect(event.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
+      await expect(action('일정 파일 받기')).toHaveCount(0);
       if (!priorRoute) {
-        const file = action('일정 파일 받기');
-        await expect(file).toBeInViewport({ratio:.95});
-        const entryUrl = page.url();
-        const [download] = await Promise.all([
-          page.waitForEvent('download'),
-          tap(file),
-        ]);
-        expect(download.url()).toMatch(/^blob:/);
-        expect(page.url()).toBe(entryUrl);
-        expect(download.suggestedFilename()).toBe('moonshot-live-20261207.ics');
-        expect(await readFile(await download.path(), 'utf8')).toMatch(/DTSTART:20261207T120000Z/);
+        await expect(google).toBeInViewport({ratio:.95});
+        const downloads = [];
+        page.on('download', download => downloads.push(download.url()));
         await page.route('https://accounts.google.com/AccountChooser?**', route => route.fulfill({contentType:'text/html',body:'<title>Google Calendar test sign-in</title>'}));
         await Promise.all([page.waitForURL(calendar.href), tap(google)]);
         expect(page.context().pages()).toHaveLength(1);
+        expect(downloads).toEqual([]);
       }
       expect(errors).toEqual([]);
       console.log(JSON.stringify({browser:engine.name(), audience:label, priorStep:priorRoute?.step ?? null, visited, lounge:true, videoPlayback:!priorRoute ? {teamLeader:true, content:true} : undefined}));

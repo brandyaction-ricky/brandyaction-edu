@@ -1,4 +1,4 @@
-import {ArrowRight, Download, ExternalLink} from 'lucide-react';
+import {ArrowRight, ExternalLink} from 'lucide-react';
 import type {ArrivalConfig} from './config';
 import {youtubeVideoId} from '../webinar/resources';
 import styles from './hall-program.module.css';
@@ -20,7 +20,6 @@ export function HallProgram({config, onContentReplay}: {config: ArrivalConfig; o
       <div><button type="button" className={styles.replay} onClick={onContentReplay}><ArrowRight size={16} aria-hidden="true"/> AI 광고 영상 제작 체험 다시 보기</button></div>
       <div><a href="https://edu.brandyaction.com/guide" target="_blank" rel="noopener noreferrer">작업별 AI 활용 가이드<ExternalLink size={15} aria-hidden="true"/></a></div>
       <div><a href="https://edu.brandyaction.com/ai-team-blueprint" target="_blank" rel="noopener noreferrer">AI팀 설계도<ExternalLink size={15} aria-hidden="true"/></a></div>
-      <div><a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16} aria-hidden="true"/> 회사 업무 기준표 받기</a></div>
       {config.handoutLabel && config.handoutUrl && <div><a href={config.handoutUrl} target="_blank" rel="noopener noreferrer">{config.handoutLabel}<ExternalLink size={15} aria-hidden="true"/></a></div>}
     </section>
     <section><h3>강의 후 공개 특전</h3>

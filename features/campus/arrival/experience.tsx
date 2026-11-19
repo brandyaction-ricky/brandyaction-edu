@@ -1,9 +1,9 @@
 'use client';
 
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
-import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, Download, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
+import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, calendarIcs, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {onboardingGuideTitle, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
@@ -439,19 +439,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setCopyFallback('');
     setNotice(state.handoff === 'copied' ? '요청문을 다시 복사했어요.' : '');
   }
-  function saveCalendar() {
-    const text = calendarIcs(event);
-    if (!text) return;
-    // Native download managers can reopen an HTTP URL without the preview browser's cookies.
-    const url = URL.createObjectURL(new Blob([text], {type: 'text/calendar;charset=utf-8'}));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${event.id}.ics`;
-    document.body.append(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
-  }
   function reset() {
     if (menu.current) menu.current.open = false;
     try {if (persistenceKey) localStorage.removeItem(persistenceKey);} catch {}
@@ -516,7 +503,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       </fieldset>
       <div className={entryStyle.entryFooter}>
         <button id="arrival-desk-button" type="button" ref={deskButton} className={progression.nextAction} disabled={!entryAudience} onClick={startEntry}>이 상황으로 시작<ArrowRight size={16} aria-hidden="true"/></button>
-        <p><BookOpen size={15} aria-hidden="true"/>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
+        <p><BookOpen size={15} aria-hidden="true"/>웰컴 라운지에서 AI팀 설계도와 작업별 AI 활용 가이드를 볼 수 있어요.</p>
       </div>
     </section> : officeIntro ? <section className={entryStyle.wayfinding} aria-label="현재 목적지" data-walk-station={station} inert={backgroundInert} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <p className={entryStyle.nextStationHint} role="status" aria-atomic="true">{guidedStation === station && nextStationHints[guidedStation]}</p>
@@ -524,7 +511,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         <span>{nearStation === station ? '도착했어요' : '다음 목적지'}</span>
         <h1>{destination}</h1>
         {station === 4 && <p className={entryStyle.nextReward}>여길 지나면 무료 자료가 있는 웰컴 라운지예요.</p>}
-        {station === 7 && <p className={entryStyle.nextReward}>AI팀 설계도와 회사 업무 기준표를 받아보세요.</p>}
+        {station === 7 && <p className={entryStyle.nextReward}>AI팀 설계도와 작업별 AI 활용 가이드를 확인해 보세요.</p>}
       </div>
       <div className={entryStyle.wayfindingActions}>
         <button id="arrival-desk-button" type="button" ref={deskButton} className={progression.nextAction} onClick={() => requestWalk(station)} disabled={walking}>
@@ -620,20 +607,16 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step !== 2 && step !== 3 && step !== 7 && notice && <p className={s.notice} role="status">{notice}</p>}
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
-      {step !== 8 && <footer className={s.dockFooter}>
+      {step !== 8 && (step !== 7 || calendarLink) && <footer className={s.dockFooter}>
         {step === 1 && <button type="button" className={progression.nextAction} onClick={personalStart}>내 상황으로 요청문 만들기<ArrowRight size={18}/></button>}
         {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={progression.nextAction} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={progression.nextAction} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
         {step === 5 && <button type="button" className={progression.nextAction} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={18}/></button>}
-        {step === 7 && <div className={s.calendarActions}>
-          <p className={s.calendarHint}>캘린더에 일정 추가</p>
-          <div className={s.calendarButtons}>
-            {calendarLink && <a href={calendarLink} target={preview || embedded ? '_blank' : undefined} rel="noreferrer">
-              <CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/>
-            </a>}
-            {calendarLink && <button type="button" onClick={saveCalendar}>일정 파일 받기<Download size={15} aria-hidden="true"/></button>}
-          </div>
-          <p className={s.calendarInstruction}>Google 캘린더에서는 ‘저장’을 눌러주세요. 일정 파일(.ics)을 받았다면 파일을 열어 캘린더에 추가해 주세요.</p>
+        {step === 7 && calendarLink && <div className={s.calendarActions}>
+          <a href={calendarLink} target={preview || embedded ? '_blank' : undefined} rel="noreferrer">
+            <CalendarDays size={17} aria-hidden="true"/>Google 캘린더에 추가<ArrowUpRight size={15} aria-hidden="true"/>
+          </a>
+          <p className={s.calendarInstruction}>일정이 열리면 ‘저장’을 눌러주세요.</p>
         </div>}
       </footer>}
       </>}
