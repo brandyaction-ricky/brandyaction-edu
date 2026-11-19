@@ -17,6 +17,13 @@ const routes = [
 ];
 const devices = [[chromium, {width:1440, height:723}], [webkit, {width:390, height:844}]];
 
+async function verifyPlayback(video, expectedDuration) {
+  await expect.poll(() => video.evaluate(element => element.duration), {timeout: 15000}).toBeCloseTo(expectedDuration, 0);
+  await video.evaluate(element => element.play());
+  await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0.25);
+  expect(await video.evaluate(element => element.error)).toBeNull();
+}
+
 for (const [engine, viewport] of devices) {
   const mobile = engine === webkit;
   const browser = await engine.launch();
@@ -52,6 +59,7 @@ for (const [engine, viewport] of devices) {
         if (station === 1 && !priorRoute) {
           await tap(action('지금 확인하기', desk));
           await expect(teamLeaderNext(desk)).toBeInViewport({ratio:1});
+          await verifyPlayback(desk.locator('video'), 20);
           await capture(page, 'team-leader-video');
         }
         if (station === 2 && !priorRoute) {
@@ -65,6 +73,7 @@ for (const [engine, viewport] of devices) {
           await tap(action('바로 열기'));
           await expect(desk.getByText('내 요청: ' + edited, {exact:true})).toBeVisible();
         }
+        if (station === 3 && !priorRoute) await verifyPlayback(desk.locator('video'), 17);
       }});
       expect(visited).toEqual([1, 2, 3, 4]);
       await expect(page.getByText('AI 직원들이 일하는 사례를 봤어요.', {exact:true})).toBeVisible();
@@ -75,7 +84,7 @@ for (const [engine, viewport] of devices) {
       const calendar = new URL(await page.getByRole('link', {name:'Google 캘린더', exact:true}).getAttribute('href'));
       expect(calendar.searchParams.get('dates')).toContain('20261207T120000Z');
       expect(errors).toEqual([]);
-      console.log(JSON.stringify({browser:engine.name(), audience:label, priorStep:priorRoute?.step ?? null, visited, lounge:true}));
+      console.log(JSON.stringify({browser:engine.name(), audience:label, priorStep:priorRoute?.step ?? null, visited, lounge:true, videoPlayback:!priorRoute ? {teamLeader:true, content:true} : undefined}));
       await page.close();
     }
   } finally {
