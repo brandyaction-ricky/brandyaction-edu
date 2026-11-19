@@ -264,7 +264,9 @@ try {
       await openLoungeSchedule(page);
       const calendar = page.getByRole('link',{name:'Google 캘린더'});
       await expect(calendar).toBeVisible();
-      const google=new URL(await calendar.getAttribute('href'));
+      const account = new URL(await calendar.getAttribute('href'));
+      expect(account.origin + account.pathname).toBe('https://accounts.google.com/AccountChooser');
+      const google = new URL(account.searchParams.get('continue'));
       expect(google.hostname).toBe('calendar.google.com');
       expect(google.searchParams.get('dates')).toContain('20261207T120000Z');
       const saved=page.waitForEvent('download');

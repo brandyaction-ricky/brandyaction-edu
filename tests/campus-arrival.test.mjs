@@ -286,6 +286,10 @@ test('the confirmed 21:00 start is usable without inventing an end or YouTube de
   const google = new URL(model.googleCalendarUrl(model.liveEvent));
   assert.equal(google.searchParams.get('dates'), '20261207T120000Z/20261207T120100Z');
   assert.equal(google.searchParams.has('location'), false);
+  const accountChooser = new URL(model.googleCalendarUrl(model.liveEvent, {chooseAccount: true}));
+  assert.equal(accountChooser.origin, 'https://accounts.google.com');
+  assert.equal(accountChooser.pathname, '/AccountChooser');
+  assert.equal(accountChooser.searchParams.get('continue'), google.href);
   assert.equal(model.googleCalendarUrl({...model.liveEvent, startsAt: null}), null);
   assert.equal(model.calendarIcs({...model.liveEvent, startsAt: null}), null);
 });

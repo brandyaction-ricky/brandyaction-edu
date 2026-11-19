@@ -222,14 +222,17 @@ function calendarTime(date: Date): string {
 }
 export function calendarReady(event: LiveEvent): boolean { return validCalendarEvent(event) !== null; }
 /** Opens Google's own form. Opening this URL is not proof that the visitor saved it. */
-export function googleCalendarUrl(event: LiveEvent): string | null {
+export function googleCalendarUrl(event: LiveEvent, {chooseAccount = false} = {}): string | null {
   const checked = validCalendarEvent(event);
   if (!checked) return null;
   // Google's form takes a start and an end. Use a one-minute slot for an unconfirmed end.
   const reminderEnd = checked.end ?? new Date(checked.start.getTime() + 60_000);
   const params = new URLSearchParams({action: 'TEMPLATE', text: event.title, dates: `${calendarTime(checked.start)}/${calendarTime(reminderEnd)}`, stz: event.timeZone, etz: event.timeZone, details: event.description + (checked.url ? `\n\n라이브 안내: ${checked.url.href}` : '')});
   if (checked.url) params.set('location', checked.url.href);
-  return `https://calendar.google.com/calendar/r/eventedit?${params.toString()}`;
+  const destination = `https://calendar.google.com/calendar/r/eventedit?${params.toString()}`;
+  if (!chooseAccount) return destination;
+  // In signed-out iPhone webviews, Calendar's passive sign-in can drop the draft and open a product page.
+  return `https://accounts.google.com/AccountChooser?${new URLSearchParams({continue: destination})}`;
 }
 function escapeIcs(value: string): string {
   return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, '\\n').replace(/;/g, '\\;').replace(/,/g, '\\,');

@@ -92,7 +92,9 @@ for (const [engine, viewport] of devices) {
       await openLoungeSchedule(page);
       const google = page.getByRole('link', {name:'Google 캘린더', exact:true});
       const calendar = new URL(await google.getAttribute('href'));
-      expect(calendar.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
+      expect(calendar.origin + calendar.pathname).toBe('https://accounts.google.com/AccountChooser');
+      const event = new URL(calendar.searchParams.get('continue'));
+      expect(event.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
       if (!priorRoute) {
         const file = page.getByRole('link', {name:'아이폰 일정 파일', exact:true});
         await expect(file).toBeInViewport({ratio:.95});
@@ -106,7 +108,7 @@ for (const [engine, viewport] of devices) {
         expect(response.headers()['content-disposition']).toBe('attachment; filename="moonshot-live-20261207.ics"');
         expect(download.suggestedFilename()).toBe('moonshot-live-20261207.ics');
         expect(await readFile(await download.path(), 'utf8')).toMatch(/DTSTART:20261207T120000Z/);
-        await page.route('https://calendar.google.com/**', route => route.fulfill({contentType:'text/html',body:'<title>Google calendar test destination</title>'}));
+        await page.route('https://accounts.google.com/AccountChooser?**', route => route.fulfill({contentType:'text/html',body:'<title>Google Calendar test sign-in</title>'}));
         await Promise.all([page.waitForURL(calendar.href), tap(google)]);
         expect(page.context().pages()).toHaveLength(1);
       }

@@ -127,7 +127,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     .slice(0, 3).map(item => item.label === '맡길 일' ? {...item, value: content.goal} : item);
   if (appliedRule) criteria.push({label: '내가 선택한 작성 기준', value: appliedRule});
   const event = arrivalLiveEvent(config);
-  const calendarLink = googleCalendarUrl(event);
+  const calendarLink = googleCalendarUrl(event, {chooseAccount: !preview && !embedded});
   const date = new Date(config.startsAt);
   const dateLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',month:'long',day:'numeric'}).format(date);
   const timeLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',hour:'numeric',minute:'2-digit',hour12:true}).format(date).replace(/:(\d{2})$/, (_, minutes: string) => minutes === '00' ? '시' : `시 ${Number(minutes)}분`);
