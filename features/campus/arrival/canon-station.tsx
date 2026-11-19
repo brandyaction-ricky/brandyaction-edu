@@ -24,7 +24,7 @@ const knowledge = [
 const exchanges = [
   {
     phase: 1,
-    action: '고객부터 알려줘보기',
+    action: '고객 정보 알려주기',
     request: '우리 고객은 바쁜 직장인이야. 퇴근 후 쉬는 시간에 팩을 사용해.',
     reply: '타겟과 상품을 연결했어요. 이제 퇴근 후 사용하는 상황으로 생각합니다.',
     update: '바쁜 직장인 ↔ 보습 마스크팩 · 퇴근 후 사용하는 상황',
@@ -80,7 +80,7 @@ export function CanonStation({phase, onAdvance, onHall}: {
     if (requestedPhase.current !== phase) return;
     requestedPhase.current = null;
     if (phase === 3) resultsHeading.current?.focus();
-    else advanceButton.current?.focus();
+    else advanceButton.current?.focus({preventScroll: phase !== 0});
   }, [phase]);
 
   function changePhase(nextPhase: CanonPhase) {
@@ -90,9 +90,14 @@ export function CanonStation({phase, onAdvance, onHall}: {
 
   return <div className={`${monitor.body} ${styles.body}`}>
     <header className={styles.intro}>
-      <h1>AI들이 이렇게 일할 수 있는 이유는 정본에 있습니다.</h1>
-      <p>정본은 AI 직원들이 함께 읽는 회사 업무 기준 문서예요.</p>
-      <p>대화에서 알려준 기준을 정리해 다음 업무에도 활용해요.</p>
+      <h1>AI들이 10배 더 똑똑하게 일할 수 있는 이유는 정본 때문이에요.</h1>
+      <p>AI 직원이 각자 배운 내용은 서로 연결되어 있지 않아요. 정본을 쓰면 대화를 거듭할수록 지식이 연결되고, AI 직원들이 그 지식을 함께 활용할 수 있어요.</p>
+      {next && <>
+        <p>아래 버튼을 눌러 AI가 어떻게 학습하는지 확인해 보세요.</p>
+        <button className={styles.action} type="button" ref={advanceButton} onClick={() => changePhase(next.phase)}>
+          {next.action}<ArrowRight size={17} aria-hidden="true"/>
+        </button>
+      </>}
     </header>
     <div className={styles.layout}>
       <section className={styles.map} aria-labelledby={mapHeading} aria-describedby={mapHint}>
@@ -102,9 +107,7 @@ export function CanonStation({phase, onAdvance, onHall}: {
           <span>{phase}/3</span>
         </header>
         <p className={styles.mapHint} id={mapHint}>
-          {phase === 0
-            ? `‘${exchanges[0].action}’를 누르면 대화에서 배운 내용이 여기에 연결돼요.`
-            : '정본이 대화에서 배운 내용을 파란색으로 연결해요.'}
+          {phase === 0 ? '대화에서 배운 내용이 여기에 하나씩 연결돼요.' : '정본이 대화에서 배운 내용을 파란색으로 연결해요.'}
         </p>
         <div className={styles.board}>
           <svg viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
@@ -128,12 +131,10 @@ export function CanonStation({phase, onAdvance, onHall}: {
         </p>
       </section>
       <section className={styles.example} aria-label="마스크팩 업무 기준을 정본에 알려주는 체험">
-        <h2>정본에 알려주기</h2>
-        <p className={styles.note}>마스크팩 예시로, 대화에서 알려준 기준이 어떻게 연결되는지 살펴보세요.</p>
-        {current && <Exchange request={current.request} reply={current.reply}/>}
-        {next && <button className={styles.action} type="button" ref={advanceButton} onClick={() => changePhase(next.phase)}>
-          {next.action}<ArrowRight size={17} aria-hidden="true"/>
-        </button>}
+        <h2>{current ? '정본과 나눈 대화' : '마스크팩 사례'}</h2>
+        {current
+          ? <Exchange request={current.request} reply={current.reply}/>
+          : <p className={styles.note}>고객 정보, 제품 사용법, 브랜드 기준을 차례로 알려줄 거예요.</p>}
         {phase > 1 && <details className={styles.history}>
           <summary>이전 대화 보기</summary>
           {history.slice(0, -1).map(exchange => <Exchange key={exchange.phase} request={exchange.request} reply={exchange.reply}/>)}

@@ -85,7 +85,7 @@ for (const [engine, viewport] of devices) {
         if (station === 3 && !priorRoute) await verifyPlayback(desk.locator('video'), 17);
       }});
       expect(visited).toEqual([1, 2, 3, 4]);
-      await expect(page.getByText('AI 직원들이 일하는 사례를 봤어요.', {exact:true})).toBeVisible();
+      await expect(page.getByRole('heading', {name:'오늘 해본 것', exact:true})).toHaveCount(0);
       await expect(page.getByText('내 AI 체험을 마쳤어요.', {exact:true})).toHaveCount(0);
       await expect(action('무료 자료 받기')).toBeVisible();
       if (!priorRoute) await capture(page, 'lounge');

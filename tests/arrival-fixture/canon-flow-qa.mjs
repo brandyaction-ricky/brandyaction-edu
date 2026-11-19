@@ -1,9 +1,10 @@
 import {chromium, expect, webkit} from '@playwright/test';
-import {mkdir} from 'node:fs/promises';
+import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, startOfficeCase, teamLeaderGuide} from './review-office.mjs';
 
-const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
+const linkFile = process.env.ARRIVAL_QA_LINK_FILE;
+const url = new URL(linkFile ? (await readFile(linkFile, 'utf8')).trim() : process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
 const output = process.env.ARRIVAL_QA_OUTPUT;
 if (output) await mkdir(output, {recursive:true});
@@ -14,7 +15,7 @@ const contentDraft = {
   customer: '고령 반려견의 보호자', facts: '평소 생활하는 집에서 촬영하고 개인 화보를 전달합니다.',
 };
 const exchanges = [
-  {button:'고객부터 알려줘보기', status:'바쁜 직장인 ↔ 보습 마스크팩 · 퇴근 후 사용하는 상황', connected:2},
+  {button:'고객 정보 알려주기', status:'바쁜 직장인 ↔ 보습 마스크팩 · 퇴근 후 사용하는 상황', connected:2},
   {button:'고객 질문도 알려주기', status:'고객 질문 ↔ 사용법 ↔ 콘텐츠·고객응대', connected:6},
   {button:'우리 브랜드의 기준도 알려주기', status:'고객 + 상품 + 사용법 + 브랜드 기준 → 우리 회사에 맞는 결과', connected:7},
 ];
@@ -59,6 +60,9 @@ for (const [device, engine, viewport] of [
 
   async function inspect(station, dialog) {
     if (station === 3) {
+      await expect(dialog.getByText('다음. 4번째 봇을 확인해보세요.', {exact:true})).toBeInViewport({ratio:.95});
+      await expect(dialog.getByText('AI 직원들이 10배 더 똑똑해지는 법', {exact:true})).toBeInViewport({ratio:.95});
+      await expect(button(dialog, '회사 업무 기준 보기')).toBeInViewport({ratio:.95});
       await dialog.getByLabel(/^상품·서비스/).fill(contentDraft.product);
       await dialog.getByLabel(/^비교할 경쟁사 이름이나 링크/).fill(contentDraft.competitor);
       await dialog.getByLabel(/^어떤 고객에게 필요한가요/).fill(contentDraft.customer);
@@ -68,6 +72,7 @@ for (const [device, engine, viewport] of [
       await expect(dialog).not.toBeVisible();
       await tap(open);
       await inspectContentDraft(dialog);
+      await expect(button(dialog, '회사 업무 기준 보기')).toBeInViewport({ratio:.95});
       await capture('content-restored');
       return;
     }
@@ -77,16 +82,29 @@ for (const [device, engine, viewport] of [
     const status = map.getByRole('status');
     await expect(map.getByRole('listitem')).toHaveCount(12);
     await expect(map.getByRole('button')).toHaveCount(0);
-    await expect(map.getByText(/고객부터 알려줘보기.*누르면/)).toBeVisible();
+    await expect(dialog.getByRole('heading', {name:'AI들이 10배 더 똑똑하게 일할 수 있는 이유는 정본 때문이에요.', exact:true})).toBeVisible();
+    await expect(dialog.getByText('정본은 AI 직원들이 함께 읽는 회사 업무 기준 문서예요.', {exact:true})).toHaveCount(0);
+    await expect(dialog.getByText('아래 버튼을 눌러 AI가 어떻게 학습하는지 확인해 보세요.', {exact:true})).toBeVisible();
+    await expect(map.getByText('대화에서 배운 내용이 여기에 하나씩 연결돼요.', {exact:true})).toBeVisible();
     await expect(connections).toHaveCount(0);
     await expect(status).toHaveText('아직 연결된 지식이 없어요.');
     await expect(button(dialog, '웰컴 라운지로 가기')).toBeEnabled();
     await capture('canon-open');
     for (const [index, exchange] of exchanges.entries()) {
-      await tap(button(dialog, exchange.button));
+      const action = button(dialog, exchange.button);
+      await expect(action).toBeInViewport({ratio:.95});
+      const actionBox = await action.boundingBox();
+      expect(actionBox.y + actionBox.height).toBeLessThan((await map.boundingBox()).y);
+      await tap(action);
       await expect(status).toHaveText(exchange.status);
       await expect(connections).toHaveCount(exchange.connected);
-      await expect(button(dialog, exchange.button)).toHaveCount(0);
+      await expect(action).toHaveCount(0);
+      const next = exchanges[index + 1];
+      if (next) {
+        const nextAction = button(dialog, next.button);
+        await expect(nextAction).toBeInViewport({ratio:.95});
+        expect(Math.abs((await nextAction.boundingBox()).y - actionBox.y)).toBeLessThan(3);
+      }
       if (index === 0) {
         const before = await position();
         await tap(button(dialog, '복도로 돌아가기'));
@@ -114,6 +132,8 @@ for (const [device, engine, viewport] of [
     await tap(open);
     await expect(status).toHaveText(exchanges.at(-1).status);
     await expect(staff).toHaveCount(2);
+    await tap(button(dialog, '처음부터 보기'));
+    await expect(button(dialog, exchanges[0].button)).toBeInViewport({ratio:.95});
   }
   async function inspectContentDraft(dialog) {
     await expect(dialog.getByLabel(/^상품·서비스/)).toHaveValue(contentDraft.product);
@@ -124,7 +144,9 @@ for (const [device, engine, viewport] of [
   }
 
   try {
-    await page.goto(url.href);
+    const response = await page.goto(url.href);
+    expect(response?.status()).toBe(200);
+    expect(new URL(page.url()).origin).toBe(url.origin);
     await finishOfficeReview(page, {
       walk, inspect, enterPersonal:false,
       beforeLeave: async () => {
@@ -143,6 +165,11 @@ for (const [device, engine, viewport] of [
     await expect(world).toHaveAttribute('data-free-roam', 'true');
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(calendar).toHaveCount(0);
+    await expect(page.getByRole('heading', {name:'오늘 해본 것', exact:true})).toHaveCount(0);
+    const lounge = page.getByRole('region', {name:'웰컴 라운지에서 할 수 있는 일', exact:true});
+    for (const label of ['캘린더에 추가', '무료 자료 받기', '복도로 돌아가기', '내 AI 체험으로 가기']) {
+      await expect(button(lounge, label)).toBeInViewport({ratio:.95});
+    }
     await capture('lounge-entry');
 
     await tap(frame.getByRole('button', {name: /자료 안내/}));

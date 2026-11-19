@@ -591,15 +591,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         </>}
       </div>
       <div className={entryStyle.loungeCard}>
-        <div className={entryStyle.loungeRecap}>
-          <h2>오늘 해본 것</h2>
-          <ul>
-            <li>{caseVisited ? <><Check size={15} aria-hidden="true"/>AI 직원들이 일하는 사례를 봤어요.</>
-              : <button type="button" onClick={openOfficeCase}>사무실 사례 둘러보기<ArrowRight size={14} aria-hidden="true"/></button>}</li>
-            <li>{personalFinished && <><Check size={15} aria-hidden="true"/>{state.experience === 'example-viewed' || (state.audience === 'work' && state.workTrial.secondAnswerExample) ? '내 AI 체험의 예시 답변을 봤어요.' : '내 AI 체험을 마쳤어요.'}</>}
-              {!personalFinished && <button type="button" onClick={openPersonalTrial}>{state.hallReturnStep === null ? '내 AI 체험으로 가기' : '내 AI 체험으로 돌아가기'}<ArrowRight size={14} aria-hidden="true"/></button>}</li>
-          </ul>
-        </div>
         <h1>{dateLabel} {timeLabel} · 무료 라이브</h1>
         <p>AI 직원에게 업무를 맡기는 방법을 라이브에서 이어서 배워보세요.</p>
         <div className={entryStyle.hallActions}>
@@ -607,8 +598,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <button type="button" onClick={event => openLobbyGuide('materials', event.currentTarget)}><BookOpen size={17} aria-hidden="true"/>무료 자료 받기</button>
         </div>
         <div className={entryStyle.hallLinks}>
-          {caseVisited && <button type="button" onClick={returnToCorridor}><ArrowLeft size={15} aria-hidden="true"/>복도로 돌아가기</button>}
-          {personalFinished && <button type="button" onClick={openPersonalTrial}>내 AI 체험으로 돌아가기</button>}
+          {caseVisited ? <button type="button" onClick={returnToCorridor}><ArrowLeft size={15} aria-hidden="true"/>복도로 돌아가기</button>
+            : <button type="button" onClick={openOfficeCase}>사무실 사례 둘러보기<ArrowRight size={14} aria-hidden="true"/></button>}
+          <button type="button" onClick={openPersonalTrial}>{personalFinished || state.hallReturnStep !== null
+            ? '내 AI 체험으로 돌아가기' : '내 AI 체험으로 가기'}</button>
           {sceneStatus !== 'ready' && <button type="button" onClick={event => openLobbyGuide('intro', event.currentTarget)}>퇴사선배 윤익 소개</button>}
         </div>
       </div>

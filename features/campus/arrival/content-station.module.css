@@ -1,4 +1,4 @@
-.station { display: grid; gap: 24px; min-width: 0; color: var(--ink, #161719); }
+.station { display: grid; align-content: start; gap: 24px; min-width: 0; color: var(--ink, #161719); }
 .chat { display: flex; align-items: flex-start; gap: 10px; }
 .avatar {
   display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0;
@@ -18,10 +18,10 @@
   margin: 0; padding: 4px 8px; border-radius: 4px; background: #0b1520e8; color: #fff;
   font-size: 13px; font-weight: 700; text-align: center; line-height: 1.35; white-space: normal;
 }
-.station :is(figcaption, .exercise > p, .experienceIntro p, .result > p, .bridge p) { margin: 0; color: var(--muted, #565e68); line-height: 1.6; }
+.station :is(figcaption, .exercise > p, .experienceIntro p, .result > p) { margin: 0; color: var(--muted, #565e68); line-height: 1.6; }
 .station figcaption { font-size: 13px; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.exercise, .bridge { border-top: 1px solid var(--line, #e2e5e9); padding-top: 18px; }
+.exercise { border-top: 1px solid var(--line, #e2e5e9); padding-top: 18px; }
 .station h3 { margin: 0 0 5px; font-size: clamp(18px, 3vw, 21px); line-height: 1.45; letter-spacing: -.035em; }
 .paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px; }
 .paths button {
@@ -62,13 +62,21 @@
 .aiLinks a:hover { border-color: var(--ba-info, #315e8b); }
 .text { min-width: 0; border-top: 1px solid var(--line, #e2e5e9); }
 .station .text textarea { margin: 0; font-size: 14px; }
-.bridge .stop { margin-bottom: 4px; font-size: 13px; }
-.bridge .bridgelink {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 4px 0;
-  border: 0; background: transparent; color: #173b69; font-size: 14px; font-weight: 700;
+.bridge {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  background: var(--paper, #fff);
 }
-.bridge .bridgelink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bridge > div { flex: 1 0 auto; max-width: 100%; }
+.bridge p { margin: 0; color: var(--muted, #565e68); font-size: 13px; line-height: 1.45; }
+.bridge h3 { margin: 2px 0 0; font-size: 17px; letter-spacing: -.035em; line-height: 1.4; }
+.bridge .nextButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  max-width: 100%; min-height: 44px; margin-inline-start: auto; padding: 8px 12px;
+  border: 0; border-radius: 8px; background: #173b69; color: #fff; font-size: 14px; font-weight: 700;
+}
+.bridge .nextButton:hover { background: #142b48; }
 @media (max-width: 440px) {
+  .bridge .nextButton { width: 100%; }
   .station { gap: 20px; }
   .example { margin: -10px 0 0 0; }
   .film { width: min(100%, 205px); }
