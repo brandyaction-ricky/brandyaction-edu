@@ -1,7 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { BlockSubmission } from '../../lib/lesson-block-review';
 
 const revision = '44444444-4444-4444-8444-444444444444';
 const oldRevision = '55555555-5555-4555-8555-555555555555';
+const savedAt = '2026-09-28T12:00:00Z';
 const lessonDocument = {
   schemaVersion: 1,
   blocks: [
@@ -19,8 +21,15 @@ const lessonDocument = {
   ], checklist: [{ id: 'check', label: '소개 문장을 정리했습니다.', required: true }],
 };
 type Draft = { values: { blocks: Record<string, unknown>; checklist: string[] }; writeId: string; updatedAt: string } | null;
-async function mock(page: Page, options: { failure?: number; historical?: boolean; unsupported?: boolean; empty?: boolean; alumni?: boolean; ongoing?: boolean } = {}) {
-  let draft: Draft = null;
+async function mock(page: Page, options: { failure?: number; historical?: boolean; unsupported?: boolean; empty?: boolean; alumni?: boolean; ongoing?: boolean; completed?: boolean } = {}) {
+  let draft: Draft = options.completed ? {
+    writeId: oldRevision,
+    updatedAt: savedAt,
+    values: { blocks: { answer: '저장된 답변', quiz: { q1: 0 } }, checklist: ['check'] },
+  } : null;
+  let submission: BlockSubmission | null = options.alumni
+    ? { id: oldRevision, revision, writeId: oldRevision, outcome: 'submitted', state: 'approved', feedback: '졸업 전 피드백 보존', createdAt: savedAt }
+    : options.completed ? { id: oldRevision, revision, writeId: oldRevision, outcome: 'completed', createdAt: savedAt } : null;
   let practiceDraft: Draft = null;
   const writes: Record<string, unknown>[] = [];
   let failure = options.failure || 0;
@@ -30,7 +39,7 @@ async function mock(page: Page, options: { failure?: number; historical?: boolea
       const isOld = new URL(route.request().url()).searchParams.get('revision') === oldRevision;
       await route.fulfill({ json: {
         practice: options.alumni ? { enabled: true, draft: practiceDraft } : null, ongoing: options.ongoing ? 'daily' : null,
-        submission: options.alumni ? { id: oldRevision, revision, writeId: oldRevision, outcome: 'submitted', state: 'approved', feedback: '졸업 전 피드백 보존' } : null,
+        submission,
         editable: false, currentRevision: revision, revision: isOld ? oldRevision : revision,
         document: options.empty ? null : { ...lessonDocument, blocks: options.unsupported ? [...lessonDocument.blocks, { id: 'tool', type: 'persona-generator', fields: [] }] : lessonDocument.blocks },
         draft: isOld ? { writeId: oldRevision, updatedAt: '2026-09-28T12:00:00Z', values: { blocks: { answer: '예전에 작성한 답변', generator: { customer: '이전 고객', category: '식품' } }, checklist: [] } } : draft,
@@ -41,6 +50,11 @@ async function mock(page: Page, options: { failure?: number; historical?: boolea
     if (body.action === 'grade') { await route.fulfill({ json: { result: { total: 1, correct: 1, passed: true, results: [{ id: 'q1', answered: true, correct: true }] } } }); return; }
     writes.push(body);
     if (failure) { const status = failure; failure = 0; await route.fulfill({ status, json: { error: status === 409 ? '다른 화면에서 저장했습니다.' : '연결이 끊겼습니다.' } }); return; }
+    if (body.action === 'submit') {
+      submission = { id: body.requestId, revision, writeId: body.writeId, outcome: 'completed', createdAt: savedAt };
+      await route.fulfill({ json: submission });
+      return;
+    }
     const saved = { writeId: body.requestId, values: body.values, updatedAt: new Date().toISOString() };
     if (body.action === 'practice-draft') practiceDraft = saved; else draft = saved;
     await route.fulfill({ json: { writeId: saved.writeId, updatedAt: saved.updatedAt } });
@@ -95,6 +109,39 @@ test('mixed lesson answers, generator, quiz and checklist survive reopening; pri
   await expect(page.getByRole('checkbox', { name: '소개 문장을 정리했습니다.' })).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('lesson-blocks.png'), fullPage: true });
+  await page.getByLabel('비공개 값', { exact: false }).fill('synthetic-after-reload');
+  await page.getByRole('button', { name: '프롬프트 만들기' }).click();
+  await page.getByRole('button', { name: '학습 완료하기' }).click();
+  await expect(page.getByText('학습을 완료했습니다.', { exact: true })).toBeVisible();
+  await expect(page.locator('.lb-prompt pre')).toContainText('시험 값: synthetic-after-reload');
+});
+
+test('completed lessons let learners make and copy prompts again without changing saved work', async ({ page, context }) => {
+  const backend = await mock(page, { completed: true });
+  const savedDraft = backend.getDraft();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/lesson-blocks-test');
+  const generator = page.getByRole('region', { name: '프롬프트 생성기' });
+  const customer = generator.getByRole('textbox', { name: '고객 (필수)', exact: true });
+  const generate = generator.getByRole('button', { name: '프롬프트 만들기' });
+  await expect(generator.getByText('복습 중에도 프롬프트를 다시 만들 수 있어요.', { exact: false })).toBeVisible();
+  await expect(generate).toBeEnabled();
+  await generate.click();
+  await expect(generator.getByRole('alert')).toContainText('고객');
+  await customer.fill('복습 중 새 고객');
+  await generator.getByRole('combobox', { name: '분야' }).selectOption('교육');
+  await generate.click();
+  await expect(generator.getByRole('region', { name: '프롬프트 내용' })).toContainText('고객: 복습 중 새 고객');
+  await generator.getByRole('button', { name: '프롬프트 복사' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('분야: 교육');
+  await expect(page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' })).toHaveAttribute('readonly', '');
+  await expect(page.getByRole('checkbox', { name: '소개 문장을 정리했습니다.' })).toBeDisabled();
+  await expect(page.getByText('학습을 완료했습니다.', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(customer).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' })).toHaveValue('저장된 답변');
+  expect(backend.getDraft()).toEqual(savedDraft);
+  expect(backend.writes).toHaveLength(0);
 });
 
 test('failed autosave retries the same write without losing newer input', async ({ page }) => {
