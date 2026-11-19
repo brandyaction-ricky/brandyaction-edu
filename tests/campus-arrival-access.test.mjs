@@ -70,14 +70,14 @@ function fixture(env = {}) {
   };
 }
 
-test('production stays closed until a reviewed snapshot is published, then serves it without SMS reminders', async () => {
-  const f = fixture({VERCEL_ENV: 'production', NEXT_PUBLIC_APP_ENV: 'production'});
+test('production stays closed until a reviewed snapshot is published, then serves it with phone reminders', async () => {
+  const f = fixture({VERCEL_ENV: 'production', NEXT_PUBLIC_APP_ENV: 'production', reminder: true});
   await assert.rejects(f.render({}), /404/);
   assert.equal((await f.calendar()).status, 404);
   f.publishDraft();
   const page = await f.render({});
   assert.equal(page.type, 'arrival');
-  assert.notEqual(page.props.liveReminderEnabled, true);
+  assert.equal(page.props.liveReminderEnabled, true);
   assert.equal((await f.calendar()).status, 200);
   assert.equal(f.reads(), 0);
   assert.equal(f.authReads(), 0);

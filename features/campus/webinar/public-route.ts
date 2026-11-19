@@ -1,7 +1,7 @@
 // Public presentation, telemetry and a no-store operator capability check.
 // The capability endpoint and every operator destination authenticate independently.
 export function isAnonymousWebinarRoute(path:string,method:string){
- return (method==='GET'&&path==='/api/campus/operator-access') || (method==='GET'&&/^\/api\/campus\/webinar\/[a-z0-9][a-z0-9-]{2,59}\/resources\/[-\w]{1,60}$/.test(path)) || (['GET','HEAD'].includes(method)&&/^\/campus\/live\/[a-z0-9][a-z0-9-]{2,59}\/?$/.test(path)) || (method==='POST'&&/^\/api\/campus\/webinar\/[a-z0-9][a-z0-9-]{2,59}\/(?:events|activity)$/.test(path)) || (method==='POST'&&path==='/api/campus/arrival/events');
+ return (method==='GET'&&path==='/api/campus/operator-access') || (method==='GET'&&/^\/api\/campus\/webinar\/[a-z0-9][a-z0-9-]{2,59}\/resources\/[-\w]{1,60}$/.test(path)) || (['GET','HEAD'].includes(method)&&/^\/campus\/live\/[a-z0-9][a-z0-9-]{2,59}\/?$/.test(path)) || (method==='POST'&&/^\/api\/campus\/webinar\/[a-z0-9][a-z0-9-]{2,59}\/(?:events|activity)$/.test(path)) || (method==='POST'&&(path==='/api/campus/arrival/events'||path==='/api/campus/arrival/live-reminder'));
 }
 // Public presentation assets contain no accounts, enrollments or private documents.
 export function isPublicWebinarAsset(path:string,method:string){

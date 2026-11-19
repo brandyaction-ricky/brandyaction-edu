@@ -82,7 +82,6 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
     </button>
     <div id={panelId} hidden={!open}>
       {open && <form className={styles.form} onSubmit={register} aria-busy={submission === 'pending'}>
-        <p className={styles.note}>미리보기에서는 신청만 확인할 수 있어요.</p>
         <fieldset disabled={submission === 'pending' || submission === 'closed'}>
           <div className={styles.phoneField}>
             <label className={styles.phone}>휴대폰 번호
@@ -97,6 +96,7 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
             <input name="consent" type="checkbox" required/>
             라이브 당일 안내 문자 1회 수신에 동의합니다.
           </label>
+          <p className={styles.note}>수집 항목: 휴대폰 번호 · 이용 목적: 12월 7일 문샷 무료 라이브 당일 안내 문자 1회 발송 · 보관 기간: 라이브 종료 후 지체 없이 파기. 동의하지 않으면 문자 알림을 받을 수 없어요.</p>
           {message && <p id={errorId} className={styles.error} role="alert">{message}</p>}
           <div className={styles.actions}>
             <button type="submit">{submission === 'pending' ? '신청 중…' : '문자 알림 신청'}</button>
