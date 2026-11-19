@@ -112,9 +112,46 @@ try {
       await hitTarget(freeMaterials);
       await capture('team');
 
+      const meetupPhoto = team.getByRole('img', {name:'브랜디액션 오프라인 모임에 함께한 참가자들의 단체 사진', exact:true});
+      const meetupCaption = team.locator('figcaption').filter({hasText:'브랜디액션 오프라인 모임'});
+      await expect(meetupPhoto).toHaveAttribute('src', '/campus/arrival/brandyaction-meetup.webp');
+      await expect(meetupCaption).toHaveText('브랜디액션 오프라인 모임');
+      await meetupCaption.scrollIntoViewIfNeeded();
+      await expect(meetupPhoto).toBeInViewport({ratio:.95});
+      await expect.poll(() => meetupPhoto.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+      await hitTarget(freeMaterials);
+      if ([390, 1440].includes(viewport.width)) await capture('team-meetup-photo');
+
+      const meetupToggle = team.getByText('오프라인 모임 영상 보기', {exact:true});
+      const meetupVideo = team.locator('video[aria-label="브랜디액션 오프라인 모임과 참가자 후기 영상"]');
+      await expect(meetupVideo).toBeHidden();
+      await press(meetupToggle);
+      await expect(meetupVideo).toBeVisible();
+      await expect(meetupVideo).toHaveAttribute('src', '/campus/arrival/brandyaction-meetup.mp4');
+      await expect(meetupVideo).toHaveAttribute('poster', '/campus/arrival/brandyaction-meetup-poster.webp');
+      await expect(meetupVideo).toHaveAttribute('preload', 'none');
+      expect(await meetupVideo.evaluate(({controls, muted, loop, playsInline}) => ({controls, muted, loop, playsInline})))
+        .toEqual({controls:true, muted:true, loop:true, playsInline:true});
+      await expect.poll(() => meetupVideo.evaluate(video => video.duration)).toBeCloseTo(5, 0);
+      await expect.poll(() => meetupVideo.evaluate(video => video.currentTime)).toBeGreaterThan(0);
+      await press(meetupToggle);
+      await expect(meetupVideo).toBeHidden();
+      await expect.poll(() => meetupVideo.evaluate(video => video.paused)).toBe(true);
+      if (viewport.width === 390) {
+        await page.emulateMedia({reducedMotion:'reduce'});
+        await press(meetupToggle);
+        await expect(meetupVideo).toBeVisible();
+        expect(await meetupVideo.evaluate(video => video.paused)).toBe(true);
+        await meetupVideo.evaluate(video => video.play());
+        expect(await meetupVideo.evaluate(video => video.paused)).toBe(false);
+        await press(meetupToggle);
+        await expect.poll(() => meetupVideo.evaluate(video => video.paused)).toBe(true);
+        await page.emulateMedia({reducedMotion:'no-preference'});
+      }
+
       await expect(team.getByRole('heading', {name:'브랜디액션 팀의 실제 AI 사무실', exact:true})).toBeVisible();
       const photo = team.locator('img[src="/campus/showcase/ai-office-real-enhanced-v3.webp"]');
-      const caption = team.locator('figcaption');
+      const caption = team.locator('figcaption').filter({hasText:'직원마다 맡은 일이 있어요.'});
       await expect(caption).toHaveText('직원마다 맡은 일이 있어요. 사람은 확인하고 승인만 해요.');
       await caption.scrollIntoViewIfNeeded();
       await expect(photo).toBeInViewport({ratio:.95});
@@ -122,11 +159,12 @@ try {
       await hitTarget(freeMaterials);
       await capture('team-office-photo');
 
-      await expect(team.locator('video')).toBeHidden();
+      const officeVideo = team.locator('video[aria-label="브랜디액션 팀의 AI 사무실 업무 화면"]');
+      await expect(officeVideo).toBeHidden();
       await press(team.getByText('AI 사무실 영상 보기', {exact:true}));
-      await expect(team.locator('video')).toBeVisible();
-      const video = await team.locator('video').elementHandle();
-      await expect(team.locator('video')).toHaveAttribute('src','/campus/arrival/team-at-work.mp4');
+      await expect(officeVideo).toBeVisible();
+      const video = await officeVideo.elementHandle();
+      await expect(officeVideo).toHaveAttribute('src','/campus/arrival/team-at-work.mp4');
       expect(await video.evaluate(element => element.clientHeight > element.clientWidth)).toBe(true);
       videoPlayed = await video.evaluate(async element => {
         element.muted = true;
@@ -139,7 +177,8 @@ try {
       await expect(guide.getByRole('heading', {name:'무료자료 · 라이브 특전', exact:true})).toBeFocused();
       await expect(guide.getByRole('button', {name:'무료자료', exact:true})).toHaveAttribute('aria-pressed', 'true');
       await expect(guide.getByRole('heading', {name:'라이브 전에 볼 자료', exact:true})).toBeVisible();
-      await expect(team.locator('video')).toHaveCount(0);
+      await expect(officeVideo).toHaveCount(0);
+      await expect(meetupVideo).toHaveCount(0);
       if (videoPlayed) await expect.poll(() => video.evaluate(element => element.paused || element.ended)).toBe(true);
       await expect.poll(() => guide.locator('img').first().evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
       await capture('materials-from-team');

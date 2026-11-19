@@ -43,11 +43,14 @@
 .agenda h3 { color: #173b69; font-size: 17px; }
 .agenda ul { margin: 0; padding-inline-start: 20px; }
 .agenda li + li { margin-top: 5px; }
-.officePhoto { margin: 0; }
-.officePhoto img { display: block; width: 100%; height: auto; border: 1px solid #dce5ef; border-radius: 8px; }
-.officePhoto figcaption { margin-top: 8px; color: var(--muted, #565e68); font-size: 14px; line-height: 1.6; }
-.officeVideo { border-top: 1px solid var(--line, #e2e5e9); }
-.officeVideo[open] summary svg { transform: rotate(180deg); }
+.mediaFigure { margin: 0; }
+.mediaFigure img { display: block; width: 100%; height: auto; border: 1px solid #dce5ef; border-radius: 8px; }
+.mediaFigure figcaption { margin-top: 8px; color: var(--muted, #565e68); font-size: 14px; line-height: 1.6; }
+.meetupPhoto { margin-top: 16px; }
+.videoDisclosure { border-top: 1px solid var(--line, #e2e5e9); }
+.videoDisclosure[open] summary svg { transform: rotate(180deg); }
+.meetupDisclosure { margin: 8px 0 14px; }
+.meetupVideo { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #17304b; border-radius: 8px; }
 .greeting :is(button, iframe) { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #17304b; color: #fff; }
 .greeting button { background-size: cover; background-position: center; }
 .greeting button span { display: flex; align-items: center; gap: 8px; background: #142b48e8; padding: 10px 13px; border-radius: 7px; }

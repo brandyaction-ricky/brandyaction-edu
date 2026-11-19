@@ -1,4 +1,4 @@
-import {useId, useRef, useState} from 'react';
+import {useId, useRef, useState, type SyntheticEvent} from 'react';
 import {ArrowLeft, ArrowRight, CalendarDays, ChevronDown, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
@@ -31,6 +31,13 @@ const guides = [
   {id:'guide', title:'작업별 AI 활용 가이드', description:'지금 맡기고 싶은 일부터 골라 AI 쓰는 방법을 확인해보세요.', href:'https://edu.brandyaction.com/guide'},
 ] as const;
 
+function toggleMeetupVideo(event: SyntheticEvent<HTMLDetailsElement>) {
+  const details = event.currentTarget;
+  const video = details.querySelector('video');
+  if (!details.open) video?.pause();
+  else if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) void video?.play().catch(() => {});
+}
+
 function MaterialCover({id}: {id: 'ad' | 'guide' | 'blueprint'}) {
   /* eslint-disable-next-line @next/next/no-img-element -- Local, sized preview of the original material. */
   return <img className={styles.cover} src={`/campus/arrival/material-${id}.webp`} width={480} height={270} alt="" loading={id === 'blueprint' ? 'eager' : 'lazy'} decoding="async"/>;
@@ -53,6 +60,7 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
   const titleId = useId();
   const greeting = youtubeVideoId(config.videoUrl);
   const isMaterials = guide === 'materials';
+  const [teamLead, ...teamParagraphs] = config.teamIntro?.split(/\n\s*\n/) ?? [];
 
   function selectMaterials(tab: 'free' | 'bonus') {
     setMaterialsTab(tab);
@@ -105,21 +113,32 @@ export function OnboardingProgram({guide, config, dateLabel, weekday, timeLabel,
         <dl className={styles.stats}>
           {instructorStats.map(({label, value}) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl>
-        {config.teamIntro && <section className={styles.story}>
+        {teamLead && <section className={styles.story}>
           <h3>브랜디액션이 일하는 방식</h3>
-          {config.teamIntro.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+          <p>{teamLead}</p>
+          <figure className={`${styles.mediaFigure} ${styles.meetupPhoto}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- Local, pre-sized photo supplied for the welcome lounge. */}
+            <img src="/campus/arrival/brandyaction-meetup.webp" width={1080} height={608} alt="브랜디액션 오프라인 모임에 함께한 참가자들의 단체 사진" loading="lazy" decoding="async"/>
+            <figcaption>브랜디액션 오프라인 모임</figcaption>
+          </figure>
+          <details className={`${styles.videoDisclosure} ${styles.meetupDisclosure}`} onToggle={toggleMeetupVideo}>
+            <summary>오프라인 모임 영상 보기 <ChevronDown size={16} aria-hidden="true"/></summary>
+            <video className={styles.meetupVideo} controls muted loop playsInline preload="none" poster="/campus/arrival/brandyaction-meetup-poster.webp"
+              aria-label="브랜디액션 오프라인 모임과 참가자 후기 영상" src="/campus/arrival/brandyaction-meetup.mp4"/>
+          </details>
+          {teamParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
         </section>}
         <section className={styles.agenda}>
           <h3>{dateLabel} ({weekday.replace(/요일$/, '')}) {timeLabel} 무료 라이브에서 알려드려요</h3>
           <ul>{liveTopics.map(topic => <li key={topic}>{topic}</li>)}</ul>
         </section>
-        <figure className={styles.officePhoto}>
+        <figure className={styles.mediaFigure}>
           <h3>브랜디액션 팀의 실제 AI 사무실</h3>
           {/* eslint-disable-next-line @next/next/no-img-element -- Local, pre-sized WebP used in the campus showcase. */}
           <img src="/campus/showcase/ai-office-real-enhanced-v3.webp" width={1473} height={1068} alt="AI 직원들이 각자 맡은 일을 하는 브랜디액션의 3D 사무실 화면" loading="lazy" decoding="async"/>
           <figcaption>직원마다 맡은 일이 있어요. 사람은 확인하고 승인만 해요.</figcaption>
         </figure>
-        <details className={styles.officeVideo}>
+        <details className={styles.videoDisclosure}>
           <summary>AI 사무실 영상 보기 <ChevronDown size={16} aria-hidden="true"/></summary>
           <video className={styles.teamVideo} controls playsInline preload="none" poster="/campus/showcase/ai-office-real-enhanced-v3.webp"
             aria-label="브랜디액션 팀의 AI 사무실 업무 화면" src="/campus/arrival/team-at-work.mp4"/>
