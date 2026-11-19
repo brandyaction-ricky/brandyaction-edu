@@ -1,5 +1,5 @@
 import {chromium, expect, webkit} from '@playwright/test';
-import {loungeScheduleButton, openLoungeSchedule, resumeOfficeVisit} from './review-office.mjs';
+import {loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
 
 const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4535');
 for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
@@ -7,11 +7,12 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
   try {
     const size = mobile ? {width: 393, height: 852} : {width: 1280, height: 820};
     const page = await browser.newPage({viewport:size, isMobile:mobile, hasTouch:mobile});
+    await page.clock.setFixedTime(new Date('2026-11-18T12:00:00Z'));
     await page.addInitScript(() => {
-      const NativeDate = Date;
-      window.Date = class extends NativeDate {
-        constructor(...args) {super(...(args.length ? args : ['2026-11-18T12:00:00Z']));}
-      };
+      if (window === window.top) localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', JSON.stringify({
+        version:1, step:7, visitorAvatar:'male-d', spyPhase:'handed-off', canonPhase:3, hallReturnStep:8,
+        answers:{business:{a:'브라우저에 남긴 연습 입력',b:'다음 화면에서 사용할 참고 내용'}},
+      }));
     });
     await page.route('**/welcome-walk.mjs', async route => {
       const response = await route.fetch();
@@ -20,10 +21,7 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
       expect(script).toContain(frameSample);
       await route.fulfill({response, body: script.replace(frameSample, 'root.dataset.firstPlayerX ??= state.x.toFixed(2); ' + frameSample)});
     });
-    await resumeOfficeVisit(page, url.href, {
-      step:7, visitorAvatar:'male-d', spyPhase:'handed-off', canonPhase:3, hallReturnStep:8,
-      answers:{business:{a:'브라우저에 남긴 연습 입력',b:'다음 화면에서 사용할 참고 내용'}},
-    });
+    await page.goto(url.href);
     const frame = page.frameLocator('iframe[title*="직원 사무실"]');
     const world = frame.locator('#walk');
     const floor = frame.locator('#floor');
@@ -79,7 +77,7 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     if (mobile) await desk.tap();
     else await desk.click();
     const canon = page.getByRole('dialog');
-    await expect(canon.getByRole('heading',{name:'두 직원이 이렇게 다시 썼어요'})).toBeVisible();
+    await expect(canon.getByRole('heading',{name:'같은 기준을 읽은 두 직원의 결과'})).toBeVisible();
     await canon.getByRole('button',{name:'웰컴 라운지로 가기',exact:true}).click();
     const hallTravel = page.locator('#arrival-desk-button');
     await hallTravel.click();

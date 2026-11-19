@@ -1,20 +1,6 @@
 import {expect} from '@playwright/test';
 
-export const arrivalStorageKeys = ['moonshot:arrival:synthetic-local-qa:v1', 'moonshot:arrival:2026-12-07:v1'];
-
-export async function resumeOfficeVisit(page, url, state) {
-  await page.goto(url);
-  await expect(page.getByRole('region', {name:'문샷 웰컴존 소개', exact:true})).toBeVisible();
-  await page.waitForFunction(keys => keys.some(key => sessionStorage.getItem(key)), arrivalStorageKeys);
-  await page.evaluate(({keys, state}) => {
-    for (const key of keys) {
-      if (sessionStorage.getItem(key)) sessionStorage.setItem(key, JSON.stringify({version:1, ...state}));
-    }
-  }, {keys:arrivalStorageKeys, state});
-  await page.reload({waitUntil:'domcontentloaded'});
-}
-
-const nextDesk = ['이 질문을 광고에 반영하기', 'AI가 내 일을 기억하는 방법 보기', '웰컴 라운지로 가기'];
+const nextDesk = ['콘텐츠 실제 제작해보기', 'AI가 내 일을 기억하는 방법 보기', '웰컴 라운지로 가기'];
 
 export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 
@@ -45,7 +31,7 @@ export async function finishTeamLeaderVideo(guide) {
 }
 
 export function loungeScheduleButton(page) {
-  return page.locator('#arrival-hall-schedule');
+  return page.getByRole('button', {name: '라이브 일정 보기', exact: true});
 }
 
 export async function openLoungeSchedule(page) {
@@ -72,8 +58,11 @@ export async function finishOfficeReview(page, {walk, inspect = async () => {}, 
       const guide = teamLeaderGuide(page);
       await expect(guide).toBeVisible({timeout: 20000});
       await inspect(station, guide);
+      if (await guide.locator('video').count() === 0) {
+        await guide.getByRole('button', {name:'지금 확인하기', exact: true}).click();
+      }
       const next = teamLeaderNext(guide);
-      await expect(next).toBeEnabled();
+      if (!await next.isVisible()) await finishTeamLeaderVideo(guide);
       await beforeLeave(station);
       await next.click();
       await expect(guide).toHaveCount(0);

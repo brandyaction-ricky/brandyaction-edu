@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {resumeOfficeVisit, spyActions} from './review-office.mjs';
+import {spyActions} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -47,7 +47,13 @@ for (const {name, engine, viewport, mobile} of devices) {
   }));
 
   try {
-    await resumeOfficeVisit(page, url.href, {step:0, station:2, spyPhase:'intro'});
+    await page.addInitScript(() => {
+      if (window !== window.top) return;
+      const visit = JSON.stringify({version: 1, step: 0, station: 2, spyPhase: 'intro'});
+      localStorage.setItem('moonshot:arrival:synthetic-local-qa:v1', visit);
+      localStorage.setItem('moonshot:arrival:2026-12-07:v1', visit);
+    });
+    await page.goto(url.href);
     await expect(walk).toHaveAttribute('data-ready', 'true', {timeout: 30_000});
     await expect(walk).toHaveAttribute('data-station', '2');
     await tap(frame.getByRole('button', {name: /쪽으로 걷기/}));
@@ -79,14 +85,13 @@ for (const {name, engine, viewport, mobile} of devices) {
     await expect(reply).toHaveCount(3);
     await expect(reply.nth(0)).toContainText('경쟁사 3곳을 조사했어요!');
     await expect(reply.nth(1).getByRole('article')).toHaveCount(2);
-    await expect(reply.nth(2)).toContainText('두 예시 후기에 같은 질문이 있었어요');
+    await expect(reply.nth(2)).toContainText('두 리뷰에');
     const batches = await page.evaluate(() => window.spyReplyBatches);
     expect(batches).toEqual(['summary', 'summary,reviews', 'summary,reviews,analysis']);
     await expect.poll(async () => (await scrollPosition()).remaining).toBeLessThan(16);
     const afterReviews = await scrollPosition();
     if (mobile) expect(afterReviews.top).toBeGreaterThan(0);
     await expect(action(1)).toBeInViewport({ratio: 0.95});
-    await expect(button(dialog, '이 질문을 광고에 반영하기')).toBeInViewport({ratio: 0.95});
     await capture('spy-replies');
 
     if (mobile) {
@@ -138,10 +143,6 @@ for (const {name, engine, viewport, mobile} of devices) {
       await clickBehindDesk();
       await expect.poll(() => distanceFrom(next)).toBeGreaterThan(.75);
       await expect(walk).toHaveAttribute('data-near-desk', 'false');
-    } else {
-      await tap(button(dialog, '이 질문을 광고에 반영하기'));
-      await expect(dialog).not.toBeVisible();
-      await expect(walk).toHaveAttribute('data-station', '3');
     }
     console.log(JSON.stringify({name, viewport, replies: batches.length, panelHeight: panel.height, afterReviews, corridorInput: mobile ? 'touch' : 'keyboard and mouse'}));
   } catch (error) {

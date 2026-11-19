@@ -4,9 +4,11 @@
   display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0;
   border: 1px solid #c9d9ee; border-radius: 10px; background: #eff5ff; color: #2f5480;
 }
-.chat > div { min-width: 0; }
-.chat p { color: var(--muted, #565e68); line-height: 1.6; font-size: 15px; }
-.example { display: grid; justify-items: start; gap: 7px; min-width: 0; margin: 0 0 0 44px; }
+.chat p {
+  width: fit-content; margin: 0; padding: 10px 14px; border-radius: 0 11px 11px 11px;
+  background: var(--surface-subtle, #f5f6f7); line-height: 1.55; font-size: 16px; font-weight: 650;
+}
+.example { display: grid; justify-items: start; gap: 7px; min-width: 0; margin: -13px 0 0 44px; }
 .film { position: relative; width: min(100%, 250px); min-width: 0; overflow: hidden; border-radius: 10px; background: #15171c; }
 .film video { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: contain; }
 .badge, .cue { position: absolute; pointer-events: none; z-index: 1; color: #fff; }
@@ -16,14 +18,14 @@
   margin: 0; padding: 4px 8px; border-radius: 4px; background: #0b1520e8; color: #fff;
   font-size: 13px; font-weight: 700; text-align: center; line-height: 1.35; white-space: normal;
 }
-.station :is(figcaption, .exercise > p, .experienceIntro p, .result > p) { margin: 0; color: var(--muted, #565e68); line-height: 1.6; }
+.station :is(figcaption, .exercise > p, .experienceIntro p, .result > p, .bridge p) { margin: 0; color: var(--muted, #565e68); line-height: 1.6; }
 .station figcaption { font-size: 13px; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.exercise { min-width: 0; padding-top: 20px; border-top: 1px solid var(--line, #e2e5e9); }
+.exercise, .bridge { border-top: 1px solid var(--line, #e2e5e9); padding-top: 18px; }
 .station h3 { margin: 0 0 5px; font-size: clamp(18px, 3vw, 21px); line-height: 1.45; letter-spacing: -.035em; }
 .paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px; }
 .paths button {
-  min-width: 0; min-height: 52px; padding: 8px 10px; border: 1px solid #cad7e8; border-radius: 8px;
+  min-width: 0; min-height: 50px; padding: 8px 10px; border: 1px solid #cad7e8; border-radius: 8px;
   background: var(--paper, #fff); color: #2f4d6e; font-size: 14px; font-weight: 600; line-height: 1.45; word-break: keep-all;
 }
 .paths button:is(:hover, [aria-pressed='true']) { border-color: #7798c2; }
@@ -39,15 +41,13 @@
 }
 .station :is(input, textarea):focus-visible { outline: 2px solid var(--ba-info, #315e8b); outline-offset: 2px; }
 .station textarea { resize: vertical; line-height: 1.55; }
-:is(.station, .bridge) .primary, .station :is(.exampleButton, .aiLinks a) { width: fit-content; max-width: 100%; min-height: 44px; font-size: 14px; }
-:is(.station, .bridge) .primary {
+.station :is(.primary, .exampleButton, .aiLinks a) { width: fit-content; max-width: 100%; min-height: 44px; font-size: 14px; }
+.station .primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 13px;
   border: 1px solid var(--ba-red, #bd2432); border-radius: 7px; color: #fff; background: var(--ba-red, #bd2432);
   font-weight: 650; text-align: start; line-height: 1.4;
 }
-:is(.station, .bridge) .primary:not(:disabled):hover { background: var(--ba-red-hover, #9d1c27); }
-.bridge .primary[data-secondary="true"] { border-color: #cad7e8; background: var(--paper, #fff); color: #173b69; }
-.bridge .primary[data-secondary="true"]:hover { background: #eef4fd; }
+.station .primary:not(:disabled):hover { background: var(--ba-red-hover, #9d1c27); }
 .station .exampleButton { justify-self: start; padding: 4px 0; border: 0; background: transparent; color: var(--ba-info, #315e8b); font-weight: 650; }
 .result { display: grid; gap: 8px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line, #e2e5e9); border-radius: 9px; }
 .result h4 { margin: 0; font-size: 17px; line-height: 1.5; }
@@ -62,12 +62,11 @@
 .aiLinks a:hover { border-color: var(--ba-info, #315e8b); }
 .text { min-width: 0; border-top: 1px solid var(--line, #e2e5e9); }
 .station .text textarea { margin: 0; font-size: 14px; }
-
+.bridge .primary { margin-top: 11px; }
 @media (max-width: 440px) {
   .station { gap: 20px; }
-  .example { margin-left: 0; }
+  .example { margin: -10px 0 0 0; }
   .film { width: min(100%, 205px); }
-  .film video { max-height: min(260px, 44dvh); }
   .station :is(input, textarea) { font-size: 16px; }
   .result { padding: 12px; }
 }

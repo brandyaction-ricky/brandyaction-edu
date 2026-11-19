@@ -1,72 +1,62 @@
 'use client';
 
-import {useEffect, useId, useRef, useState} from 'react';
-import {ArrowRight, BookOpen, Bot, Check, ChevronDown, RotateCcw} from 'lucide-react';
+import {useEffect, useId, useRef} from 'react';
+import {ArrowRight, Bot, Check, Network, RotateCcw} from 'lucide-react';
 import type {CanonPhase} from './model';
 import monitor from './office-demo.module.css';
 import styles from './canon-station.module.css';
 
-const toneRule = '겁주는 말 없이, 처음 쓰는 사람도 쉽게 이해할 수 있게 설명해 주세요.';
-
 const knowledge = [
-  {name: '우리 고객', detail: '바쁜 직장인'},
+  {name: '타겟', detail: '바쁜 직장인'},
   {name: '가격'},
   {name: '경쟁사'},
-  {name: '말투', detail: '쉽게 · 겁주지 않기'},
+  {name: '브랜드', detail: '쉽게 · 겁주지 않기'},
   {name: '상품', detail: '보습 마스크팩'},
   {name: '사용법', detail: '10~15분 뒤 떼기'},
   {name: '고객 질문', detail: '붙이고 자도 될까?'},
   {name: '장점'},
-  {name: '판매처'},
+  {name: '채널'},
   {name: '고객 후기'},
-  {name: '광고 문구', detail: '고객 질문 반영'},
-  {name: '문의 답변', detail: '사용법 안내'},
+  {name: '콘텐츠', detail: '질문을 콘텐츠로'},
+  {name: '고객응대', detail: '사용법 안내'},
 ] as const;
 
 const exchanges = [
   {
     phase: 1,
-    action: '누가 쓰는지 알려주기',
+    action: '고객부터 알려줘보기',
     request: '우리 고객은 바쁜 직장인이야. 퇴근 후 쉬는 시간에 팩을 사용해.',
-    reply: '광고를 쓸 때 직장인이 퇴근해서 팩을 붙이는 모습을 떠올릴게요.',
-    update: '퇴근 후 팩을 쓰는 직장인을 기억했어요.',
+    reply: '타겟과 상품을 연결했어요. 이제 퇴근 후 사용하는 상황으로 생각합니다.',
+    update: '바쁜 직장인 ↔ 보습 마스크팩 · 퇴근 후 사용하는 상황',
     connections: [[0, 4]],
   },
   {
     phase: 2,
-    action: '자주 묻는 질문 알려주기',
+    action: '고객 질문도 알려주기',
     request: '팩 붙이고 자도 되냐고 자주 물어봐. 우리 제품은 10~15분 뒤 떼면 돼.',
-    reply: '광고에도, 문의에 답할 때도 10~15분 뒤에 떼라는 안내를 넣을게요.',
-    update: '두 직원이 같은 사용법을 참고해요.',
+    reply: '고객 질문에 사용법을 연결했어요. 콘텐츠 주제와 응대에도 함께 활용합니다.',
+    update: '고객 질문 ↔ 사용법 ↔ 콘텐츠·고객응대',
     connections: [[4, 5], [5, 6], [6, 10], [6, 11]],
   },
   {
     phase: 3,
-    action: '어떤 말투로 쓸지 알려주기',
-    request: toneRule,
-    reply: '제품 사용 시간은 그대로 안내하고, 처음 쓰는 고객도 편하게 읽을 말투로 쓸게요.',
-    update: '두 직원이 같은 자료와 말투를 써요.',
+    action: '우리 브랜드의 기준도 알려주기',
+    request: '겁주는 말은 쓰지 마. 처음 쓰는 고객도 이해할 수 있게 쉽게 알려줘.',
+    reply: '브랜드의 표현 기준까지 연결했어요. 앞서 알려주신 고객과 사용법도 함께 참고합니다.',
+    update: '고객 + 상품 + 사용법 + 브랜드 기준 → 우리 회사에 맞는 결과',
     connections: [[3, 10], [3, 11], [10, 11]],
   },
 ] as const;
 
 const outputs = [
-  {
-    name: '광고 문구',
-    before: '사용 시간을 꼭 지켜주세요. 마스크팩 권장 사용 시간은 10~15분입니다.',
-    after: '퇴근 후 마스크팩으로 잠깐 쉬어가세요. 10~15분 뒤 떼어내 주세요.',
-  },
-  {
-    name: '고객 문의 답변',
-    before: '권장 사용 시간은 10~15분입니다. 사용 기준을 반드시 지켜주세요.',
-    after: '이 팩은 10~15분 뒤 떼어내 주세요. 잠들기 전에 쓰시면 돼요.',
-  },
+  {name: '콘텐츠 AI', text: '퇴근 후 팩을 붙인 채 잠들어도 될까요?\n10~15분 뒤 떼어내 주세요.\n사용법을 차근차근 알려드릴게요.'},
+  {name: '고객응대 AI', text: '퇴근 후 쉬는 시간에 사용하시면 좋아요.\n이 제품은 10~15분 뒤 떼어내 주세요.\n처음 사용하신다면 쉽게 안내해드릴게요.'},
 ] as const;
 
 function Exchange({request, reply}: {request: string; reply: string}) {
   return <div className={styles.exchange}>
     <p className={styles.request}><strong>내가 알려준 내용</strong>{request}</p>
-    <p className={styles.reply}><strong><Bot size={17} aria-hidden="true"/>직원의 답</strong>{reply}</p>
+    <p className={styles.reply}><strong><Bot size={17} aria-hidden="true"/>정본에 반영한 내용</strong>{reply}</p>
   </div>;
 }
 
@@ -76,16 +66,11 @@ export function CanonStation({phase, onAdvance, onHall}: {
   onHall: () => void;
 }) {
   const mapHeading = useId();
-  const comparisonId = useId();
-  const [showRevised, setShowRevised] = useState<boolean | null>(null);
-  const applied = showRevised ?? (phase === 3);
   const current = phase ? exchanges[phase - 1] : null;
   const next = phase === 3 ? null : exchanges[phase];
   const history = exchanges.slice(0, phase);
   const connections = history.flatMap(exchange => [...exchange.connections]);
   const connected = new Set<number>(connections.flat());
-  const body = useRef<HTMLDivElement>(null);
-  const previews = useRef<HTMLDivElement>(null);
   const advanceButton = useRef<HTMLButtonElement>(null);
   const resultsHeading = useRef<HTMLHeadingElement>(null);
   const requestedPhase = useRef<CanonPhase | null>(null);
@@ -99,125 +84,72 @@ export function CanonStation({phase, onAdvance, onHall}: {
 
   function changePhase(nextPhase: CanonPhase) {
     requestedPhase.current = nextPhase;
-    if (nextPhase === 3 || nextPhase === 0) setShowRevised(null);
     onAdvance(nextPhase);
   }
 
-  function toggleComparison() {
-    setShowRevised(!applied);
-    if (applied) return;
-    requestAnimationFrame(() => {
-      const panel = body.current;
-      const heading = resultsHeading.current;
-      const cards = previews.current;
-      if (!panel || !heading || !cards) return;
-
-      const panelBounds = panel.getBoundingClientRect();
-      if (cards.getBoundingClientRect().bottom <= panelBounds.bottom) return;
-      panel.scrollTop += heading.getBoundingClientRect().top - panelBounds.top - 14;
-      heading.focus({preventScroll: true});
-    });
-  }
-
-  return <>
-    <div ref={body} className={`${monitor.body} ${styles.body}`}>
+  return <div className={`${monitor.body} ${styles.body}`}>
     <header className={styles.intro}>
-      <h1>기준 한 줄로 두 직원의 답이 달라져요</h1>
-      <p><span>고객 질문</span> “마스크팩을 붙이고 자도 되나요?”</p>
+      <h1>AI들이 이렇게 일할 수 있는 이유는 정본에 있습니다.</h1>
+      <p>AI가 회사에 대한 지식을 스스로 정리합니다.</p>
+      <p>대화와 피드백으로 배우고, 바뀐 내용은 다음 업무의 기준이 됩니다.</p>
     </header>
-    <div className={styles.rule}>
+    <div className={styles.layout}>
+      <section className={styles.map} aria-labelledby={mapHeading}>
+        <header className={styles.mapHeader}>
+          <Network size={18} aria-hidden="true"/>
+          <h2 id={mapHeading}>회사 지식 지도</h2>
+          <span>{phase}/3</span>
+        </header>
+        <div className={styles.board}>
+          <svg viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
+            {connections.map(([from, to]) => <line key={`${from}-${to}`}
+              x1={(from % 4) * 100 + 50} y1={Math.floor(from / 4) * 100 + 50}
+              x2={(to % 4) * 100 + 50} y2={Math.floor(to / 4) * 100 + 50}
+              vectorEffect="non-scaling-stroke"/>)}
+          </svg>
+          <ul className={styles.nodes}>
+            {knowledge.map((node, index) => <li key={node.name} data-connected={connected.has(index)}>
+              <span className={styles.node}>{node.name}{connected.has(index) && 'detail' in node && <small>{node.detail}</small>}</span>
+            </li>)}
+          </ul>
+        </div>
+        <p className={styles.update} role="status" aria-atomic="true">
+          {current && <Check size={16} aria-hidden="true"/>}
+          {current?.update ?? '아직 연결된 지식이 없어요.'}
+        </p>
+      </section>
+      <section className={styles.example} aria-label="마스크팩 업무 기준을 정본에 알려주는 체험">
+        <h2>정본에 알려주기</h2>
+        <p className={styles.note}>마스크팩 예시로, 대화에서 알려준 기준이 어떻게 연결되는지 살펴보세요.</p>
+        {current && <Exchange request={current.request} reply={current.reply}/>}
+        {next && <button className={styles.action} type="button" ref={advanceButton} onClick={() => changePhase(next.phase)}>
+          {next.action}<ArrowRight size={17} aria-hidden="true"/>
+        </button>}
+        {phase > 1 && <details className={styles.history}>
+          <summary>이전 대화 보기</summary>
+          {history.slice(0, -1).map(exchange => <Exchange key={exchange.phase} request={exchange.request} reply={exchange.reply}/>)}
+        </details>}
+        {phase === 3 && <section className={styles.results} aria-label="같은 기준을 활용한 업무 결과">
+          <h3 ref={resultsHeading} tabIndex={-1}>같은 기준을 읽은 두 직원의 결과</h3>
+          {outputs.map(output => <article key={output.name} className={styles.result}>
+            <h4>{output.name}</h4>
+            <p>{output.text}</p>
+          </article>)}
+          <button className={styles.replay} type="button" onClick={() => changePhase(0)}>
+            <RotateCcw size={16} aria-hidden="true"/>처음부터 보기
+          </button>
+        </section>}
+      </section>
+    </div>
+    {phase === 3 && <p className={styles.takeaway}>이야기를 나눌수록 우리 회사에 더 잘 맞는 AI가 됩니다.</p>}
+    <footer className={styles.hall}>
       <div>
-        <p className={styles.ruleLabel}>두 직원에게 줄 기준</p>
-        <p className={styles.ruleText}>{toneRule}</p>
+        <h2>12월 7일 라이브에서 이 전 과정을 알려드립니다.</h2>
+        <p>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
       </div>
-      <button
-        className={styles.apply}
-        type="button"
-        aria-controls={comparisonId}
-        data-applied={applied}
-        onClick={toggleComparison}
-      >
-        {applied ? '바꾸기 전만 보기' : <>이 기준으로 다시 써보기<ArrowRight size={17} aria-hidden="true"/></>}
-      </button>
-    </div>
-    <section id={comparisonId} className={styles.comparison} aria-label="광고 문구와 고객 답변 비교">
-      <h2 ref={resultsHeading} tabIndex={-1}>
-        {applied ? '두 직원이 이렇게 다시 썼어요' : '두 직원이 처음 쓴 문장'}
-      </h2>
-      <div ref={previews} className={styles.previews} data-applied={applied}>
-        {outputs.map(output => <article key={output.name} className={styles.preview}>
-          <h3>{output.name}</h3>
-          <div className={styles.before}>
-            {applied && <p className={styles.previewLabel}>바꾸기 전</p>}
-            <p>{output.before}</p>
-          </div>
-          {applied && <div className={styles.after}>
-            <p className={styles.previewLabel}><Check size={14} aria-hidden="true"/>바꾼 뒤</p>
-            <p>{output.after}</p>
-          </div>}
-        </article>)}
-      </div>
-      <p className={styles.takeaway} role="status" aria-atomic="true">
-        {applied && '10~15분은 그대로예요. 광고는 언제 쓰면 좋을지, 문의 답변은 언제 떼면 될지 알려줘요.'}
-      </p>
-    </section>
-    <details className={styles.detail} onToggle={({target, currentTarget}) => {
-      const panel = body.current;
-      if (target !== currentTarget || !currentTarget.open || !panel) return;
-      const bounds = currentTarget.getBoundingClientRect();
-      const panelBounds = panel.getBoundingClientRect();
-      if (bounds.bottom > panelBounds.bottom) panel.scrollTop += bounds.top - panelBounds.top - 14;
-    }}>
-      <summary><BookOpen size={19} aria-hidden="true"/><span>직원들이 참고한 자료와 대화 보기</span><ChevronDown size={16} aria-hidden="true"/></summary>
-      <div className={styles.layout}>
-        <section className={styles.map} aria-labelledby={mapHeading}>
-          <header className={styles.mapHeader}>
-            <h2 id={mapHeading}>직원들이 함께 보는 자료</h2>
-            <p>우리 팀은 함께 쓰는 자료와 업무 기준을 모아 둔 곳을 ‘정본’이라고 불러요.</p>
-          </header>
-          <div className={styles.board}>
-            <svg viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
-              {connections.map(([from, to]) => <line key={`${from}-${to}`}
-                x1={(from % 4) * 100 + 50} y1={Math.floor(from / 4) * 100 + 50}
-                x2={(to % 4) * 100 + 50} y2={Math.floor(to / 4) * 100 + 50}
-                vectorEffect="non-scaling-stroke"/>)}
-            </svg>
-            <ul className={styles.nodes}>
-              {knowledge.map((node, index) => <li key={node.name} data-connected={connected.has(index)}>
-                <span className={styles.node}>{node.name}{connected.has(index) && 'detail' in node && <small>{node.detail}</small>}</span>
-              </li>)}
-            </ul>
-          </div>
-          <p className={styles.update} role="status" aria-atomic="true">
-            {current && <Check size={16} aria-hidden="true"/>}
-            {current?.update ?? '아직 직원들에게 알려준 내용이 없어요.'}
-          </p>
-        </section>
-        <section className={styles.example} aria-label="직원들에게 알려주기">
-          <h2>직원들에게 알려주기</h2>
-          {!current && <p className={styles.note}>버튼을 눌러 어떤 자료가 쓰이는지 확인해 보세요.</p>}
-          {current && <Exchange request={current.request} reply={current.reply}/>}
-          {next && <button className={styles.action} type="button" ref={advanceButton} onClick={() => changePhase(next.phase)}>
-            {next.action}<ArrowRight size={17} aria-hidden="true"/>
-          </button>}
-          {phase > 1 && <details className={styles.history}>
-            <summary>이전 대화 보기</summary>
-            {history.slice(0, -1).map(exchange => <Exchange key={exchange.phase} request={exchange.request} reply={exchange.reply}/>)}
-          </details>}
-          {phase === 3 &&
-            <button className={styles.replay} type="button" onClick={() => changePhase(0)}>
-              <RotateCcw size={16} aria-hidden="true"/>처음부터 보기
-            </button>
-          }
-        </section>
-      </div>
-    </details>
-    </div>
-    <footer className={`${monitor.footer} ${styles.hall}`} data-applied={applied}>
-      <p>라운지에 업무 기준표를 준비했어요.</p>
       <button className={styles.hallLink} type="button" onClick={onHall}>
         웰컴 라운지로 가기<ArrowRight size={17} aria-hidden="true"/>
       </button>
     </footer>
-  </>;
+  </div>;
 }

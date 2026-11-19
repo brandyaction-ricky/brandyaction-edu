@@ -13,7 +13,7 @@ const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get('bridge');
 const avatars = ['female-c', 'female-a', 'male-c', 'male-d'];
 const greetings = {
-  1: '고객이 남긴 질문 하나,\n저희 팀이 같이 풀어봤어요.',
+  1: '첫 업무 보고를 준비했어요.\n여기를 눌러 확인해보세요.',
   2: '경쟁사 고객들의 속마음, 제가 찾아왔어요. 저를 눌러 확인해보세요.',
   3: '경쟁사 조사에서 찾은 내용을 콘텐츠로 만들었어요. 한번 보실래요?',
   4: 'AI가 우리 회사를 알아가는 방법, 여기서 확인해보세요.',
@@ -191,13 +191,8 @@ async function start() {
     projected.project(camera);
     const x = (projected.x + 1) * width / 2 - markerWidth / 2;
     const y = (1 - projected.y) * height / 2 - markerHeight;
-    // On short mobile screens, the welcome card is below and the avatar control is to the right.
-    const compactReception = atReception && width <= 700 && height <= 556;
-    const rightInset = compactReception ? 146 : 10;
-    const left = Math.max(10, Math.min(width - markerWidth - rightInset, x));
-    const top = compactReception
-      ? Math.max(18, Math.min(height - markerHeight - 304, y))
-      : Math.max(72, Math.min(height - markerHeight - 96, y));
+    const left = Math.max(10, Math.min(width - markerWidth - 10, x));
+    const top = Math.max(72, Math.min(height - markerHeight - 96, y));
     marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
   }

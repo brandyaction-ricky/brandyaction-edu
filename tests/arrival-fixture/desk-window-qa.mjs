@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {finishTeamLeaderVideo, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4560/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -81,20 +81,12 @@ for (const {name, engine, viewport, mobile} of devices) {
     expect(requestedPaths.has(modelPath('female-c'))).toBe(true);
     expect(requestedPaths.has(modelPath('female-d'))).toBe(false);
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
-    if (mobile) {
-      await expect.poll(async () => {
-        const marker = await frame.getByRole('button', {name: /쪽으로 걷기/}).boundingBox();
-        const avatar = await button(page, '내 캐릭터').boundingBox();
-        const welcome = await page.getByRole('region', {name: '문샷 웰컴존 소개'}).boundingBox();
-        return Boolean(marker && avatar && welcome && marker.x + marker.width <= avatar.x && marker.y + marker.height <= welcome.y);
-      }).toBe(true);
-    }
     await capture('entry');
     await walkTo(1);
     const leader = teamLeaderGuide(page);
     await expect(leader).toBeVisible();
-    await expect(leader.locator('video')).toHaveCount(0);
-    await expect(teamLeaderNext(leader)).toBeInViewport({ratio: .95});
+    await tap(button(leader, '지금 확인하기'));
+    if (!await teamLeaderNext(leader).isVisible()) await finishTeamLeaderVideo(leader);
     const spyModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('female-d'));
     await tap(teamLeaderNext(leader));
     await spyModel;
@@ -137,7 +129,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     }
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
     const contentModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('male-b'));
-    await tap(button(desk, '이 질문을 광고에 반영하기'));
+    await tap(button(desk, '콘텐츠 실제 제작해보기'));
     await contentModel;
     await expect(desk).not.toBeVisible();
 
@@ -149,9 +141,7 @@ for (const {name, engine, viewport, mobile} of devices) {
     await capture('content-open');
     if (mobile) await page.setViewportSize({width: viewport.width, height: 380});
     const resizedContentHeight = await expectDeskVisible();
-    await expect(button(desk, 'AI가 내 일을 기억하는 방법 보기')).toBeInViewport({ratio: .95});
     const product = desk.getByLabel(/^상품·서비스/);
-    await expect(button(desk, '소개할 상품이 있어요')).toHaveAttribute('aria-pressed', 'true');
     const draft = '웰컴존 테스트용 노트북 거치대';
     await tap(product);
     await page.keyboard.insertText(draft);

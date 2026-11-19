@@ -74,7 +74,7 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
       <p className={styles.context}>마스크팩 가상 사례 · 예시 대화</p>
       <div className={styles.transcript} role="log" aria-label="대화 메시지">
         <BotMessage>
-          <p>저는 경쟁사 스파이입니다.<br/>경쟁사의 광고와 고객 반응을 조사해<br/><strong>우리 광고에서 고객에게 더 알려줄 점을 찾아요.</strong></p>
+          <p>저는 경쟁사 스파이입니다.<br/>경쟁사의 광고와 고객 반응을 조사해<br/><strong>우리 브랜드에 활용할 기회를 찾아드립니다.</strong></p>
         </BotMessage>
         {(step >= 1 || pending === 'intro') && <VisitorMessage>{replies.intro.text}</VisitorMessage>}
         {visibleReviews >= 1 && <BotMessage part="summary"><p><strong>경쟁사 3곳을 조사했어요!</strong></p></BotMessage>}
@@ -92,15 +92,15 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
             </div>
         </BotMessage>}
         {visibleReviews >= 3 && <BotMessage part="analysis">
-          <p>두 예시 후기에 같은 질문이 있었어요. <strong>“팩을 붙이고 얼마나 기다려야 하죠?”</strong></p>
-          <p>우리 제품 설명서에는 <strong>권장 사용 시간 10~15분</strong>이 적혀 있어요. 광고 첫 장면에 그 시간을 보여주면 고객이 답을 바로 찾을 수 있어요.</p>
+          <p>두 리뷰에 <strong>얼마나 붙여야 하는지 모르겠다</strong>는 불편이 공통으로 나타나요. 권장 사용 시간이 눈에 잘 띄는지 살펴볼 만합니다.</p>
+          <p>우리 브랜드에서도 이런 불편을 줄일 방법을 찾아볼까요?</p>
         </BotMessage>}
         {step >= 2 && <>
           <VisitorMessage>{replies.reviews.text}</VisitorMessage>
           <BotMessage>
-            <p>우리 제품 설명서도 확인했어요.</p>
+            <p>이 가상 사례의 정본에서 상품 사용 가이드를 확인했어요.</p>
             <div className={styles.guide}>
-              <span>제품 설명서 예시</span>
+              <span>회사 정본 · 상품 사용 가이드 예시</span>
               <strong>10~15분 사용 후 떼어내세요.</strong>
             </div>
             <p>권장 사용 시간을 영상 첫 부분에 넣으면, 고객이 설명을 찾아보지 않아도 언제 떼어야 하는지 바로 알 수 있어요.</p>
@@ -113,7 +113,7 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
             <p><strong>체험에서 콘텐츠 담당자에게 전달한 내용이에요.</strong></p>
             <dl className={styles.handoff}>
               <div><dt>고객의 불편</dt><dd>얼마나 오래 붙여야 하는지 모르겠음</dd></div>
-              <div><dt>우리 상품의 기준</dt><dd>설명서에 적힌 권장 사용 시간 10~15분</dd></div>
+              <div><dt>우리 상품의 기준</dt><dd>정본에 기록된 권장 사용 시간 10~15분</dd></div>
               <div><dt>맡긴 일</dt><dd>사용 시간을 알기 쉽게 보여주는 콘텐츠 만들기</dd></div>
             </dl>
           </BotMessage>
@@ -131,14 +131,15 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
     </div>
     <footer className={`${monitor.footer} ${styles.footer}`}>
       {shownPhase === 'intro' && !pending && <p>아래 요청문을 보내 업무를 맡겨보세요.</p>}
-      {!pending && step >= 1 && <button className={styles.action} type="button" onClick={onComplete}>이 질문을 광고에 반영하기<ArrowRight size={17} aria-hidden="true"/></button>}
-      {reply && <div className={styles.composer} data-follow-up={step >= 1 || undefined}>
+      {reply
+        ? <div className={styles.composer}>
           <span className={styles.messagePreview} aria-hidden="true">{!pending && reply.text}</span>
           <span className={styles.screenReader} id={sendDescription}>예시 메시지 보내기</span>
           <button className={styles.send} type="button" onClick={sendMessage} aria-label={reply.text} aria-describedby={sendDescription} aria-disabled={pending !== null || undefined}>
             <ArrowUp size={17} aria-hidden="true"/><span aria-hidden="true">보내기</span>
           </button>
-        </div>}
+        </div>
+        : <button className={styles.action} type="button" onClick={onComplete}>콘텐츠 실제 제작해보기<ArrowRight size={17} aria-hidden="true"/></button>}
     </footer>
   </>;
 }

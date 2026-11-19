@@ -5,12 +5,12 @@ import {ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Copy
 import {buildWorkManual, buildWorkPrompt, criteriaReady, DEFAULT_WORK_TRIAL, secondTaskReady, updateWorkTrial, workPromptCopyId, WORK_TRIAL_LIMITS, type WorkTrialConfig, type WorkTrialState} from './work-trial';
 import s from './work-trial-panel.module.css';
 
-const stages = ['업무 기준', '첫 업무', '답변 수정', '다음 업무'];
+const stages = ['업무 기준', '첫 업무', '피드백', '재사용'];
 
 function RequestPicture({reusing}: {reusing: boolean}) {
   return <figure className={s.requestPicture} aria-label="업무 기준과 이번 자료를 합쳐 AI에게 보낼 전체 요청을 만듭니다">
     <div className={s.requestParts}>
-      <div className={s.rulePaper}><ListChecks size={22}/><span>계속 사용할 기준</span><strong>내 업무 기준{reusing && <small>+ 새로 정한 기준</small>}</strong><i/><i/></div>
+      <div className={s.rulePaper}><ListChecks size={22}/><span>계속 사용할 기준</span><strong>내 업무 기준{reusing && <small>+ 반영한 피드백</small>}</strong><i/><i/></div>
       <Plus size={18} aria-hidden="true"/>
       <div className={s.taskPaper}><FileText size={22}/><span>이번에 바뀌는 내용</span><strong>이번 업무 자료</strong><i/><i/></div>
     </div>
@@ -155,7 +155,7 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
           <label><span>{config.readerLabel}</span><textarea rows={2} maxLength={WORK_TRIAL_LIMITS.reader} value={state.reader} placeholder={config.readerDefault} onChange={event => patch({reader: event.target.value})}/></label>
         </div>
         <fieldset className={s.priority}><legend>{config.priorityQuestion}</legend>{config.priorities.map(item => <label key={item.id} data-selected={state.priority === item.id}><input type="radio" name={priorityName} value={item.id} checked={state.priority === item.id} onChange={() => patch({priority: item.id})}/><span>{item.label}</span></label>)}</fieldset>
-        <details className={s.disclosure}><summary>기본 업무 기준 보고 바꾸기<ChevronDown size={16}/></summary><div className={s.fields}>
+        <details className={s.disclosure}><summary>기본 업무 기준 확인·수정<ChevronDown size={16}/></summary><div className={s.fields}>
           <label><span>{config.boundaryLabel}</span><textarea rows={3} maxLength={WORK_TRIAL_LIMITS.rule} value={state.boundary} placeholder={config.boundaryDefault} onChange={event => patch({boundary: event.target.value})}/></label>
           <label><span>{config.formatLabel}</span><textarea rows={3} maxLength={WORK_TRIAL_LIMITS.rule} value={state.format} placeholder={config.formatDefault} onChange={event => patch({format: event.target.value})}/></label>
           <p className={s.fine}>비워두면 위 기본 기준을 적용합니다. 바꾸고 싶은 내용이 있다면 직접 적어주세요.</p>
@@ -169,7 +169,7 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
         <textarea id="work-trial-task" className={s.taskInput} rows={5} maxLength={WORK_TRIAL_LIMITS.task} value={taskValue} onChange={event => patch(state.step === 1 ? {firstTask: event.target.value} : {secondTask: event.target.value})} placeholder={task.sample}/>
         <p className={s.fieldHint}>{task.hint}</p>
         {state.step === 3 && state.secondTask.trim() && !secondTaskReady(state) && <p className={s.fieldError} role="status">첫 업무와 다른 메모를 넣어주세요. 같은 기준이 새로운 업무에도 적용되는지 확인합니다.</p>}
-        <details className={s.disclosure}><summary>이 메모와 함께 보낼 업무 기준<ChevronDown size={16}/></summary><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}{state.step === 3 && <p><strong>지난번에 새로 정한 기준</strong>{state.feedback}</p>}</div></details>
+        <details className={s.disclosure}><summary>AI에게 함께 보낼 업무 기준{state.step === 3 ? '·피드백' : ''}<ChevronDown size={16}/></summary><div className={s.manualRows}>{manualRows.map(item => <p key={item.label}><strong>{item.label}</strong>{item.value}</p>)}{state.step === 3 && <p><strong>이번 업무에도 적용할 피드백</strong>{state.feedback}</p>}</div></details>
       </>}
 
       {state.step === 2 && <>
@@ -180,7 +180,7 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
       </>}
 
       {state.step > 0 && state.step < 4 && <>
-        {prompt && <details className={s.disclosure}><summary>AI에 보낼 내용 미리 보기<ChevronDown size={16}/></summary><div><p className={s.packageHint}>내 업무 기준{state.step > 1 ? '과 피드백' : ''}에 {state.step === 2 ? '첫 업무 자료' : '위에 입력한 자료'}를 합쳤어요. 아래 내용 전체가 복사됩니다.</p><textarea className={s.promptText} aria-label="개인 AI에게 보낼 요청문" readOnly value={prompt}/></div></details>}
+        {prompt && <details className={s.disclosure}><summary>복사할 전체 요청문 미리보기<ChevronDown size={16}/></summary><div><p className={s.packageHint}>내 업무 기준{state.step > 1 ? '과 피드백' : ''}에 {state.step === 2 ? '첫 업무 자료' : '위에 입력한 자료'}를 합쳤어요. 아래 내용 전체가 복사됩니다.</p><textarea className={s.promptText} aria-label="개인 AI에게 보낼 요청문" readOnly value={prompt}/></div></details>}
         {!hasCopied && <p className={s.fine}>복사한 요청문은 평소 쓰는 AI에 붙여넣어 주세요. 답변은 그 AI에서 확인할 수 있어요.</p>}
         {prompt && !hasCopied && <button type="button" className={s.textButton} onClick={confirmResponse}>이미 답변을 받았어요<ArrowRight size={14}/></button>}
       </>}
@@ -203,7 +203,7 @@ export function WorkTrialPanel({config, state, onChange, onExit, onLive, persist
     <footer className={s.footer}>
       {state.step === 0 ? <><p>{firstReady ? '내 기준과 첫 업무를 함께 AI에 보냅니다.' : '맡길 일과 읽을 사람을 적고, 우선순위를 골라주세요.'}</p><button type="button" className={s.primary} disabled={!firstReady} onClick={() => go(1)}>이 기준으로 첫 업무 맡기기<ArrowRight size={17}/></button></> : state.step === 4 ? <button type="button" className={s.primary} onClick={onLive}>라이브에서 이어서 배우기<ArrowRight size={17}/></button> : <>
         <p>{hasCopied ? '답변을 받으면 이 화면으로 돌아오세요.' : state.step === 2 ? '수정할 기준을 담아 첫 답변을 다시 요청합니다.' : state.step === 3 ? '수정한 기준과 새 메모를 함께 보냅니다.' : '내 업무 기준과 메모가 하나의 요청문으로 준비됩니다.'}</p>
-        <div className={s.footerActions}>{hasCopied ? <><button type="button" className={s.primary} onClick={confirmResponse}>{state.step === 1 ? '첫 답변을 받았어요' : state.step === 2 ? '수정한 답변을 확인했어요' : '두 번째 답변을 받았어요'}<Check size={17}/></button><button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button></> : <button type="button" className={s.primary} disabled={!prompt || copying === 'prompt'} aria-busy={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={17}/>{copying === 'prompt' ? '복사 중…' : state.step === 2 ? '고쳐 달라는 말 복사' : '기준과 자료 함께 복사'}</button>}</div>
+        <div className={s.footerActions}>{hasCopied ? <><button type="button" className={s.primary} onClick={confirmResponse}>{state.step === 1 ? '첫 답변을 받았어요' : state.step === 2 ? '수정한 답변을 확인했어요' : '두 번째 답변을 받았어요'}<Check size={17}/></button><button type="button" className={s.textButton} aria-label="요청문 다시 복사" onClick={() => copy(prompt)}><Copy size={16}/><span>다시 복사</span></button></> : <button type="button" className={s.primary} disabled={!prompt || copying === 'prompt'} aria-busy={copying === 'prompt'} onClick={() => copy(prompt)}><Copy size={17}/>{copying === 'prompt' ? '복사 중…' : state.step === 2 ? '피드백 반영 요청 복사' : '기준과 자료 함께 복사'}</button>}</div>
       </>}
     </footer>
   </div>;

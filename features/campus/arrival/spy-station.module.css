@@ -101,10 +101,6 @@
 }
 .footer :is(.send, .action):hover { background: #142b48; }
 .footer .send { flex: 0 0 auto; min-width: 44px; }
-.action + .composer { margin-top: 6px; border-color: transparent; background: transparent; padding: 0; }
-.composer[data-follow-up] .messagePreview { padding-inline-start: 0; color: var(--muted, #565e68); font-size: 13px; }
-.composer[data-follow-up] .send:not([aria-disabled]) { background: #eef3f9; color: #173b69; }
-.composer[data-follow-up] .send:not([aria-disabled]):hover { background: #dce5ef; }
 .footer .send[aria-disabled="true"] { background: #dce5ef; color: #516375; cursor: default; }
 .screenReader { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 390px) {

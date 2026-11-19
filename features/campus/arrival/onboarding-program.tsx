@@ -1,5 +1,5 @@
 import {useId, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, CalendarDays, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
 import monitor from './office-demo.module.css';
@@ -18,15 +18,13 @@ function MaterialCover({id}: {id: 'ad' | 'guide' | 'blueprint'}) {
   return <img className={styles.cover} src={`/campus/arrival/material-${id}.webp`} width={480} height={270} alt="" loading={id === 'blueprint' ? 'eager' : 'lazy'} decoding="async"/>;
 }
 
-export function OnboardingProgram({guide, config, dateLabel, materialsReady, onContentReplay, onClose, onContinue, onShowSchedule}: {
+export function OnboardingProgram({guide, config, dateLabel, onContentReplay, onClose, onOpenMaterials}: {
   guide: OnboardingGuide;
   config: ArrivalConfig;
   dateLabel: string;
-  materialsReady: boolean;
   onContentReplay: () => void;
   onClose: () => void;
-  onContinue: () => void;
-  onShowSchedule?: () => void;
+  onOpenMaterials: () => void;
 }) {
   const [materialsTab, setMaterialsTab] = useState<'free' | 'bonus'>('free');
   const [playGreeting, setPlayGreeting] = useState(false);
@@ -53,22 +51,10 @@ export function OnboardingProgram({guide, config, dateLabel, materialsReady, onC
       {isMaterials ? <section aria-label="웰컴 라운지 안내">
         {materialsTab === 'free' ? <>
           <h3>라이브 전에 볼 자료</h3>
-          <article className={styles.worksheet}>
-            <h4>우리 회사 업무 기준표</h4>
-            <p>AI에게 맡길 일과 결과를 판단할 기준을 적어보세요. 소개글과 문의 답변에 같은 기준을 적용해볼 수 있어요.</p>
+          <div className={styles.worksheet}>
+            <p>AI 직원에게 맡길 일과 결과를 확인할 기준을 적어보세요.</p>
             <a href="/campus/arrival/company-rule-worksheet.txt" download="문샷-우리-회사-업무-기준표.txt"><Download size={16} aria-hidden="true"/>회사 업무 기준표 받기</a>
-            <details className={styles.worksheetExample}>
-              <summary>작성 예시 보기</summary>
-              <dl className={styles.sample}>
-                <div><dt>오늘 AI에게 맡길 일 한 가지</dt><dd>다음 라이브를 소개하는 첫 문장과 신청 문의 답변 초안을 준비한다.</dd></div>
-                <div><dt>함께 지킬 기준 한 줄</dt><dd>기능 이름보다 고객이 받아볼 결과물을 먼저 보여준다.</dd></div>
-              </dl>
-            </details>
-          </article>
-          {onShowSchedule && <div className={styles.next}>
-            <p>{dateLabel} 라이브에서 이 기준을 AI 직원에게 적용하는 방법을 배워요.</p>
-            <button type="button" onClick={onShowSchedule}><CalendarDays size={16} aria-hidden="true"/>일정 다시 보기</button>
-          </div>}
+          </div>
           <div className={styles.cards}>
             {guides.map(item => <article className={styles.card} key={item.id}>
               <MaterialCover id={item.id}/>
@@ -92,23 +78,17 @@ export function OnboardingProgram({guide, config, dateLabel, materialsReady, onC
           {config.bonusPreview && <p>{config.bonusPreview}</p>}
         </>}
       </section> : <section>
-        <h3>{config.instructorName}</h3>
-        <p>{config.instructorIntro}</p>
-        <div className={styles.teamExample}>
-          <div>
-            <h4 className={styles.teamTitle}>브랜디액션 팀이 AI와 일하는 모습</h4>
-            <p>AI 직원에게 이름과 업무를 정해 주는 화면과 고객 응대·경쟁 분석·시장 조사를 맡은 직원의 책상을 볼 수 있어요.</p>
-            <p className={styles.teamDuration}>14초 영상</p>
-          </div>
-          <video className={styles.teamVideo} controls playsInline preload="none" poster="/campus/showcase/ai-office-real-enhanced-v3.webp"
-            aria-label="브랜디액션 팀의 AI 사무실 업무 화면" src="/campus/arrival/team-at-work.mp4"/>
-        </div>
         {greeting && <section className={styles.greeting} aria-label="퇴사선배 윤익의 인사 영상">
           {playGreeting ? <iframe title="퇴사선배 윤익의 인사 영상" src={`https://www.youtube-nocookie.com/embed/${greeting}?autoplay=1`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen/>
             : <button type="button" style={{backgroundImage: `url(https://i.ytimg.com/vi/${greeting}/hqdefault.jpg)`}} onClick={() => setPlayGreeting(true)}><span><Play size={22} aria-hidden="true"/>퇴사선배 윤익의 인사 영상 재생</span></button>}
         </section>}
+        <h3>{config.instructorName}</h3>
+        <p>{config.instructorIntro}</p>
+        <h4 className={styles.teamTitle}>브랜디액션 팀이 AI와 일하는 모습</h4>
+        <video className={styles.teamVideo} controls playsInline preload="none" poster="/campus/showcase/ai-office-real-enhanced-v3.webp"
+          aria-label="브랜디액션 팀의 AI 사무실 업무 화면" src="/campus/arrival/team-at-work.mp4"/>
       </section>}
     </div>
-    {!isMaterials && <footer className={monitor.footer}><button type="button" className={styles.guideButton} onClick={onContinue}>{materialsReady ? '무료 자료 보기' : '라이브 일정 저장'}<ArrowRight size={16} aria-hidden="true"/></button></footer>}
+    {!isMaterials && <footer className={monitor.footer}><button type="button" className={styles.guideButton} onClick={onOpenMaterials}>무료자료 확인하러 가기 <ArrowRight size={16} aria-hidden="true"/></button></footer>}
   </section>;
 }

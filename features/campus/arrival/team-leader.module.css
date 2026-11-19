@@ -2,236 +2,96 @@
   position: absolute;
   z-index: 8;
   inset: 0;
-  display: grid;
-  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
-  place-items: center;
-  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
-    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  background: #101c2db0;
-  color: var(--ink, #161719);
-  color-scheme: light;
-}
-.content {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  inline-size: min(100%, 576px);
-  max-block-size: 100%;
-  min-inline-size: 0;
-  min-block-size: 0;
-  overflow: hidden;
-  border: 1px solid var(--line, #e2e5e9);
-  border-radius: 16px;
-  background: var(--paper, #fff);
-  box-shadow: 0 16px 56px #06121d45;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-}
-.header, .actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  padding-inline: 25px;
-}
-.header {
-  min-block-size: 58px;
-  padding-block: 6px;
-  border-bottom: 1px solid var(--line, #e2e5e9);
-}
-.header h2 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.header h2:focus, .screening h3:focus { outline: none; }
-.scene :is(.back, .videoToggle, .cta) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-inline-size: 0;
-  min-block-size: 44px;
-  padding: 8px 13px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.45;
-}
-.scene .back {
-  margin-inline-end: -5px;
-  padding-inline: 5px;
-  white-space: nowrap;
-  background: transparent;
-  color: var(--muted, #565e68);
-}
-.scene .back:hover { color: var(--ink, #161719); }
-.body {
-  min-block-size: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 24px 25px;
-  scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-}
-.report .greeting {
-  margin-block-end: 14px;
-  color: var(--muted, #565e68);
-  font-size: 15px;
-  white-space: pre-wrap;
-}
-.question {
-  padding: 16px 18px 17px;
-  border: 1px solid #eadcdf;
-  border-radius: 10px;
-  background: #fbf5f6;
-}
-.question p {
-  margin: 0 0 4px;
-  color: #715058;
-  font-size: 13px;
-  font-weight: 600;
-}
-.question h3 {
-  margin: 0;
-  font-size: clamp(21px, 4.6vw, 29px);
-  font-weight: 750;
-  line-height: 1.35;
-  letter-spacing: -.037em;
-}
-.findings { margin: 16px 0 12px; }
-.findings > div {
-  display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  align-items: baseline;
-  gap: 4px 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line, #e2e5e9);
-}
-.findings dt {
-  color: var(--muted, #565e68);
-  font-size: 14px;
-  font-weight: 650;
-}
-.findings dd { margin: 0; font-size: 15px; }
-.findings strong {
-  color: #9c2132;
-  font-weight: 750;
-  white-space: nowrap;
-}
-.report .summary { color: var(--muted, #565e68); font-size: 15px; }
-.actions {
-  flex-wrap: wrap;
-  padding-block: 12px;
-  border-top: 1px solid var(--line, #e2e5e9);
-}
-.scene .videoToggle {
-  padding-inline: 10px;
-  border-color: var(--line, #e2e5e9);
-  background: var(--paper, #fff);
-  color: var(--ink, #161719);
-  font-weight: 600;
-}
-.scene .videoToggle:hover { background: var(--surface-subtle, #f5f6f7); }
-.scene .cta {
-  margin-inline-start: auto;
-  border-color: var(--ba-red, #bc2535);
-  background: var(--ba-red, #bc2535);
+  background: #111b2dbd;
   color: #fff;
-  font-weight: 700;
-}
-.scene .cta:hover { filter: brightness(.92); }
-.scene .videoToggle[aria-expanded="false"] {
-  border-color: var(--ba-red, #bc2535);
-  background: var(--ba-red, #bc2535);
-  color: #fff;
-  font-weight: 700;
-}
-.scene .videoToggle[aria-expanded="false"]:hover { filter: brightness(.92); }
-.scene .videoToggle[aria-expanded="false"] + .cta {
-  border-color: var(--line, #e2e5e9);
-  background: var(--paper, #fff);
-  color: var(--ink, #161719);
-}
-.scene .videoToggle[aria-expanded="false"] + .cta:hover { background: var(--surface-subtle, #f5f6f7); filter: none; }
-.screening { margin-inline: auto; max-inline-size: 440px; }
-.screening h3 {
-  margin: 0;
-  font-size: 19px;
-  line-height: 1.5;
-}
-.screening .videoCaption {
-  margin-block: 4px 12px;
-  color: var(--muted, #565e68);
-  font-size: 14px;
-  line-height: 1.5;
-}
-.player {
-  overflow: hidden;
-  border-radius: 10px;
-  background: #0a101b;
-  color: #fff;
+  animation: fade-in .55s ease-out both;
   color-scheme: dark;
 }
-.picture {
-  --preview-height: clamp(178px, calc(100dvh - 326px), 372px);
+.content {
   position: relative;
-  block-size: var(--preview-height);
-  overflow: hidden;
-}
-.picture video {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  display: block;
-  /* Frame the middle 560 pixels of the 464px-wide recording to reduce black bars. */
-  inline-size: min(100%, calc(var(--preview-height) * 464 / 560));
-  block-size: auto;
-  transform: translate(-50%, -50%);
-}
-.controls { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 2px 4px; }
-.controls button {
-  flex: 0 0 44px;
   display: grid;
-  place-items: center;
-  block-size: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  min-height: 100%;
+  padding: max(72px, env(safe-area-inset-top)) 16px max(38px, env(safe-area-inset-bottom));
+}
+.scene .back {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 7px 13px;
+  border: 1px solid #ffffff66;
+  border-radius: 8px;
+  background: #0d1a2be0;
   color: inherit;
 }
+.intro, .next { text-align: center; }
+.intro h2 {
+  max-inline-size: 24ch;
+  margin: 0 0 24px;
+  color: #fff;
+  font-size: clamp(28px, 5vw, 52px);
+  font-weight: 750;
+  line-height: 1.24;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  text-shadow: 0 2px 16px #06101fcc;
+  outline: none;
+}
+.scene .cta {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 17px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--ba-red, #ba2639);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+.screening { inline-size: min(100%, 464px); min-inline-size: 0; animation: fade-in .55s ease-out both; }
+.player { overflow: hidden; border-radius: 12px; background: #0a101b; }
+.picture { position: relative; aspect-ratio: 464 / 560; overflow: hidden; }
+.picture video { position: absolute; top: 50%; left: 0; display: block; inline-size: 100%; block-size: auto; transform: translateY(-50%); }
+.controls { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 2px 4px; }
+.controls button { flex: 0 0 44px; display: grid; place-items: center; block-size: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #fff; }
 .controls button:hover { background: #ffffff24; }
-.player .controls button:focus-visible { outline-offset: -3px; }
-.controls input { flex: 1 1 auto; min-inline-size: 32px; block-size: 44px; margin: 0 4px; accent-color: #ff666e; }
+.controls button:focus-visible { outline-offset: -3px; }
+.controls input { flex: 1 1 auto; min-width: 32px; block-size: 44px; margin: 0 4px; accent-color: #ff666e; }
 .controls span { color: #d9e2ef; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .player:fullscreen { display: grid; grid-template-rows: minmax(0, 1fr) auto; border-radius: 0; background: #000; }
-.player:fullscreen .picture { block-size: auto; }
-.player:fullscreen video { position: static; inline-size: 100%; block-size: 100%; object-fit: contain; transform: none; }
-.player:fullscreen .controls { inline-size: min(100%, 680px); margin-inline: auto; }
-.error { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 8px; font-size: 14px; }
-.scene .error button {
-  min-block-size: 44px;
-  padding: 0 4px;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-size: inherit;
-  text-decoration: underline;
+.player:fullscreen .picture { aspect-ratio: auto; }
+.player:fullscreen video { position: static; block-size: 100%; object-fit: contain; transform: none; }
+.player:fullscreen .controls { width: min(100%, 680px); margin-inline: auto; }
+.next { margin-top: 16px; visibility: hidden; }
+.next[data-available] { visibility: visible; animation: next-in .3s ease-out both; }
+.scene .next p { margin: 0 0 12px; font-size: clamp(16px, 3vw, 20px); font-weight: 650; word-break: keep-all; }
+.scene .error { margin: 10px 0 0; text-align: center; }
+.error button { min-height: 44px; padding: 0 8px; border: 0; background: none; color: inherit; text-decoration: underline; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes next-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 700px) {
+  .content { padding-bottom: max(23px, env(safe-area-inset-bottom)); }
+  .screening { inline-size: min(100%, 390px); }
+  .scene .back { top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); }
 }
-@media (max-width: 540px) {
-  .header, .actions, .body { padding-inline: 16px; }
-  .body { padding-block: 16px; scrollbar-gutter: auto; }
-  .question { padding: 12px 14px; }
-  .findings { margin-block-start: 8px; }
-  .findings > div { grid-template-columns: minmax(0, 1fr); gap: 1px; padding-block: 7px; }
-  .actions { gap: 7px; padding-block: 9px; }
+@media (max-width: 700px) and (max-height: 650px) {
+  .picture { max-block-size: max(222px, calc(100dvh - 254px)); }
+  .player:fullscreen .picture { max-block-size: none; }
 }
-@media (max-width: 390px) {
-  .scene { padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right)); }
-  .header, .actions, .body { padding-inline: 12px; }
-  .scene :is(.videoToggle, .cta) { gap: 5px; padding-inline: 9px; font-size: 13px; }
-}
-@media (max-width: 350px) {
-  .scene :is(.videoToggle, .cta) { padding-inline: 7px; }
-  .videoToggle svg { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .scene, .screening, .next[data-available] { animation: none; }
 }
