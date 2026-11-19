@@ -68,14 +68,19 @@ test('CRM previews only this live event’s one-time consent and shows the plann
   assert.match(reminder.liveReminderPreview.message, /카카오톡방 공지/);
 });
 
-test('reminders require the explicit feature flag, development application, Preview and the DEV database', () => {
+test('reminders run on the DEV database anywhere and on production only with the production database', () => {
   assert.equal(reminder.arrivalLiveReminderEnabled(dev), true);
-  for (const [name, value] of [
-    ['VERCEL_ENV','production'], ['NEXT_PUBLIC_APP_ENV','production'],
-    ['EDU_CAMPUS_ARRIVAL_REMINDERS_ENABLED','0'], ['SUPABASE_SERVICE_ROLE_KEY',''],
-    ['NEXT_PUBLIC_SUPABASE_URL','https://qitqxizuwmmlhlcgsrqe.supabase.co'],
-    ['NEXT_PUBLIC_SUPABASE_URL','https://vjmjhaidlqkmascdjocw.supabase.co.example.com'],
-  ]) assert.equal(reminder.arrivalLiveReminderEnabled({...dev,[name]:value}),false, name);
+  assert.equal(reminder.arrivalLiveReminderEnabled({...dev, VERCEL_ENV:'production'}), true);
+  const production = {VERCEL_ENV:'production', NEXT_PUBLIC_APP_ENV:'production', NEXT_PUBLIC_SUPABASE_URL:'https://qitqxizuwmmlhlcgsrqe.supabase.co/', SUPABASE_SERVICE_ROLE_KEY:'unit-test-placeholder'};
+  assert.equal(reminder.arrivalLiveReminderEnabled(production), true);
+  for (const [base, name, value] of [
+    [dev, 'SUPABASE_SERVICE_ROLE_KEY', ''],
+    [dev, 'NEXT_PUBLIC_SUPABASE_URL', 'https://qitqxizuwmmlhlcgsrqe.supabase.co'],
+    [dev, 'NEXT_PUBLIC_SUPABASE_URL', 'https://vjmjhaidlqkmascdjocw.supabase.co.example.com'],
+    [production, 'VERCEL_ENV', 'preview'], [production, 'NEXT_PUBLIC_APP_ENV', 'development'],
+    [production, 'NEXT_PUBLIC_SUPABASE_URL', 'https://qitqxizuwmmlhlcgsrqe.supabase.co.example.com'],
+    [production, 'SUPABASE_SERVICE_ROLE_KEY', ''],
+  ]) assert.equal(reminder.arrivalLiveReminderEnabled({...base,[name]:value}),false, name+'='+value);
   assert.equal(reminder.arrivalLiveReminderOpen(Date.parse(event.startsAt) - 1), true);
   assert.equal(reminder.arrivalLiveReminderOpen(Date.parse(event.startsAt)), false);
 });
