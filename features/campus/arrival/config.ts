@@ -64,12 +64,19 @@ function defaultAudience(id: Audience): ArrivalAudienceConfig {
   };
 }
 
+const introDateFormat = new Intl.DateTimeFormat('ko-KR', {timeZone: 'Asia/Seoul', month: 'long', day: 'numeric'});
+const defaultIntroDescription = (date: Date) => `AI 직원들이 일하는 사무실을 먼저 둘러보는 공간이에요. ${introDateFormat.format(date)} 무료 라이브 전에 AI에게 일을 맡기면 어떻게 되는지 확인해보세요.`;
+
 /** Editorial defaults only. Saving the settings never executes an AI request. */
 export const DEFAULT_ARRIVAL: ArrivalConfig = {
   version: 1,
   title: '혼자 하던 일,\nAI에게 맡길 수 있을까요?',
-  description: '회사 업무를 더 수월하게 하고 싶을 때도, 새로운 일을 준비할 때도. 문샷 무료 라이브 전에 AI를 내 상황에 맞게 써보는 공간입니다.',
-  welcomeBenefits: ['흩어진 업무 메모를 보고할 초안으로 정리하기', '막연한 아이디어에서 다음에 할 일 찾기', '내가 원하는 형식과 기준으로 AI 답변 다듬기'],
+  description: defaultIntroDescription(new Date(liveEvent.startsAt!)),
+  welcomeBenefits: [
+    '경쟁사 조사부터 광고 영상까지, AI 직원들의 업무 보기',
+    '정본에 우리 회사 기준을 알려주고 달라지는 답 보기',
+    '웰컴 라운지에서 무료 자료 받고 내 상황에 맞게 써보기',
+  ],
   workTrial: DEFAULT_WORK_TRIAL,
   officeDemo: DEFAULT_OFFICE_DEMO,
   instructorName: '퇴사선배 윤익 · 브랜디액션 팀',
@@ -199,6 +206,12 @@ export function buildManagedRequest(config: ArrivalConfig, id: Audience, answers
   return config.audiences[id].requestTemplate.replace(/\{\{(answer1|answer2)\}\}/g, (_, key: keyof typeof values) => values[key]);
 }
 
+export function arrivalIntroDescription(config: ArrivalConfig): string {
+  if (config.description !== DEFAULT_ARRIVAL.description) return config.description;
+  const start = new Date(config.startsAt);
+  return Number.isFinite(start.getTime()) ? defaultIntroDescription(start) : config.description;
+}
+
 /** The campaign's stable UID survives schedule edits; no end time or live URL is invented. */
 export function arrivalLiveEvent(config: ArrivalConfig): LiveEvent {
   const start = new Date(config.startsAt);
@@ -211,7 +224,7 @@ export function arrivalLiveEvent(config: ArrivalConfig): LiveEvent {
     // intact in config; calendar payloads represent event times to the second.
     startsAt: calendarTimestamp(config.startsAt), endsAt: config.endsAt === null ? null : calendarTimestamp(config.endsAt), infoUrl: config.liveUrl || null,
     description: [
-      `${when}(한국시간)에 시작합니다.`, config.description, config.instructorIntro,
+      `${when}(한국시간)에 시작합니다.`, arrivalIntroDescription(config), config.instructorIntro,
       config.endsAt === null ? '종료 시간은 추후 안내합니다.' : '',
       config.liveUrl ? '아래 라이브 주소로 참여해 주세요.' : 'YouTube 참여 링크는 카톡방에서 추가 안내할 예정입니다.',
       config.endsAt === null ? '이 일정은 시작 시각을 기억하기 위한 알림입니다.' : '',

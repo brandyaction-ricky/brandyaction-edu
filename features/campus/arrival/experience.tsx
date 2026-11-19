@@ -20,7 +20,7 @@ import {officeCaseContent, officeCaseRevision} from './office-demo-case';
 import {DEFAULT_OFFICE_DEMO} from './office-demo';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
-import {DEFAULT_ARRIVAL, LIVE_AGENDA, buildManagedRequest, arrivalLiveEvent, type ArrivalConfig} from './config';
+import {DEFAULT_ARRIVAL, LIVE_AGENDA, buildManagedRequest, arrivalIntroDescription, arrivalLiveEvent, type ArrivalConfig} from './config';
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
 const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
@@ -481,7 +481,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         </>}
       </div>
       <details ref={menu} className={s.menu}><summary aria-label="체험 메뉴"><MoreHorizontal size={23}/></summary><div>
-        <span>{preview ? '저장 전 관리자 미리보기' : '브랜치 미리보기'}</span>
+        {preview && <span>관리자 미리보기</span>}
         <button type="button" onClick={() => {if (menu.current) menu.current.open = false; setIntroOpen(true);}}>체험 소개</button>
         {!officeIntro && step !== 7 && <>
           <button type="button" onClick={openOfficeCase}><BriefcaseBusiness size={16}/>사무실 사례 둘러보기</button>
@@ -671,8 +671,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         onClose={closeLobbyGuide} onOpenMaterials={() => setLobbyGuide('materials')}/>}
     </dialog>
     <dialog ref={introDialog} className={s.exampleDialog} aria-label="체험 소개" onCancel={event => {event.stopPropagation(); setIntroOpen(false);}}>
-      <header><h2>{config.title}</h2><button type="button" aria-label="소개 닫기" onClick={() => setIntroOpen(false)}><X size={20}/></button></header>
-      <div className={s.exampleBody}><p>{config.description}</p><ul>{config.welcomeBenefits.map((benefit, i) => <li key={i}>{benefit}</li>)}</ul></div>
+      <header><div><h2>{config.title}</h2></div><button type="button" aria-label="소개 닫기" onClick={() => setIntroOpen(false)}><X size={20} aria-hidden="true"/></button></header>
+      <div className={s.exampleBody}><p>{arrivalIntroDescription(config)}</p><ul>{config.welcomeBenefits.map((benefit, i) => <li key={i}>{benefit}</li>)}</ul></div>
     </dialog>
     <dialog ref={exampleDialog} className={s.exampleDialog} onCancel={() => setShowExample(false)} aria-labelledby="arrival-example-title">
       <header><div><span>미리 준비한 결과 예시</span><h2 id="arrival-example-title">{content.goal}</h2></div><button type="button" aria-label="결과 예시 닫기" onClick={() => setShowExample(false)}><X size={20}/></button></header>
