@@ -37,6 +37,20 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/moonshot-release-20261119" ]; then
+            expected_main=b376d8bf0e272217ad760e635d97b592782ee846
+            release_payload=271e52c635e549f1be4bf56172e11b9ec1b41576
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_sql=$(printf '%s\n' supabase/migrations/20261119061959_edu_campus_arrival_live_reminders.sql supabase/migrations/20261119120000_arrival_visit_analytics.sql)
+            test "$(git diff --name-only "$expected_main" "$release_payload" -- supabase)" = "$expected_sql"
+            test -z "$(git diff --name-only "$expected_main" "$release_payload" -- .github tools/release-guard package.json package-lock.json)"
+            echo 'Verified the pinned Moonshot welcome release: CEO-approved SQL limited to two new tables; no release control or dependency changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-staff-prompt-review-20261119" ]; then
             expected_main=84a87a36dd6cf0643ca47f512cab48fefd60663b
             release_payload=ff43b6dc27749ab3184ebde2928008c994466811

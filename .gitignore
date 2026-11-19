@@ -13,3 +13,5 @@ supabase/.temp/
 
 /test-results/
 /playwright-report/
+
+# Include the original media via scripts/package-moonshot-welcome-preview.sh for protected previews.
