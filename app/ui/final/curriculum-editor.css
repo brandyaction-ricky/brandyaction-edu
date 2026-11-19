@@ -41,7 +41,7 @@
 .edu-admin .curriculum-editor-page .studio-lesson-link small { font-size:11px; margin-bottom:3px; }
 .edu-admin .curriculum-editor-page .studio-lesson-link b { display:block; font-size:13px; font-weight:600; overflow-wrap:anywhere; line-height:1.6; }
 .edu-admin .curriculum-editor-page .studio-lesson-link[aria-current] { color:#b11d2c; }
-.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li > div > small { font-size:10px; line-height:1.6; margin:0 0 0 27px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li > div > small { font-size:11px; line-height:1.6; margin:0 0 0 27px; }
 .edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li .row { justify-content:flex-end; }
 .edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li .row button { min-height:44px; background:transparent; border:0; color:#717986; font-size:11px; }
 .edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week-actions { display:flex; justify-content:flex-end; padding:0 10px; }

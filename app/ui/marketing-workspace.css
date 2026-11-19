@@ -11,7 +11,7 @@
 
 
 .edu-admin .marketing-workspace-guide{margin:var(--space-4) 0;padding:var(--space-4);border-radius:var(--radius-sm);background:#f5f7f8}
-.edu-admin .marketing-workspace-guide h2{margin:0;font-size:1.05rem}
+.edu-admin .marketing-workspace-guide h2{margin:0;font-size:16px;line-height:24px;font-weight:600}
 .edu-admin .marketing-workspace-guide>p{margin:var(--space-2) 0;color:var(--ink)}
 .edu-admin .marketing-workspace-guide ol{display:grid;gap:var(--space-2);margin:var(--space-3) 0;padding-left:1.5rem}
 .edu-admin .marketing-workspace-guide li{padding-left:var(--space-1)}
@@ -44,7 +44,6 @@
 @media(max-width:1100px){.edu-admin .marketing-workspace .marketing-task-nav{grid-template-columns:minmax(0,1fr);gap:16px}.edu-admin .marketing-task-group{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;gap:12px}.edu-admin .marketing-task-group>span{margin:0}}
 @media(max-width:600px){.edu-admin .marketing-workspace{grid-template-columns:minmax(0,1fr);padding:16px;gap:12px}.edu-admin .marketing-workspace .marketing-task-nav{gap:8px}.edu-admin .marketing-workspace-help{grid-column:1}.edu-admin .marketing-task-group{grid-template-columns:minmax(0,1fr);gap:8px}.edu-admin .marketing-workspace .marketing-task-nav a{min-height:44px}.edu-admin .marketing-workspace-heading{align-items:flex-start;flex-wrap:wrap}.edu-admin .marketing-list-search{flex-basis:100%}}
 
-.edu-admin .analytics-period-presets{display:flex;gap:4px;background:var(--admin-surface-subtle,#f5f6f8);padding:4px;border-radius:10px;width:fit-content;margin-bottom:12px}.edu-admin .analytics-period-presets .admin-button{border:0;border-radius:7px;min-width:60px}.edu-admin .analytics-period-presets [aria-pressed=true]{background:white;color:var(--ba-red-hover,#a92525);box-shadow:0 1px 4px #17203312}
 
 .edu-admin .marketing-list-search>.meta{white-space:nowrap}.edu-admin .marketing-list-search{margin-block:12px}
 

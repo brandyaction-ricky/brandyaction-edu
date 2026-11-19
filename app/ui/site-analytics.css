@@ -1,0 +1,40 @@
+/* 전체 유입 성과 — 화면 고유 배치만. 버튼·입력·표·상태 모양은 features/admin-ui/styles/admin-system.css(.adm)를 따른다. */
+.edu-admin .site-analytics{display:grid;gap:var(--adm-space-4,16px);min-width:0}
+.edu-admin .site-analytics .admin-workspace-tabs{display:grid;gap:var(--adm-space-4,16px);min-width:0}
+.edu-admin .site-analytics [role=tabpanel]{min-width:0}
+.edu-admin .site-analytics [role=tabpanel]:focus-visible{outline:2px solid var(--adm-primary,#c9232d);outline-offset:4px;border-radius:var(--adm-radius-sm,4px)}
+.edu-admin .site-analytics-panel{display:grid;gap:var(--adm-space-4,16px);min-width:0}
+.edu-admin .site-analytics-presets{display:flex;align-items:flex-end;gap:var(--adm-space-2,8px);flex-wrap:wrap;min-height:var(--adm-control,36px)}
+.edu-admin .site-analytics-filter .admin-filter-bar-controls{flex-wrap:wrap}
+.edu-admin .site-analytics-filter .admin-filter-bar-date{display:flex;gap:var(--adm-space-2,8px);align-items:end}
+.edu-admin .site-analytics-filter .admin-filter-bar-date .admin-field{width:168px}
+.edu-admin .site-analytics-filter .admin-filter-bar-action{margin-left:auto}
+.edu-admin .site-analytics-scope,.edu-admin .site-analytics-note{margin:0;color:var(--adm-text-sub,#626770);font-size:var(--adm-font-12,12px);line-height:1.6}
+.edu-admin .site-analytics-stages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--adm-space-3,12px);margin:0;padding:0;list-style:none}
+.edu-admin .site-analytics-stages li{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:var(--adm-space-1,4px) var(--adm-space-2,8px);min-width:0;padding:var(--adm-space-3,12px) var(--adm-space-4,16px);border:1px solid var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-md,8px);background:var(--adm-surface-subtle,#f7f8f9)}
+.edu-admin .site-analytics-stage-label{grid-column:1/-1;color:var(--adm-text-sub,#626770);font-size:var(--adm-font-12,12px);font-weight:600}
+.edu-admin .site-analytics-stages strong{font-size:var(--adm-font-20,20px);line-height:1.4;font-weight:700;font-variant-numeric:tabular-nums;color:var(--adm-text,#161719)}
+.edu-admin .site-analytics-stages strong small{font-size:var(--adm-font-12,12px);font-weight:600;color:var(--adm-text-sub,#626770)}
+.edu-admin .site-analytics-stage-share{font-size:var(--adm-font-13,13px);font-weight:600;font-variant-numeric:tabular-nums;color:var(--adm-text-sub,#626770)}
+.edu-admin .site-analytics-stage-bar{grid-column:1/-1;height:6px;border-radius:999px;background:var(--adm-neutral-soft,#f0f2f4);overflow:hidden}
+.edu-admin .site-analytics-stage-bar>span{display:block;height:100%;min-width:2px;border-radius:inherit;background:var(--adm-info,#315e8b)}
+.edu-admin .site-analytics-channels{display:flex;align-items:center;gap:var(--adm-space-2,8px);flex-wrap:wrap;padding:var(--adm-space-3,12px) var(--adm-space-4,16px);border:1px solid var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px);background:var(--adm-surface,#fff);font-size:var(--adm-font-13,13px);color:var(--adm-text-sub,#626770)}
+.edu-admin .site-analytics-channels>span{margin-right:auto}
+.edu-admin .site-analytics .admin-section-header{align-items:flex-end;flex-wrap:wrap}
+.edu-admin .site-analytics .admin-section-actions .admin-search-field{width:min(320px,100%)}
+@media(max-width:1100px){.edu-admin .site-analytics-stages{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){
+  .adm.edu-admin .site-analytics-kpis.admin-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .adm.edu-admin .site-analytics-kpis .admin-metric{padding:12px}
+  .edu-admin .site-analytics-filter .admin-filter-bar-date{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .edu-admin .site-analytics-filter .admin-filter-bar-date .admin-field{width:auto;min-width:0}
+  .edu-admin .site-analytics-filter .admin-filter-bar-action{margin-left:0;width:100%}
+  .edu-admin .site-analytics-filter .admin-filter-bar-action .admin-button{width:100%}
+  .edu-admin .site-analytics-presets{width:100%}
+  .edu-admin .site-analytics-presets .admin-button{flex:1 1 0}
+  .edu-admin .site-analytics-channels>span{flex:1 1 100%}
+  .edu-admin .site-analytics-channels .admin-button{flex:1 1 0}
+  .edu-admin .site-analytics .admin-section-actions{width:100%}
+  .edu-admin .site-analytics .admin-section-actions .admin-search-field{width:100%}
+}
+@media(max-width:360px){.adm.edu-admin .site-analytics-kpis.admin-metric-grid{grid-template-columns:minmax(0,1fr)}}

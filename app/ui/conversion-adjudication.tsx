@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import type { ConversionAdjudicationNote, ConversionSnapshot, JevCalibration, JevDimension, JevResult } from '@/lib/conversion-review';
 import { isRunStale } from '@/lib/conversion-review';
 import { jevV4UncertaintyFlags } from '@/lib/conversion-jev-v4';
-import { AdminButton, AdminEmptyState, AdminSelect, AdminTextarea } from './final/admin-system';
+import { AdminButton, AdminEmptyState, AdminSelect, AdminTextarea } from '@/features/admin-ui';
 
 const dimensions: { key: JevDimension; label: string }[] = [
   { key: 'purchase_intent', label: '구매 의도' },
