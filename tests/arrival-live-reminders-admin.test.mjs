@@ -5,6 +5,7 @@ import ts from 'typescript';
 
 const source = readFileSync(new URL('../app/api/admin/crm/live-reminders/route.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
+const preview = {proposedSendAt:'2026-12-07T11:30:00.000Z',liveStartsAt:'2026-12-07T21:00:00+09:00',message:'안내 문자 초안'};
 
 function loadRoute({enabled = true, authorised = true, read}) {
   const permissions = [];
@@ -12,6 +13,7 @@ function loadRoute({enabled = true, authorised = true, read}) {
   const dependencies = {
     '@/features/campus/arrival/live-reminder-server': {
       arrivalLiveReminderEnabled: () => enabled,
+      liveReminderPreview: preview,
       readArrivalLiveReminders: read,
     },
     '@/lib/operator-permissions': {
@@ -54,6 +56,7 @@ test('live reminder CRM reports the total and at most 50 recent masked entries',
   assert.ok(!text.includes(phone));
   const result = JSON.parse(text);
   assert.equal(result.count, 54);
+  assert.deepEqual(result.preview, preview);
   assert.equal(result.latest.length, 50);
   assert.deepEqual(result.latest[0], {maskedPhone: '010-****-3344', consentedAt});
   assert.deepEqual(result.latest[1], {maskedPhone: '010-****-****', consentedAt});

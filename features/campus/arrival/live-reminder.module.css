@@ -35,6 +35,7 @@
   border: 0;
 }
 
+.phoneField { display: grid; gap: 4px; min-width: 0; }
 .phone { display: grid; gap: 4px; font-size: 14px; font-weight: 650; }
 .phone input {
   width: 100%;

@@ -6,6 +6,12 @@ const consentVersion = 1;
 const event = arrivalLiveEvent(DEFAULT_ARRIVAL);
 const devDatabaseUrl = 'https://vjmjhaidlqkmascdjocw.supabase.co';
 
+export const liveReminderPreview = {
+  proposedSendAt: new Date(Date.parse(DEFAULT_ARRIVAL.startsAt) - 30 * 60_000).toISOString(),
+  liveStartsAt: DEFAULT_ARRIVAL.startsAt,
+  message: '[브랜디액션] 오늘 오후 9시 문샷 무료 라이브가 시작됩니다.\n참여 링크는 카카오톡방 공지에서 확인해 주세요.',
+};
+
 export function arrivalLiveReminderEnabled(env = process.env) {
   return env.VERCEL_ENV === 'preview'
     && env.NEXT_PUBLIC_APP_ENV === 'development'
@@ -39,6 +45,7 @@ export async function readArrivalLiveReminders() {
   const {data, count, error} = await db.from(reminderTable)
     .select('phone,consented_at', {count:'exact'})
     .eq('event_id', event.id)
+    .eq('consent_version', consentVersion)
     .order('consented_at', {ascending:false})
     .order('phone')
     .limit(50)

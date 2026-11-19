@@ -1,4 +1,4 @@
-import { arrivalLiveReminderEnabled, readArrivalLiveReminders } from '@/features/campus/arrival/live-reminder-server';
+import { arrivalLiveReminderEnabled, liveReminderPreview, readArrivalLiveReminders } from '@/features/campus/arrival/live-reminder-server';
 import { getOperatorUser } from '@/lib/operator-permissions';
 
 const headers = { 'Cache-Control': 'private, no-store' };
@@ -12,6 +12,7 @@ export async function GET() {
     const { count, latest } = await readArrivalLiveReminders();
     return Response.json({
       count,
+      preview: liveReminderPreview,
       latest: latest.slice(0, 50).map(({ maskedPhone, consentedAt }) => ({
         maskedPhone: /^010-\*{4}-\d{4}$/.test(maskedPhone) ? maskedPhone : '010-****-****',
         consentedAt,

@@ -17,6 +17,7 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
   onRegistered: () => void;
 }) {
   const panelId = useId();
+  const phoneHintId = useId();
   const errorId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const confirmation = useRef<HTMLParagraphElement>(null);
@@ -81,12 +82,15 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
       {open && <form className={styles.form} onSubmit={register} aria-busy={submission === 'pending'}>
         <p className={styles.note}>미리보기에서는 신청만 확인할 수 있어요.</p>
         <fieldset disabled={submission === 'pending' || submission === 'closed'}>
-          <label className={styles.phone}>휴대폰 번호
-            <input name="phone" type="tel" inputMode="tel" autoComplete="off" placeholder="010-0000-0000"
-              maxLength={32} required aria-invalid={submission === 'invalid' || undefined}
-              aria-describedby={submission === 'invalid' ? errorId : undefined}
-              onChange={() => {if (submission === 'invalid') setSubmission('idle');}}/>
-          </label>
+          <div className={styles.phoneField}>
+            <label className={styles.phone}>휴대폰 번호
+              <input name="phone" type="tel" inputMode="tel" autoComplete="off" placeholder="010-0000-0000"
+                maxLength={32} required aria-invalid={submission === 'invalid' || undefined}
+                aria-describedby={submission === 'invalid' ? `${phoneHintId} ${errorId}` : phoneHintId}
+                onChange={() => {if (submission === 'invalid') setSubmission('idle');}}/>
+            </label>
+            <p id={phoneHintId} className={styles.note}>010-0000-0000과 01000000000 모두 가능해요.</p>
+          </div>
           <label className={styles.consent}>
             <input name="consent" type="checkbox" required/>
             라이브 당일 안내 문자 1회 수신에 동의합니다.

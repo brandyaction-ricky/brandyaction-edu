@@ -25,7 +25,7 @@ if (preview) {
 }
 
 const national = `010-0000-00${suffix}`;
-const international = `+82 10-0000-00${suffix}`;
+const digits = national.replace(/\D/g, '');
 const actions = ['캘린더에 추가', '무료 자료 받기', '라이브 당일 문자 받기'];
 const viewport = {width: 390, height: 690};
 const browser = await webkit.launch();
@@ -76,6 +76,7 @@ async function openForm() {
   const submit = page.getByRole('button', {name: '문자 알림 신청', exact: true});
   await expect(phone).toBeVisible();
   await expect(phone).toHaveAttribute('type', 'tel');
+  await expect(phone).toHaveAccessibleDescription('010-0000-0000과 01000000000 모두 가능해요.');
   await expect(phone).toHaveValue('');
   await expect(consent).not.toBeChecked();
   await expect(page.getByRole('checkbox')).toHaveCount(1);
@@ -97,10 +98,10 @@ async function send(form, status) {
   if (status === 200) {
     expect(await response.json()).toEqual({registered: true});
     await expect(form.page.getByRole('status').filter({hasText: successMessage})).toBeVisible();
-    expect(await form.page.evaluate(({national, international}) => {
+    expect(await form.page.evaluate(({national, digits}) => {
       const stored = JSON.stringify([localStorage, sessionStorage]);
-      return stored.includes(national) || stored.includes(international) || stored.includes(national.replace(/\D/g, ''));
-    }, {national, international})).toBe(false);
+      return stored.includes(national) || stored.includes(digits);
+    }, {national, digits})).toBe(false);
   }
 }
 
@@ -132,7 +133,7 @@ try {
 
   if (preview) {
     const repeated = await openForm();
-    await repeated.phone.fill(international);
+    await repeated.phone.fill(digits);
     await repeated.consent.check();
     await send(repeated, 200);
     verifyWrites(repeated, 1);

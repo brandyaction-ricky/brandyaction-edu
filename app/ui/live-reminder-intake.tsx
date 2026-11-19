@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { AdminButton, AdminDataTable, AdminEmptyState, AdminInlineError, AdminStatusBadge } from '@/features/admin-ui';
-import { liveEvent } from '@/features/campus/arrival/model';
+import type { liveReminderPreview } from '@/features/campus/arrival/live-reminder-server';
 import { kstLabel } from '@/lib/marketing-qa';
+import styles from './live-reminder-intake.module.css';
 
 type Reminder = { maskedPhone: string; consentedAt: string };
-type Intake = { count: number; latest: Reminder[] };
+type Intake = { count: number; latest: Reminder[]; preview: typeof liveReminderPreview };
 type View = { data: Intake } | { error: true };
 
 export function LiveReminderIntake() {
@@ -49,27 +50,39 @@ export function LiveReminderIntake() {
   }
 
   return (
-    <details className="panel admin-crm-settings mb24">
-      <summary>문샷 무료 라이브 알림 신청 <span>{data ? `접수 ${data.count.toLocaleString('ko-KR')}건` : '접수 확인 필요'}</span></summary>
+    <details id="moonshot-live-reminder" className="panel admin-crm-settings mb24">
+      <summary>문샷 무료 라이브 알림 신청 <span>{data ? `발송 대상 ${data.count.toLocaleString('ko-KR')}명` : '대상 확인 필요'}</span></summary>
       <div className="pad">
-        <div className="between">
-          <h2>{kstLabel(liveEvent.startsAt)}</h2>
+        <div className={styles.header}>
+          <h2>12월 7일 라이브 안내 문자</h2>
           <AdminStatusBadge status="paused" label="발송 꺼짐" />
           <AdminButton type="button" variant="outline" size="sm" loading={loading} onClick={reload}>새로 불러오기</AdminButton>
         </div>
-        <p className="meta mt8 mb24">이 행사에 한해 알림을 받겠다고 동의한 신청입니다. 최근 50건까지 표시합니다.</p>
-        {data ? <AdminDataTable label="최근 라이브 알림 신청" sticky={false}>
-          <thead><tr><th scope="col">휴대폰 번호</th><th scope="col">동의 시각</th></tr></thead>
-          <tbody>
-            {data.latest.map(({ maskedPhone, consentedAt }, index) => (
-              <tr key={`${consentedAt}-${maskedPhone}-${index}`}>
-                <td>{maskedPhone}</td>
-                <td><time dateTime={consentedAt}>{kstLabel(consentedAt)}</time></td>
-              </tr>
-            ))}
-            {data.latest.length === 0 && <tr><td colSpan={2}><AdminEmptyState compact title="아직 알림 신청이 없습니다." /></td></tr>}
-          </tbody>
-        </AdminDataTable> : <AdminInlineError>라이브 알림 신청을 불러오지 못했습니다.</AdminInlineError>}
+        {data ? <>
+          <dl className={styles.schedule}>
+            <div><dt>발송 시각 · 검수안</dt><dd><time dateTime={data.preview.proposedSendAt}>{kstLabel(data.preview.proposedSendAt)}</time></dd></div>
+            <div><dt>라이브 시작</dt><dd><time dateTime={data.preview.liveStartsAt}>{kstLabel(data.preview.liveStartsAt)}</time></dd></div>
+          </dl>
+          <div className={styles.message}>
+            <h3>문자 내용 미리보기</h3>
+            <p>{data.preview.message}</p>
+          </div>
+          <p className="meta mt8 mb24">미리보기에서 발송 시각과 문구를 확인할 수 있어요. 실제 발송 예약은 생성되지 않습니다.</p>
+          <h3>발송 대상</h3>
+          <p className="meta mt8 mb24">웰컴 라운지에서 이번 라이브 안내 문자 1회 수신에 동의한 번호만 포함됩니다. 같은 번호는 한 번만 집계하며 표에는 최근 50건까지 표시합니다.</p>
+          <AdminDataTable label="라이브 안내 문자 발송 대상" sticky={false}>
+            <thead><tr><th scope="col">휴대폰 번호</th><th scope="col">동의 시각</th></tr></thead>
+            <tbody>
+              {data.latest.map(({ maskedPhone, consentedAt }, index) => (
+                <tr key={`${consentedAt}-${maskedPhone}-${index}`}>
+                  <td>{maskedPhone}</td>
+                  <td><time dateTime={consentedAt}>{kstLabel(consentedAt)}</time></td>
+                </tr>
+              ))}
+              {data.latest.length === 0 && <tr><td colSpan={2}><AdminEmptyState compact title="아직 알림 신청이 없습니다." /></td></tr>}
+            </tbody>
+          </AdminDataTable>
+        </> : <AdminInlineError>라이브 알림 신청을 불러오지 못했습니다.</AdminInlineError>}
       </div>
     </details>
   );

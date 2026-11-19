@@ -24,17 +24,48 @@ const dev = {
   SUPABASE_SERVICE_ROLE_KEY:'unit-test-placeholder',
 };
 const stores = [];
+const recipients = [
+  {event_id:event.id,consent_version:1,phone:'01000000042',consented_at:'2026-11-19T05:12:00Z'},
+  {event_id:'another-live',consent_version:1,phone:'01000000043',consented_at:'2026-11-19T05:13:00Z'},
+  {event_id:event.id,consent_version:0,phone:'01000000044',consented_at:'2026-11-19T05:14:00Z'},
+];
 const reminder = await loadModule('features/campus/arrival/live-reminder-server.ts', {
-  './config': {DEFAULT_ARRIVAL:{},arrivalLiveEvent:() => event},
+  './config': {DEFAULT_ARRIVAL:{startsAt:event.startsAt},arrivalLiveEvent:() => event},
   '@/lib/supabase/admin': {createAdminClient:() => ({
     from(table) {
       assert.equal(table, 'edu_campus_arrival_live_reminders');
-      return {upsert(values,options) {
-        stores.push({values,options});
-        return {abortSignal:async () => ({error:null})};
-      }};
+      return {
+        upsert(values,options) {
+          stores.push({values,options});
+          return {abortSignal:async () => ({error:null})};
+        },
+        select(columns, options) {
+          assert.equal(columns, 'phone,consented_at');
+          assert.deepEqual(options, {count:'exact'});
+          let matching = recipients;
+          return {
+            eq(column, value) {
+              matching = matching.filter(row => row[column] === value);
+              return this;
+            },
+            order() { return this; },
+            limit: size => ({abortSignal:async () => ({data:matching.slice(0,size),count:matching.length,error:null})}),
+          };
+        },
+      };
     },
   })},
+});
+
+test('CRM previews only this live event’s one-time consent and shows the planned time', async () => {
+  assert.deepEqual(await reminder.readArrivalLiveReminders(), {
+    count:1,
+    latest:[{maskedPhone:'010-****-0042',consentedAt:recipients[0].consented_at}],
+  });
+  assert.equal(reminder.liveReminderPreview.proposedSendAt, '2026-12-07T11:30:00.000Z');
+  assert.equal(reminder.liveReminderPreview.liveStartsAt, event.startsAt);
+  assert.match(reminder.liveReminderPreview.message, /오후 9시.*문샷 무료 라이브/);
+  assert.match(reminder.liveReminderPreview.message, /카카오톡방 공지/);
 });
 
 test('reminders require the explicit feature flag, development application, Preview and the DEV database', () => {
@@ -90,13 +121,14 @@ test('endpoint requires same-origin, a bounded two-field submission, valid phone
   assert.equal(unavailable.status, 503);
   assert.deepEqual(await unavailable.json(), {error:'unavailable'});
   fail = false;
-  for (const phone of [national.phone, '+82 (0)10-0000-0042', '+82 10 0000 0042']) {
+  const phoneFormats = [national.phone, '01000000042', '+82 (0)10-0000-0042', '+82 10 0000 0042'];
+  for (const phone of phoneFormats) {
     const response = await route.POST(request({phone,consent:true}));
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'private, no-store');
     assert.deepEqual(await response.json(), {registered:true});
   }
-  assert.deepEqual(stores, Array.from({length:3}, () => ({
+  assert.deepEqual(stores, Array.from({length:phoneFormats.length}, () => ({
     values:{event_id:event.id,phone:'01000000042',consent_version:1},
     options:{onConflict:'event_id,phone',ignoreDuplicates:true},
   })));
