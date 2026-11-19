@@ -27,7 +27,8 @@ test('anonymous session refresh exemption never includes private access, admins,
  assert.equal(isAnonymousWebinarRoute('/api/campus/webinar/moonshot-open/events','POST'),true);
  // Moonshot visitor journey (production private-release gate): corridor page, lounge media and anonymous visit analytics only.
  assert.equal(isAnonymousWebinarRoute('/api/campus/arrival/events','POST'),true);
- for(const [path,method] of [['/api/campus/arrival/events','GET'],['/api/campus/arrival/live-reminder','POST'],['/api/admin/campus/arrival-analytics','GET']])assert.equal(isAnonymousWebinarRoute(path,method),false);
+ assert.equal(isAnonymousWebinarRoute('/api/campus/arrival/live-reminder','POST'),true);
+ for(const [path,method] of [['/api/campus/arrival/events','GET'],['/api/campus/arrival/live-reminder','GET'],['/api/admin/campus/arrival-analytics','GET']])assert.equal(isAnonymousWebinarRoute(path,method),false);
  for(const path of ['/campus/world/tour/welcome-walk.html','/campus/arrival/team-leader-telegram.mp4','/campus/arrival/mask-example-silent.mp4','/campus/arrival/brandyaction-meetup.mp4','/campus/arrival/avatars/female-a.webp'])assert.equal(isPublicWebinarAsset(path,'GET'),true,path);
  for(const [path,method] of [['/campus/arrival/company-rule-worksheet.txt','GET'],['/campus/arrival/../workspace','GET'],['/campus/arrival/team-at-work.mp4','POST'],['/campus/world/tour/other.html','GET'],['/campus/arrival/x/y.mp4','GET']])assert.equal(isPublicWebinarAsset(path,method),false,path);
  for(const [path,method] of [['/api/campus/webinar/moonshot-open/access','GET'],['/admin/campus/webinars','GET'],['/campus/workspace','GET'],['/campus/live/moonshot-open','POST'],['/campus/live/a/../../workspace','GET'],['/api/campus/webinar/moonshot-open/events','GET']])assert.equal(isAnonymousWebinarRoute(path,method),false);

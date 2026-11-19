@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
+import {useEffect, useEffectEvent, useMemo, useRef, useState, type MouseEvent} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
@@ -54,6 +54,15 @@ function LiveCountdown({date, className}: {date: string; className: string}) {
     };
   }, [date]);
   return label ? <span className={className}>{label}</span> : null;
+}
+
+// iPhone Calendar opens its own "Add event" sheet for a text/calendar response in Safari. KakaoTalk's
+// in-app browser cannot, so hand the same URL to Safari through Kakao's documented external-browser scheme.
+const APPLE_CALENDAR_PATH = '/experience/moonshot/live.ics';
+function openAppleCalendar(event: MouseEvent<HTMLAnchorElement>) {
+  if (!/KAKAOTALK/i.test(navigator.userAgent)) return;
+  event.preventDefault();
+  window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(new URL(APPLE_CALENDAR_PATH, window.location.origin).href);
 }
 
 export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, liveReminderEnabled = false}: {
@@ -616,7 +625,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <a href={calendarLink} target={preview || embedded ? '_blank' : undefined} rel="noreferrer">
             <CalendarDays size={17} aria-hidden="true"/>Google 캘린더에 추가<ArrowUpRight size={15} aria-hidden="true"/>
           </a>
-          <p className={s.calendarInstruction}>일정이 열리면 ‘저장’을 눌러주세요.</p>
+          <a href={APPLE_CALENDAR_PATH} target={preview || embedded ? '_blank' : undefined} onClick={openAppleCalendar}>
+            <CalendarDays size={17} aria-hidden="true"/>아이폰 캘린더에 추가<ArrowUpRight size={15} aria-hidden="true"/>
+          </a>
+          <p className={s.calendarInstruction}>일정이 열리면 ‘저장’ 또는 ‘추가’를 눌러주세요.</p>
         </div>}
       </footer>}
       </>}

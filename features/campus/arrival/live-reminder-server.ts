@@ -5,6 +5,7 @@ const reminderTable = 'edu_campus_arrival_live_reminders';
 const consentVersion = 1;
 const event = arrivalLiveEvent(DEFAULT_ARRIVAL);
 const devDatabaseUrl = 'https://vjmjhaidlqkmascdjocw.supabase.co';
+const productionDatabaseUrl = 'https://qitqxizuwmmlhlcgsrqe.supabase.co';
 
 export const liveReminderPreview = {
   proposedSendAt: new Date(Date.parse(DEFAULT_ARRIVAL.startsAt) - 30 * 60_000).toISOString(),
@@ -12,12 +13,12 @@ export const liveReminderPreview = {
   message: '[브랜디액션] 오늘 오후 9시 문샷 무료 라이브가 시작됩니다.\n참여 링크는 카카오톡방 공지에서 확인해 주세요.',
 };
 
+// CEO 11-20: phone opt-ins are collected on production too. Allowed pairs only: the real production
+// site on the production database, or any deployment (fixed DEV, branch preview) on the DEV database.
 export function arrivalLiveReminderEnabled(env = process.env) {
-  return env.VERCEL_ENV === 'preview'
-    && env.NEXT_PUBLIC_APP_ENV === 'development'
-    && env.EDU_CAMPUS_ARRIVAL_REMINDERS_ENABLED === '1'
-    && env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') === devDatabaseUrl
-    && Boolean(env.SUPABASE_SERVICE_ROLE_KEY);
+  const database = env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
+  const production = env.VERCEL_ENV === 'production' && env.NEXT_PUBLIC_APP_ENV === 'production' && database === productionDatabaseUrl;
+  return Boolean(env.SUPABASE_SERVICE_ROLE_KEY) && (production || database === devDatabaseUrl);
 }
 
 export function arrivalLiveReminderOpen(now = Date.now()) {
