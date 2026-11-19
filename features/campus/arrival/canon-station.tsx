@@ -170,7 +170,7 @@ export function CanonStation({phase, onAdvance, onHall}: {
     {phase === 3 && <p className={styles.takeaway}>이야기를 나눌수록 우리 회사에 더 잘 맞는 AI가 됩니다.</p>}
     <section className={styles.hall}>
       <h2>12월 7일 라이브에서 이 전 과정을 알려드립니다.</h2>
-      <p>웰컴 라운지에서 AI팀 설계도와 회사 업무 기준표를 받을 수 있어요.</p>
+      <p>웰컴 라운지에서 AI팀 설계도와 작업별 AI 활용 가이드를 볼 수 있어요.</p>
     </section>
   </div>
   <footer className={monitor.footer}>

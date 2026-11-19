@@ -381,10 +381,8 @@
 .ticket small { font-size: 13px; }
 .calendarIntro { margin-top: 12px !important; font-size: 15px; color: var(--muted); line-height: 1.6; word-break: keep-all; }
 .calendarActions { display: grid; gap: 7px; }
-.calendarHint { font-weight: 650; font-size: 15px; }
 .calendarInstruction { color: var(--muted); font-size: 13px; line-height: 1.45; word-break: keep-all; }
-.calendarButtons { display: flex; flex-wrap: wrap; gap: 8px; }
-.calendarButtons > a, .calendarButtons > button {
+.calendarActions > a {
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--paper);
@@ -393,12 +391,12 @@
   justify-content: center;
   gap: 7px;
   padding: 8px 12px;
-  min-height: 44px;
+  min-height: 48px;
   font-size: 15px;
   font-weight: 650;
   color: var(--ink);
 }
-.calendarButtons > a:hover, .calendarButtons > button:hover { background: var(--surface-subtle); border-color: var(--ba-red); }
+.calendarActions > a:hover { background: var(--surface-subtle); border-color: var(--ba-red); }
 
 /* Recovery, feedback and optional world exploration. */
 .root .exploreButton {
@@ -537,8 +535,7 @@
   .hallDock .intro { margin-bottom: 12px; }
   .hallDock .intro h1 { font-size: 24px; }
   .ticket { padding: 9px 12px; }
-  .calendarButtons > a, .calendarButtons > button { padding: 8px; gap: 5px; font-size: 14px; }
-  .calendarButtons > a > svg:first-child:not(:only-child) { display: none; }
+  .calendarActions > a { font-size: 14px; }
   .root:has(.dockHidden) .world { height: calc(100dvh - 64px); }
   .root:has(.dockHidden) .place { top: auto; bottom: 25px; }
   .root:has(.questions) { --scene-height: 120px; }

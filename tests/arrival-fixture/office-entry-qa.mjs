@@ -1,5 +1,5 @@
 import {chromium, expect} from '@playwright/test';
-import {mkdir, readFile} from 'node:fs/promises';
+import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {firstSpyRequest, finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
@@ -269,18 +269,13 @@ try {
       const google = new URL(account.searchParams.get('continue'));
       expect(google.hostname).toBe('calendar.google.com');
       expect(google.searchParams.get('dates')).toContain('20261207T120000Z');
-      const saved=page.waitForEvent('download');
-      await button(page,'일정 파일 받기').click();
-      const download=await saved;
-      const file=await readFile(await download.path(),'utf8');
-      expect(download.suggestedFilename()).toMatch(/20261207\.ics$/);
-      expect(file).toMatch(/DTSTART:20261207T120000Z/);
-      await expect(page.getByText(/파일을 열어 캘린더에 추가/)).toBeInViewport({ratio: 0.95});
+      await expect(button(page,'일정 파일 받기')).toHaveCount(0);
+      await expect(page.getByText('일정이 열리면 ‘저장’을 눌러주세요.')).toBeInViewport({ratio: 0.95});
       await capture('hall');
       expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(errors).toEqual([]);
       expect(externalAI).toEqual([]);
-      console.log(JSON.stringify({device,viewport,arrivals,exceptions:errors,google:google.hostname,ics:download.suggestedFilename()}));
+      console.log(JSON.stringify({device,viewport,arrivals,exceptions:errors,google:google.hostname}));
     } catch(error) {await capture('failure'); throw error;}
     finally {await page.close();}
   }

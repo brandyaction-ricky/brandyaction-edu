@@ -1,5 +1,5 @@
 import {chromium, expect, webkit} from '@playwright/test';
-import {mkdir, readFile} from 'node:fs/promises';
+import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
 
@@ -73,10 +73,7 @@ try {
       await capture('materials');
       await expect(guide.getByRole('link', {name:/작업별 AI 활용 가이드/})).toHaveAttribute('href', 'https://edu.brandyaction.com/guide');
       await expect(guide.getByRole('link', {name:/AI팀 설계도/})).toHaveAttribute('href', 'https://edu.brandyaction.com/ai-team-blueprint');
-      const pendingWorksheet = page.waitForEvent('download');
-      await press(guide.getByRole('link', {name:'회사 업무 기준표 받기', exact:true}));
-      const worksheet = await pendingWorksheet;
-      expect(await readFile(await worksheet.path(), 'utf8')).toContain('오늘 AI에게 맡길 일 한 가지');
+      await expect(guide.getByRole('link', {name:'회사 업무 기준표 받기', exact:true})).toHaveCount(0);
       await press(guide.getByRole('button', {name:'광고 영상 체험 열기'}));
       const replay = page.getByRole('dialog', {name:'콘텐츠 제작 다시 보기', exact:true});
       await expect(replay).toBeVisible();

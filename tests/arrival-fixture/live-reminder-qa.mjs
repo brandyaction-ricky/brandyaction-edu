@@ -84,7 +84,7 @@ async function openLounge() {
 
 async function checkOpenForm(visit) {
   const {page, schedule} = visit;
-  await expect(schedule.getByRole('link', {name: 'Google 캘린더', exact: true})).toBeVisible();
+  await expect(schedule.getByRole('link', {name: 'Google 캘린더에 추가', exact: true})).toBeVisible();
   await expect(action(schedule, reminderLabel)).toHaveAttribute('aria-expanded', 'true');
   const phone = page.getByRole('textbox', {name: '휴대폰 번호', exact: true});
   const consent = page.getByRole('checkbox', {name: '라이브 당일 안내 문자 1회 수신에 동의합니다.', exact: true});
@@ -161,7 +161,7 @@ try {
   await returnToLounge(visit);
 
   await visit.calendar.tap();
-  await expect(visit.schedule.getByRole('link', {name: 'Google 캘린더', exact: true})).toBeVisible();
+  await expect(visit.schedule.getByRole('link', {name: 'Google 캘린더에 추가', exact: true})).toBeVisible();
   const inline = action(visit.schedule, reminderLabel);
   await expect(inline).toHaveAttribute('aria-expanded', 'false');
   await inline.tap();

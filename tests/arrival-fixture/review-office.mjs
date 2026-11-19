@@ -44,7 +44,7 @@ export async function startOfficeCase(page, audience = '이미 사업을 하고 
 }
 
 export async function openLoungeSchedule(page) {
-  const calendar = page.getByRole('link', {name: 'Google 캘린더', exact: true});
+  const calendar = page.getByRole('link', {name: 'Google 캘린더에 추가', exact: true});
   if (!await calendar.isVisible()) await loungeScheduleButton(page).click();
   await expect(calendar).toBeVisible({timeout: 20000});
 }
