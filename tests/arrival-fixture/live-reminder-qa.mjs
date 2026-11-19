@@ -87,12 +87,12 @@ async function checkOpenForm(visit) {
   await expect(schedule.getByRole('link', {name: 'Google 캘린더에 추가', exact: true})).toBeVisible();
   await expect(action(schedule, reminderLabel)).toHaveAttribute('aria-expanded', 'true');
   const phone = page.getByRole('textbox', {name: '휴대폰 번호', exact: true});
-  const consent = page.getByRole('checkbox', {name: '라이브 당일 안내 문자 1회 수신에 동의합니다.', exact: true});
+  const consent = page.getByRole('checkbox', {name: '문샷 라이브 안내 문자 수신에 동의합니다.', exact: true});
   const submit = action(page, '문자 알림 신청');
   await expect(phone).toBeVisible();
   await expect(phone).toHaveAttribute('type', 'tel');
   await expect(phone).toHaveAccessibleDescription('010-0000-0000과 01000000000 모두 가능해요.');
-  await expect(page.getByText(/2026년 12월 10일 오후 11시 59분\(한국 시간\)까지 보관한 뒤 삭제해요/)).toBeVisible();
+  await expect(consent).toHaveAccessibleDescription('휴대폰 번호는 문샷 라이브 안내 문자에만 사용해요. 브랜디액션은 번호를 2026년 12월 10일 오후 11시 59분(한국 시간)에 삭제해요. 신청하지 않아도 라이브에 참여할 수 있어요.');
   await expect(phone).toHaveValue('');
   await expect(consent).not.toBeChecked();
   await expect(page.getByRole('checkbox')).toHaveCount(1);

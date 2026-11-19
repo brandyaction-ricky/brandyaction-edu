@@ -22,6 +22,7 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
 }) {
   const panelId = useId();
   const phoneHintId = useId();
+  const consentHintId = useId();
   const errorId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const confirmation = useRef<HTMLParagraphElement>(null);
@@ -96,10 +97,10 @@ export function LiveReminder({open, registered, onOpenChange, onRegistered}: {
             <p id={phoneHintId} className={styles.note}>010-0000-0000과 01000000000 모두 가능해요.</p>
           </div>
           <label className={styles.consent}>
-            <input name="consent" type="checkbox" required/>
-            라이브 당일 안내 문자 1회 수신에 동의합니다.
+            <input name="consent" type="checkbox" required aria-describedby={consentHintId}/>
+            문샷 라이브 안내 문자 수신에 동의합니다.
           </label>
-          <p className={styles.note}>휴대폰 번호는 12월 7일 문샷 무료 라이브 당일 안내 문자 1회 발송에 사용해요. 브랜디액션은 신청 정보를 {arrivalLiveReminderRetentionLabel}까지 보관한 뒤 삭제해요. 문자를 발송하면 솔라피는 수신번호를 포함한 발송 기록을 발송일로부터 1년간 보관해요. 동의하지 않으면 문자 알림을 받을 수 없어요.</p>
+          <p id={consentHintId} className={styles.note}>휴대폰 번호는 문샷 라이브 안내 문자에만 사용해요. 브랜디액션은 번호를 {arrivalLiveReminderRetentionLabel}에 삭제해요. 신청하지 않아도 라이브에 참여할 수 있어요.</p>
           {message && <p id={errorId} className={styles.error} role="alert">{message}</p>}
           <div className={styles.actions}>
             <button type="submit">{submission === 'pending' ? '신청 중…' : '문자 알림 신청'}</button>
