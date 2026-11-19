@@ -1,6 +1,6 @@
 import {useEffect, useId, useRef, useState} from 'react';
 import {ArrowRight, ArrowUp, Bot} from 'lucide-react';
-import {SPY_PHASES, type SpyPhase} from './model';
+import {SPY_PHASES, SPY_REQUEST_LIMIT, type SpyPhase} from './model';
 import monitor from './office-demo.module.css';
 import styles from './spy-station.module.css';
 
@@ -9,6 +9,12 @@ const replies = {
   reviews: {text: '응, 우리 상품도 확인해줘.', next: 'guide'},
   guide: {text: '응, 콘텐츠 담당자에게 전달해줘.', next: 'handed-off'},
 } as const;
+const productPlaceholder = '[내 상품 이름]';
+const firstRequestExamples = [
+  {label: '예시 그대로', text: replies.intro.text},
+  {label: '내 상품 이름 넣기', text: `경쟁사 후기를 보고 ${productPlaceholder}에서 보완할 점을 찾아줘.`},
+  {label: '다른 내용 요청하기', text: '경쟁사 리뷰에서 고객이 가장 불편해한 점을 찾아줘.'},
+];
 const REPLY_PAUSE_MS = 560;
 const REVIEW_MESSAGE_PAUSE_MS = 360;
 const REVIEW_MESSAGE_COUNT = 3;
@@ -30,7 +36,13 @@ function VisitorMessage({children}: {children: string}) {
   return <p className={styles.visitorMessage}><span className={styles.screenReader}>내 요청: </span>{children}</p>;
 }
 
-export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onAdvance: (phase: SpyPhase) => void; onComplete: () => void}) {
+export function SpyStation({phase, firstRequest, onAdvance, onComplete}: {
+  phase: SpyPhase;
+  firstRequest: string;
+  onAdvance: (phase: SpyPhase, firstRequest?: string) => void;
+  onComplete: () => void;
+}) {
+  const [draft, setDraft] = useState(replies.intro.text as string);
   const [pending, setPending] = useState<RequestPhase | null>(null);
   const [reviewMessages, setReviewMessages] = useState(0);
   const shownPhase = pending ?? phase;
@@ -39,7 +51,10 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
   const reply = shownPhase === 'handed-off' ? null : replies[shownPhase];
   const sendDescription = useId();
   const body = useRef<HTMLDivElement>(null);
+  const requestField = useRef<HTMLInputElement>(null);
   const replyTimer = useRef<number | null>(null);
+  const sentRequest = firstRequest || replies.intro.text;
+  const draftRequest = draft.trim();
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -54,6 +69,9 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
 
   function sendMessage() {
     if (phase === 'handed-off' || replyTimer.current !== null) return;
+    const initialRequest = phase === 'intro' ? draftRequest : undefined;
+    if (initialRequest === '' || initialRequest?.includes(productPlaceholder)) return;
+    if (initialRequest) requestField.current?.blur();
     setPending(phase);
     function finishReply() {
       replyTimer.current = null;
@@ -66,7 +84,17 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
     }
     replyTimer.current = window.setTimeout(phase === 'intro' ? () => revealReviewMessage(1) : finishReply, REPLY_PAUSE_MS);
     // Save the sent step before the visual pause so reopening skips only the typing indicator.
-    onAdvance(replies[phase].next);
+    onAdvance(replies[phase].next, initialRequest);
+  }
+
+  function chooseRequest(text: string) {
+    setDraft(text);
+    const start = text.indexOf(productPlaceholder);
+    if (start < 0) return;
+    requestField.current?.focus();
+    requestAnimationFrame(() => {
+      requestField.current?.setSelectionRange(start, start + productPlaceholder.length);
+    });
   }
 
   return <>
@@ -76,8 +104,11 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
         <BotMessage>
           <p>저는 경쟁사 스파이입니다.<br/>경쟁사의 광고와 고객 반응을 조사해<br/><strong>우리 브랜드에 활용할 기회를 찾아드립니다.</strong></p>
         </BotMessage>
-        {(step >= 1 || pending === 'intro') && <VisitorMessage>{replies.intro.text}</VisitorMessage>}
-        {visibleReviews >= 1 && <BotMessage part="summary"><p><strong>경쟁사 3곳을 조사했어요!</strong></p></BotMessage>}
+        {(step >= 1 || pending === 'intro') && <VisitorMessage>{sentRequest}</VisitorMessage>}
+        {visibleReviews >= 1 && <BotMessage part="summary">
+          <p><strong>경쟁사 리뷰를 살펴봤어요.</strong></p>
+          {sentRequest !== replies.intro.text && <p>답변은 마스크팩 예시로 보여드려요.</p>}
+        </BotMessage>}
         {visibleReviews >= 2 && <BotMessage part="reviews">
             <div className={styles.reviews} role="group" aria-label="가상 리뷰 재구성">
               <header><strong>상품 리뷰</strong><span>가상 리뷰 재구성</span></header>
@@ -98,7 +129,7 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
         {step >= 2 && <>
           <VisitorMessage>{replies.reviews.text}</VisitorMessage>
           <BotMessage>
-            <p>이 가상 사례의 정본에서 상품 사용 가이드를 확인했어요.</p>
+            <p>이 가상 사례의 정본(회사 기준을 모아둔 문서)에서 상품 사용법을 확인했어요.</p>
             <div className={styles.guide}>
               <span>회사 정본 · 상품 사용 가이드 예시</span>
               <strong>10~15분 사용 후 떼어내세요.</strong>
@@ -130,8 +161,21 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
       </div>
     </div>
     <footer className={`${monitor.footer} ${styles.footer}`}>
-      {shownPhase === 'intro' && !pending && <p>아래 요청문을 보내 업무를 맡겨보세요.</p>}
-      {reply
+      {shownPhase === 'intro' ? <form onSubmit={event => {event.preventDefault(); sendMessage();}}>
+        <p id={sendDescription}><strong>업무를 맡겨보세요.</strong> 문장을 고쳐 보낼 수 있어요.</p>
+        <div className={styles.requestOptions} role="group" aria-label="요청문 예시">
+          {firstRequestExamples.map(({label, text}) => <button key={label} type="button" aria-pressed={draft === text}
+            disabled={pending !== null} onClick={() => chooseRequest(text)}>{label}</button>)}
+        </div>
+        <div className={styles.composer}>
+          <input ref={requestField} value={draft} onChange={event => setDraft(event.target.value)} maxLength={SPY_REQUEST_LIMIT}
+            aria-label="경쟁사 스파이에게 보낼 첫 요청" aria-describedby={sendDescription} readOnly={pending !== null}/>
+          <button className={styles.send} type="submit" aria-label="첫 요청 보내기"
+            disabled={!draftRequest || draftRequest.includes(productPlaceholder)} aria-disabled={pending !== null || undefined}>
+            <ArrowUp size={17} aria-hidden="true"/><span aria-hidden="true">보내기</span>
+          </button>
+        </div>
+      </form> : reply
         ? <div className={styles.composer}>
           <span className={styles.messagePreview} aria-hidden="true">{!pending && reply.text}</span>
           <span className={styles.screenReader} id={sendDescription}>예시 메시지 보내기</span>
@@ -139,7 +183,7 @@ export function SpyStation({phase, onAdvance, onComplete}: {phase: SpyPhase; onA
             <ArrowUp size={17} aria-hidden="true"/><span aria-hidden="true">보내기</span>
           </button>
         </div>
-        : <button className={styles.action} type="button" onClick={onComplete}>콘텐츠 실제 제작해보기<ArrowRight size={17} aria-hidden="true"/></button>}
+        : <button className={styles.action} type="button" onClick={onComplete}>콘텐츠 담당자 열기<ArrowRight size={17} aria-hidden="true"/></button>}
     </footer>
   </>;
 }

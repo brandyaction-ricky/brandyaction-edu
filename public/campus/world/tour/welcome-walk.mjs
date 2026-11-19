@@ -13,10 +13,17 @@ const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get('bridge');
 const avatars = ['female-c', 'female-a', 'male-c', 'male-d'];
 const greetings = {
-  1: '첫 업무 보고를 준비했어요.\n여기를 눌러 확인해보세요.',
-  2: '경쟁사 고객들의 속마음, 제가 찾아왔어요. 저를 눌러 확인해보세요.',
-  3: '경쟁사 조사에서 찾은 내용을 콘텐츠로 만들었어요. 한번 보실래요?',
-  4: 'AI가 우리 회사를 알아가는 방법, 여기서 확인해보세요.',
+  1: '텔레그램에서 AI 직원에게 일을 맡기는 20초 영상이에요.',
+  2: '경쟁사 고객의 후기에서 반복되는 불편을 찾았어요.',
+  3: '후기에서 찾은 내용을 광고 영상 자막에 써봤어요.',
+  4: '정본은 회사의 업무 기준을 담은 문서예요.',
+};
+const greetingAnchors = {
+  1: [-1.43, 2.12, -3.49],
+  2: [-1.03, 2.25, -3.71],
+  3: [-1.35, 2.25, -4.03],
+  4: [-.22, 1.75, -3.07],
+  7: [0, 2.30, -2.25],
 };
 const keys = new Set();
 let applySync, walkTo, pauseMovement;
@@ -126,7 +133,7 @@ async function start() {
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.032;
   shadow.scale.set(1, 0.72, 1);
   figure.add(shadow);
-  const aim = new THREE.Vector3(), projected = new THREE.Vector3(), guidePoint = new THREE.Vector3();
+  const aim = new THREE.Vector3(), projected = new THREE.Vector3(), guidePoint = new THREE.Vector3(), signPoint = new THREE.Vector3();
   const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), groundHit = new THREE.Vector3();
   const footprint = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.235, 28), new THREE.MeshBasicMaterial({
@@ -136,10 +143,11 @@ async function start() {
   footprint.visible = false;
   scene.add(footprint);
   let footprintUntil = 0;
-  let width, height, trackingX, trackingZ = 0, roamCamera = 0, raf = 0, last = 0, arranged = false;
+  let width, height, trackingX, trackingScale, trackingZ = 0, roamCamera = 0, raf = 0, last = 0, arranged = false;
   let markerWidth = 110, markerHeight = 44, arrived = 0;
   let pendingFloorPick;
   let shownIndex, shownStation, synced = false;
+  let openOnArrival = false;
   function resize() {
     width = Math.max(1, root.clientWidth); height = Math.max(1, root.clientHeight);
     renderer.setSize(width, height, false);
@@ -154,21 +162,24 @@ async function start() {
   }
   const officeSky = new THREE.Color(0xe8eff1), lobbySky = new THREE.Color(0xd9e6ed);
   function placeCamera(dt) {
-    const lead = Math.min(1.7, Math.max(0, (stations[state.station-1].x - state.x) * 0.42));
+    const gap = Math.max(0, stations[state.station - 1].x - state.x);
+    const narrow = width < 680;
+    const lead = Math.min(narrow ? 3.4 : 1.7, gap * .42);
     const focus = state.x + lead;
-    trackingX = trackingX == null ? focus : trackingX + (focus - trackingX) * (1 - Math.exp(-7 * dt));
+    const follow = 1 - Math.exp(-7 * dt);
+    trackingX = trackingX == null ? focus : trackingX + (focus - trackingX) * follow;
+    // On narrow screens, frame the visitor and next desk together while there is still an aisle between them.
+    const desiredScale = narrow ? Math.max(1.24, gap / (5.8 * Math.max(.4, camera.aspect))) : 1;
+    trackingScale = trackingScale == null ? desiredScale : trackingScale + (desiredScale - trackingScale) * follow;
     // Keep the camera turn gradual as the corridor opens into the welcome lounge.
-    const cameraScale = width < 600 ? 1.24 : 1;
     const hallEntrance = stations.at(-1).x - 6;
     const progress = state.station === stations.length ? Math.max(0, Math.min(1, (state.x - hallEntrance) / 5.4)) : 0;
     const hall = progress * progress * (3 - 2 * progress);
-    const narrow = width < 600;
     const blend = (from, to) => from + (to - from) * hall;
-    camera.position.set(trackingX - blend(1.65 * cameraScale, narrow ? 5.6 : 4.4),
-      blend(1.27 + 2.98 * cameraScale, narrow ? 5.8 : 5.0),
-      blend(-1.1 + 8.8 * cameraScale, narrow ? 8.8 : 8.3));
+    camera.position.set(trackingX - blend(1.65 * trackingScale, narrow ? 5.6 : 4.4),
+      blend(1.27 + 2.98 * trackingScale, narrow ? 5.8 : 5.0),
+      blend(-1.1 + 8.8 * trackingScale, narrow ? 8.8 : 8.3));
     aim.set(trackingX + 2.28 * hall, 1.27 + .44 * hall, blend(-1.1, -1.48));
-    const follow = 1 - Math.exp(-7 * dt);
     roamCamera += (Number(state.freeRoam) - roamCamera) * follow;
     trackingZ += (state.z - trackingZ) * follow;
     if (roamCamera > 0.001) {
@@ -182,25 +193,42 @@ async function start() {
     scene.fog.color.copy(scene.background);
     camera.lookAt(aim); camera.updateMatrixWorld();
   }
+  function signBottom(station) {
+    // Use both lower corners of the bay sign so a slanted camera angle leaves the full sign visible.
+    const lobby = station === stations.length;
+    const center = stations[station - 1].x + (lobby ? .85 : 0);
+    const halfWidth = lobby ? 2.76 : 2.37;
+    const y = lobby ? 2.3 : 2.45;
+    const z = lobby ? -5.01 : -6.35;
+    const left = signPoint.set(center - halfWidth, y, z).project(camera).y;
+    const right = signPoint.set(center + halfWidth, y, z).project(camera).y;
+    return (1 - Math.min(left, right)) * height / 2;
+  }
   function placeMarker() {
     if (marker.hidden) return;
     const station = stations[state.station - 1];
-    // Pin the entrance greeting above the team leader, beside the reception desk.
-    const atReception = state.station === 1;
-    if (atReception) projected.set(station.x - 1.43, 2.24, station.z - 3.49);
-    else projected.set(station.x, 2.65, station.z - 2.25);
-    projected.project(camera);
-    const x = (projected.x + 1) * width / 2 - markerWidth / 2;
-    const y = (1 - projected.y) * height / 2 - markerHeight;
-    const left = Math.max(10, Math.min(width - markerWidth - 10, x));
-    const top = Math.max(72, Math.min(height - markerHeight - 96, y));
-    marker.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
-    marker.dataset.edge = x > left + 6 ? 'right' : x < left - 6 ? 'left' : '';
+    const [dx, y, z] = greetingAnchors[state.station] ?? greetingAnchors[7];
+    projected.set(station.x + dx, y, station.z + z).project(camera);
+    const x = (projected.x + 1) * width / 2;
+    const anchorY = (1 - projected.y) * height / 2;
+    const maxLeft = width - markerWidth - 10;
+    const spaceRight = x + 22 <= maxLeft;
+    const spaceLeft = x - 22 - markerWidth >= 10;
+    const side = spaceRight ? 'left' : spaceLeft ? 'right' : '';
+    const sideLeft = spaceRight ? x + 22 : x - 22 - markerWidth;
+    const left = Math.max(10, Math.min(maxLeft, side ? sideLeft : x - markerWidth / 2));
+    const top = Math.max(72, Math.min(height - markerHeight - 96,
+      Math.max(signBottom(state.station) + 8, anchorY - (side ? markerHeight / 2 : markerHeight) - 8)));
+    marker.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
+    marker.dataset.edge = side || (x > left + markerWidth + 6 ? 'right' : x < left - 6 ? 'left' : '');
   }
   function placeLobbyGuides() {
+    const active = state.freeRoam && !state.paused;
+    const minTop = active ? Math.max(76, signBottom(state.station) + 8) : 0;
+    const safeBottom = height - Math.min(height * .46, width <= 700 ? 264 : 218);
     let previous;
     for (const [id, button] of lobbyGuides) {
-      if (!state.freeRoam || state.paused || !set.lobbyGuidePoint(id, guidePoint)) {
+      if (!active || !set.lobbyGuidePoint(id, guidePoint)) {
         button.hidden = true;
         continue;
       }
@@ -211,9 +239,10 @@ async function start() {
       if (button.hidden) continue;
       const w = button.offsetWidth, h = button.offsetHeight;
       const left = Math.max(8, Math.min(width - w - 8, x - w / 2));
-      let top = Math.max(76, y - h);
+      const maxTop = safeBottom - h;
+      let top = Math.min(maxTop, Math.max(minTop, y - h));
       if (previous && left < previous.right + 6 && left + w > previous.left - 6 && top + h > previous.top - 6 && top < previous.bottom + 6) {
-        top = Math.min(height - h - 86, previous.bottom + 8);
+        top = previous.bottom + 8 <= maxTop ? previous.bottom + 8 : Math.max(8, previous.top - h - 8);
       }
       button.dataset.primary = String(id === 'materials' && Math.abs(state.x - stations.at(-1).x) < 2.6);
       button.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
@@ -225,8 +254,8 @@ async function start() {
   function markDestination() {
     const near = needsDeskClick() && motion.atDesk();
     root.dataset.nearDesk = String(near);
-    label.textContent = near ? deskLabel + ' 열기' : deskLabel;
-    marker.setAttribute('aria-label', deskLabel + (near ? ' 열기' : ' 쪽으로 걷기'));
+    label.textContent = deskLabel + ' 열기';
+    marker.setAttribute('aria-label', deskLabel + ' 열기');
     sizeMarker();
   }
   function openNearbyDesk() {
@@ -242,10 +271,12 @@ async function start() {
     const returningToDesk = msg.station < state.station;
     const wasRoaming = state.freeRoam;
     if (msg.reset || msg.station !== state.station) {pendingFloorPick = undefined; keys.clear();}
+    if (msg.paused || msg.freeRoam || msg.reset || msg.station !== state.station) openOnArrival = false;
     motion.sync(msg.station, msg.paused === true, msg.reset === true, msg.freeRoam === true);
     if (state.freeRoam && !wasRoaming) floor.focus({preventScroll: true});
     if (!synced || msg.reset || returningToDesk) {
       trackingX = undefined;
+      trackingScale = undefined;
       trackingZ = state.z;
       roamCamera = Number(state.freeRoam);
       keys.clear();
@@ -276,9 +307,14 @@ async function start() {
       pick(x, y);
     }
   }
-  function moveTo(x, z) {
-    if (!ready || state.paused) return false;
-    keys.clear(); return motion.walk(x, z);
+  function moveTo(x, z, open = false) {
+    if (!ready || state.paused || !motion.walk(x, z)) return false;
+    keys.clear();
+    openOnArrival = open;
+    return true;
+  }
+  function openCurrentStation() {
+    if (!openNearbyDesk()) moveTo(undefined, undefined, true);
   }
   function tick(now) {
     if (failed) return;
@@ -295,12 +331,15 @@ async function start() {
       const len = Math.hypot(fx, fz) || 1;
       [dx, dz] = [(-fz * dx - fx * dz) / len, (fx * dx - fz * dz) / len];
     }
+    if (dx || dz) openOnArrival = false;
     const progressed = motion.update(dt, dx, dz);
     if (progressed) {
       if (!state.moving) keys.clear();
       arrived++; root.dataset.arrivals = String(arrived);
       markDestination();
-      send(needsDeskClick() ? 'approach' : 'arrive', state.station);
+      // The marker or desk itself is a request to open. Floor taps and direction keys only approach.
+      send(needsDeskClick() && !openOnArrival ? 'approach' : 'arrive', state.station);
+      openOnArrival = false;
     } else if (needsDeskClick() && root.dataset.nearDesk === 'true' && !motion.atDesk()) {
       markDestination();
       send('depart', state.station);
@@ -377,8 +416,9 @@ async function start() {
         break;
       }
     }
+    const open = Boolean(target);
     if (!target && ray.ray.intersectPlane(ground, groundHit)) target = floorDestination(groundHit, stations, state.station);
-    if (!target || !moveTo(target.x, target.z)) return;
+    if (!target || !moveTo(target.x, target.z, open)) return;
     footprint.position.set(target.x, 0.045, target.z);
     footprintUntil = performance.now() + 850;
   }
@@ -414,7 +454,7 @@ async function start() {
     if (start && Math.hypot(start.x - event.clientX, start.y - event.clientY) > 12) return;
     pick(event.clientX, event.clientY);
   });
-  marker.addEventListener('click', () => {if (!openNearbyDesk()) moveTo();});
+  marker.addEventListener('click', openCurrentStation);
   for (const [id, button] of lobbyGuides) button.addEventListener('click', () => {
     if (state.freeRoam && !state.paused) send('open-guide', state.station, id);
   });

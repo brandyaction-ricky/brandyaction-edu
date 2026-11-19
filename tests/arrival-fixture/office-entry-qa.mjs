@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startBusinessCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -18,58 +18,35 @@ try {
       if (new URL(r.url()).pathname === '/campus/arrival/mask-example-silent.mp4') maskVideoRequests.push(r.url());
     });
     const frame = page.frameLocator('iframe[title*="직원 사무실"]');
-    const marker = frame.getByRole('button', {name:/쪽으로 걷기/});
-    const openDesk = frame.getByRole('button', {name:/열기$|입장하기$/});
     const state = frame.locator('#walk');
     const button = (root, name) => root.getByRole('button',{name, exact:true});
     async function capture(stage) {
       if (output) await page.screenshot({path:resolve(output, device+'-'+stage+'.png'), animations:'disabled'});
     }
     async function walk(station) {
-      await expect(state).toHaveAttribute('data-ready','true');
+      if (station === 1) await startBusinessCase(page);
+      else {
+        const target = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true});
+        if (!await target.isVisible() && await page.locator('#arrival-desk-button').isEnabled()) {
+          await page.locator('#arrival-desk-button').click();
+        }
+        await expect(target).toBeVisible({timeout:20000});
+      }
       await expect(state).toHaveAttribute('data-station', String(station));
-      const count = Number(await state.getAttribute('data-arrivals'));
-      const from = Number(await state.getAttribute('data-player-x'));
-      if (await state.getAttribute('data-near-desk') === 'true') {
-        if (mobile) await openDesk.tap(); else await openDesk.click();
-        await expect(station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog')).toBeVisible();
-        await expect(state).toHaveAttribute('data-arrivals', String(count));
-        return;
-      }
-      await expect(marker).toBeVisible({timeout:60000});
-      if (mobile) await marker.tap(); else await marker.click();
-      await expect(state).toHaveAttribute('data-arrivals', String(count+1), {timeout:20000});
-      const to = Number(await state.getAttribute('data-player-x'));
-      expect(Math.abs(to-(station === 7 ? 32 : (station-1)*8))).toBeLessThan(.75);
-      arrivals.push({station,from,to});
-      if (station !== 1) {
-        await expect(state).toHaveAttribute('data-near-desk', 'true');
-        await expect(openDesk).toBeVisible();
-        await expect(page.getByRole('dialog')).not.toBeVisible();
-        if (station === 2) await capture('spy-arrived');
-        if (mobile) await openDesk.tap(); else await openDesk.click();
-        await expect(state).toHaveAttribute('data-arrivals', String(count+1));
-      }
+      arrivals.push(station);
     }
-    const worldPosition = () => state.evaluate(element => [element.dataset.playerX, element.dataset.playerZ, element.dataset.arrivals]);
-    let positionBeforeLeave;
     async function beforeLeave() {
       await expect(state).toHaveAttribute('data-moving', 'false');
-      positionBeforeLeave = await worldPosition();
     }
     async function afterLeave(station) {
       await expect(state).toHaveAttribute('data-station', String(station === 4 ? 7 : station+1));
-      await expect(state).toHaveAttribute('data-moving', 'false');
-      await expect(marker).toBeVisible();
-      expect(await worldPosition()).toEqual(positionBeforeLeave);
-      await expect(page.getByRole('dialog')).not.toBeVisible();
       if (station === 2) expect(maskVideoRequests).toEqual([]);
     }
     async function inspectLeader(guide) {
       const intro = guide.getByRole('heading', {name:'AI봇들과 함께 일하면 어떻게 될까요?', exact:true});
       const start = button(guide,'지금 확인하기');
       const next = teamLeaderNext(guide);
-      const invitation = guide.getByText('각 담당자들이 어떻게 일하는지 직접 확인해보실까요?', {exact:true});
+      const caption = guide.getByText(/20초 무음 영상/);
       const video = guide.locator('video');
       const fullscreen = button(guide,'전체 화면');
       const seek = guide.getByRole('slider', {name:'재생 위치', exact:true});
@@ -97,8 +74,8 @@ try {
       await expect(fullscreen).toBeInViewport({ratio:0.95});
       await expect(seek).toBeInViewport({ratio:0.95});
       expect(await guide.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-      await expect(invitation).toBeHidden();
-      await expect(next).toHaveCount(0);
+      await expect(caption).toBeVisible();
+      await expect(next).toBeInViewport({ratio:1});
       if (device === 'small-mobile') {
         await expect.poll(() => page.evaluate(() => window.__leaderAutoplayBlocked)).toBe(true);
         await button(guide,'재생').click();
@@ -131,23 +108,11 @@ try {
         await start.click();
       }
       await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
-      await video.evaluate(element => {element.pause(); element.currentTime = 4.5;});
-      await expect.poll(async () => Number(await seek.inputValue())).toBe(4.5);
-      await expect(next).toHaveCount(0);
-      await video.evaluate(element => {element.currentTime = 5;});
-      await expect(next).toBeVisible();
-      expect(await video.evaluate(element => element.ended)).toBe(false);
-      await video.evaluate(element => {element.currentTime = 1;});
-      await expect.poll(async () => Number(await seek.inputValue())).toBe(1);
-      await expect(next).toBeVisible();
-      await expect(next).toBeInViewport({ratio:0.95});
-      await capture('leader-continue-at-five-seconds');
-      await button(guide,'재생').click();
+      await expect(next).toBeInViewport({ratio:1});
       await finishTeamLeaderVideo(guide);
       await expect.poll(() => video.evaluate(element => element.ended)).toBe(true);
-      await expect(invitation).toBeVisible();
-      await next.scrollIntoViewIfNeeded();
-      await expect(next).toBeInViewport({ratio:0.95});
+      await expect(caption).toBeVisible();
+      await expect(next).toBeInViewport({ratio:1});
       await capture('leader-complete');
       if (!mobile) {
         await button(guide,'다시 재생').click();
@@ -174,7 +139,7 @@ try {
           await walk(2);
         }
         await expect(conversation).toContainText('우리 브랜드에 활용할 기회를 찾아드립니다.');
-        await expect(dialog.getByRole('textbox')).toHaveCount(0);
+        await expect(dialog.getByRole('textbox', {name:'경쟁사 스파이에게 보낼 첫 요청'})).toBeVisible();
         await expect(reviews).toHaveCount(0);
         // Dispatch a duplicate tap before React commits the next phase.
         await button(dialog, spyActions[0]).evaluate(element => {element.click(); element.click();});
@@ -216,8 +181,8 @@ try {
         await video.evaluate(element => {element.currentTime = 9.2;});
         await expect(film.getByText('사용 전, 제품의 사용 가이드를 확인하세요.', {exact:true})).toBeVisible();
 
-        const create = button(dialog,'프롬프트 만들기');
-        const copy = button(dialog,'프롬프트 복사');
+        const create = button(dialog,'요청문 만들기');
+        const copy = button(dialog,'요청문 복사');
         const ownInputs = [
           [/상품·서비스/, '검수용 반려동물 방문 사진'],
           [/비교할 경쟁사/, '검수용 A 사진팀'],
@@ -230,8 +195,8 @@ try {
         await expect(create).toBeDisabled();
         for (const [name, value] of ownInputs) await dialog.getByRole('textbox', {name}).fill(value);
         await create.click();
-        await dialog.getByText('프롬프트 보기', {exact:true}).click();
-        const prompt = dialog.getByRole('textbox', {name:'생성한 프롬프트'});
+        await dialog.getByText('요청문 보기', {exact:true}).click();
+        const prompt = dialog.getByRole('textbox', {name:'생성한 요청문'});
         const generated = await prompt.inputValue();
         for (const [, value] of ownInputs) expect(generated).toContain(value);
         for (const requirement of ['실제로 읽은 자료의 URL', '웹이나 일부 자료를 열 수 없으면', '첫 3초', '장면표', '공개 전에 검수']) expect(generated).toContain(requirement);
@@ -246,7 +211,7 @@ try {
         await expect(copy).toHaveCount(0);
         await button(dialog,'마스크팩 예시 넣기').click();
         await create.click();
-        await dialog.getByText('프롬프트 보기', {exact:true}).click();
+        await dialog.getByText('요청문 보기', {exact:true}).click();
         await expect(prompt).toHaveValue(/검색하거나 실제 조사처럼 설명하지 말고/);
         expect(await prompt.inputValue()).not.toContain(ownInputs[0][1]);
       }
@@ -259,8 +224,7 @@ try {
     }
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
-      await expect(marker).toBeVisible({timeout:60000});
-      await expect(marker).toContainText('첫 업무 보고를 준비했어요.');
+      await expect(page.getByRole('radio')).toHaveCount(4);
       await expect(teamLeaderGuide(page)).toHaveCount(0);
       await expect(page.locator('video')).toHaveCount(0);
       await page.evaluate(()=>document.fonts.ready);
@@ -278,7 +242,8 @@ try {
         await button(page,'이 기준으로 첫 업무 맡기기').click();
         await button(page,'예시 메모 넣기').click();
         await button(page,'기준과 자료 함께 복사').click();
-        await button(page,'첫 답변을 받았어요').click();
+        await page.getByLabel('받은 답변을 여기에 붙여넣기').fill('배포일은 미정입니다. 다음 회의에서 날짜를 결정해 주세요.');
+        await button(page,'이 답변으로 피드백하기').click();
         const note='결정이 필요한 내용을 먼저 보여주세요.';
         await page.getByRole('textbox',{name:'내 말로 수정하기'}).fill(note);
         await button(page,'피드백 반영 요청 복사').click();
@@ -291,7 +256,8 @@ try {
         expect(reused).toContain(note);
         expect(reused).toContain('워크숍');
         expect(reused).not.toContain('신입 동료 안내자료');
-        await button(page,'두 번째 답변을 받았어요').click();
+        await page.getByLabel('받은 답변을 여기에 붙여넣기').fill('장소와 인원을 결정해야 합니다.');
+        await button(page,'답변 검토 마치기').click();
         await button(page,'라이브에서 이어서 배우기').click();
       }
       await openLoungeSchedule(page);

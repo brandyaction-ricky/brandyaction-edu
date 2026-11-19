@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishTeamLeaderVideo, spyActions, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {spyActions, startBusinessCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4560/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -39,16 +39,8 @@ for (const {name, engine, viewport, mobile} of devices) {
     });
   }
 
-  async function walkTo(station) {
-    await expect(world).toHaveAttribute('data-station', String(station));
-    const previousArrivals = Number(await world.getAttribute('data-arrivals'));
-    await tap(frame.getByRole('button', {name: /쪽으로 걷기/}));
-    await expect(world).toHaveAttribute('data-arrivals', String(previousArrivals + 1), {timeout: 20_000});
-    if (station !== 1) await expect(world).toHaveAttribute('data-near-desk', 'true');
-  }
-
   async function openFromHost() {
-    await expect(hostOpen).toHaveText('내용 열기');
+    await expect(hostOpen).toHaveText('바로 열기');
     await tap(hostOpen);
   }
 
@@ -82,18 +74,16 @@ for (const {name, engine, viewport, mobile} of devices) {
     expect(requestedPaths.has(modelPath('female-d'))).toBe(false);
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
     await capture('entry');
-    await walkTo(1);
+    await startBusinessCase(page);
     const leader = teamLeaderGuide(page);
     await expect(leader).toBeVisible();
     await tap(button(leader, '지금 확인하기'));
-    if (!await teamLeaderNext(leader).isVisible()) await finishTeamLeaderVideo(leader);
+    await expect(teamLeaderNext(leader)).toBeInViewport({ratio: .95});
     const spyModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('female-d'));
     await tap(teamLeaderNext(leader));
     await spyModel;
 
-    await walkTo(2);
-    await openFromHost();
-    await expect(desk).toHaveAccessibleName('경쟁사 스파이');
+    await expect(desk).toHaveAccessibleName('경쟁사 스파이', {timeout: 20_000});
     const spyHeight = await expectDeskVisible();
     releaseModels.get('female-d')();
     await capture('spy-open');
@@ -129,13 +119,9 @@ for (const {name, engine, viewport, mobile} of devices) {
     }
     expect(requestedPaths.has(modelPath('male-b'))).toBe(false);
     const contentModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('male-b'));
-    await tap(button(desk, '콘텐츠 실제 제작해보기'));
+    await tap(button(desk, '콘텐츠 담당자 열기'));
     await contentModel;
-    await expect(desk).not.toBeVisible();
-
-    await walkTo(3);
-    await tap(frameOpen);
-    await expect(desk).toHaveAccessibleName('콘텐츠 담당자');
+    await expect(desk).toHaveAccessibleName('콘텐츠 담당자', {timeout: 20_000});
     const contentHeight = await expectDeskVisible();
     releaseModels.get('male-b')();
     await capture('content-open');
@@ -163,9 +149,8 @@ for (const {name, engine, viewport, mobile} of devices) {
     await openFromHost();
     await expectDeskVisible();
     await expect(product).toHaveValue(draft);
-    await tap(button(desk, 'AI가 내 일을 기억하는 방법 보기'));
-    await expect(desk).not.toBeVisible();
-    await walkTo(4);
+    await tap(button(desk, '회사 업무 기준 보기'));
+    await expect(desk).toHaveAccessibleName('정본 · 회사 업무 기준', {timeout: 20_000});
     expect([...requestedPaths].some(path => path.includes('/vendor/assets/agents/'))).toBe(false);
     console.log(JSON.stringify({name, viewport, spyHeight, resizedSpyHeight, contentHeight, resizedContentHeight, reachedStation: 4}));
   } catch (error) {

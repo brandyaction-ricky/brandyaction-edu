@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule} from './review-office.mjs';
+import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, startBusinessCase, teamLeaderGuide} from './review-office.mjs';
 
 const url = new URL(process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4529/experience/moonshot');
 if (url.pathname === '/') url.pathname = '/experience/moonshot';
@@ -9,7 +9,6 @@ const output = process.env.ARRIVAL_QA_OUTPUT;
 if (output) await mkdir(output, {recursive:true});
 
 const route = new Map([[1, 2], [2, 3], [3, 4], [4, 7]]);
-const destinationX = {1:0, 2:8, 3:16, 4:24, 7:32};
 const contentDraft = {
   product: '반려동물 출장 사진 촬영', competitor: 'https://example.com/qa-studio',
   customer: '고령 반려견의 보호자', facts: '평소 생활하는 집에서 촬영하고 개인 화보를 전달합니다.',
@@ -36,8 +35,7 @@ for (const [device, engine, viewport] of [
   });
   const frame = page.frameLocator('iframe[title*="직원 사무실"]');
   const world = frame.locator('#walk');
-  const marker = frame.getByRole('button', {name:/쪽으로 걷기/});
-  const open = frame.getByRole('button', {name:/열기$|입장하기$/});
+  const open = page.locator('#arrival-desk-button');
   const calendar = page.getByRole('link', {name:'Google 캘린더', exact:true});
   const nextHint = page.getByRole('region', {name:'현재 목적지', exact:true}).getByRole('status').filter({hasText:/옆으로 이동해|옆자리에서|복도 끝/});
   const button = (root, name) => root.getByRole('button', {name, exact:true});
@@ -46,25 +44,16 @@ for (const [device, engine, viewport] of [
   const capture = stage => output && page.screenshot({path:resolve(output, `${device}-${stage}.png`), animations:'disabled'});
 
   async function walk(station) {
-    await expect(world).toHaveAttribute('data-ready', 'true', {timeout:30000});
-    await expect(world).toHaveAttribute('data-station', String(station));
-    await expect(marker).toHaveCount(1);
-    await expect(world).toHaveAttribute('data-player-x', /\d/);
-    const [from, , arrivals] = await position();
-    await tap(marker);
-    await expect(world).toHaveAttribute('data-moving', 'true');
-    await expect(world).toHaveAttribute('data-arrivals', String(arrivals + 1), {timeout:30000});
-    const [to] = await position();
-    expect(to - from).toBeGreaterThan(2);
-    expect(Math.abs(to - destinationX[station])).toBeLessThan(.8);
-    if (station !== 1) {
-      await expect(open).toBeVisible();
+    if (station === 1) {
+      await expect(world).toHaveAttribute('data-ready', 'true', {timeout:30000});
+      await startBusinessCase(page);
+      await expect(teamLeaderGuide(page)).toBeVisible();
+    } else {
+      const destination = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true});
+      await expect(destination).toBeVisible({timeout:16000});
       await expect(nextHint).toHaveCount(0);
-      await expect(page.getByRole('dialog')).not.toBeVisible();
-      await expect(calendar).not.toBeVisible();
-      await tap(open);
-      await expect(world).toHaveAttribute('data-arrivals', String(arrivals + 1));
     }
+    await expect(world).toHaveAttribute('data-station', String(station));
     visited.push(station);
   }
 
@@ -74,7 +63,7 @@ for (const [device, engine, viewport] of [
       await dialog.getByLabel(/^비교할 경쟁사 이름이나 링크/).fill(contentDraft.competitor);
       await dialog.getByLabel(/^어떤 고객에게 필요한가요/).fill(contentDraft.customer);
       await dialog.getByLabel(/^고객 질문과 실제 상품 특징/).fill(contentDraft.facts);
-      await tap(button(dialog, '프롬프트 만들기'));
+      await tap(button(dialog, '요청문 만들기'));
       await tap(button(dialog, '복도로 돌아가기'));
       await expect(dialog).not.toBeVisible();
       await tap(open);
@@ -122,8 +111,7 @@ for (const [device, engine, viewport] of [
     await results.scrollIntoViewIfNeeded();
     await capture('canon-results');
     await page.reload({waitUntil:'domcontentloaded'});
-    await walk(4);
-    visited.pop();
+    await tap(open);
     await expect(status).toHaveText(exchanges.at(-1).status);
     await expect(staff).toHaveCount(2);
   }
@@ -132,23 +120,18 @@ for (const [device, engine, viewport] of [
     await expect(dialog.getByLabel(/^비교할 경쟁사 이름이나 링크/)).toHaveValue(contentDraft.competitor);
     await expect(dialog.getByLabel(/^어떤 고객에게 필요한가요/)).toHaveValue(contentDraft.customer);
     await expect(dialog.getByLabel(/^고객 질문과 실제 상품 특징/)).toHaveValue(contentDraft.facts);
-    await expect(dialog.getByRole('heading', {name:'내 사업에 적용할 프롬프트가 준비됐어요.'})).toBeVisible();
+    await expect(dialog.getByRole('heading', {name:'내 사업에 적용할 요청문이 준비됐어요.'})).toBeVisible();
   }
 
   try {
     await page.goto(url.href);
-    let before;
     await finishOfficeReview(page, {
       walk, inspect, enterPersonal:false,
       beforeLeave: async () => {
         await expect(world).toHaveAttribute('data-moving','false');
-        before = await position();
       },
       afterLeave: async station => {
         await expect(world).toHaveAttribute('data-station', String(route.get(station)));
-        await expect(world).toHaveAttribute('data-moving','false');
-        await expect(marker).toHaveCount(1);
-        expect(await position()).toEqual(before);
         await expect(calendar).not.toBeVisible();
         await expect(nextHint).toContainText(['경쟁사 스파이', '콘텐츠 담당자', '회사 업무 기준', '웰컴 라운지'][station - 1]);
         await expect(nextHint).toBeInViewport({ratio:1});
@@ -169,7 +152,8 @@ for (const [device, engine, viewport] of [
     await expect(resources.getByRole('link', {name:'회사 업무 기준표 받기', exact:true})).toHaveAttribute('download', /업무-기준표\.txt$/);
     await capture('lounge-materials');
     await tap(button(guide, '라이브 특전'));
-    await expect(resources.getByText(/라이브에서 비밀번호를 공개합니다/)).toBeVisible();
+    await expect(resources.getByText(/12월 7일 오후 9시 라이브에서 비밀번호를 공개합니다/)).toBeVisible();
+    await expect(button(guide, '캘린더에 추가')).toBeVisible();
     await expect(resources.getByRole('listitem')).toHaveCount(3);
     await tap(button(guide, '무료자료'));
     await tap(button(resources, '광고 영상 체험 열기'));

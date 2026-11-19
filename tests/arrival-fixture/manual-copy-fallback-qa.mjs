@@ -11,7 +11,7 @@ const browser = await chromium.launch({headless: true});
 const results = [];
 
 try {
-  for (const [device, viewport] of [['pc', {width: 1440, height: 1000}], ['mobile', {width: 390, height: 844}]]) {
+  for (const [device, viewport] of [['pc', {width: 1440, height: 723}], ['mobile', {width: 390, height: 844}]]) {
     const context = await browser.newContext({viewport, hasTouch: device === 'mobile', isMobile: device === 'mobile', deviceScaleFactor: 1});
     // Deterministic denial in every stage. The exercise still advances only through
     // visible visitor confirmations; this synthetic QA does not call a personal AI.
@@ -27,21 +27,26 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => {if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.url());});
     const step = page.locator('[data-work-step]');
-    async function copyPromptAndConfirm(copyLabel, responseLabel) {
+    async function copyPromptAndConfirm(copyLabel, responseLabel, answer) {
       await page.getByRole('button', {name: copyLabel, exact: true}).click();
       await expect(page.getByRole('textbox', {name: '직접 복사할 전체 요청문', exact: true})).toBeVisible();
       await page.getByRole('button', {name: '직접 복사했어요', exact: true}).click();
-      await page.getByRole('button', {name: responseLabel, exact: true}).click();
+      const proceed = page.getByRole('button', {name: responseLabel, exact: true});
+      if (answer) {
+        await expect(proceed).toBeDisabled();
+        await page.getByRole('textbox', {name:'받은 답변을 여기에 붙여넣기', exact:true}).fill(answer);
+      }
+      await proceed.click();
     }
     try {
       await page.goto(base + path, {waitUntil: 'domcontentloaded'});
       await finishOfficeReview(page, {inspect: async (station, dialog) => {
         if (station !== 3) return;
         await dialog.getByRole('button', {name:'마스크팩 예시 넣기', exact:true}).click();
-        await dialog.getByRole('button', {name:'프롬프트 만들기', exact:true}).click();
-        await dialog.getByRole('button', {name:'프롬프트 복사', exact:true}).click();
+        await dialog.getByRole('button', {name:'요청문 만들기', exact:true}).click();
+        await dialog.getByRole('button', {name:'요청문 복사', exact:true}).click();
         await expect(dialog.getByRole('status')).toContainText('아래 요청문을 직접 복사해 주세요.');
-        const manualPrompt = dialog.getByRole('textbox', {name:'생성한 프롬프트', exact:true});
+        const manualPrompt = dialog.getByRole('textbox', {name:'생성한 요청문', exact:true});
         await expect(manualPrompt).toBeVisible();
         await expect(manualPrompt).toBeFocused();
         expect(await manualPrompt.evaluate(element => element.value.length > 0 && element.selectionStart === 0 && element.selectionEnd === element.value.length)).toBe(true);
@@ -51,14 +56,14 @@ try {
       await page.getByRole('button', {name: '예시 업무로 시작', exact: true}).click();
       await page.getByRole('button', {name: '이 기준으로 첫 업무 맡기기', exact: true}).click();
       await page.getByRole('button', {name: '예시 메모 넣기', exact: true}).click();
-      await copyPromptAndConfirm('기준과 자료 함께 복사', '첫 답변을 받았어요');
+      await copyPromptAndConfirm('기준과 자료 함께 복사', '이 답변으로 피드백하기', '복사를 직접 마친 뒤 가져온 첫 답변');
       await expect(step).toHaveAttribute('data-work-step', '2');
       const feedback = '확인된 사실과 제안을 구분하고, 결정할 사항마다 필요한 정보를 함께 보여줘.';
       await page.getByRole('textbox', {name: '내 말로 수정하기', exact: true}).fill(feedback);
       await copyPromptAndConfirm('피드백 반영 요청 복사', '수정한 답변을 확인했어요');
       await expect(step).toHaveAttribute('data-work-step', '3');
       await page.getByRole('button', {name: '예시 메모 넣기', exact: true}).click();
-      await copyPromptAndConfirm('기준과 자료 함께 복사', '두 번째 답변을 받았어요');
+      await copyPromptAndConfirm('기준과 자료 함께 복사', '답변 검토 마치기', '복사를 직접 마친 뒤 가져온 두 번째 답변');
       await expect(step).toHaveAttribute('data-work-step', '4');
 
       const card = page.locator('article').filter({has: page.getByRole('heading', {name: '내 AI 직원의 업무 매뉴얼', exact: true})});

@@ -15,10 +15,11 @@ const configured = () => trial.updateWorkTrial(trial.initialWorkTrialState(), {r
 function completed() {
   let state = configured();
   state = trial.updateWorkTrial(state, {firstTask: config.firstTask.sample, step: 1});
+  state = trial.updateWorkTrial(state, {firstAnswer: '개인 AI에서 가져온 첫 답변'});
   state = trial.updateWorkTrial(state, {firstConfirmed: true, step: 2});
   state = trial.updateWorkTrial(state, {feedback: '결정할 사항마다 선택지를 함께 보여줘.'});
   state = trial.updateWorkTrial(state, {feedbackConfirmed: true, step: 3});
-  state = trial.updateWorkTrial(state, {secondTask: config.secondTask.sample});
+  state = trial.updateWorkTrial(state, {secondTask: config.secondTask.sample, secondAnswer: '개인 AI에서 가져온 두 번째 답변'});
   return trial.updateWorkTrial(state, {secondConfirmed: true, checks: [true, false, true], step: 4});
 }
 const rejects = value => assert.throws(() => trial.validateWorkTrialConfig(value), error => error.status === 400 && Boolean(error.message));
@@ -115,12 +116,15 @@ test('manual uses personal role, reader and selected judgement with editable def
   assert.equal(trial.updateWorkTrial(state, {role: '작성 중 '}).role, '작성 중 ', 'typing keeps spaces');
 });
 
-test('four stages require explicit reports; copying or a saved step never manufactures an AI reply', () => {
+test('first and second review require a pasted or example answer as well as confirmation', () => {
   let state = configured();
   state = trial.updateWorkTrial(state, {firstTask: config.firstTask.sample, step: 4});
   assert.equal(state.step, 1);
   assert.equal(state.firstConfirmed, false);
   assert.equal(trial.buildWorkPrompt(config, state, 'feedback'), '');
+  state = trial.updateWorkTrial(state, {firstConfirmed: true, step: 2});
+  assert.equal(state.step, 1);
+  state = trial.updateWorkTrial(state, {firstAnswer: '받은 답변'});
   state = trial.updateWorkTrial(state, {firstConfirmed: true, step: 2});
   assert.equal(state.step, 2);
   state = trial.updateWorkTrial(state, {feedback: '선택지를 함께 정리해줘.', step: 3});
@@ -130,10 +134,36 @@ test('four stages require explicit reports; copying or a saved step never manufa
   state = trial.updateWorkTrial(state, {secondTask: config.secondTask.sample, step: 4});
   assert.equal(state.step, 3);
   state = trial.updateWorkTrial(state, {secondConfirmed: true, step: 4});
+  assert.equal(state.step, 3);
+  state = trial.updateWorkTrial(state, {secondAnswerExample: true});
+  state = trial.updateWorkTrial(state, {secondConfirmed: true, step: 4});
   assert.equal(state.step, 4);
+  assert.equal(state.secondAnswer, '');
   assert.deepEqual(state.checks, [false, false, false], 'answer receipt does not mean quality passed');
   const untrusted = trial.parseWorkTrialState({...trial.initialWorkTrialState(), step: 4, firstConfirmed: true, feedbackConfirmed: true, secondConfirmed: true, checks: [true, true, true]});
   assert.deepEqual(untrusted, trial.initialWorkTrialState());
+});
+
+test('legacy confirmations survive the answer-field upgrade and reserialization', () => {
+  const saved = completed();
+  for (const key of ['firstAnswer', 'firstAnswerExample', 'firstChecks', 'secondAnswer', 'secondAnswerExample']) delete saved[key];
+  const restored = trial.parseWorkTrialState(saved);
+  assert.equal(restored.step, 4);
+  assert.equal(restored.firstAnswer, null);
+  assert.equal(restored.secondAnswer, null);
+  assert.equal(restored.firstConfirmed, true);
+  assert.equal(restored.secondConfirmed, true);
+  assert.deepEqual(trial.parseWorkTrialState(JSON.parse(JSON.stringify(restored))), restored);
+});
+
+test('the first review proposes feedback for unchecked criteria', () => {
+  assert.equal(trial.workReviewFeedback([true, true, true]), '');
+  assert.equal(trial.workReviewFeedback([true, false, true]), trial.WORK_TRIAL_FIRST_CHECKS[1].feedback);
+  const ready = trial.updateWorkTrial(configured(), {firstTask: config.firstTask.sample, firstAnswer: '가'.repeat(4001)});
+  assert.equal(ready.firstAnswer.length, 4000);
+  const checked = trial.updateWorkTrial(ready, {firstChecks: [true, false, true]});
+  assert.deepEqual(checked.firstChecks, [true, false, true]);
+  assert.deepEqual(trial.updateWorkTrial(checked, {firstAnswer: '다른 답변'}).firstChecks, [false, false, false]);
 });
 
 test('feedback is added to the manual and reused with only the new task facts', () => {
@@ -146,6 +176,9 @@ test('feedback is added to the manual and reused with only the new task facts', 
   assert.ok(update.includes(state.feedback) && update.includes(state.firstTask));
   assert.ok(reuse.includes(state.feedback) && reuse.includes(state.secondTask));
   assert.ok(!reuse.includes(state.firstTask), 'previous task facts are not a reusable working standard');
+  for (const answer of [state.firstAnswer, state.secondAnswer]) {
+    for (const output of [first, update, reuse, trial.buildWorkManual(config, state)]) assert.ok(!output.includes(answer));
+  }
   assert.ok(!trial.buildWorkManual(config, state).includes(state.secondTask));
   const same = trial.updateWorkTrial(state, {secondTask: '  ' + state.firstTask.replaceAll(' ', '\n') + ' '});
   assert.equal(trial.secondTaskReady(same), false);
@@ -182,14 +215,14 @@ test('editing earlier decisions clears dependent completion but keeps the visito
 
 test('leaving for personal AI restores the real drafts and self-reported checks without creating them', () => {
   const state = model.initialArrivalState();
-  state.workTrial = completed(); state.step = 1; state.station = 6;
+  state.workTrial = completed(); state.step = 1; state.station = 6; state.entryStarted = true;
   assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(state)), state);
   const legacy = {...state}; delete legacy.workTrial;
   assert.deepEqual(model.parseArrivalState(JSON.stringify(legacy)).workTrial, trial.initialWorkTrialState());
   for (const unit of ['"', '\ud800']) {
     const allMax = model.initialArrivalState();
     for (const answers of Object.values(allMax.answers)) {answers.a = unit.repeat(500); answers.b = unit.repeat(500);}
-    allMax.workTrial = trial.parseWorkTrialState({...completed(), role: unit.repeat(240), reader: unit.repeat(400), boundary: unit.repeat(700), format: unit.repeat(700), firstTask: unit.repeat(2400), secondTask: 'a' + unit.repeat(2399), feedback: unit.repeat(700)});
+    allMax.workTrial = trial.parseWorkTrialState({...completed(), role: unit.repeat(240), reader: unit.repeat(400), boundary: unit.repeat(700), format: unit.repeat(700), firstTask: unit.repeat(2400), secondTask: 'a' + unit.repeat(2399), feedback: unit.repeat(700), firstAnswer: unit.repeat(4000), secondAnswer: unit.repeat(4000)});
     allMax.audience = 'business';
     allMax.companyRule = 0;
     allMax.consentedCompanyRule = unit.repeat(240);

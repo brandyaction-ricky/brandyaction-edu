@@ -17,8 +17,23 @@ export type WorkTrialConfig = {
 };
 export const WORK_TRIAL_LIMITS = {
   title: 120, description: 500, label: 160, hint: 500, role: 240, reader: 400,
-  rule: 700, task: 2400, feedback: 700, template: 7000,
+  rule: 700, task: 2400, answer: 4000, feedback: 700, template: 7000,
 } as const;
+
+export const WORK_TRIAL_FIRST_CHECKS = [
+  {label: '내가 고른 우선순위가 맨 위에 있어요.', feedback: '내가 고른 우선순위에 해당하는 내용을 답변 맨 위에 적어줘.'},
+  {label: '메모에 없는 정보는 확인할 사항으로 남겼어요.', feedback: '메모에 없는 담당자·날짜·수치는 확인이 필요하다고 표시해줘.'},
+  {label: '다음에 할 일이 구체적으로 적혀 있어요.', feedback: '다음에 할 일을 바로 실행할 수 있는 문장으로 적어줘.'},
+] as const;
+
+export const WORK_TRIAL_ANSWER_EXAMPLES = {
+  first: '[결정 필요] 계정 신청 안내가 빠진 상태로 이번 주에 먼저 공유할지 정해야 합니다.\n[진행 상황] 안내자료 목차 정리 완료. 계정 신청 안내는 담당 부서의 회신 대기 중입니다.\n[다음 할 일] 안내자료를 준비합니다.',
+  second: '[결정 필요] 참석 인원과 예산을 먼저 확인한 뒤 장소를 정할지 결정해 주세요.\n[진행 상황] 가까운 장소는 예약 가능 여부가 미정입니다. 먼 장소는 예약할 수 있습니다.\n[다음 할 일] 가까운 장소의 예약 가능 날짜를 확인하고, 두 장소의 비용과 이동 시간을 비교합니다.\n[확인 필요] 예약 담당자와 마감일은 미정입니다.',
+} as const;
+
+export function workReviewFeedback(checks: boolean[]): string {
+  return WORK_TRIAL_FIRST_CHECKS.filter((_, index) => !checks[index]).map(item => item.feedback).join('\n');
+}
 
 export const DEFAULT_WORK_TRIAL: WorkTrialConfig = {
   title: '내가 매번 고치는 부분까지,\n업무 기준으로 남겨보세요.',
@@ -134,11 +149,16 @@ export type WorkTrialState = {
   step: 0 | 1 | 2 | 3 | 4;
   role: string; reader: string; priority: WorkTrialPriority | ''; boundary: string; format: string;
   firstTask: string; feedback: string; secondTask: string;
+  firstAnswer: string | null; secondAnswer: string | null;
+  firstAnswerExample: boolean; secondAnswerExample: boolean;
   copiedRequestId: string;
-  firstConfirmed: boolean; feedbackConfirmed: boolean; secondConfirmed: boolean; checks: boolean[];
+  firstConfirmed: boolean; feedbackConfirmed: boolean; secondConfirmed: boolean;
+  firstChecks: boolean[]; checks: boolean[];
 };
 export function initialWorkTrialState(): WorkTrialState {
-  return {step: 0, role: '', reader: '', priority: '', boundary: '', format: '', firstTask: '', feedback: '', secondTask: '', copiedRequestId: '', firstConfirmed: false, feedbackConfirmed: false, secondConfirmed: false, checks: [false, false, false]};
+  return {step: 0, role: '', reader: '', priority: '', boundary: '', format: '', firstTask: '', feedback: '', secondTask: '',
+    firstAnswer: '', secondAnswer: '', firstAnswerExample: false, secondAnswerExample: false, copiedRequestId: '',
+    firstConfirmed: false, feedbackConfirmed: false, secondConfirmed: false, firstChecks: [false, false, false], checks: [false, false, false]};
 }
 function input(value: unknown, limit: number): string {
   return typeof value === 'string' ? value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, limit) : '';
@@ -151,7 +171,20 @@ export function criteriaReady(config: WorkTrialConfig, state: WorkTrialState): b
 export function secondTaskReady(state: WorkTrialState): boolean {
   return Boolean(state.secondTask.trim()) && normalizeTask(state.secondTask) !== normalizeTask(state.firstTask);
 }
-/** Browser state records only what the visitor explicitly reported, never an AI execution. */
+export function workAnswerReady(state: WorkTrialState, task: 'first' | 'second'): boolean {
+  return task === 'first' ? Boolean(state.firstAnswer?.trim() || state.firstAnswerExample) : Boolean(state.secondAnswer?.trim() || state.secondAnswerExample);
+}
+
+// Null preserves a completed step from older versions that had no answer field.
+function readAnswer(value: unknown, confirmed: boolean): string | null {
+  return confirmed && (value === undefined || value === null) ? null : input(value, WORK_TRIAL_LIMITS.answer);
+}
+
+function readChecks(value: unknown): boolean[] {
+  return [0, 1, 2].map(index => Array.isArray(value) && value[index] === true);
+}
+
+/** Pasted answers and review choices stay in the browser's work-trial state. */
 export function parseWorkTrialState(value: unknown): WorkTrialState {
   const state = initialWorkTrialState();
   if (!value || typeof value !== 'object' || Array.isArray(value)) return state;
@@ -161,27 +194,55 @@ export function parseWorkTrialState(value: unknown): WorkTrialState {
   if (typeof v.copiedRequestId === 'string' && /^[a-z0-9]{1,7}$/.test(v.copiedRequestId)) state.copiedRequestId = v.copiedRequestId;
   state.priority = WORK_TRIAL_PRIORITIES.includes(v.priority as WorkTrialPriority) ? v.priority as WorkTrialPriority : '';
   const ready = hasCriteria(state);
-  state.firstConfirmed = ready && Boolean(state.firstTask.trim()) && v.firstConfirmed === true;
+  const firstSubmitted = ready && Boolean(state.firstTask.trim()) && v.firstConfirmed === true;
+  state.firstAnswer = readAnswer(v.firstAnswer, firstSubmitted);
+  state.firstAnswerExample = v.firstAnswerExample === true;
+  state.firstConfirmed = firstSubmitted && (state.firstAnswer === null || workAnswerReady(state, 'first'));
   state.feedbackConfirmed = state.firstConfirmed && Boolean(state.feedback.trim()) && v.feedbackConfirmed === true;
-  state.secondConfirmed = state.feedbackConfirmed && secondTaskReady(state) && v.secondConfirmed === true;
-  if (state.secondConfirmed && Array.isArray(v.checks)) state.checks = state.checks.map((_, index) => (v.checks as unknown[])[index] === true);
+  const secondSubmitted = state.feedbackConfirmed && secondTaskReady(state) && v.secondConfirmed === true;
+  state.secondAnswer = readAnswer(v.secondAnswer, secondSubmitted);
+  state.secondAnswerExample = v.secondAnswerExample === true;
+  state.secondConfirmed = secondSubmitted && (state.secondAnswer === null || workAnswerReady(state, 'second'));
+  if (workAnswerReady(state, 'first')) state.firstChecks = readChecks(v.firstChecks);
+  if (state.secondConfirmed || workAnswerReady(state, 'second')) state.checks = readChecks(v.checks);
   const allowed = !ready ? 0 : !state.firstConfirmed ? 1 : !state.feedbackConfirmed ? 2 : !state.secondConfirmed ? 3 : 4;
   const requested = typeof v.step === 'number' && Number.isInteger(v.step) && v.step >= 0 && v.step <= 4 ? v.step : 0;
   state.step = Math.min(requested, allowed) as WorkTrialState['step'];
   return state;
 }
-/** Changing a source invalidates its dependent confirmations without discarding the visitor's drafts. */
+/** Keep the work and feedback drafts while dropping answers attached to changed requests. */
 export function updateWorkTrial(state: WorkTrialState, patch: Partial<WorkTrialState>): WorkTrialState {
   const next = {...state, ...patch};
   const changed = (keys: (keyof WorkTrialState)[]) => keys.some(key => Object.hasOwn(patch, key) && patch[key] !== state[key]);
-  if (changed(['role', 'reader', 'priority', 'boundary', 'format'])) {
-    next.firstConfirmed = next.feedbackConfirmed = next.secondConfirmed = false; next.checks = [false, false, false]; next.step = 0;
-  } else if (changed(['firstTask'])) {
-    next.firstConfirmed = next.feedbackConfirmed = next.secondConfirmed = false; next.checks = [false, false, false]; next.step = Math.min(next.step, 1) as WorkTrialState['step'];
-  } else if (changed(['feedback'])) {
-    next.feedbackConfirmed = next.secondConfirmed = false; next.checks = [false, false, false]; next.step = Math.min(next.step, 2) as WorkTrialState['step'];
-  } else if (changed(['secondTask'])) {
-    next.secondConfirmed = false; next.checks = [false, false, false]; next.step = Math.min(next.step, 3) as WorkTrialState['step'];
+  const criteriaChanged = changed(['role', 'reader', 'priority', 'boundary', 'format']);
+  const firstTaskChanged = changed(['firstTask']);
+  const firstReviewChanged = firstTaskChanged || changed(['firstAnswer', 'firstAnswerExample']);
+  const feedbackChanged = changed(['feedback']);
+  const secondTaskChanged = changed(['secondTask']);
+  if (criteriaChanged || firstTaskChanged) {
+    next.firstAnswer = patch.firstAnswer ?? '';
+    next.firstAnswerExample = patch.firstAnswerExample ?? false;
+  }
+  if (criteriaChanged || firstReviewChanged || feedbackChanged || secondTaskChanged) {
+    next.secondAnswer = patch.secondAnswer ?? '';
+    next.secondAnswerExample = patch.secondAnswerExample ?? false;
+  }
+  if (criteriaChanged) {
+    next.firstConfirmed = next.feedbackConfirmed = next.secondConfirmed = false;
+    next.firstChecks = next.checks = readChecks(undefined);
+    next.step = 0;
+  } else if (firstReviewChanged) {
+    next.firstConfirmed = next.feedbackConfirmed = next.secondConfirmed = false;
+    next.firstChecks = next.checks = readChecks(undefined);
+    next.step = Math.min(next.step, 1) as WorkTrialState['step'];
+  } else if (feedbackChanged) {
+    next.feedbackConfirmed = next.secondConfirmed = false;
+    next.checks = readChecks(undefined);
+    next.step = Math.min(next.step, 2) as WorkTrialState['step'];
+  } else if (secondTaskChanged || changed(['secondAnswer', 'secondAnswerExample'])) {
+    next.secondConfirmed = false;
+    next.checks = readChecks(undefined);
+    next.step = Math.min(next.step, 3) as WorkTrialState['step'];
   }
   return parseWorkTrialState(next);
 }

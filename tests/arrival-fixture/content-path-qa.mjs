@@ -34,16 +34,13 @@ for (const {browserType, viewport, mobile} of viewports) {
   const product = dialog.getByRole('textbox', {name:/상품·서비스/});
   const experience = dialog.getByRole('textbox', {name:/어떤 일을 해보셨나요/});
   const createExperience = button('내 첫 콘텐츠 기획 요청문 만들기');
-  const prompt = dialog.getByRole('textbox', {name:'생성한 프롬프트', exact:true});
-  const next = button('AI가 내 일을 기억하는 방법 보기');
+  const prompt = dialog.getByRole('textbox', {name:'생성한 요청문', exact:true});
+  const next = button('회사 업무 기준 보기');
 
   async function openContentDesk() {
     await expect(page.getByRole('region', {name:'현재 목적지', exact:true})).toHaveAttribute('data-walk-station', '3');
     await press(page.locator('#arrival-desk-button'));
-    const open = page.getByRole('button', {name:'내용 열기', exact:true});
-    await expect(open.or(dialog).filter({visible:true}).first()).toBeVisible({timeout:15000});
-    if (!await dialog.isVisible()) await press(open);
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({timeout:15000});
   }
 
   try {
@@ -54,9 +51,10 @@ for (const {browserType, viewport, mobile} of viewports) {
     await expect(productPath).toHaveAttribute('aria-pressed', 'true');
     await expect(product).toHaveValue(legacyProduct);
     await press(button('마스크팩 예시 넣기'));
-    await press(button('프롬프트 만들기'));
+    await press(button('요청문 만들기'));
+    await expect(button('요청문 만들기')).toHaveCount(0);
     const originalProduct = await product.inputValue();
-    const productResult = dialog.getByRole('heading', {name:'내 사업에 적용할 프롬프트가 준비됐어요.'});
+    const productResult = dialog.getByRole('heading', {name:'내 사업에 적용할 요청문이 준비됐어요.'});
     await expect(productResult).toBeVisible();
 
     await press(experiencePath);
@@ -70,14 +68,14 @@ for (const {browserType, viewport, mobile} of viewports) {
     await press(createExperience);
     const experienceResult = dialog.getByRole('heading', {name:'첫 콘텐츠를 기획할 요청문이 준비됐어요.'});
     await expect(experienceResult).toBeFocused();
-    await press(dialog.getByText('프롬프트 보기', {exact:true}));
+    await press(dialog.getByText('요청문 보기', {exact:true}));
     const generated = await prompt.inputValue();
     expect(generated).toContain(example);
     expect(generated).toContain('직접 확인한 게시물 링크와 제목');
     expect(generated).toContain('지어내지 말고 검색어');
     expect(generated).toContain('제목 하나, 첫 문장 하나, 본문에 담을 내용 세 가지');
     expect(generated).not.toContain(originalProduct);
-    await press(button('프롬프트 복사'));
+    await press(button('요청문 복사'));
     await expect(dialog.getByRole('status')).toContainText('복사했어요.');
     expect(await page.evaluate(() => window.copiedContent)).toBe(generated);
 
@@ -89,7 +87,7 @@ for (const {browserType, viewport, mobile} of viewports) {
     await expect(experienceResult).toBeVisible();
     await experience.fill(updatedExample);
     await expect(experienceResult).toHaveCount(0);
-    await expect(button('프롬프트 복사')).toHaveCount(0);
+    await expect(button('요청문 복사')).toHaveCount(0);
     await press(button('복도로 돌아가기'));
     await openContentDesk();
     await expect(experience).toHaveValue(updatedExample);
@@ -104,11 +102,11 @@ for (const {browserType, viewport, mobile} of viewports) {
     await expect(productResult).toBeVisible();
     if (mobile) await product.fill('');
     else await press(experiencePath);
-    await expect(button('프롬프트 복사')).toHaveCount(0);
+    await expect(button('요청문 복사')).toHaveCount(0);
     await expect(next).toBeEnabled();
     await press(next);
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByRole('region', {name:'현재 목적지', exact:true})).toHaveAttribute('data-walk-station', '4');
+    await expect(page.getByRole('dialog', {name:'정본 · 회사 업무 기준', exact:true})).toBeVisible({timeout:15000});
     expect(errors).toEqual([]);
     expect(apiRequests).toEqual([]);
     console.log(JSON.stringify({browser:browserType.name(), viewport, separateDrafts:true, copied:true, continuedWithoutGenerating:true}));

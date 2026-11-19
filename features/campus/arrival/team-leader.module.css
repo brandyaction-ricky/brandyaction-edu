@@ -13,10 +13,12 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
-  min-height: 100%;
-  padding: max(72px, env(safe-area-inset-top)) 16px max(38px, env(safe-area-inset-bottom));
+  block-size: 100%;
+  min-block-size: 320px;
+  padding: max(72px, calc(env(safe-area-inset-top) + 54px)) 16px max(18px, env(safe-area-inset-bottom));
 }
 .scene .back {
   position: absolute;
@@ -61,37 +63,54 @@
   line-height: 1.4;
   text-align: center;
 }
-.screening { inline-size: min(100%, 464px); min-inline-size: 0; animation: fade-in .55s ease-out both; }
-.player { overflow: hidden; border-radius: 12px; background: #0a101b; }
-.picture { position: relative; aspect-ratio: 464 / 560; overflow: hidden; }
-.picture video { position: absolute; top: 50%; left: 0; display: block; inline-size: 100%; block-size: auto; transform: translateY(-50%); }
+.screening {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 9px;
+  inline-size: min(100%, 420px);
+  block-size: 100%;
+  max-block-size: 680px;
+  min-inline-size: 0;
+  animation: fade-in .55s ease-out both;
+}
+.player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0a101b;
+}
+.picture { position: relative; min-block-size: 0; overflow: hidden; }
+.picture video { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+@supports (width: 1cqh) {
+  .picture { container-type: size; }
+  /* The recording includes black margins. Keep the visible conversation legible as the player shrinks. */
+  .picture video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    inline-size: min(100%, 88cqh);
+    block-size: auto;
+    transform: translate(-50%, -47%);
+  }
+}
 .controls { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 2px 4px; }
 .controls button { flex: 0 0 44px; display: grid; place-items: center; block-size: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #fff; }
 .controls button:hover { background: #ffffff24; }
 .controls button:focus-visible { outline-offset: -3px; }
-.controls input { flex: 1 1 auto; min-width: 32px; block-size: 44px; margin: 0 4px; accent-color: #ff666e; }
+.controls input { flex: 1 1 0; min-width: 32px; block-size: 44px; margin: 0 4px; accent-color: #ff666e; }
 .controls span { color: #d9e2ef; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.player:fullscreen { display: grid; grid-template-rows: minmax(0, 1fr) auto; border-radius: 0; background: #000; }
-.player:fullscreen .picture { aspect-ratio: auto; }
-.player:fullscreen video { position: static; block-size: 100%; object-fit: contain; transform: none; }
+.player:fullscreen { border-radius: 0; background: #000; }
+.player:fullscreen video { inset: 0; inline-size: 100%; block-size: 100%; transform: none; }
 .player:fullscreen .controls { width: min(100%, 680px); margin-inline: auto; }
-.next { margin-top: 16px; visibility: hidden; }
-.next[data-available] { visibility: visible; animation: next-in .3s ease-out both; }
-.scene .next p { margin: 0 0 12px; font-size: clamp(16px, 3vw, 20px); font-weight: 650; word-break: keep-all; }
-.scene .error { margin: 10px 0 0; text-align: center; }
+.scene .next p { margin: 0 0 8px; color: #e4ebf5; font-size: 14px; line-height: 1.45; word-break: keep-all; }
 .error button { min-height: 44px; padding: 0 8px; border: 0; background: none; color: inherit; text-decoration: underline; }
-.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes next-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 700px) {
-  .content { padding-bottom: max(23px, env(safe-area-inset-bottom)); }
-  .screening { inline-size: min(100%, 390px); }
+  .screening { inline-size: min(100%, 390px); max-block-size: min(580px, calc(100vw + 160px)); }
   .scene .back { top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); }
 }
-@media (max-width: 700px) and (max-height: 650px) {
-  .picture { max-block-size: max(222px, calc(100dvh - 254px)); }
-  .player:fullscreen .picture { max-block-size: none; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .scene, .screening, .next[data-available] { animation: none; }
+  .scene, .screening { animation: none; }
 }

@@ -14,9 +14,12 @@
 .progress li[aria-current] { color:var(--ink,#161719); border-bottom-color:var(--ba-red,#cf1728); font-weight:700; }
 .progress li[data-complete=true] { color:var(--ink,#161719); }
 .body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:26px 28px 30px; scrollbar-width:thin; scrollbar-color:var(--border-strong,#cfd3d8) transparent; }
+.body.reviewBody { padding-block-start:16px; }
 .intro { margin-bottom:23px; }
 .intro h1 { margin:0; font-size:30px; font-weight:750; line-height:1.4; letter-spacing:-.04em; word-break:keep-all; white-space:pre-line; text-wrap:balance; }
 .panel .intro > p { margin:12px 0 0; font-size:16px; line-height:1.75; color:var(--muted,#626770); word-break:keep-all; }
+.intro.reviewIntro { margin-bottom:14px; }
+.reviewIntro h1 { font-size:24px; }
 .workExample { margin-bottom:12px; border:1px solid var(--line,#e2e5e9); border-radius:8px; background:var(--surface-subtle,#f7f8fa); }
 .workExample > summary { display:flex; align-items:center; gap:9px; min-height:46px; padding:10px 13px; cursor:pointer; list-style:none; font-size:15px; font-weight:700; }
 .workExample > summary::-webkit-details-marker { display:none; }
@@ -30,10 +33,11 @@
 .workExample > p { margin:14px 0 0; padding:12px 14px; border-top:1px solid var(--line,#e2e5e9); }
 .exampleButton { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 13px; color:var(--ink,#161719); border:1px solid var(--border-strong,#cfd3d8); border-radius:7px; background:var(--paper,#fff); margin-bottom:22px; font-weight:600!important; font-size:14px!important; }
 .exampleButton:hover { background:var(--surface-subtle,#f7f8fa); border-color:var(--ink,#161719); }
+.panel .sampleNotice { margin:-9px 0 18px; font-size:14px; color:#215537; line-height:1.6; }
 .fields { display:grid; gap:18px; }
 .fields > label, .feedbackLabel { display:block; min-width:0; }
 .fields label > span, .feedbackLabel > span { display:block; font-size:15px; font-weight:650; margin-bottom:8px; }
-.fields :is(input,textarea),.taskInput,.feedbackLabel textarea,.fallback textarea { display:block; width:100%; max-width:100%; min-width:0; padding:12px 13px; border:1px solid var(--border-strong,#cfd3d8); border-radius:7px; background:var(--paper,#fff); line-height:1.65; box-sizing:border-box; }
+.fields :is(input,textarea),.taskInput,.feedbackLabel textarea,.fallback textarea,.answerField textarea { display:block; width:100%; max-width:100%; min-width:0; padding:12px 13px; border:1px solid var(--border-strong,#cfd3d8); border-radius:7px; background:var(--paper,#fff); line-height:1.65; box-sizing:border-box; }
 .fields input { min-height:48px; }
 .panel textarea { resize:vertical; }
 .panel :is(input,textarea)::placeholder { color:#7c818a; opacity:1; }
@@ -72,6 +76,18 @@
 .aiLinks { display:flex; flex-wrap:wrap; gap:8px; margin-top:11px; }
 .aiLinks a { display:inline-flex; align-items:center; gap:9px; min-height:44px; border:1px solid var(--border-strong,#cfd3d8); border-radius:7px; padding:10px 14px; font-size:15px; color:var(--ink,#161719); text-decoration:none; background:var(--paper,#fff); }
 .aiLinks a:hover { border-color:var(--ba-red,#cf1728); }
+.compactHandoff { margin-bottom:18px; }
+.compactHandoff h2 { margin-bottom:3px; }
+.compactHandoff .aiLinks { margin-top:8px; }
+.answerField { display:block; }
+.answerField > span { display:block; margin:0 0 8px; font-size:16px; font-weight:650; }
+.answerExample,.savedAnswer { margin:0; padding:14px 16px; border:1px solid var(--line,#e2e5e9); border-radius:8px; background:var(--surface-subtle,#f7f8fa); }
+.answerExample h2 { margin:0 0 8px; font-size:15px; }
+.panel .answerExample p,.panel .savedAnswer { font-size:15px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.panel .savedAnswer { margin:0 0 16px; }
+.answerChecks { margin-top:12px; }
+.answerChecks .checks legend { margin-bottom:4px; }
+.answerChecks .checks label { padding-block:8px; font-size:15px; }
 .checks { padding:0; margin:0; border:0; min-width:0; }
 .checks legend { margin-bottom:12px; padding:0; font-size:16px; font-weight:650; }
 .checks label { display:flex; align-items:flex-start; gap:10px; padding:11px 0; border-bottom:1px solid var(--line,#e2e5e9); font-size:16px; line-height:1.7; cursor:pointer; word-break:keep-all; }

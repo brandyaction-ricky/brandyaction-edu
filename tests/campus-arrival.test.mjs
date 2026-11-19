@@ -100,6 +100,7 @@ test('the reusable criteria preserve a personal correction and follow the demons
 test('leaving for a personal AI and returning restores all four draft paths', () => {
   const state = model.initialArrivalState();
   state.step = 3; state.station = 6;
+  state.entryStarted = true;
   state.handoff = 'copied';
   state.audience = 'preparing';
   state.answers.work = {a: '업무 메모', b: '읽는 사람과 목적'};
@@ -131,6 +132,7 @@ test('legacy three-route drafts retain their selected route and answers when wor
   }
   const work = model.initialArrivalState();
   work.step = 3; work.station = 6;
+  work.entryStarted = true;
   work.answers.work = {a: '보고할 메모', b: '팀장에게 진행 상황 공유'};
   assert.deepEqual(model.parseArrivalState(model.serializeArrivalState(work)), work);
 });
@@ -203,6 +205,7 @@ test('the audience selection resumes separately from the welcome introduction wi
   const state = model.initialArrivalState();
   assert.equal(state.step, 0, 'new visitors start with the welcome introduction');
   state.step = 8; state.station = 6;
+  state.entryStarted = true;
   state.audience = 'exploring';
   state.answers.exploring = {a: '동료에게 엑셀 정리를 설명했어요.', b: '엑셀을 처음 쓰는 동료예요.'};
   const restored = model.parseArrivalState(model.serializeArrivalState(state));

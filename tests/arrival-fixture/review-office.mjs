@@ -1,8 +1,8 @@
 import {expect} from '@playwright/test';
 
-const nextDesk = ['콘텐츠 실제 제작해보기', 'AI가 내 일을 기억하는 방법 보기', '웰컴 라운지로 가기'];
+const nextDesk = ['콘텐츠 담당자 열기', '회사 업무 기준 보기', '웰컴 라운지로 가기'];
 
-export const spyActions = ['경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
+export const spyActions = ['첫 요청 보내기', '응, 우리 상품도 확인해줘.', '응, 콘텐츠 담당자에게 전달해줘.'];
 
 export async function finishSpyHandoff(dialog) {
   for (const label of spyActions) {
@@ -31,7 +31,15 @@ export async function finishTeamLeaderVideo(guide) {
 }
 
 export function loungeScheduleButton(page) {
-  return page.getByRole('button', {name: '라이브 일정 보기', exact: true});
+  return page.getByRole('region', {name:'웰컴 라운지에서 할 수 있는 일'}).getByRole('button', {name: '캘린더에 추가', exact: true});
+}
+
+export async function startBusinessCase(page) {
+  const start = page.getByRole('button', {name:'이 상황으로 시작', exact:true});
+  await expect(start).toBeVisible();
+  await page.getByText('이미 사업을 하고 있어요', {exact:true}).click();
+  await start.click();
+  await expect(teamLeaderGuide(page)).toBeVisible({timeout:20000});
 }
 
 export async function openLoungeSchedule(page) {
@@ -43,14 +51,8 @@ export async function openLoungeSchedule(page) {
 // The desktop and mobile clipboard fixtures can use the equivalent HTML entry when WebGL is unavailable.
 export async function finishOfficeReview(page, {walk, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}, enterPersonal = true} = {}) {
   const travel = walk ?? (async station => {
-    const action = page.locator('#arrival-desk-button');
-    await action.click({timeout: 60000});
-    if (station !== 1) {
-      const open = page.getByRole('button', {name: station === 7 ? '웰컴 라운지 입장하기' : '내용 열기', exact: true});
-      const destination = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog');
-      await expect(open.or(destination).filter({visible: true})).toBeVisible({timeout: 20000});
-      if (await open.isVisible()) await open.click();
-    }
+    if (station === 1) await startBusinessCase(page);
+    else await expect(station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true})).toBeVisible({timeout:20000});
   });
   for (const station of [1, 2, 3, 4]) {
     await travel(station);
@@ -74,8 +76,9 @@ export async function finishOfficeReview(page, {walk, inspect = async () => {}, 
     await inspect(station, dialog);
     if (station === 2) await finishSpyHandoff(dialog);
     await beforeLeave(station);
+    const currentName = ['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2];
     await dialog.getByRole('button', {name:nextDesk[station - 2], exact:true}).click();
-    await expect(dialog).not.toBeVisible();
+    await expect(page.getByRole('dialog', {name:currentName, exact:true})).not.toBeVisible();
     await afterLeave(station);
   }
   await travel(7);

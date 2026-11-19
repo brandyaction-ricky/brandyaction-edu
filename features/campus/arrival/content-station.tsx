@@ -57,7 +57,7 @@ export function ContentStation({draft, onDraftChange, onComplete, revisit = fals
 
   function makePrompt(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!eligible) return;
+    if (!eligible || prompt) return;
     changeDraft(productPath ? {requestReady: true} : {experienceRequestReady: true});
     requestAnimationFrame(() => resultHeading.current?.focus());
   }
@@ -75,7 +75,7 @@ export function ContentStation({draft, onDraftChange, onComplete, revisit = fals
   return <div className={styles.station}>
     <div className={styles.chat}>
       <span className={styles.avatar} aria-hidden="true"><MessageSquareText size={17}/></span>
-      <p>경쟁사 스파이에게 받은 내용으로<br/>콘텐츠를 제작했어요!</p>
+      <p>경쟁사 스파이에게 받은 내용을 기존 AI 영상에 자막으로 넣어봤어요.</p>
     </div>
 
     <figure className={styles.example}>
@@ -86,7 +86,7 @@ export function ContentStation({draft, onDraftChange, onComplete, revisit = fals
         <span className={styles.badge}>AI만으로 제작한 영상</span>
         <p className={styles.cue} aria-hidden="true">{captions[caption]}</p>
       </div>
-      <figcaption>가상 상품 사례입니다. 기존 AI 영상에 이번 기획 문구를 적용했어요.</figcaption>
+      <figcaption>가상 상품의 권장 사용 시간 10~15분을 영상 앞부분에 안내했어요.</figcaption>
       <span id={transcriptId} className={styles.visuallyHidden}>무음 영상의 자막. {captions.join(' / ')}</span>
     </figure>
 
@@ -123,30 +123,32 @@ export function ContentStation({draft, onDraftChange, onComplete, revisit = fals
             onChange={event => changeDraft({experience: event.target.value, experienceRequestReady: false})}
             placeholder="예: 직장에서 신입 교육을 많이 맡아 하고 있어요"/>
         </label>}
-        <button className={styles.primary} type="submit" disabled={!eligible}>
-          {productPath ? '프롬프트 만들기' : '내 첫 콘텐츠 기획 요청문 만들기'}<ArrowRight size={16} aria-hidden="true"/>
-        </button>
+        {!prompt && <button className={styles.primary} type="submit" disabled={!eligible}>
+          {productPath ? '요청문 만들기' : '내 첫 콘텐츠 기획 요청문 만들기'}<ArrowRight size={16} aria-hidden="true"/>
+        </button>}
       </form>
       {prompt && <div className={styles.result} key={path}>
-        <h4 ref={resultHeading} tabIndex={-1}>{productPath ? '내 사업에 적용할 프롬프트가 준비됐어요.' : '첫 콘텐츠를 기획할 요청문이 준비됐어요.'}</h4>
+        <h4 ref={resultHeading} tabIndex={-1}>{productPath ? '내 사업에 적용할 요청문이 준비됐어요.' : '첫 콘텐츠를 기획할 요청문이 준비됐어요.'}</h4>
         <p>요청문을 복사해 평소 쓰는 AI의 새 대화에 붙여넣으세요.</p>
-        <button className={styles.primary} type="button" onClick={() => void copyPrompt()}><Copy size={16} aria-hidden="true"/>프롬프트 복사</button>
+        <button className={styles.primary} type="button" onClick={() => void copyPrompt()}><Copy size={16} aria-hidden="true"/>요청문 복사</button>
         <p className={styles.status} role="status">{copy === 'copied' ? '복사했어요. 아래에서 AI를 열 수 있어요.' : copy === 'manual' ? '아래 요청문을 직접 복사해 주세요.' : ''}</p>
         <div className={styles.aiLinks}>
           <a href="https://chatgpt.com/" target="_blank" rel="noreferrer">ChatGPT 열기<ArrowUpRight size={14} aria-hidden="true"/></a>
           <a href="https://claude.ai/new" target="_blank" rel="noreferrer">Claude 열기<ArrowUpRight size={14} aria-hidden="true"/></a>
         </div>
         <details className={styles.text} ref={details}>
-          <summary>프롬프트 보기<ChevronDown size={16} aria-hidden="true"/></summary>
-          <textarea aria-label="생성한 프롬프트" readOnly ref={promptText} value={prompt} rows={9} spellCheck={false}/>
+          <summary>요청문 보기<ChevronDown size={16} aria-hidden="true"/></summary>
+          <textarea aria-label="생성한 요청문" readOnly ref={promptText} value={prompt} rows={9} spellCheck={false}/>
         </details>
       </div>}
     </section>
 
     <section className={styles.bridge}>
-      <h3>서로 다른 AI 직원이 같은 기준으로 일하려면?</h3>
-      <p>조사와 제작을 맡은 직원 모두 같은 상품 사용 가이드를 봤어요. 다음 장소에서 회사 기준 하나가 두 직원의 답을 어떻게 바꾸는지 확인해 보세요.</p>
-      <button className={styles.primary} type="button" onClick={onComplete}>{revisit ? '자료 목록으로 돌아가기' : 'AI가 내 일을 기억하는 방법 보기'}<ArrowRight size={16} aria-hidden="true"/></button>
+      {!revisit && <>
+        <p className={styles.stop}>다음 · 4번째 정거장</p>
+        <h3>두 AI 직원이 같은 기준으로 일하는 이유</h3>
+      </>}
+      <button className={styles.bridgelink} type="button" onClick={onComplete}>{revisit ? '자료 목록으로 돌아가기' : '회사 업무 기준 보기'}<ArrowRight size={16} aria-hidden="true"/></button>
     </section>
   </div>;
 }

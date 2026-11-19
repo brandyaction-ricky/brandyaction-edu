@@ -1,5 +1,5 @@
 import {useId, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
+import {ArrowLeft, ArrowRight, CalendarDays, Download, ExternalLink, LockKeyhole, Play} from 'lucide-react';
 import {youtubeVideoId} from '../webinar/resources';
 import type {ArrivalConfig} from './config';
 import monitor from './office-demo.module.css';
@@ -18,13 +18,15 @@ function MaterialCover({id}: {id: 'ad' | 'guide' | 'blueprint'}) {
   return <img className={styles.cover} src={`/campus/arrival/material-${id}.webp`} width={480} height={270} alt="" loading={id === 'blueprint' ? 'eager' : 'lazy'} decoding="async"/>;
 }
 
-export function OnboardingProgram({guide, config, dateLabel, onContentReplay, onClose, onOpenMaterials}: {
+export function OnboardingProgram({guide, config, dateLabel, timeLabel, onContentReplay, onClose, onOpenMaterials, onOpenSchedule}: {
   guide: OnboardingGuide;
   config: ArrivalConfig;
   dateLabel: string;
+  timeLabel: string;
   onContentReplay: () => void;
   onClose: () => void;
   onOpenMaterials: () => void;
+  onOpenSchedule: () => void;
 }) {
   const [materialsTab, setMaterialsTab] = useState<'free' | 'bonus'>('free');
   const [playGreeting, setPlayGreeting] = useState(false);
@@ -69,13 +71,14 @@ export function OnboardingProgram({guide, config, dateLabel, onContentReplay, on
           </div>
           {config.handoutLabel && config.handoutUrl && <div className={styles.more}><a href={config.handoutUrl} target="_blank" rel="noopener noreferrer">{config.handoutLabel}<ExternalLink size={15} aria-hidden="true"/></a></div>}
         </> : <>
-          <p className={styles.lockNote}><LockKeyhole size={17} aria-hidden="true"/>{dateLabel} 라이브에서 비밀번호를 공개합니다.</p>
+          <p className={styles.lockNote}><LockKeyhole size={17} aria-hidden="true"/>{dateLabel} {timeLabel} 라이브에서 비밀번호를 공개합니다.</p>
           <ul className={styles.bonuses}>
             <li>내 사업에 딱 맞춘 AI 활용 리포트</li>
             <li>메타 × 클로드 세팅 가이드</li>
             <li>Garry Tan Skills 자료</li>
           </ul>
           {config.bonusPreview && <p>{config.bonusPreview}</p>}
+          <button type="button" className={styles.guideButton} onClick={onOpenSchedule}><CalendarDays size={16} aria-hidden="true"/>캘린더에 추가</button>
         </>}
       </section> : <section>
         {greeting && <section className={styles.greeting} aria-label="퇴사선배 윤익의 인사 영상">

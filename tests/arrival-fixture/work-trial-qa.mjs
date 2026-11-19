@@ -1,4 +1,4 @@
-import {finishOfficeReview, openLoungeSchedule} from './review-office.mjs';
+import {openLoungeSchedule} from './review-office.mjs';
 import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -9,10 +9,27 @@ await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true});
 const results=[];
 try {
-for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:390,height:844}]]){
+for(const [name,viewport] of [['pc',{width:1440,height:723}],['mobile',{width:390,height:844}]]){
   const context=await browser.newContext({viewport,hasTouch:name==='mobile',isMobile:name==='mobile',permissions:['clipboard-read','clipboard-write'],deviceScaleFactor:1});
-  const page=await context.newPage(); const errors=[]; const api=[];
-  page.on('pageerror',e=>errors.push(e.message)); page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))api.push(r.url());});
+  const page=await context.newPage(); const errors=[]; const api=[]; const outboundAnswers=[];
+  const firstAnswer='로컬 검수 전용 첫 답변 813572';
+  const secondAnswer='로컬 검수 전용 두 번째 답변 260874';
+  page.on('pageerror',e=>errors.push(e.message));
+  page.on('request',request=>{
+    if(new URL(request.url()).pathname.startsWith('/api/'))api.push(request.url());
+    const requestText = [decodeURI(request.url()), request.postData(), ...Object.values(request.headers())].join(' ');
+    if ([firstAnswer, secondAnswer].some(answer => requestText.includes(answer))) outboundAnswers.push(request.url());
+  });
+  const button = name => page.getByRole('button', {name, exact:true});
+  const answerInput = page.getByRole('textbox', {name:'받은 답변을 여기에 붙여넣기', exact:true});
+  async function startWork() {
+    const choices = page.getByRole('region', {name:'문샷 웰컴존 소개'}).getByRole('radio');
+    await expect(choices).toHaveCount(4);
+    await expect(button('이 상황으로 시작')).toBeDisabled();
+    await page.getByText('회사 업무에 AI를 써보고 싶어요',{exact:true}).click();
+    await button('이 상황으로 시작').click();
+    await expect(page.getByRole('textbox', {name:'AI 직원에게 어떤 일을 맡길까요?',exact:true})).toBeVisible();
+  }
   async function capture(stage){
     await page.locator('[data-work-step]').waitFor({state:'visible'});
     await page.evaluate(()=>document.fonts.ready);
@@ -21,13 +38,8 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
   }
   try {
     await page.goto(base+path,{waitUntil:'domcontentloaded'});
-    await finishOfficeReview(page);
-    const choices=page.getByLabel('내 상황에 맞는 체험 선택').getByRole('button');
-    await expect(choices).toHaveCount(4);
-    const sizes=await choices.evaluateAll(nodes=>nodes.map(node=>[node.offsetWidth,node.offsetHeight]));
-    expect(sizes.every(([width,height])=>width===sizes[0][0]&&height===sizes[0][1])).toBe(true);
     await page.screenshot({path:resolve(out,`${name}-audiences.png`)});
-    await page.getByRole('button',{name:/회사 업무에 AI를 써보고 싶어요/}).click();
+    await startWork();
     const step=page.locator('[data-work-step]');
     await expect(step).toHaveAttribute('data-work-step','0');
     const example=page.getByText('작성 없이 결과 예시 보기',{exact:true});
@@ -38,6 +50,7 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
     await capture('worked-example');
     await example.click();
     await page.getByRole('button',{name:'예시 업무로 시작',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'예시 업무 기준을 채웠어요'})).toBeVisible();
     await page.getByRole('radio',{name:'꼭 끝낼 일과 조정할 일부터'}).check();
     await capture('criteria');
     await page.getByRole('button',{name:'이 기준으로 첫 업무 맡기기',exact:true}).click();
@@ -46,7 +59,16 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
     const first=await page.evaluate(()=>navigator.clipboard.readText());
     expect(first).toContain('신입 동료 안내자료');expect(first).toContain('범위를 조정');
     expect(first).not.toContain('[피드백으로 보완한 기준]');
-    await page.getByRole('button',{name:'첫 답변을 받았어요',exact:true}).click();
+    await expect(button('이 답변으로 피드백하기')).toBeDisabled();
+    await expect(answerInput).toHaveAttribute('maxlength','4000');
+    await answerInput.fill(firstAnswer);
+    await page.getByRole('checkbox').nth(0).check();
+    await page.getByRole('checkbox').nth(1).check();
+    await capture('first-answer-review');
+    await expect(page.getByRole('checkbox').nth(2)).toBeInViewport({ratio:0.95});
+    await expect(button('이 답변으로 피드백하기')).toBeInViewport({ratio:0.95});
+    await button('이 답변으로 피드백하기').click();
+    await expect(page.getByRole('textbox',{name:'내 말로 수정하기',exact:true})).toHaveValue('다음에 할 일을 바로 실행할 수 있는 문장으로 적어줘.');
     await page.getByRole('textbox',{name:'내 말로 수정하기',exact:true}).fill('결정할 사항마다 선택지와 추가로 확인할 정보를 함께 보여줘. 확정된 사실과 제안을 구분해줘.');
     await capture('feedback');
     await page.getByRole('button',{name:'피드백 반영 요청 복사',exact:true}).click();
@@ -65,7 +87,11 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
     const reused=await page.evaluate(()=>navigator.clipboard.readText());
     expect(reused).toContain('선택지와 추가로 확인할 정보');expect(reused).toContain('워크숍');expect(reused).not.toContain('신입 동료 안내자료');
     await capture('reuse');
-    await page.getByRole('button',{name:'두 번째 답변을 받았어요',exact:true}).click();
+    await expect(button('답변 검토 마치기')).toBeDisabled();
+    await answerInput.fill(secondAnswer);
+    await page.reload({waitUntil:'domcontentloaded'});
+    await expect(answerInput).toHaveValue(secondAnswer);
+    await button('답변 검토 마치기').click();
     await page.getByText('두 번째 답변에서 기준이 지켜졌는지 확인하기',{exact:true}).click();
     await page.getByRole('checkbox').first().check();
     await page.getByRole('button',{name:'매뉴얼 복사',exact:true}).click();
@@ -83,15 +109,28 @@ for(const [name,viewport] of [['pc',{width:1440,height:1000}],['mobile',{width:3
     await page.getByRole('button',{name:'라이브에서 이어서 배우기',exact:true}).click();
     await openLoungeSchedule(page);
     expect(await page.getByRole('link',{name:/Google 캘린더/}).getAttribute('href')).toContain('20261207T120000Z');
-    await page.getByRole('button',{name:'내 AI 체험으로 돌아가기',exact:true}).click();await expect(step).toHaveAttribute('data-work-step','4');
+    await button('내 AI 체험으로 돌아가기').filter({visible:true}).first().click();await expect(step).toHaveAttribute('data-work-step','4');
     await page.getByText('두 번째 답변에서 기준이 지켜졌는지 확인하기',{exact:true}).click();
     await page.getByRole('button',{name:'피드백을 보완하고 다시 해보기',exact:true}).click();await expect(step).toHaveAttribute('data-work-step','2');
     await page.getByRole('textbox',{name:'내 말로 수정하기',exact:true}).fill('불확실한 내용은 먼저 확인해줘.');
     await page.reload({waitUntil:'domcontentloaded'});await expect(step).toHaveAttribute('data-work-step','2');
     const persisted=await page.evaluate(()=>Object.keys(localStorage).map(k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}}).find(v=>v?.workTrial).workTrial);
     expect(persisted.secondConfirmed).toBe(false);expect(persisted.checks).toEqual([false,false,false]);
-    expect(errors).toEqual([]);expect(api).toEqual([]);
-    results.push({device:name,viewport,passed:true,copyFirst:first.length,copyFeedback:updated.length,copyReuse:reused.length,manual:manual.length,apiRequests:api.length,errors,download:download.suggestedFilename()});
+    expect(persisted.firstAnswer).toBe(firstAnswer);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({waitUntil:'domcontentloaded'});
+    await startWork();
+    await button('예시 업무로 시작').click();
+    await button('이 기준으로 첫 업무 맡기기').click();
+    await button('예시 답변으로 계속').click();
+    await expect(page.getByRole('heading',{name:'체험용 예시 답변',exact:true})).toBeVisible();
+    await button('이 답변으로 피드백하기').click();
+    await button('예시로 다음 업무 계속하기').click();
+    await button('예시 답변으로 계속').click();
+    await button('답변 검토 마치기').click();
+    await expect(step).toHaveAttribute('data-work-step','4');
+    expect(errors).toEqual([]);expect(api).toEqual([]);expect(outboundAnswers).toEqual([]);
+    results.push({device:name,viewport,passed:true,workEntryClicks:2,examplePath:true,copyFirst:first.length,copyFeedback:updated.length,copyReuse:reused.length,manual:manual.length,apiRequests:api.length,outboundAnswers:outboundAnswers.length,errors,download:download.suggestedFilename()});
   } catch(e){await page.screenshot({path:resolve(out,`${name}-failure.png`)});throw e;}
   finally{await context.close();}
 }

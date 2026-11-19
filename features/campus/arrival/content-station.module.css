@@ -62,7 +62,12 @@
 .aiLinks a:hover { border-color: var(--ba-info, #315e8b); }
 .text { min-width: 0; border-top: 1px solid var(--line, #e2e5e9); }
 .station .text textarea { margin: 0; font-size: 14px; }
-.bridge .primary { margin-top: 11px; }
+.bridge .stop { margin-bottom: 4px; font-size: 13px; }
+.bridge .bridgelink {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 4px 0;
+  border: 0; background: transparent; color: #173b69; font-size: 14px; font-weight: 700;
+}
+.bridge .bridgelink:hover { text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 440px) {
   .station { gap: 20px; }
   .example { margin: -10px 0 0 0; }

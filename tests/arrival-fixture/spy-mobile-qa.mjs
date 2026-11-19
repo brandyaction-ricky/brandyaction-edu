@@ -24,9 +24,12 @@ for (const {name, engine, viewport, mobile} of devices) {
   const walk = frame.locator('#walk');
   const floor = frame.locator('#floor');
   const dialog = page.getByRole('dialog', {name: '경쟁사 스파이'});
+  const openSpy = frame.getByRole('button', {name: '경쟁사 스파이 열기', exact: true});
   const transcript = dialog.getByRole('region', {name: '경쟁사 스파이와 나눈 대화'});
   const reply = transcript.locator('[data-spy-reply]');
   const action = index => button(dialog, spyActions[index]);
+  const firstRequest = dialog.getByRole('textbox', {name: '경쟁사 스파이에게 보낼 첫 요청', exact: true});
+  const requestText = '내 상품인 여행용 물병을 비교해 고칠 점을 찾아줘.';
   const close = button(dialog, '복도로 돌아가기');
   const position = () => walk.evaluate(node => [Number(node.dataset.playerX), Number(node.dataset.playerZ)]);
   const distanceFrom = async ([oldX, oldZ]) => {
@@ -56,11 +59,21 @@ for (const {name, engine, viewport, mobile} of devices) {
     await page.goto(url.href);
     await expect(walk).toHaveAttribute('data-ready', 'true', {timeout: 30_000});
     await expect(walk).toHaveAttribute('data-station', '2');
-    await tap(frame.getByRole('button', {name: /쪽으로 걷기/}));
-    await tap(frame.getByRole('button', {name: /열기$/}));
+    await tap(openSpy);
     await expect(dialog).toBeVisible();
     await expect(close).toBeInViewport({ratio: 0.95});
     await expect(action(0)).toBeInViewport({ratio: 0.95});
+    await expect(firstRequest).toHaveAttribute('maxlength', '120');
+    await firstRequest.fill('');
+    await expect(action(0)).toBeDisabled();
+    await tap(button(dialog, '내 상품 이름 넣기'));
+    await expect(firstRequest).toHaveValue(/\[내 상품 이름\]/);
+    await expect(action(0)).toBeDisabled();
+    await tap(button(dialog, '다른 내용 요청하기'));
+    await expect(firstRequest).toHaveValue('경쟁사 리뷰에서 고객이 가장 불편해한 점을 찾아줘.');
+    await tap(button(dialog, '예시 그대로'));
+    await expect(firstRequest).toHaveValue('경쟁사 조사해서 우리 상품에 보완할 거 찾아줘.');
+    await firstRequest.fill(requestText);
     const panel = await dialog.boundingBox();
     expect(panel.height).toBeGreaterThan(250);
     expect(panel.y).toBeGreaterThanOrEqual(0);
@@ -83,7 +96,9 @@ for (const {name, engine, viewport, mobile} of devices) {
     });
     await tap(action(0));
     await expect(reply).toHaveCount(3);
-    await expect(reply.nth(0)).toContainText('경쟁사 3곳을 조사했어요!');
+    await expect(reply.nth(0)).toContainText('경쟁사 리뷰를 살펴봤어요.');
+    await expect(reply.nth(0)).toContainText('답변은 마스크팩 예시로 보여드려요.');
+    await expect(transcript).toContainText(requestText);
     await expect(reply.nth(1).getByRole('article')).toHaveCount(2);
     await expect(reply.nth(2)).toContainText('두 리뷰에');
     const batches = await page.evaluate(() => window.spyReplyBatches);
@@ -130,10 +145,10 @@ for (const {name, engine, viewport, mobile} of devices) {
     await expect(walk).toHaveAttribute('data-near-desk', 'false');
     await expect(dialog).not.toBeVisible();
     await capture('spy-corridor');
-    await tap(frame.getByRole('button', {name: /쪽으로 걷기/}));
-    await tap(frame.getByRole('button', {name: /열기$/}));
+    await tap(openSpy);
     await expect(dialog).toBeVisible();
     await expect(action(0)).toHaveCount(0);
+    await expect(transcript).toContainText(requestText);
     await expect(action(2)).toBeInViewport({ratio: 0.95});
     await expect.poll(async () => (await scrollPosition()).remaining).toBeLessThan(16);
     if (!mobile) {

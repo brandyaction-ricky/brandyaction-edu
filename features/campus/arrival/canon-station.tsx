@@ -55,7 +55,7 @@ const outputs = [
 
 function Exchange({request, reply}: {request: string; reply: string}) {
   return <div className={styles.exchange}>
-    <p className={styles.request}><strong>내가 알려준 내용</strong>{request}</p>
+    <p className={styles.request}><strong>예시로 알려준 기준</strong>{request}</p>
     <p className={styles.reply}><strong><Bot size={17} aria-hidden="true"/>정본에 반영한 내용</strong>{reply}</p>
   </div>;
 }
@@ -91,8 +91,8 @@ export function CanonStation({phase, onAdvance, onHall}: {
   return <div className={`${monitor.body} ${styles.body}`}>
     <header className={styles.intro}>
       <h1>AI들이 이렇게 일할 수 있는 이유는 정본에 있습니다.</h1>
-      <p>AI가 회사에 대한 지식을 스스로 정리합니다.</p>
-      <p>대화와 피드백으로 배우고, 바뀐 내용은 다음 업무의 기준이 됩니다.</p>
+      <p>정본은 AI 직원들이 함께 읽는 회사 업무 기준 문서예요.</p>
+      <p>대화에서 알려준 기준을 정리해 다음 업무에도 활용해요.</p>
     </header>
     <div className={styles.layout}>
       <section className={styles.map} aria-labelledby={mapHeading} aria-describedby={mapHint}>
@@ -139,7 +139,21 @@ export function CanonStation({phase, onAdvance, onHall}: {
           {history.slice(0, -1).map(exchange => <Exchange key={exchange.phase} request={exchange.request} reply={exchange.reply}/>)}
         </details>}
         {phase === 3 && <section className={styles.results} aria-label="같은 기준을 활용한 업무 결과">
-          <h3 ref={resultsHeading} tabIndex={-1}>같은 기준을 읽은 두 직원의 결과</h3>
+          <h3 ref={resultsHeading} tabIndex={-1}>같은 질문에 답이 어떻게 달라질까요?</h3>
+          <p className={styles.customerQuestion}>“팩 붙이고 자도 되나요?” <span>체험용 예시</span></p>
+          <div className={styles.comparison}>
+            <div className={styles.withoutCanon}>
+              <h4>정본 없이 답할 때</h4>
+              <p>“오래 붙일수록 보습에 좋다고 해요.”</p>
+              <small>제품의 사용법을 확인하지 않고 후기의 오해를 옮겼어요.</small>
+            </div>
+            <div className={styles.withCanon}>
+              <h4>정본을 읽고 답할 때</h4>
+              <p>“붙인 채로 잠들지 마세요. 이 팩은 10~15분 뒤 떼어내 주세요.”</p>
+              <small>우리 제품의 사용 시간을 먼저 알려줘요.</small>
+            </div>
+          </div>
+          <h3>같은 기준을 읽은 두 직원의 결과</h3>
           {outputs.map(output => <article key={output.name} className={styles.result}>
             <h4>{output.name}</h4>
             <p>{output.text}</p>
