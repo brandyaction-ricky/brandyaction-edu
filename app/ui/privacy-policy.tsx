@@ -22,7 +22,7 @@ export function PrivacyPolicy({ version }: { version?: string }) {
     <div className="privacy-policy-copy">
       {!version && <section className="reading-copy privacy-policy-section" id="moonshot-live-reminder" aria-labelledby="moonshot-live-reminder-title">
         <h2 id="moonshot-live-reminder-title">문샷 무료 라이브 문자 알림</h2>
-        <p>이용자가 수신에 동의하면 휴대폰 번호를 문샷 무료 라이브 안내 문자 발송에만 사용합니다. 신청 시 동의 일시와 동의 문구 버전도 함께 기록합니다.</p>
+        <p>이용자가 수신에 동의하면 휴대폰 번호를 문샷 무료 라이브 안내 문자 발송에만 사용합니다. 본 라이브 참여 안내 1회와 앵콜 라이브 참여 안내 1회를 합해 최대 2회 발송합니다. 신청 시 동의 일시와 동의 문구 버전도 함께 기록합니다.</p>
         <p>브랜디액션은 신청 정보를 {arrivalLiveReminderRetentionLabel}에 파기합니다.</p>
         <p>문자 알림 신청은 선택입니다. 신청하지 않아도 체험과 무료 라이브에 참여할 수 있습니다.</p>
       </section>}

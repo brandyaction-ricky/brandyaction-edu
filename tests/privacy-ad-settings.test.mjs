@@ -111,8 +111,9 @@ test('the archived page keeps the original text after the active policy is repla
   assert.match(current, /새로 적용된 방침/);
   const [reminder, outsourcing] = current.split('5. 개인정보 처리업무의 위탁');
   assert.match(reminder, /휴대폰 번호를 문샷 무료 라이브 안내 문자 발송에만 사용/);
+  assert.match(reminder, /본 라이브 참여 안내 1회와 앵콜 라이브 참여 안내 1회를 합해 최대 2회/);
   assert.match(reminder, /2026년 12월 10일 오후 11시 59분\(한국 시간\)\s*에 파기/);
-  assert.doesNotMatch(reminder, /\d+회|솔라피/);
+  assert.doesNotMatch(reminder, /솔라피/);
   assert.match(outsourcing, /문샷 무료 라이브 안내 문자 발송은 솔라피 주식회사에 위탁/);
   assert.match(outsourcing, /수신번호를 포함한 발송 기록을 발송일로부터 1년간 보관/);
   assert.doesNotMatch(archived, /새로 적용된 방침/);
