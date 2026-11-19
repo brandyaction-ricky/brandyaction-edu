@@ -1,3 +1,4 @@
+import {ARRIVAL_CALENDAR_FILE} from '../../features/campus/arrival/model';
 import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {WebinarAdmin} from '../../features/campus/webinar/admin';
@@ -56,5 +57,5 @@ createRoot(document.getElementById('root')!).render(
   path === '/frame' ? <Frame/> :
   path === '/webinar-admin' || path === '/admin/campus/webinars' ? <><div style={{background: '#fff2d5', color: '#6c4a15', padding: 12, textAlign: 'center', fontFamily: 'var(--font-sans, sans-serif)'}}>로컬 합성 QA · 저장은 이 서버 메모리에만 반영됩니다. 실제 행사·수강생·DB는 변경하지 않습니다.</div><WebinarAdmin/></> :
   path === '/saved-preview' || path === '/experience/moonshot' && params.has('event') ? <SavedPreview/> :
-  <ArrivalExperience config={DEFAULT_ARRIVAL} persistenceKey="moonshot:arrival:synthetic-local-qa:v1"/>,
+  <ArrivalExperience config={DEFAULT_ARRIVAL} persistenceKey="moonshot:arrival:synthetic-local-qa:v1" calendarFileHref={ARRIVAL_CALENDAR_FILE}/>,
 );

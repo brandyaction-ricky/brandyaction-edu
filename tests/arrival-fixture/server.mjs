@@ -27,10 +27,10 @@ await browserBuild.rebuild();
 await browserBuild.watch();
 
 const modules = await build({
-  stdin: {contents: `export {config as baseEvent} from './tests/webinar-fixture/data'; export {DEFAULT_WELCOME} from './features/campus/welcome/content'; export {DEFAULT_ARRIVAL,validateArrivalConfig} from './features/campus/arrival/config'; export {validateWebinar} from './features/campus/webinar/domain';`, resolveDir: root, loader: 'ts'},
+  stdin: {contents: `export {config as baseEvent} from './tests/webinar-fixture/data'; export {DEFAULT_WELCOME} from './features/campus/welcome/content'; export {DEFAULT_ARRIVAL,validateArrivalConfig} from './features/campus/arrival/config'; export {validateWebinar} from './features/campus/webinar/domain'; export {GET as downloadCalendar} from './app/experience/moonshot/live.ics/route'; export {ARRIVAL_CALENDAR_FILE} from './features/campus/arrival/model';`, resolveDir: root, loader: 'ts'},
   bundle: true, write: false, format: 'esm', platform: 'node',
 });
-const {baseEvent, DEFAULT_WELCOME, DEFAULT_ARRIVAL, validateArrivalConfig, validateWebinar} = await import('data:text/javascript;base64,' + Buffer.from(modules.outputFiles[0].contents).toString('base64'));
+const {baseEvent, DEFAULT_WELCOME, DEFAULT_ARRIVAL, validateArrivalConfig, validateWebinar, downloadCalendar, ARRIVAL_CALENDAR_FILE} = await import('data:text/javascript;base64,' + Buffer.from(modules.outputFiles[0].contents).toString('base64'));
 const seed = validateWebinar({
   ...baseEvent, slug: 'arrival-synthetic-qa', title: '[합성 QA] 모집 무료 체험', status: 'draft',
   startsAt: '2026-12-07T12:00:00.000Z', endsAt: '2026-12-07T14:00:00.000Z',
@@ -73,6 +73,12 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/api/')) return reply(res, 503, {error: '이 로컬 검수에는 실제 서버 연결이 없습니다.'});
     if (req.method !== 'GET' && req.method !== 'HEAD') return reply(res, 405, {error: '읽기 전용 검수 파일입니다.'});
+    if (url.pathname === ARRIVAL_CALENDAR_FILE) {
+      const calendar = downloadCalendar();
+      res.writeHead(calendar.status, Object.fromEntries(calendar.headers));
+      res.end(req.method === 'HEAD' ? undefined : await calendar.text());
+      return;
+    }
     if (assets.has(url.pathname)) {res.setHeader('Content-Type', mime[extname(url.pathname)] || 'application/octet-stream'); res.end(req.method === 'HEAD' ? undefined : assets.get(url.pathname)); return;}
     if (url.pathname.startsWith('/campus/') || url.pathname === '/brandy-action-logo.png') {
       const publicRoot = resolve(root, 'public'), path = resolve(publicRoot, '.' + decodeURIComponent(url.pathname));

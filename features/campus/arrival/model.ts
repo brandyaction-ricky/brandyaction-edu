@@ -4,6 +4,7 @@ import {OFFICE_DEMO_LIMITS, type OfficeDemoChoice, type OfficeDemoPhase} from '.
 import {DEFAULT_VISITOR_AVATAR, isVisitorAvatarId, type VisitorAvatarId} from './visitor-avatar-options';
 import {initialWorkTrialState, parseWorkTrialState, type WorkTrialState} from './work-trial';
 
+export const ARRIVAL_CALENDAR_FILE = '/experience/moonshot/live.ics';
 export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
 // JSON can use six characters to escape one stored UTF-16 code unit.
@@ -224,8 +225,9 @@ export function calendarReady(event: LiveEvent): boolean { return validCalendarE
 export function googleCalendarUrl(event: LiveEvent): string | null {
   const checked = validCalendarEvent(event);
   if (!checked) return null;
-  // Without an end, this is a start reminder rather than an invented event duration.
-  const params = new URLSearchParams({action: 'TEMPLATE', text: event.title, dates: `${calendarTime(checked.start)}/${calendarTime(checked.end ?? checked.start)}`, stz: event.timeZone, etz: event.timeZone, details: event.description + (checked.url ? `\n\n라이브 안내: ${checked.url.href}` : '')});
+  // Google's form takes a start and an end. Use a one-minute slot for an unconfirmed end.
+  const reminderEnd = checked.end ?? new Date(checked.start.getTime() + 60_000);
+  const params = new URLSearchParams({action: 'TEMPLATE', text: event.title, dates: `${calendarTime(checked.start)}/${calendarTime(reminderEnd)}`, stz: event.timeZone, etz: event.timeZone, details: event.description + (checked.url ? `\n\n라이브 안내: ${checked.url.href}` : '')});
   if (checked.url) params.set('location', checked.url.href);
   return `https://calendar.google.com/calendar/r/eventedit?${params.toString()}`;
 }

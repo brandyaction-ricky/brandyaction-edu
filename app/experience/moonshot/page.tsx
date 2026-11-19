@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import {notFound} from 'next/navigation';
+import {ARRIVAL_CALENDAR_FILE} from '@/features/campus/arrival/model';
 import {ArrivalExperience} from '@/features/campus/arrival/experience';
 import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
@@ -27,5 +28,5 @@ export default async function Page({searchParams}: {searchParams: Promise<Record
     if (!webinar?.arrival) notFound();
     return <ArrivalExperience config={webinar.arrival} persistenceKey={null} preview/>;
   }
-  return <ArrivalExperience/>;
+  return <ArrivalExperience calendarFileHref={ARRIVAL_CALENDAR_FILE}/>;
 }

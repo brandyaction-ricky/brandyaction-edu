@@ -191,7 +191,7 @@ test('calendar uses edited Korean date and time, stable campaign UID and no made
   assert.ok(edited.description.includes('1월 4일'));
   assert.equal(model.calendarReady(edited), true);
   const google = new URL(model.googleCalendarUrl(edited));
-  assert.equal(google.searchParams.get('dates'), '20270103T163000Z/20270103T163000Z');
+  assert.equal(google.searchParams.get('dates'), '20270103T163000Z/20270103T163100Z');
   assert.equal(google.searchParams.get('location'), 'https://example.com/live');
 });
 

@@ -53,7 +53,9 @@ function LiveCountdown({date, className}: {date: string; className: string}) {
   return label ? <span className={className}>{label}</span> : null;
 }
 
-export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false}: {config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean}) {
+export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, calendarFileHref}: {
+  config?: ArrivalConfig; persistenceKey?: string | null; preview?: boolean; embedded?: boolean; calendarFileHref?: string;
+}) {
   const [savedState, setState] = useState<ArrivalState>(initialArrivalState);
   const caseRevision = officeCaseRevision(config.officeDemo ?? DEFAULT_OFFICE_DEMO);
   const state = useMemo(() => reconcileArrivalOfficeCase(savedState, caseRevision), [savedState, caseRevision]);
@@ -403,9 +405,13 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     const text = calendarIcs(event);
     if (!text) return;
     const url = URL.createObjectURL(new Blob([text], {type: 'text/calendar;charset=utf-8'}));
-    const a = document.createElement('a'); a.href = url; a.download = `moonshot-live-${event.date.replaceAll('-', '')}.ics`; a.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `moonshot-live-${event.date.replaceAll('-', '')}.ics`;
+    document.body.append(a);
+    a.click();
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    setNotice('일정 파일을 열고 ‘추가’를 누르세요. 카톡에서 파일이 안 열리면 Safari로 이 페이지를 열어주세요.');
   }
   function reset() {
     if (menu.current) menu.current.open = false;
@@ -575,8 +581,15 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 5 && <button type="button" className={s.primary} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={18}/></button>}
         {step === 7 && <div className={s.calendarActions}>
           <p className={s.calendarHint}>캘린더에 일정 추가</p>
-          <div className={s.calendarButtons}>{calendarLink && <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => setNotice('Google 캘린더에서 ‘저장’을 눌러주세요.')}><CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/></a>}<button type="button" onClick={saveCalendar}><CalendarDays size={16} aria-hidden="true"/>아이폰·기타 캘린더<ArrowRight size={14} aria-hidden="true"/></button></div>
-          <p className={s.calendarInstruction} role="status">{notice || (config.endsAt ? '캘린더에서 ‘저장’ 또는 ‘추가’를 누르면 완료돼요.' : '시작 시각을 담았어요. 캘린더에서 ‘저장’ 또는 ‘추가’를 눌러주세요.')}</p>
+          <div className={s.calendarButtons}>
+            {calendarLink && <a href={calendarLink} target={preview || embedded ? '_blank' : undefined} rel="noreferrer">
+              <CalendarDays size={16} aria-hidden="true"/>Google 캘린더<ArrowUpRight size={14} aria-hidden="true"/>
+            </a>}
+            {calendarFileHref
+              ? <a href={calendarFileHref}><CalendarDays size={16} aria-hidden="true"/>아이폰 일정 파일<ArrowRight size={14} aria-hidden="true"/></a>
+              : <button type="button" onClick={saveCalendar}><CalendarDays size={16} aria-hidden="true"/>아이폰 일정 파일<ArrowRight size={14} aria-hidden="true"/></button>}
+          </div>
+          <p className={s.calendarInstruction}>Google에서는 ‘저장’, 아이폰에서는 받은 일정 파일을 열고 ‘추가’를 눌러주세요. Google 로그인이나 파일 열기가 막히면 Safari에서 이 페이지를 다시 열어주세요.</p>
         </div>}
       </footer>}
       </>}

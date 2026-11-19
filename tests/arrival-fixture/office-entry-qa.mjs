@@ -268,12 +268,12 @@ try {
       expect(google.hostname).toBe('calendar.google.com');
       expect(google.searchParams.get('dates')).toContain('20261207T120000Z');
       const saved=page.waitForEvent('download');
-      await button(page,'아이폰·기타 캘린더').click();
+      await page.getByRole('link', {name:'아이폰 일정 파일', exact:true}).click();
       const download=await saved;
       const file=await readFile(await download.path(),'utf8');
       expect(download.suggestedFilename()).toMatch(/20261207\.ics$/);
       expect(file).toMatch(/DTSTART:20261207T120000Z/);
-      await expect(page.getByRole('status').filter({hasText:'일정 파일을 열고'})).toBeInViewport({ratio: 0.95});
+      await expect(page.getByText(/Safari에서 이 페이지를 다시 열어주세요/)).toBeInViewport({ratio: 0.95});
       await capture('hall');
       expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(errors).toEqual([]);

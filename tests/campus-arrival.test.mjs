@@ -284,7 +284,7 @@ test('the confirmed 21:00 start is usable without inventing an end or YouTube de
   assert.ok(unfolded.includes('종료 시간은 추후 안내'));
   assert.ok(unfolded.includes('YouTube 참여 링크는 카톡방에서 추가 안내'));
   const google = new URL(model.googleCalendarUrl(model.liveEvent));
-  assert.equal(google.searchParams.get('dates'), '20261207T120000Z/20261207T120000Z');
+  assert.equal(google.searchParams.get('dates'), '20261207T120000Z/20261207T120100Z');
   assert.equal(google.searchParams.has('location'), false);
   assert.equal(model.googleCalendarUrl({...model.liveEvent, startsAt: null}), null);
   assert.equal(model.calendarIcs({...model.liveEvent, startsAt: null}), null);

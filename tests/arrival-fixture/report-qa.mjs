@@ -90,8 +90,26 @@ for (const [engine, viewport] of devices) {
       await expect(action('무료 자료 받기')).toBeVisible();
       if (!priorRoute) await capture(page, 'lounge');
       await openLoungeSchedule(page);
-      const calendar = new URL(await page.getByRole('link', {name:'Google 캘린더', exact:true}).getAttribute('href'));
-      expect(calendar.searchParams.get('dates')).toContain('20261207T120000Z');
+      const google = page.getByRole('link', {name:'Google 캘린더', exact:true});
+      const calendar = new URL(await google.getAttribute('href'));
+      expect(calendar.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
+      if (!priorRoute) {
+        const file = page.getByRole('link', {name:'아이폰 일정 파일', exact:true});
+        await expect(file).toBeInViewport({ratio:.95});
+        const [response, download] = await Promise.all([
+          page.waitForResponse(response => new URL(response.url()).pathname === '/experience/moonshot/live.ics'),
+          page.waitForEvent('download'),
+          tap(file),
+        ]);
+        expect(response.status()).toBe(200);
+        expect(response.headers()['content-type']).toContain('text/calendar');
+        expect(response.headers()['content-disposition']).toBe('attachment; filename="moonshot-live-20261207.ics"');
+        expect(download.suggestedFilename()).toBe('moonshot-live-20261207.ics');
+        expect(await readFile(await download.path(), 'utf8')).toMatch(/DTSTART:20261207T120000Z/);
+        await page.route('https://calendar.google.com/**', route => route.fulfill({contentType:'text/html',body:'<title>Google calendar test destination</title>'}));
+        await Promise.all([page.waitForURL(calendar.href), tap(google)]);
+        expect(page.context().pages()).toHaveLength(1);
+      }
       expect(errors).toEqual([]);
       console.log(JSON.stringify({browser:engine.name(), audience:label, priorStep:priorRoute?.step ?? null, visited, lounge:true, videoPlayback:!priorRoute ? {teamLeader:true, content:true} : undefined}));
       await page.close();
