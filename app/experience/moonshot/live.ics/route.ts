@@ -13,7 +13,7 @@ export async function GET() {
   if (!file) return new Response(null, {status: 404});
   return new Response(file, {headers: {
     'Content-Type': 'text/calendar; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${event.id}.ics"`,
+    'Content-Disposition': `inline; filename="${event.id}.ics"`,
     'Cache-Control': 'private, no-store',
     'X-Robots-Tag': 'noindex',
   }});
