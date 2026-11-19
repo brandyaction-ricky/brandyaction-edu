@@ -1,9 +1,9 @@
 'use client';
 
-import {useEffect, useEffectEvent, useMemo, useRef, useState, type MouseEvent} from 'react';
+import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, ARRIVAL_CALENDAR_FILE, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {onboardingGuideTitle, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
@@ -56,13 +56,39 @@ function LiveCountdown({date, className}: {date: string; className: string}) {
   return label ? <span className={className}>{label}</span> : null;
 }
 
-// iPhone Calendar opens its own "Add event" sheet for a text/calendar response in Safari. KakaoTalk's
-// in-app browser cannot, so hand the same URL to Safari through Kakao's documented external-browser scheme.
-const APPLE_CALENDAR_PATH = '/experience/moonshot/live.ics';
-function openAppleCalendar(event: MouseEvent<HTMLAnchorElement>) {
-  if (!/KAKAOTALK/i.test(navigator.userAgent)) return;
-  event.preventDefault();
-  window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(new URL(APPLE_CALENDAR_PATH, window.location.origin).href);
+function AppleCalendarAction({userAgent}: {userAgent: string}) {
+  const [copied, setCopied] = useState(false);
+  const [manualLink, setManualLink] = useState('');
+  const inKakao = /KAKAOTALK/i.test(userAgent);
+  const isSafari = !inKakao && /Version\/[\d.]+.*Safari\//i.test(userAgent)
+    && !/CriOS|FxiOS|EdgiOS|GSA|OPiOS/i.test(userAgent);
+  if (isSafari) {
+    return <a href={ARRIVAL_CALENDAR_FILE}>
+      <CalendarDays size={17} aria-hidden="true"/>아이폰 캘린더에 추가<ArrowUpRight size={15} aria-hidden="true"/>
+    </a>;
+  }
+
+  async function copySafariLink() {
+    const link = new URL(ARRIVAL_CALENDAR_FILE, window.location.origin).href;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setManualLink('');
+    } catch {
+      setCopied(false);
+      setManualLink(link);
+    }
+  }
+
+  return <details className={s.calendarHelp}>
+    <summary><CalendarDays size={17} aria-hidden="true"/>아이폰 캘린더에 추가<ChevronDown size={15} aria-hidden="true"/></summary>
+    <div>
+      <p>{inKakao ? '카톡 밖에서 Safari를 열고 일정 링크를 붙여넣어 주세요.' : '아래 일정 링크를 복사해 Safari에서 열어주세요.'}</p>
+      <button type="button" onClick={copySafariLink}><Copy size={15} aria-hidden="true"/>일정 링크 복사</button>
+      {copied && <p role="status">복사했어요. Safari 주소창에 붙여넣어 주세요.</p>}
+      {manualLink && <label>직접 복사할 일정 링크<input type="url" readOnly value={manualLink} onFocus={event => event.currentTarget.select()}/></label>}
+    </div>
+  </details>;
 }
 
 export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = ARRIVAL_STORAGE_KEY, preview = false, embedded = false, liveReminderEnabled = false}: {
@@ -155,6 +181,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   if (appliedRule) criteria.push({label: '내가 선택한 작성 기준', value: appliedRule});
   const event = arrivalLiveEvent(config);
   const calendarLink = googleCalendarUrl(event, {chooseAccount: !preview && !embedded});
+  const calendarUserAgent = hydrated && !preview && !embedded ? navigator.userAgent : '';
+  const showAppleCalendar = /iPhone|iPad|iPod/i.test(calendarUserAgent);
   const date = new Date(config.startsAt);
   const dateLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',month:'long',day:'numeric'}).format(date);
   const timeLabel = new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',hour:'numeric',minute:'2-digit',hour12:true}).format(date).replace(/:(\d{2})$/, (_, minutes: string) => minutes === '00' ? '시' : `시 ${Number(minutes)}분`);
@@ -622,13 +650,11 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={progression.nextAction} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}
         {step === 5 && <button type="button" className={progression.nextAction} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={18}/></button>}
         {step === 7 && calendarLink && <div className={s.calendarActions}>
+          {showAppleCalendar && <AppleCalendarAction userAgent={calendarUserAgent}/>}
           <a href={calendarLink} target={preview || embedded ? '_blank' : undefined} rel="noreferrer">
             <CalendarDays size={17} aria-hidden="true"/>Google 캘린더에 추가<ArrowUpRight size={15} aria-hidden="true"/>
           </a>
-          <a href={APPLE_CALENDAR_PATH} target={preview || embedded ? '_blank' : undefined} onClick={openAppleCalendar}>
-            <CalendarDays size={17} aria-hidden="true"/>아이폰 캘린더에 추가<ArrowUpRight size={15} aria-hidden="true"/>
-          </a>
-          <p className={s.calendarInstruction}>일정이 열리면 ‘저장’ 또는 ‘추가’를 눌러주세요.</p>
+          <p className={s.calendarInstruction}>{showAppleCalendar ? '캘린더 화면에서 ‘추가’ 또는 ‘저장’을 눌러주세요.' : '일정이 열리면 ‘저장’을 눌러주세요.'}</p>
         </div>}
       </footer>}
       </>}
