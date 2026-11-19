@@ -141,7 +141,7 @@ export function ContentStation({draft, onDraftChange, onComplete, revisit = fals
       </div>
     </div>
     <footer className={`${monitor.footer} ${styles.bridge}`}>
-      <button className={styles.primary} type="button" onClick={onComplete}>{revisit ? '자료 목록으로 돌아가기' : 'AI가 내 일을 기억하는 방법 보기'}<ArrowRight size={16} aria-hidden="true"/></button>
+      <button className={styles.primary} data-secondary={!revisit && copy !== 'copied' || undefined} type="button" onClick={onComplete}>{revisit ? '자료 목록으로 돌아가기' : 'AI가 내 일을 기억하는 방법 보기'}<ArrowRight size={16} aria-hidden="true"/></button>
     </footer>
   </>;
 }

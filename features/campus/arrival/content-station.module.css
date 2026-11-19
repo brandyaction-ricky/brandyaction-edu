@@ -46,6 +46,8 @@
   font-weight: 650; text-align: start; line-height: 1.4;
 }
 :is(.station, .bridge) .primary:not(:disabled):hover { background: var(--ba-red-hover, #9d1c27); }
+.bridge .primary[data-secondary="true"] { border-color: #cad7e8; background: var(--paper, #fff); color: #173b69; }
+.bridge .primary[data-secondary="true"]:hover { background: #eef4fd; }
 .station .exampleButton { justify-self: start; padding: 4px 0; border: 0; background: transparent; color: var(--ba-info, #315e8b); font-weight: 650; }
 .result { display: grid; gap: 8px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line, #e2e5e9); border-radius: 9px; }
 .result h4 { margin: 0; font-size: 17px; line-height: 1.5; }
