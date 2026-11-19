@@ -40,6 +40,8 @@ async function openForm() {
     const req = route.request();
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method())) return route.continue();
     const target = new URL(req.url());
+    // The Vercel preview toolbar probes its own login independently of the page.
+    if (target.origin === 'https://vercel.live' && target.pathname === '/login/validate') return route.abort();
     writes.push({origin: target.origin, path: target.pathname, method: req.method()});
     if (target.origin !== url.origin || target.pathname !== reminderPath || req.method() !== 'POST') {
       return route.abort();
