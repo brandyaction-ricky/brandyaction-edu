@@ -48,6 +48,19 @@ const choiceLabels: Record<Audience, string> = {
   preparing: '창업을 준비하고 있어요',
   exploring: '아직 아이템이 없어요',
 };
+
+export const arrivalEntryAudiences = ['business', 'preparing', 'exploring', 'work'] as const satisfies readonly Audience[];
+
+const entryChoiceLabels: Partial<Record<Audience, string>> = {
+  preparing: '내 사업을 준비하고 있어요',
+  work: '회사에 다니고 있어요',
+};
+
+export function arrivalEntryAudienceLabel(id: Audience, label: string) {
+  // Published settings may still contain these defaults. Keep administrator-written labels.
+  return label === choiceLabels[id] ? entryChoiceLabels[id] ?? label : label;
+}
+
 export const LIVE_AGENDA = [
   'AI 마케팅 팀 만드는 법',
   '흩어진 데이터를 한 곳에 모으는 법',
