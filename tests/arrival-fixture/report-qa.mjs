@@ -10,10 +10,10 @@ const storageKey = process.env.ARRIVAL_QA_STORAGE_KEY ?? 'moonshot:arrival:synth
 const output = process.env.ARRIVAL_QA_OUTPUT;
 if (output) await mkdir(output, {recursive: true});
 const routes = [
-  ['회사 업무에 AI를 써보고 싶어요', {audience:'work', step:1}],
-  ['이미 사업을 하고 있어요', null],
-  ['창업을 준비하고 있어요', {audience:'preparing', step:2}],
-  ['아직 아이템이 없어요', {audience:'exploring', step:7, hallReturnStep:5, experience:'self-reported'}],
+  ['business', '이미 사업을 하고 있어요', null],
+  ['preparing', '내 사업을 준비하고 있어요', {audience:'preparing', step:2}],
+  ['exploring', '아직 아이템이 없어요', {audience:'exploring', step:7, hallReturnStep:5, experience:'self-reported'}],
+  ['work', '회사에 다니고 있어요', {audience:'work', step:1}],
 ];
 const devices = [[chromium, {width:1440, height:723}], [webkit, {width:390, height:844}]];
 
@@ -29,7 +29,7 @@ for (const [engine, viewport] of devices) {
   const browser = await engine.launch();
   const capture = (page, name) => output && page.screenshot({path:resolve(output, engine.name() + '-' + name + '.png')});
   try {
-    for (const [label, priorRoute] of routes) {
+    for (const [, label, priorRoute] of routes) {
       const page = await browser.newPage({viewport, hasTouch:mobile, isMobile:mobile, userAgent:mobile ? deviceDescriptors['iPhone 13'].userAgent : undefined});
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
@@ -44,7 +44,14 @@ for (const [engine, viewport] of devices) {
       expect(response?.status()).toBe(200);
       expect(new URL(page.url()).origin).toBe(url.origin);
       await expect(action('이 상황으로 시작')).toBeDisabled();
-      for (const [choice] of routes) await expect(page.getByText(choice, {exact:true})).toBeInViewport({ratio:1});
+      const entry = page.getByRole('region', {name:'문샷 AI 직원 체험 소개', exact:true});
+      const radios = entry.getByRole('radio');
+      await expect(radios).toHaveCount(routes.length);
+      for (const [index, [id, choice]] of routes.entries()) {
+        await expect(radios.nth(index)).toHaveValue(id);
+        await expect(radios.nth(index)).toHaveAccessibleName(choice);
+        await expect(entry.getByText(choice, {exact:true})).toBeInViewport({ratio:1});
+      }
       if (priorRoute) {
         await expect.poll(() => page.evaluate(key => JSON.parse(localStorage.getItem(key))?.step, storageKey)).toBe(0);
       } else {
