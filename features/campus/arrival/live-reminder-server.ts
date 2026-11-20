@@ -1,9 +1,9 @@
 import {createAdminClient} from '@/lib/supabase/admin';
 import {arrivalLiveEvent, DEFAULT_ARRIVAL} from './config';
+import {arrivalLiveReminderConsentVersion} from './live-reminder-consent';
 
 const reminderTable = 'edu_campus_arrival_live_reminders';
-const consentVersion = 1;
-const event = arrivalLiveEvent(DEFAULT_ARRIVAL);
+export const arrivalLiveReminderEvent = arrivalLiveEvent(DEFAULT_ARRIVAL);
 const devDatabaseUrl = 'https://vjmjhaidlqkmascdjocw.supabase.co';
 const productionDatabaseUrl = 'https://qitqxizuwmmlhlcgsrqe.supabase.co';
 
@@ -15,14 +15,19 @@ export const liveReminderPreview = {
 
 // CEO 11-20: phone opt-ins are collected on production too. Allowed pairs only: the real production
 // site on the production database, or any deployment (fixed DEV, branch preview) on the DEV database.
-export function arrivalLiveReminderEnabled(env = process.env) {
+export function arrivalLiveReminderProduction(env = process.env) {
   const database = env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
-  const production = env.VERCEL_ENV === 'production' && env.NEXT_PUBLIC_APP_ENV === 'production' && database === productionDatabaseUrl;
-  return Boolean(env.SUPABASE_SERVICE_ROLE_KEY) && (production || database === devDatabaseUrl);
+  return Boolean(env.SUPABASE_SERVICE_ROLE_KEY) && env.VERCEL_ENV === 'production'
+    && env.NEXT_PUBLIC_APP_ENV === 'production' && database === productionDatabaseUrl;
+}
+
+export function arrivalLiveReminderEnabled(env = process.env) {
+  return arrivalLiveReminderProduction(env) || (Boolean(env.SUPABASE_SERVICE_ROLE_KEY)
+    && env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') === devDatabaseUrl);
 }
 
 export function arrivalLiveReminderOpen(now = Date.now()) {
-  return event.startsAt !== null && now < Date.parse(event.startsAt);
+  return arrivalLiveReminderEvent.startsAt !== null && now < Date.parse(arrivalLiveReminderEvent.startsAt);
 }
 
 export function normalizeArrivalReminderPhone(value: unknown): string | null {
@@ -33,20 +38,33 @@ export function normalizeArrivalReminderPhone(value: unknown): string | null {
 
 export async function registerArrivalLiveReminder(phone: string) {
   const db = createAdminClient();
-  const {error} = await db.from(reminderTable).upsert({
-    event_id: event.id,
+  const eventId = arrivalLiveReminderEvent.id;
+  const {data: inserted, error} = await db.from(reminderTable).upsert({
+    event_id: eventId,
     phone,
-    consent_version: consentVersion,
-  }, {onConflict:'event_id,phone', ignoreDuplicates:true}).abortSignal(AbortSignal.timeout(8000));
+    consent_version: arrivalLiveReminderConsentVersion,
+  }, {onConflict:'event_id,phone', ignoreDuplicates:true})
+    .select('consent_version').abortSignal(AbortSignal.timeout(8000)).maybeSingle();
   if (error) throw Error('Live reminder could not be saved');
+  if (inserted) return;
+
+  const {data: existing, error: readError} = await db.from(reminderTable).select('consent_version')
+    .eq('event_id', eventId).eq('phone', phone).abortSignal(AbortSignal.timeout(8000)).maybeSingle();
+  if (readError || !existing) throw Error('Live reminder could not be verified');
+  if (existing.consent_version === arrivalLiveReminderConsentVersion) return;
+
+  const {data: consented, error: upgradeError} = await db.rpc('edu_refresh_campus_arrival_reminder_consent', {
+    p_event: eventId, p_phone: phone, p_consent_version: arrivalLiveReminderConsentVersion,
+  }).abortSignal(AbortSignal.timeout(8000));
+  if (upgradeError || consented !== true) throw Error('Live reminder consent could not be refreshed');
 }
 
 export async function readArrivalLiveReminders() {
   const db = createAdminClient();
   const {data, count, error} = await db.from(reminderTable)
     .select('phone,consented_at', {count:'exact'})
-    .eq('event_id', event.id)
-    .eq('consent_version', consentVersion)
+    .eq('event_id', arrivalLiveReminderEvent.id)
+    .eq('consent_version', arrivalLiveReminderConsentVersion)
     .order('consented_at', {ascending:false})
     .order('phone')
     .limit(50)

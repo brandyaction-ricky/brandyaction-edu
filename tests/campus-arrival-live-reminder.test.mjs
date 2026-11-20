@@ -24,22 +24,40 @@ const dev = {
   SUPABASE_SERVICE_ROLE_KEY:'unit-test-placeholder',
 };
 const stores = [];
+const refreshes = [];
+const consentPath = './live-reminder-consent';
+const consentImport = '@/features/campus/arrival/live-reminder-consent';
+const consent = await loadModule('features/campus/arrival/live-reminder-consent.ts', {});
+const {arrivalLiveReminderConsentVersion: consentVersion} = consent;
+let priorVersion = null;
 const recipients = [
-  {event_id:event.id,consent_version:1,phone:'01000000042',consented_at:'2026-11-19T05:12:00Z'},
-  {event_id:'another-live',consent_version:1,phone:'01000000043',consented_at:'2026-11-19T05:13:00Z'},
-  {event_id:event.id,consent_version:0,phone:'01000000044',consented_at:'2026-11-19T05:14:00Z'},
+  {event_id:event.id,consent_version:consentVersion,phone:'01000000042',consented_at:'2026-11-19T05:12:00Z'},
+  {event_id:'another-live',consent_version:consentVersion,phone:'01000000043',consented_at:'2026-11-19T05:13:00Z'},
+  {event_id:event.id,consent_version:1,phone:'01000000044',consented_at:'2026-11-19T05:14:00Z'},
 ];
 const reminder = await loadModule('features/campus/arrival/live-reminder-server.ts', {
   './config': {DEFAULT_ARRIVAL:{startsAt:event.startsAt},arrivalLiveEvent:() => event},
+  [consentPath]: consent,
   '@/lib/supabase/admin': {createAdminClient:() => ({
+    rpc(name, args) {
+      refreshes.push({name, args});
+      return {abortSignal:async () => ({data:true,error:null})};
+    },
     from(table) {
       assert.equal(table, 'edu_campus_arrival_live_reminders');
       return {
         upsert(values,options) {
           stores.push({values,options});
-          return {abortSignal:async () => ({error:null})};
+          return {select(name) {
+            assert.equal(name, 'consent_version');
+            return {abortSignal: () => ({maybeSingle:async () => ({data:priorVersion === null ? {consent_version:consentVersion} : null,error:null})})};
+          }};
         },
         select(columns, options) {
+          if (columns === 'consent_version') return {
+            eq() { return this; },
+            abortSignal: () => ({maybeSingle: async () => ({data:{consent_version:priorVersion},error:null})}),
+          };
           assert.equal(columns, 'phone,consented_at');
           assert.deepEqual(options, {count:'exact'});
           let matching = recipients;
@@ -90,6 +108,7 @@ const body = await loadModule('features/campus/space/body.ts', {
 });
 let enabled = true, open = true, fail = false;
 const route = await loadModule('app/api/campus/arrival/live-reminder/route.ts', {
+  [consentImport]: consent,
   '@/features/campus/arrival/live-reminder-server': {
     ...reminder,
     arrivalLiveReminderEnabled:() => enabled,
@@ -102,12 +121,12 @@ const route = await loadModule('app/api/campus/arrival/live-reminder/route.ts', 
   '@/features/campus/space/body':body,
 });
 
-test('endpoint requires same-origin, a bounded two-field submission, valid phone and literal opt-in', async () => {
+test('endpoint requires same-origin, a bounded submission, valid phone and current literal opt-in', async () => {
   const origin = 'https://preview.example.com';
   const request = (value, source = origin) => new Request(origin + '/api/campus/arrival/live-reminder', {
     method:'POST', headers:{origin:source,'Content-Type':'application/json'},body:JSON.stringify(value),
   });
-  const national = {phone:'010-0000-0042',consent:true};
+  const national = {phone:'010-0000-0042',consent:true,consentVersion};
   enabled = false;
   assert.equal((await route.POST(request(national))).status, 404);
   enabled = true;
@@ -120,6 +139,11 @@ test('endpoint requires same-origin, a bounded two-field submission, valid phone
     {...national,phone:'call 01000000042'}, {...national,phone:'02-000-1234'},
     {...national,phone:'0'.repeat(260)}, {...national,event_id:'other-event'},
   ]) assert.equal((await route.POST(request(input))).status, 400);
+  for (const stale of [undefined, 1, String(consentVersion)]) {
+    const response = await route.POST(request({...national,consentVersion:stale}));
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), {error:'refresh'});
+  }
   assert.equal(stores.length, 0);
   fail = true;
   const unavailable = await route.POST(request(national));
@@ -128,13 +152,23 @@ test('endpoint requires same-origin, a bounded two-field submission, valid phone
   fail = false;
   const phoneFormats = [national.phone, '01000000042', '+82 (0)10-0000-0042', '+82 10 0000 0042'];
   for (const phone of phoneFormats) {
-    const response = await route.POST(request({phone,consent:true}));
+    const response = await route.POST(request({...national,phone}));
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'private, no-store');
     assert.deepEqual(await response.json(), {registered:true});
   }
   assert.deepEqual(stores, Array.from({length:phoneFormats.length}, () => ({
-    values:{event_id:event.id,phone:'01000000042',consent_version:1},
+    values:{event_id:event.id,phone:'01000000042',consent_version:consentVersion},
     options:{onConflict:'event_id,phone',ignoreDuplicates:true},
   })));
+});
+
+test('the same new consent stays unchanged, and a fresh form can update an older consent', async () => {
+  priorVersion = consentVersion;
+  await reminder.registerArrivalLiveReminder('01000000042');
+  assert.deepEqual(refreshes, []);
+  priorVersion = 1;
+  await reminder.registerArrivalLiveReminder('01000000042');
+  assert.deepEqual(refreshes, [{name:'edu_refresh_campus_arrival_reminder_consent',
+    args:{p_event:event.id,p_phone:'01000000042',p_consent_version:consentVersion}}]);
 });

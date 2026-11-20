@@ -7,7 +7,7 @@ import ts from 'typescript';
 const pageSource = await readFile('app/experience/moonshot/page.tsx', 'utf8');
 const calendarSource = await readFile('app/experience/moonshot/live.ics/route.ts', 'utf8');
 const compileOptions = {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX};
-const defaultArrival = {title: '기본 체험', liveTitle: '문샷 무료 라이브', startsAt: '2026-12-07T12:00:00.000Z', endsAt: null, liveUrl: ''};
+const defaultArrival = {title: '기본 체험', description: '무료 라이브 전에 체험해 보세요.', liveTitle: '문샷 무료 라이브', startsAt: '2026-12-07T12:00:00.000Z', endsAt: null, liveUrl: ''};
 
 function loadModule(source, mocks, env) {
   const exports = {};
@@ -29,10 +29,13 @@ function fixture(env = {}) {
   const jsx = (type, props) => ({type, props});
   const mocks = {
     '@/features/campus/arrival/preview-gate': previewGate,
+    react: {cache: handler => handler},
     'react/jsx-runtime': {jsx, jsxs: jsx}, 'next/link': {default: 'link'},
     'next/navigation': {notFound: () => {throw Error('404');}},
+    '@/lib/edu-seo': {EDU_SITE_NAME: '브랜디에듀'},
     '@/features/campus/arrival/config': {
       DEFAULT_ARRIVAL: defaultArrival,
+      arrivalIntroDescription: config => config.description,
       arrivalLiveEvent: config => ({id: 'moonshot-test', title: config.liveTitle}),
     },
     '@/features/campus/arrival/experience': {ArrivalExperience: 'arrival'},
@@ -59,6 +62,7 @@ function fixture(env = {}) {
   const calendar = loadModule(calendarSource, mocks, env);
   return {
     render: query => page.default({searchParams: Promise.resolve(query)}),
+    metadata: query => page.generateMetadata({searchParams: Promise.resolve(query)}),
     calendar: () => calendar.GET(),
     allow: () => {allowed = true;},
     reads: () => reads,
@@ -111,6 +115,8 @@ test('fixed DEV visitor and calendar use the same published snapshot through lat
     assert.deepEqual(page.props.config, config);
     const calendar = await f.calendar();
     assert.equal(calendar.status, 200);
+    assert.equal(calendar.headers.get('Content-Type'), 'text/calendar; charset=utf-8');
+    assert.equal(calendar.headers.get('Content-Disposition'), 'inline; filename="moonshot-test.ics"');
     assert.equal(calendar.headers.get('Cache-Control'), 'private, no-store');
     assert.equal(await calendar.text(), `SUMMARY:${config.liveTitle}`);
   };
@@ -136,6 +142,35 @@ test('branch preview uses the preset without reading a fixed DEV publication', a
   assert.deepEqual((await f.render({})).props.config, defaultArrival);
   assert.equal(await (await f.calendar()).text(), `SUMMARY:${defaultArrival.liveTitle}`);
   assert.equal(f.publicReads(), 0);
+});
+
+test('sharing metadata follows the published visitor copy; a saved draft cannot reach the public or preview metadata', async () => {
+  const f = fixture({VERCEL_ENV: 'production', NEXT_PUBLIC_APP_ENV: 'production'});
+  const draft = {...f.draft(), title: 'AI 직원과\n함께 일하기', description: '문샷을 먼저 둘러보고\n무료 라이브를 준비하세요.'};
+  f.saveDraft(draft);
+  assert.equal((await f.metadata({})).openGraph, undefined);
+
+  f.publishDraft();
+  f.saveDraft({...draft, title: '편집 중인 제목', description: '편집 중인 설명'});
+  const publicMeta = await f.metadata({utm_source: 'kakao'});
+  assert.equal(publicMeta.title, 'AI 직원과 함께 일하기');
+  assert.equal(publicMeta.description, '문샷을 먼저 둘러보고 무료 라이브를 준비하세요.');
+  assert.deepEqual(publicMeta.openGraph, {
+    title: publicMeta.title, description: publicMeta.description, siteName: '브랜디에듀', locale: 'ko_KR', type: 'website',
+  });
+  const publicReads = f.publicReads();
+  const previewMeta = await f.metadata({event: 'test-event'});
+  assert.equal(previewMeta.openGraph, undefined);
+  assert.deepEqual(previewMeta.robots, {index: false, follow: false});
+  assert.doesNotMatch(JSON.stringify(previewMeta), /편집 중인/);
+  assert.equal(f.publicReads(), publicReads);
+  assert.equal(f.reads(), 0);
+  assert.equal(f.authReads(), 0);
+
+  const preview = fixture({VERCEL_ENV: 'preview', NEXT_PUBLIC_APP_ENV: 'development'});
+  preview.publishDraft();
+  assert.equal((await preview.metadata({})).openGraph.title, defaultArrival.title);
+  assert.equal(preview.publicReads(), 0);
 });
 
 test('private preview rejects a stale revision and accepts the matching saved revision', async () => {

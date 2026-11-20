@@ -1,4 +1,5 @@
 import { arrivalLiveReminderEnabled, liveReminderPreview, readArrivalLiveReminders } from '@/features/campus/arrival/live-reminder-server';
+import { readArrivalReminderDeliverySummary } from '@/features/campus/arrival/live-reminder-delivery';
 import { getOperatorUser } from '@/lib/operator-permissions';
 
 const headers = { 'Cache-Control': 'private, no-store' };
@@ -9,10 +10,11 @@ export async function GET() {
   try {
     if (!await getOperatorUser('marketing')) return new Response(null, { status: 403, headers });
 
-    const { count, latest } = await readArrivalLiveReminders();
+    const [{ count, latest }, delivery] = await Promise.all([readArrivalLiveReminders(), readArrivalReminderDeliverySummary()]);
     return Response.json({
       count,
       preview: liveReminderPreview,
+      delivery,
       latest: latest.slice(0, 50).map(({ maskedPhone, consentedAt }) => ({
         maskedPhone: /^010-\*{4}-\d{4}$/.test(maskedPhone) ? maskedPhone : '010-****-****',
         consentedAt,

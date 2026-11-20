@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../app/api/admin/crm/live-reminders/route.t
 const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
 const preview = {proposedSendAt:'2026-12-07T11:30:00.000Z',liveStartsAt:'2026-12-07T21:00:00+09:00',message:'안내 문자 초안'};
 
-function loadRoute({enabled = true, authorised = true, read}) {
+function loadRoute({enabled = true, authorised = true, read, readDelivery = async () => null}) {
   const permissions = [];
   const exports = {};
   const dependencies = {
@@ -16,6 +16,7 @@ function loadRoute({enabled = true, authorised = true, read}) {
       liveReminderPreview: preview,
       readArrivalLiveReminders: read,
     },
+    '@/features/campus/arrival/live-reminder-delivery': {readArrivalReminderDeliverySummary: readDelivery},
     '@/lib/operator-permissions': {
       getOperatorUser: async scope => {
         permissions.push(scope);
@@ -30,7 +31,12 @@ function loadRoute({enabled = true, authorised = true, read}) {
   return {GET: exports.GET, permissions};
 }
 
-test('live reminder CRM checks the preview flag and marketing access before reading', async () => {
+test('CRM campaigns can show the reminder panel in both production and DEV', () => {
+  const workflows = readFileSync(new URL('../app/ui/admin-workflows.tsx', import.meta.url), 'utf8');
+  assert.match(workflows, /\{section === "campaigns" && <LiveReminderIntake\s*\/>\}/);
+});
+
+test('live reminder CRM checks the environment and marketing access before reading', async () => {
   let reads = 0;
   const read = async () => { reads += 1; };
   const disabled = loadRoute({enabled: false, read});

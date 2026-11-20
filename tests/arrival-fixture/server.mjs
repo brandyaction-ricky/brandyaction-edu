@@ -98,7 +98,7 @@ const server = createServer(async (req, res) => {
       const event = arrivalLiveEvent(publishedConfig ?? DEFAULT_ARRIVAL);
       const file = calendarIcs(event);
       if (!file) return res.writeHead(404).end();
-      res.writeHead(200, {'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="${event.id}.ics"`});
+      res.writeHead(200, {'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `inline; filename="${event.id}.ics"`});
       res.end(req.method === 'HEAD' ? undefined : file);
       return;
     }

@@ -1,4 +1,4 @@
-import {chromium, expect, webkit} from '@playwright/test';
+import {chromium, devices as deviceDescriptors, expect, webkit} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {firstSpyRequest, finishOfficeReview, openLoungeSchedule, teamLeaderNext} from './review-office.mjs';
@@ -30,7 +30,7 @@ for (const [engine, viewport] of devices) {
   const capture = (page, name) => output && page.screenshot({path:resolve(output, engine.name() + '-' + name + '.png')});
   try {
     for (const [label, priorRoute] of routes) {
-      const page = await browser.newPage({viewport, hasTouch:mobile, isMobile:mobile});
+      const page = await browser.newPage({viewport, hasTouch:mobile, isMobile:mobile, userAgent:mobile ? deviceDescriptors['iPhone 13'].userAgent : undefined});
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       const tap = locator => mobile ? locator.tap() : locator.click();
@@ -97,6 +97,11 @@ for (const [engine, viewport] of devices) {
       const event = new URL(calendar.searchParams.get('continue'));
       expect(event.searchParams.get('dates')).toBe('20261207T120000Z/20261207T120100Z');
       await expect(action('일정 파일 받기')).toHaveCount(0);
+      const apple = page.getByRole('link', {name:'아이폰 캘린더에 추가', exact:true});
+      if (mobile) {
+        await expect(apple).toHaveAttribute('href', '/experience/moonshot/live.ics');
+        expect(await apple.getAttribute('download')).toBeNull();
+      } else await expect(apple).toHaveCount(0);
       if (!priorRoute) {
         await expect(google).toBeInViewport({ratio:.95});
         const downloads = [];

@@ -382,7 +382,8 @@
 .calendarIntro { margin-top: 12px !important; font-size: 15px; color: var(--muted); line-height: 1.6; word-break: keep-all; }
 .calendarActions { display: grid; gap: 7px; }
 .calendarInstruction { color: var(--muted); font-size: 13px; line-height: 1.45; word-break: keep-all; }
-.calendarActions > a {
+.calendarActions > a,
+.calendarHelp > summary {
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--paper);
@@ -396,7 +397,33 @@
   font-weight: 650;
   color: var(--ink);
 }
-.calendarActions > a:hover { background: var(--surface-subtle); border-color: var(--ba-red); }
+.calendarActions > a:hover, .calendarHelp > summary:hover { background: var(--surface-subtle); border-color: var(--ba-red); }
+.calendarHelp > summary { cursor: pointer; list-style: none; }
+.calendarHelp > summary::-webkit-details-marker { display: none; }
+.calendarHelp[open] > summary svg:last-child { transform: rotate(180deg); }
+.calendarHelp > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.calendarHelp button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ink);
+  font-weight: 650;
+}
+.calendarHelp label { display: grid; gap: 4px; }
+.calendarHelp input { min-width: 0; width: 100%; padding: 6px; color: var(--ink); }
 
 /* Recovery, feedback and optional world exploration. */
 .root .exploreButton {
@@ -535,7 +562,7 @@
   .hallDock .intro { margin-bottom: 12px; }
   .hallDock .intro h1 { font-size: 24px; }
   .ticket { padding: 9px 12px; }
-  .calendarActions > a { font-size: 14px; }
+  .calendarActions > a, .calendarHelp > summary { font-size: 14px; }
   .root:has(.dockHidden) .world { height: calc(100dvh - 64px); }
   .root:has(.dockHidden) .place { top: auto; bottom: 25px; }
   .root:has(.questions) { --scene-height: 120px; }
