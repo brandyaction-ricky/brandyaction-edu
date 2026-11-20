@@ -46,7 +46,8 @@ export function createCampusPlan() {
   study.viewRadiusY=(study.bounds.maxY-study.bounds.minY)/2;
   const officeSeats=[];
   for(let index=0;index<10;index++) {
-    const row=index%5,wing=index<5?'left':'right',x=wing==='left'?21.8:30.8,y=12.1+row*2.15;
+    // Left wing: banks of three and two leave an aisle in front of the study doorway (18.7,17).
+    const row=index%5,wing=index<5?'left':'right',x=wing==='left'?21.8:30.8,y=wing==='left'?[11.7,13.35,15,18,19.85][row]:12.1+row*2.15;
     officeSeats.push({x,y,side:wing==='left'?'n':'s',wing,index,lab:true,
       yaw:wing==='left'?-Math.PI/2:Math.PI/2,
       seat:point(wing==='left'?23.7:30.3,y+.6)});
@@ -56,7 +57,7 @@ export function createCampusPlan() {
   ];
   return freezeTree({W:36,D:28,rooms,corridors,officeSeats,spawn:officeArrival,
     mission:{center:point(27,17),bounds:{minX:25,maxX:29,minY:15,maxY:19}},
-    approaches:{study:[officeArrival,point(24.4,22.2),point(24.4,19.5),point(20.4,19.5),point(18.7,17)]}});
+    approaches:{study:[officeArrival,point(24.4,22.2),point(24.4,17),point(18.7,17)]}});
 }
 
 const DEFAULT_PLAN=createCampusPlan();
