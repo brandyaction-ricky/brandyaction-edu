@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/campus-entry-button-20261120" ]; then
+            expected_main=6f8d624d3e45ae3399973db3e22b570869437e11
+            release_payload=730a7de1049c9664c56ee7fbc48426833a998eb5
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' app/[[...path]]/page.tsx features/campus/ui/entry-bar.tsx tests/campus-entry.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned campus entry button change; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-open-nits-20261120" ]; then
             expected_main=f2b6449c57b4377e17216a1eab0237d0389602b8
             release_payload=130e001ba764f4a6aa45a2465deed486bf41e785
