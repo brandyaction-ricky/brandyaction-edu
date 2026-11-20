@@ -1,8 +1,10 @@
 import type {Metadata} from 'next';
 import {notFound} from 'next/navigation';
+import {cache} from 'react';
 import {ArrivalExperience} from '@/features/campus/arrival/experience';
-import {DEFAULT_ARRIVAL} from '@/features/campus/arrival/config';
+import {arrivalIntroDescription, DEFAULT_ARRIVAL} from '@/features/campus/arrival/config';
 import {arrivalLiveReminderEnabled, arrivalLiveReminderOpen} from '@/features/campus/arrival/live-reminder-server';
+import {EDU_SITE_NAME} from '@/lib/edu-seo';
 import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {slugPattern, uuid} from '@/features/campus/webinar/domain';
@@ -10,14 +12,26 @@ import {arrivalPublicationEnabled, arrivalRequiresPublication} from '@/features/
 import {readPublishedArrival} from '@/features/campus/arrival/publication-server';
 import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: '문샷 AI 직원 체험 · 혼자 하던 일, AI에게 맡길 수 있을까요?',
-  description: '회사 업무를 더 수월하게 하고 싶을 때도, 새로운 일을 준비할 때도. 내 상황에 맞는 AI 체험과 문샷 무료 라이브를 만나보세요.',
-  robots: {index: false, follow: false},
-};
 export const dynamic = 'force-dynamic';
 
-export default async function Page({searchParams}: {searchParams: Promise<Record<string, string | string[] | undefined>>}) {
+type PageProps = {searchParams: Promise<Record<string, string | string[] | undefined>>};
+const robots = {index: false, follow: false};
+const readPublicArrival = cache(() => arrivalPublicationEnabled(process.env) ? readPublishedArrival() : null);
+
+export async function generateMetadata({searchParams}: PageProps): Promise<Metadata> {
+  const {event} = await searchParams;
+  if (event !== undefined) return {title: '문샷 체험 · 관리자 미리보기', robots};
+
+  const publication = await readPublicArrival();
+  if (!publication && arrivalRequiresPublication(process.env)) return {title: '문샷 AI 직원 체험', robots};
+
+  const config = publication?.config ?? DEFAULT_ARRIVAL;
+  const title = config.title.replace(/\s+/g, ' ').trim();
+  const description = arrivalIntroDescription(config).replace(/\s+/g, ' ').trim();
+  return {title, description, robots, openGraph: {title, description, siteName: EDU_SITE_NAME, locale: 'ko_KR', type: 'website'}};
+}
+
+export default async function Page({searchParams}: PageProps) {
   const {event, revision} = await searchParams;
   if (event !== undefined) {
     if (typeof event !== 'string' || !slugPattern.test(event) || (revision !== undefined && !uuid(revision))) notFound();
@@ -29,7 +43,7 @@ export default async function Page({searchParams}: {searchParams: Promise<Record
     }
     return <ArrivalExperience config={webinar.arrival} persistenceKey={null} preview/>;
   }
-  const publication = arrivalPublicationEnabled(process.env) ? await readPublishedArrival() : null;
+  const publication = await readPublicArrival();
   if (!publication && arrivalRequiresPublication(process.env)) notFound();
   return <ArrivalExperience config={publication?.config ?? DEFAULT_ARRIVAL}
     liveReminderEnabled={arrivalLiveReminderEnabled() && arrivalLiveReminderOpen()}/>;

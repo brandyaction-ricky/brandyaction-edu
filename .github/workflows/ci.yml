@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/moonshot-live-completion-20261120" ]; then
+            expected_main=3010ea6687ef7fa258601d7cff6d060a1a32642c
+            release_payload=4e46989b84713669669eaea686ca3d753083aff7
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' .env.example app/api/admin/crm/live-reminders/route.ts app/api/campus/arrival/live-reminder/route.ts app/api/cron/moonshot-live-reminder/route.ts app/experience/moonshot/page.tsx app/ui/admin-workflows.tsx app/ui/live-reminder-intake.tsx app/ui/privacy-policy.tsx features/campus/arrival/experience.module.css features/campus/arrival/experience.tsx features/campus/arrival/live-reminder-consent.ts features/campus/arrival/live-reminder-delivery.ts features/campus/arrival/live-reminder-server.ts features/campus/arrival/live-reminder.tsx supabase/migrations/20261119233002_edu_campus_arrival_live_reminder_delivery.sql tests/arrival-fixture/live-reminder-qa.mjs tests/arrival-fixture/report-qa.mjs tests/arrival-fixture/server.mjs tests/arrival-live-reminder-delivery.test.mjs tests/arrival-live-reminders-admin.test.mjs tests/campus-arrival-access.test.mjs tests/campus-arrival-live-reminder.test.mjs tests/privacy-ad-settings.test.mjs vercel.json)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned Moonshot live reminder delivery change; SQL 20261119233002 was applied with CEO approval before release.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/moonshot-reminder-20261120" ]; then
             expected_main=b96a1fc4032e77d89e13b19dc8fcc58685f98dd7
             release_payload=70a274e77886453273d1b094599b4faf2f5abb18

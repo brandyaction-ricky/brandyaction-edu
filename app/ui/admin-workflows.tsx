@@ -469,7 +469,7 @@ function CrmManager({ section, data, send, pending }: Props) {
   const formKey = `${section}-${editing?.id || editing?._followupKey || "new"}-${formVersion}`;
   return (
     <>
-      {section === "campaigns" && process.env.NEXT_PUBLIC_APP_ENV === "development" && <LiveReminderIntake />}
+      {section === "campaigns" && <LiveReminderIntake />}
       <div className="admin-crm-workspace-actions">
         <label className="marketing-list-search"><input type="search" className="admin-input" aria-label={`${title} 검색`} placeholder="이름·내용 검색" value={listSearch} onChange={event => setListSearch(event.target.value)}/><span className="meta">{visibleItems.length}건</span></label>
         <AdminButton type="button" tone="primary" onClick={focusEditor}>{editing ? "작성 중인 내용으로 이동" : section === "templates" ? "템플릿 만들기" : section === "campaigns" ? "발송 예약 만들기" : "자동 안내 만들기"}</AdminButton>
