@@ -3,6 +3,7 @@ import {chromium, expect} from '@playwright/test';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 const base=process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4499';
+const origin = new URL(base).origin;
 const path=process.env.ARRIVAL_QA_PATH || '/arrival';
 const out=process.env.ARRIVAL_QA_OUTPUT || '/private/tmp/moonshot-work-trial-qa';
 await mkdir(out,{recursive:true});
@@ -16,7 +17,10 @@ for(const [name,viewport] of [['pc',{width:1440,height:723}],['mobile',{width:39
   const secondAnswer='로컬 검수 전용 두 번째 답변 260874';
   page.on('pageerror',e=>errors.push(e.message));
   page.on('request',request=>{
-    if(new URL(request.url()).pathname.startsWith('/api/'))api.push(request.url());
+    const url = new URL(request.url());
+    const isAnalytics = url.origin === origin && url.pathname === '/api/campus/arrival/events' && request.method() === 'POST';
+    const isFixtureConfig = url.origin === origin && url.pathname === '/api/arrival-fixture/published' && request.method() === 'GET';
+    if(url.pathname.startsWith('/api/') && !isAnalytics && !isFixtureConfig)api.push(request.url());
     const requestText = [decodeURI(request.url()), request.postData(), ...Object.values(request.headers())].join(' ');
     if ([firstAnswer, secondAnswer].some(answer => requestText.includes(answer))) outboundAnswers.push(request.url());
   });
