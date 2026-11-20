@@ -26,9 +26,8 @@ for(const [name,viewport] of [['pc',{width:1440,height:723}],['mobile',{width:39
     const choices = page.getByRole('region', {name:'문샷 AI 직원 체험 소개'}).getByRole('radio');
     await expect(choices).toHaveCount(4);
     await expect(button('이 상황으로 시작')).toBeDisabled();
-    const workLabel = '회사 업무에 AI를 써보고 싶어요';
-    await finishOfficeReview(page, {audience: workLabel});
-    await page.getByRole('button', {name: new RegExp(workLabel)}).click();
+    await finishOfficeReview(page, {audience: '회사에 다니고 있어요'});
+    await page.getByRole('button', {name: /회사 업무에 AI를 써보고 싶어요/}).click();
     await expect(page.getByRole('textbox', {name:'AI 직원에게 어떤 일을 맡길까요?',exact:true})).toBeVisible();
   }
   async function capture(stage){

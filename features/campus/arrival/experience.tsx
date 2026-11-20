@@ -20,7 +20,7 @@ import {officeCaseContent, officeCaseRevision} from './office-demo-case';
 import {DEFAULT_OFFICE_DEMO} from './office-demo';
 import s from './experience.module.css';
 import theme from '../ui/theme.module.css';
-import {DEFAULT_ARRIVAL, LIVE_AGENDA, buildManagedRequest, arrivalIntroDescription, arrivalLiveEvent, type ArrivalConfig} from './config';
+import {DEFAULT_ARRIVAL, LIVE_AGENDA, buildManagedRequest, arrivalEntryAudiences, arrivalEntryAudienceLabel, arrivalIntroDescription, arrivalLiveEvent, type ArrivalConfig} from './config';
 
 const icons = {work: FileText, business: BriefcaseBusiness, preparing: Compass, exploring: Lightbulb};
 const destinations = ['팀장 봇', '경쟁사 스파이', '콘텐츠 담당자', '정본 · 회사 업무 기준', '', '내 AI 체험', '웰컴 라운지'] as const;
@@ -532,10 +532,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <p>지금 하는 일에 맞춰, AI에게 무엇을 어떻게 맡길 수 있는지 확인해 보세요.</p>
       <fieldset>
         <legend>지금 내 상황에 가장 가까운 것은 무엇인가요?</legend>
-        <div className={entryStyle.entryOptions}>{audiences.map(id => {
+        <div className={entryStyle.entryOptions}>{arrivalEntryAudiences.map(id => {
           const Icon = icons[id];
           return <label key={id}><input type="radio" name="welcome-audience" value={id} checked={entryAudience === id} onChange={() => setEntryAudience(id)}/>
-            <span><Icon size={17} aria-hidden="true"/>{config.audiences[id].label}</span></label>;
+            <span><Icon size={17} aria-hidden="true"/>{arrivalEntryAudienceLabel(id, config.audiences[id].label)}</span></label>;
         })}</div>
       </fieldset>
       <div className={entryStyle.entryFooter}>
