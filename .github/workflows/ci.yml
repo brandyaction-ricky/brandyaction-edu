@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/moonshot-entry-audience-20261120" ]; then
+            expected_main=2c76411ea6b195790ad13dceada517e7b8f9395f
+            release_payload=2fe7b1e66e7b411e260951a2ea80bb207786f21c
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' features/campus/arrival/config.ts features/campus/arrival/editor.tsx features/campus/arrival/experience.tsx tests/arrival-fixture/report-qa.mjs tests/arrival-fixture/work-trial-qa.mjs tests/campus-arrival-config.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned Moonshot entry audience order change (Codex 1c57fbe9, f1b2b4f0); no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-entry-button-20261120" ]; then
             expected_main=6f8d624d3e45ae3399973db3e22b570869437e11
             release_payload=730a7de1049c9664c56ee7fbc48426833a998eb5

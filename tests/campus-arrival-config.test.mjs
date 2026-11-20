@@ -28,6 +28,26 @@ test('editable defaults preserve the examples and all four working requests', ()
   }
 });
 
+test('the first screen updates old default labels in the new order while keeping saved custom labels', () => {
+  const saved = draft();
+  saved.audiences.preparing.label = '창업을 준비하고 있어요';
+  saved.audiences.work.label = '회사 업무에 AI를 써보고 싶어요';
+  const published = config.validateArrivalConfig(saved);
+  const labels = config.arrivalEntryAudiences.map(id => [id, config.arrivalEntryAudienceLabel(id, published.audiences[id].label)]);
+  assert.deepEqual(labels, [
+    ['business', '이미 사업을 하고 있어요'],
+    ['preparing', '내 사업을 준비하고 있어요'],
+    ['exploring', '아직 아이템이 없어요'],
+    ['work', '회사에 다니고 있어요'],
+  ]);
+  assert.equal(published.audiences.work.label, saved.audiences.work.label);
+  assert.equal(published.audiences.preparing.label, saved.audiences.preparing.label);
+  for (const id of ['preparing', 'work']) {
+    saved.audiences[id].label = '관리자가 정한 문구';
+    assert.equal(config.arrivalEntryAudienceLabel(id, config.validateArrivalConfig(saved).audiences[id].label), '관리자가 정한 문구');
+  }
+});
+
 test('legacy settings add work and shared welcome benefits without replacing administrator edits', () => {
   const legacy = draft();
   delete legacy.audiences.work;

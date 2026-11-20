@@ -6,7 +6,7 @@ import {ArrowUpRight, Eye, Plus, X} from 'lucide-react';
 import {AdminButton, AdminInput, AdminTextarea, useAdminDialog} from '@/features/admin-ui/components/admin-system';
 import {EditorDisclosure} from '../content/disclosure';
 import {audiences, type Audience} from './content';
-import {ARRIVAL_CONFIG_LIMITS as limits, DEFAULT_ARRIVAL, validateArrivalConfig, type ArrivalConfig} from './config';
+import {ARRIVAL_CONFIG_LIMITS as limits, arrivalEntryAudienceLabel, DEFAULT_ARRIVAL, validateArrivalConfig, type ArrivalConfig} from './config';
 import {DEFAULT_WORK_TRIAL} from './work-trial';
 import {WorkTrialEditor} from './work-trial-editor';
 import {DEFAULT_OFFICE_DEMO} from './office-demo';
@@ -133,10 +133,12 @@ export function ArrivalEditor({value: storedValue, onChange, disabled = false, s
 
     {audiences.map(id => {
       const item = value.audiences[id];
+      const entryLabel = arrivalEntryAudienceLabel(id, item.label);
+      const labelHelp = entryLabel === item.label ? '방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.' : `이 기본 문구는 첫 화면에서 ‘${entryLabel}’로 표시됩니다.`;
       return <EditorDisclosure key={id} title={`${audienceNames[id]} · 체험 내용`}>
         <fieldset disabled={disabled} className={styles.fields}>
           <div className={styles.grid}>
-            <AdminInput label="대상 안내 · 버튼의 큰 제목" helper={id === 'work' ? '예: 회사 업무에 AI를 써보고 싶어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.' : '예: 이미 사업을 하고 있어요. 방문자가 자신의 상황을 바로 고를 수 있게 적어주세요.'} required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
+            <AdminInput label="대상 안내 · 버튼의 큰 제목" helper={labelHelp} required maxLength={limits.label} value={item.label} onChange={event => updateAudience(id, {label: event.target.value})}/>
             <AdminInput label="체험 후 얻는 결과" required maxLength={limits.goal} value={item.goal} onChange={event => updateAudience(id, {goal: event.target.value})}/>
           </div>
           {id === 'work' ? <WorkTrialEditor value={value.workTrial} onChange={next => patch('workTrial', next)} disabled={disabled}/> : <>
