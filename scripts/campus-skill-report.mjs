@@ -99,12 +99,14 @@ export async function tidyStartFiles(startPath, now=Date.now()) {
 }
 // What the employee tells the learner when a report did not reach the office. The first line is copied as is.
 export function failureNotice(message) {
+  const known=/Report rejected \(HTTP 40[13]\)|Invalid skill request binding|Delivery unconfirmed|Local report file unavailable|Missing private report storage/.test(message);
   const why=/Report rejected \(HTTP 40[13]\)|Invalid skill request binding/.test(message)
     ? '이 직원의 보고 연결이 해제됐거나 만료됐어요. 캠퍼스 ‘내 AI 직원’의 이 직원 카드에 ‘연결 해제’ 버튼이 보이면 먼저 누르고, 이 대화에 ‘캠퍼스 연결 준비’를 보내 다시 연결해 주세요.'
     : /Delivery unconfirmed/.test(message) ? '캠퍼스에 닿지 못했어요. 인터넷 연결을 확인한 뒤 같은 일을 다시 맡겨 주세요.'
     : /Local report file unavailable|Missing private report storage/.test(message) ? '이 직원은 아직 캠퍼스에 연결되지 않았어요. 이 대화에 ‘캠퍼스 연결 준비’를 보내 연결해 주세요.'
     : '잠시 뒤 같은 일을 다시 맡겨 주세요. 계속되면 아래 오류 문장을 운영 담당자에게 알려 주세요.';
-  return '⚠️ 캠퍼스 사무실에는 기록되지 않았어요. '+why+'\n('+message+')';
+  // Learners only see Korean; the raw error stays only where an operator is asked to look at it.
+  return '⚠️ 캠퍼스 사무실에는 기록되지 않았어요. '+why+(known?'':'\n('+message+')');
 }
 async function main(configPath,inputPath,mode) {
   if(!configPath||!inputPath)throw Error('Usage: report.mjs PRIVATE_CONFIG INPUT_JSON');

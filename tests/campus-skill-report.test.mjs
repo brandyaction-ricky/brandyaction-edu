@@ -112,7 +112,8 @@ test('a failed report gives the employee one first line to copy, with the right 
   assert.match(first('Delivery unconfirmed. Keep this saved report and retry it; do not create another event.'),/인터넷 연결/);
   assert.match(first('Local report file unavailable'),/아직 캠퍼스에 연결되지 않았어요/);
   assert.match(first('Report rejected (HTTP 409). x'),/^⚠️ 캠퍼스 사무실에는 기록되지 않았어요\. 잠시 뒤/);
-  assert.match(failureNotice('Invalid skill request binding'),/\n\(Invalid skill request binding\)$/);
+  assert.doesNotMatch(failureNotice('Report rejected (HTTP 403). Keep the saved report; check mapping/revision before retrying.'),/[A-Za-z]{3}/);
+  assert.match(failureNotice('Report rejected (HTTP 409). x'),/\n\(Report rejected \(HTTP 409\)\. x\)$/);
 });
 test('report text shows the words of a Telegram-markdown answer without changing links or plain text',async()=>{
   const {officeReportText}=await import('../features/campus/office/report-text.ts');
