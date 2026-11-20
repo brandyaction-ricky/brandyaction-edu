@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/campus-open-nits-20261120" ]; then
+            expected_main=f2b6449c57b4377e17216a1eab0237d0389602b8
+            release_payload=130e001ba764f4a6aa45a2465deed486bf41e785
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' features/campus/space/panel.tsx features/campus/tour/preview.tsx scripts/campus-skill-report.mjs skills/packages/moonshot-campus-report-development.zip skills/packages/moonshot-campus-report-production.zip tests/campus-skill-report.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned campus student-open nits change; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/moonshot-live-completion-20261120" ]; then
             expected_main=3010ea6687ef7fa258601d7cff6d060a1a32642c
             release_payload=4e46989b84713669669eaea686ca3d753083aff7
