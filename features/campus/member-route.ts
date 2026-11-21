@@ -4,7 +4,7 @@
  */
 const memberApis=new Set([
  '/api/campus/event','/api/campus','/api/campus/focus','/api/campus/journal','/api/campus/library','/api/campus/welcome','/api/campus/lesson-search',
- '/api/campus/office','/api/campus/office/agents','/api/campus/space',
+ '/api/campus/office','/api/campus/office/agents','/api/campus/office/skill','/api/campus/space',
  '/api/campus/community','/api/campus/community/exhibition','/api/campus/community/files',
  '/api/campus/community/rewards','/api/campus/community/workflows',
  '/api/campus/business','/api/campus/business/archive','/api/campus/business/cases',
