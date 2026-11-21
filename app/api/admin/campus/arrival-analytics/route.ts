@@ -16,17 +16,27 @@ export async function GET(request: Request) {
     const days: string[] = [];
     for (let t = start; t < end; t += 86400000) days.push(new Date(t + 9 * 3600000).toISOString().slice(0, 10));
     const db = createAdminClient(), rows: ArrivalRow[] = [];
-    const page = 5000, cap = 100000;
-    for (let offset = 0; offset < cap; offset += page) {
-      const r = await db.from('edu_arrival_events').select('session_id,kind,station,target,seconds,source,medium,campaign,occurred_at')
-        .gte('occurred_at', new Date(start).toISOString()).lt('occurred_at', new Date(end).toISOString())
-        .order('id').range(offset, offset + page - 1).abortSignal(AbortSignal.timeout(10000));
-      if (r.error) throw r.error;
-      rows.push(...(r.data as ArrivalRow[]));
-      if (r.data.length < page) break;
+    const startTime = new Date(start).toISOString();
+    const endTime = new Date(Math.min(end, Date.now())).toISOString();
+    const cap = 100_000;
+    let lastId: string | undefined;
+    while (rows.length <= cap) {
+      let query = db.from('edu_arrival_events')
+        .select('cursor_id:id::text,session_id,kind,station,target,seconds,source,medium,campaign,occurred_at')
+        .gte('occurred_at', startTime).lt('occurred_at', endTime)
+        .order('id').limit(Math.min(1000, cap + 1 - rows.length));
+      if (lastId !== undefined) query = query.gt('id', lastId);
+      const {data, error} = await query.abortSignal(AbortSignal.timeout(10000));
+      if (error) throw error;
+      // PostgREST can return fewer rows than requested even when more exist.
+      if (data.length === 0) break;
+      rows.push(...(data as ArrivalRow[]));
+      lastId = data[data.length - 1].cursor_id;
     }
+    const truncated = rows.length > cap;
+    if (truncated) rows.pop();
     const setting = await db.from('edu_campus_analytics_settings').select('enabled').eq('id', true).maybeSingle();
     if (setting.error) throw setting.error;
-    return privateReply({...buildArrivalReport(rows, days), trackingEnabled: setting.data?.enabled === true, from, to, truncated: rows.length >= cap});
+    return privateReply({...buildArrivalReport(rows, days), trackingEnabled: setting.data?.enabled === true, from, to, truncated});
   } catch (e) { return problem(e); }
 }
