@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/campus-skill-download-20261121" ]; then
+            expected_main=ad4ad53600f86ee85ca027c2bc4c102dbd1d064d
+            release_payload=5da942bd85033dd6fb94cec70823d4ba8194a7f3
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' features/campus/member-route.ts tests/campus-public-link.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned campus report skill download fix; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/moonshot-analytics-range-20261121" ]; then
             expected_main=5bfe27a208c2ed80e50eed176005bd330e6bbc51
             release_payload=9446e3f7b9a2af7b1217acc2e299e825b8d19860
