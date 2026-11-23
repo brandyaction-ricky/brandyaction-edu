@@ -227,19 +227,30 @@ test('example viewing and self-reported AI completion stay separate on restorati
   assert.equal(model.parseArrivalState(JSON.stringify({...initial, mode: 'personal', experience: 'example-viewed'})).experience, 'none');
 });
 
-test('returning to the welcome zone restarts the old shortcuts before the office case', () => {
+test('visitors who reached the lounge, even by shortcut, return straight to it', () => {
   const initial = model.initialArrivalState();
-  const stored = {...initial, entryStarted:true, visitorAvatar:'male-d', spyPhase:'handed-off',
+  const stored = {...initial, entryStarted:true, visitorAvatar:'male-d', spyPhase:'reviews',
     audience:'preparing', hallReturnStep:5, handoff:'copied', experience:'self-reported'};
   stored.answers.preparing = {a:'저장한 연습 입력', b:''};
   for (const step of [1, 2, 3, 5, 7, 8]) {
     const restored = model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({...stored, step})));
-    assert.deepEqual([restored.step, restored.station, restored.officeStation, restored.entryStarted], [0, 1, 1, false]);
+    assert.deepEqual([restored.step, restored.station, restored.entryStarted, restored.loungeVisited], [7, 7, true, true]);
     assert.deepEqual([restored.experience, restored.handoff, restored.hallReturnStep], ['none', 'ready', null]);
     assert.deepEqual(restored.answers, stored.answers);
     assert.equal(restored.visitorAvatar, stored.visitorAvatar);
   }
-  assert.equal(model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({version:1, spyPhase:'handed-off', step:7}))).step, 0);
+  assert.equal(model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({version:1, step:7}))).step, 7);
+  // The lounge stays remembered after leaving it for the personal trial.
+  const trial = model.parseArrivalState(JSON.stringify({version:1, step:2, station:6, loungeVisited:true}));
+  assert.equal(model.resumeArrivalRoute(trial).step, 7);
+  // A corridor finisher standing at the lounge door walks in.
+  const door = model.parseArrivalState(JSON.stringify({version:1, step:0, station:7, officeStation:7, spyPhase:'handed-off', entryStarted:true}));
+  assert.deepEqual([model.resumeArrivalRoute(door).step, model.resumeArrivalRoute(door).station], [7, 7]);
+});
+
+test('a personal trial opened before the lounge still restarts the corridor', () => {
+  const restored = model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({version:1, step:2, station:6, entryStarted:true, experience:'self-reported'})));
+  assert.deepEqual([restored.step, restored.station, restored.officeStation, restored.loungeVisited], [0, 1, 1, false]);
 });
 
 test('the current office route and a deliberate personal trial from the lounge still resume', () => {

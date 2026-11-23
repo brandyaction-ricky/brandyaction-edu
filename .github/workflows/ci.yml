@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/arrival-lounge-return-20261123" ]; then
+            expected_main=b7a44a55410af2c3b2e50980b47342c3cfca5baf
+            release_payload=31cef6773707836b50e623f8cbb97d5539986ea1
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' features/campus/arrival/experience.tsx features/campus/arrival/model.ts features/campus/arrival/office-entry.module.css tests/campus-arrival.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned Moonshot lounge return change; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/campus-skill-download-20261121" ]; then
             expected_main=ad4ad53600f86ee85ca027c2bc4c102dbd1d064d
             release_payload=5da942bd85033dd6fb94cec70823d4ba8194a7f3
