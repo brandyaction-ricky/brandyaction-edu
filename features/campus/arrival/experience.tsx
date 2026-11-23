@@ -432,13 +432,17 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     setLobbyGuide(null);
     setReminderOpen(false);
     setExplore(next === 7);
-    update({...route, step: next});
+    update({...route, step: next, ...(next === 7 ? {loungeVisited: true} : {})});
   }
   function startEntry() {
     if (!entryAudience) return;
     tracking.current?.track({kind: 'click', station: 0, target: `audience:${entryAudience}`});
     update({entryStarted: true, audience: entryAudience});
     requestWalk(1);
+  }
+  function skipToLounge() {
+    update({entryStarted: true, ...(entryAudience ? {audience: entryAudience} : {})});
+    go(7, {station: 7});
   }
   function selectAudience(audience: Audience) {
     update({audience, consentedCompanyRule: audience === state.audience ? state.consentedCompanyRule : '',
@@ -541,6 +545,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
       <div className={entryStyle.entryFooter}>
         <button id="arrival-desk-button" type="button" ref={deskButton} className={progression.nextAction} disabled={!entryAudience} onClick={startEntry}>이 상황으로 시작<ArrowRight size={16} aria-hidden="true"/></button>
         <p><BookOpen size={15} aria-hidden="true"/>웰컴 라운지에서 AI팀 설계도와 작업별 AI 활용 가이드를 볼 수 있어요.</p>
+        <button type="button" className={entryStyle.skipLounge} onClick={skipToLounge}>이미 체험했어요 · 웰컴 라운지로 바로 가기<ArrowRight size={15} aria-hidden="true"/></button>
       </div>
     </section> : officeIntro ? <section className={entryStyle.wayfinding} aria-label="현재 목적지" data-walk-station={station} inert={backgroundInert} style={teamLeaderOpen ? {visibility: 'hidden'} : undefined}>
       <p className={entryStyle.nextStationHint} role="status" aria-atomic="true">{guidedStation === station && nextStationHints[guidedStation]}</p>
