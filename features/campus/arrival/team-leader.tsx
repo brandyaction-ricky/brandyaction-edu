@@ -11,24 +11,20 @@ function timestamp(seconds: number) {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
-export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; onClose: () => void; onComplete: () => void}) {
-  const [showVideo, setShowVideo] = useState(false);
+export function TeamLeader({onClose, onComplete}: {onClose: () => void; onComplete: () => void}) {
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [playbackError, setPlaybackError] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const heading = useRef<HTMLHeadingElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const player = useRef<HTMLDivElement>(null);
   const controls = useRef<HTMLButtonElement>(null);
   const autoplayTimer = useRef<number | undefined>(undefined);
   const descriptionId = useId();
 
-  useEffect(() => {heading.current?.focus({preventScroll: true});}, []);
   useEffect(() => {
-    if (!showVideo) return;
     const media = video.current;
     controls.current?.focus({preventScroll: true});
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 360;
@@ -36,7 +32,7 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
       void media?.play().catch(() => {/* The visible play button is available if autoplay is blocked. */});
     }, delay);
     return () => {window.clearTimeout(autoplayTimer.current); media?.pause();};
-  }, [showVideo]);
+  }, []);
   useEffect(() => {
     function handleFullscreen() {setFullscreen(document.fullscreenElement === player.current);}
     document.addEventListener('fullscreenchange', handleFullscreen);
@@ -86,10 +82,7 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
   }}>
     <div className={styles.content}>
       <button type="button" className={styles.back} onClick={() => leave(onClose)}><ArrowLeft size={18} aria-hidden="true"/>사무실로</button>
-      {!showVideo ? <div className={styles.intro}>
-        <h2 tabIndex={-1} ref={heading}>{greeting}</h2>
-        <button className={styles.cta} type="button" onClick={() => setShowVideo(true)}><Play size={17} aria-hidden="true"/>지금 확인하기</button>
-      </div> : <div className={styles.screening}>
+      <div className={styles.screening}>
         <div className={styles.player} ref={player}>
           <div className={styles.picture}>
             <video ref={video} src={VIDEO_SOURCE} muted playsInline preload="metadata" width={464} height={848}
@@ -124,7 +117,7 @@ export function TeamLeader({greeting, onClose, onComplete}: {greeting: string; o
           }}>다시 불러오기</button></p>}
           <button type="button" className={progression.nextAction} onClick={() => leave(onComplete)}>경쟁사 스파이 만나기<ArrowRight size={16} aria-hidden="true"/></button>
         </div>
-      </div>}
+      </div>
     </div>
   </section>;
 }

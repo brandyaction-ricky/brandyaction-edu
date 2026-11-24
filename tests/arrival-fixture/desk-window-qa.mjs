@@ -77,7 +77,6 @@ for (const {name, engine, viewport, mobile} of devices) {
     await startOfficeCase(page);
     const leader = teamLeaderGuide(page);
     await expect(leader).toBeVisible();
-    await tap(button(leader, '지금 확인하기'));
     await expect(teamLeaderNext(leader)).toBeInViewport({ratio: .95});
     const spyModel = page.waitForRequest(request => new URL(request.url()).pathname === modelPath('female-d'));
     await tap(teamLeaderNext(leader));

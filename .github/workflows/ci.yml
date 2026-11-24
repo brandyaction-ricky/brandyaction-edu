@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/arrival-teaser-20261124" ]; then
+            expected_main=75da616f9dc77e293eeba93791b80ee67eca0da9
+            release_payload=163bdfd3a59a0580823ad6ef5938c9137ac09c3e
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' features/campus/arrival/experience.tsx features/campus/arrival/team-leader.tsx tests/arrival-fixture/desk-window-qa.mjs tests/arrival-fixture/office-entry-qa.mjs tests/arrival-fixture/report-qa.mjs tests/arrival-fixture/review-office.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned Moonshot entry teaser change; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/arrival-lounge-return-20261123" ]; then
             expected_main=b7a44a55410af2c3b2e50980b47342c3cfca5baf
             release_payload=31cef6773707836b50e623f8cbb97d5539986ea1
