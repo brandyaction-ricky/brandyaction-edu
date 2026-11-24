@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
-import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare} from 'lucide-react';
+import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare, Play} from 'lucide-react';
 import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
 import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, ARRIVAL_CALENDAR_FILE, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
@@ -10,6 +10,7 @@ import {CorridorPanel} from './corridor-panel';
 import {reuseContentStationAnswers} from './content-station-prompt';
 import {startArrivalTracking} from './analytics';
 import {TeamLeader} from './team-leader';
+import leaderStyle from './team-leader.module.css';
 import entryStyle from './office-entry.module.css';
 import progression from './progression.module.css';
 import {WorkTrialPanel} from './work-trial-panel';
@@ -119,6 +120,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   const [revisitContent, setRevisitContent] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [teaserDone, setTeaserDone] = useState(false);
   const lobbyDialog = useRef<HTMLDialogElement>(null);
   const lobbyGuideTrigger = useRef<HTMLButtonElement | null>(null);
   const sceneFrame = useRef<HTMLIFrameElement>(null);
@@ -530,7 +532,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     {officeIntro && firstStop && sceneStatus === 'ready' && !teamLeaderOpen && <div className={entryStyle.avatarControl}>
       <VisitorAvatar value={state.visitorAvatar} onChange={visitorAvatar => update({visitorAvatar})} onOpenChange={setAvatarOpen} persistent={Boolean(persistenceKey) && !storageBlocked}/>
     </div>}
-    {choosingAudience ? <section className={entryStyle.entryChoice} aria-label="문샷 AI 직원 체험 소개">
+    {choosingAudience && !teaserDone ? <section className={leaderStyle.scene} aria-label="문샷 AI 직원 체험 시작"><div className={leaderStyle.content}><div className={leaderStyle.intro}>
+      <h2>{officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting}</h2>
+      <button className={leaderStyle.cta} type="button" autoFocus onClick={() => setTeaserDone(true)}><Play size={17} aria-hidden="true"/>지금 확인하기</button>
+    </div></div></section> : choosingAudience ? <section className={entryStyle.entryChoice} aria-label="문샷 AI 직원 체험 소개">
       <p className={entryStyle.experienceName}>문샷 AI 직원 체험</p>
       <h1>{config.title}</h1>
       <p>지금 하는 일에 맞춰, AI에게 무엇을 어떻게 맡길 수 있는지 확인해 보세요.</p>
@@ -689,7 +694,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         </div>
       </div>
     </section>}
-    {teamLeaderOpen && <TeamLeader greeting={officeCaseContent(config.officeDemo ?? DEFAULT_OFFICE_DEMO).greeting} onClose={closeDesk} onComplete={finishStation}/>}
+    {teamLeaderOpen && <TeamLeader onClose={closeDesk} onComplete={finishStation}/>}
     {openDeskStation && <CorridorPanel station={openDeskStation}
       spyPhase={state.spyPhase} onSpyAdvance={advanceSpy} canonPhase={state.canonPhase} onCanonAdvance={advanceCanon}
       contentDraft={state.contentDraft} onContentDraftChange={contentDraft => update({contentDraft})}
