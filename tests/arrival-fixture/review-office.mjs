@@ -35,7 +35,15 @@ export function loungeScheduleButton(page) {
   return page.getByRole('region', {name:'웰컴 라운지에서 할 수 있는 일'}).getByRole('button', {name: '캘린더에 추가', exact: true});
 }
 
+export async function passEntryTeaser(page) {
+  const teaser = page.getByRole('region', {name:'문샷 AI 직원 체험 시작', exact:true});
+  const start = page.getByRole('button', {name:'이 상황으로 시작', exact:true});
+  await expect(teaser.or(start)).toBeVisible({timeout:20000});
+  if (await teaser.isVisible()) await teaser.getByRole('button', {name:'지금 확인하기', exact:true}).click();
+}
+
 export async function startOfficeCase(page, audience = '이미 사업을 하고 있어요') {
+  await passEntryTeaser(page);
   const start = page.getByRole('button', {name:'이 상황으로 시작', exact:true});
   await expect(start).toBeVisible();
   await page.getByText(audience, {exact:true}).click();
@@ -66,9 +74,6 @@ export async function finishOfficeReview(page, {walk, audience, inspect = async 
       const guide = teamLeaderGuide(page);
       await expect(guide).toBeVisible({timeout: 20000});
       await inspect(station, guide);
-      if (await guide.locator('video').count() === 0) {
-        await guide.getByRole('button', {name:'지금 확인하기', exact: true}).click();
-      }
       const next = teamLeaderNext(guide);
       if (!await next.isVisible()) await finishTeamLeaderVideo(guide);
       await beforeLeave(station);

@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {firstSpyRequest, finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {firstSpyRequest, finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, passEntryTeaser, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -24,8 +24,18 @@ try {
       if (output) await page.screenshot({path:resolve(output, device+'-'+stage+'.png'), animations:'disabled'});
     }
     async function walk(station) {
-      if (station === 1) await startOfficeCase(page);
-      else {
+      if (station === 1) {
+        // The team leader now starts the video on arrival, so block autoplay before entering.
+        if (device === 'small-mobile') await page.evaluate(() => {
+          const play = HTMLMediaElement.prototype.play;
+          HTMLMediaElement.prototype.play = function() {
+            HTMLMediaElement.prototype.play = play;
+            window.__leaderAutoplayBlocked = true;
+            return Promise.reject(new DOMException('Autoplay blocked for this QA run', 'NotAllowedError'));
+          };
+        });
+        await startOfficeCase(page);
+      } else {
         const target = station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true});
         if (!await target.isVisible() && await page.locator('#arrival-desk-button').isEnabled()) {
           await page.locator('#arrival-desk-button').click();
@@ -51,23 +61,9 @@ try {
       const fullscreen = button(guide,'전체 화면');
       const seek = guide.getByRole('slider', {name:'재생 위치', exact:true});
       await expect(page.getByRole('dialog')).toHaveCount(0);
-      await expect(intro).toBeVisible();
-      await expect(start).toBeInViewport({ratio:0.95});
-      await expect(video).toHaveCount(0);
-      await expect(next).toHaveCount(0);
+      await expect(intro).toHaveCount(0);
+      await expect(start).toHaveCount(0);
       await expect(guide.getByText('담당자들의 책상에 놓인 일')).toHaveCount(0);
-      await capture('leader-intro');
-      if (device === 'small-mobile') {
-        await page.evaluate(() => {
-          const play = HTMLMediaElement.prototype.play;
-          HTMLMediaElement.prototype.play = function() {
-            HTMLMediaElement.prototype.play = play;
-            window.__leaderAutoplayBlocked = true;
-            return Promise.reject(new DOMException('Autoplay blocked for this QA run', 'NotAllowedError'));
-          };
-        });
-      }
-      await start.click();
       await expect(video).toHaveAttribute('src', '/campus/arrival/team-leader-telegram.mp4');
       await expect(video).toHaveAttribute('aria-label', '텔레그램에서 AI 직원에게 일을 맡기고 보고받는 모습');
       await expect(page.locator('iframe[title*="직원 사무실"]')).toBeVisible();
@@ -103,9 +99,8 @@ try {
         await expect(guide).toHaveCount(0);
         await expect(video).toHaveCount(0);
         await page.locator('#arrival-desk-button').click();
-        await expect(intro).toBeVisible();
-        await expect(video).toHaveCount(0);
-        await start.click();
+        await expect(intro).toHaveCount(0);
+        await expect(video).toHaveCount(1);
       }
       await expect.poll(() => video.evaluate(element => element.currentTime)).toBeGreaterThan(0);
       await expect(next).toBeInViewport({ratio:1});
@@ -225,6 +220,8 @@ try {
     }
     try {
       await page.goto(new URL('/experience/moonshot', base).href);
+      await capture('teaser');
+      await passEntryTeaser(page);
       await expect(page.getByRole('radio')).toHaveCount(4);
       await expect(teamLeaderGuide(page)).toHaveCount(0);
       await expect(page.locator('video')).toHaveCount(0);

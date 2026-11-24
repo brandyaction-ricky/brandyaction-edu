@@ -1,7 +1,7 @@
 import {chromium, devices as deviceDescriptors, expect, webkit} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {firstSpyRequest, finishOfficeReview, openLoungeSchedule, teamLeaderNext} from './review-office.mjs';
+import {firstSpyRequest, finishOfficeReview, openLoungeSchedule, passEntryTeaser, teamLeaderNext} from './review-office.mjs';
 
 const linkFile = process.env.ARRIVAL_QA_LINK_FILE;
 const url = new URL(linkFile ? (await readFile(linkFile, 'utf8')).trim() : process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4497');
@@ -12,7 +12,7 @@ if (output) await mkdir(output, {recursive: true});
 const routes = [
   ['business', '이미 사업을 하고 있어요', null],
   ['preparing', '내 사업을 준비하고 있어요', {audience:'preparing', step:2}],
-  ['exploring', '아직 아이템이 없어요', {audience:'exploring', step:7, hallReturnStep:5, experience:'self-reported'}],
+  ['exploring', '아직 아이템이 없어요', {audience:'exploring', step:3, experience:'self-reported'}],
   ['work', '회사에 다니고 있어요', {audience:'work', step:1}],
 ];
 const devices = [[chromium, {width:1440, height:723}], [webkit, {width:390, height:844}]];
@@ -43,6 +43,7 @@ for (const [engine, viewport] of devices) {
       const response = await page.goto(url.href);
       expect(response?.status()).toBe(200);
       expect(new URL(page.url()).origin).toBe(url.origin);
+      await passEntryTeaser(page);
       await expect(action('이 상황으로 시작')).toBeDisabled();
       const entry = page.getByRole('region', {name:'문샷 AI 직원 체험 소개', exact:true});
       const radios = entry.getByRole('radio');
@@ -64,7 +65,6 @@ for (const [engine, viewport] of devices) {
         await expect(page.locator('[data-work-step], #arrival-brief')).toHaveCount(0);
         await expect(action('무료 자료 받기')).toHaveCount(0);
         if (station === 1 && !priorRoute) {
-          await tap(action('지금 확인하기', desk));
           await expect(teamLeaderNext(desk)).toBeInViewport({ratio:1});
           await verifyPlayback(desk.locator('video'), 20);
           await capture(page, 'team-leader-video');
