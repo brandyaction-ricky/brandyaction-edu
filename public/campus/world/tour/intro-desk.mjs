@@ -39,15 +39,20 @@ function boxEntry(near, far, min, max) {
   return first;
 }
 
-export function hitsIntroDesk(near, far, desks) {
+// The nearest desk or chair the click ray enters; occupied chairs are tall enough to cover the seated figure.
+export function pickDesk(near, far, desks, occupied = () => false) {
   let closest = Infinity, picked;
   for (const desk of desks) {
     const {x, y, seat} = desk;
     const table = boxEntry(near, far, {x: x - .12, y: .05, z: y - .12}, {x: x + 1.52, y: 1.52, z: y + 1.32});
     const chair = boxEntry(near, far, {x: seat.x - .38, y: .1, z: seat.y - .38},
-      {x: seat.x + .38, y: desk.index === introSeatIndex ? 1.65 : .98, z: seat.y + .38});
+      {x: seat.x + .38, y: occupied(desk.index) ? 1.65 : .98, z: seat.y + .38});
     const t = Math.min(table, chair);
     if (t < closest) {closest = t; picked = desk.index;}
   }
-  return picked === introSeatIndex;
+  return picked;
+}
+
+export function hitsIntroDesk(near, far, desks) {
+  return pickDesk(near, far, desks, index => index === introSeatIndex) === introSeatIndex;
 }
