@@ -186,3 +186,19 @@ test('tap the demo employee, their workstation or neither from two camera direct
   // A neighbouring desk in front of the selected one intercepts the tap.
   assert.ok(!hitsIntroDesk({x: desk.x + .7, y: .8, z: 24}, {x: desk.x + .7, y: .8, z: 10}, desks));
 });
+
+test('tapping any employee or their desk in the office names that seat', async () => {
+  const {pickDesk} = await import('../public/campus/world/tour/intro-desk.mjs');
+  const {createCampusPlan} = await import('../public/campus/world/office/vendor/campus-plan.js');
+  const desks = createCampusPlan().officeSeats, seated = index => index === 2 || index === 7;
+  const tap = (x, z) => pickDesk({x, y: 5, z}, {x, y: -5, z}, desks, seated);
+  for (const desk of desks) {
+    assert.equal(tap(desk.seat.x, desk.seat.y), desk.index);
+    assert.equal(tap(desk.x + .7, desk.y + .6), desk.index);
+  }
+  assert.equal(tap(27, 17), undefined);
+  // A seated figure is taller than an empty chair, so a level tap at head height still finds them.
+  const head = (desk, occupied) => pickDesk({x: desk.seat.x, y: 1.4, z: 26}, {x: desk.seat.x, y: 1.4, z: 9}, [desk], occupied);
+  assert.equal(head(desks[7], seated), 7);
+  assert.equal(head(desks[7], () => false), undefined);
+});

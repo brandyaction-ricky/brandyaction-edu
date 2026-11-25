@@ -18,7 +18,7 @@ import {atriumHeightAt,canWalkAtrium,intersectAtriumRay} from './atrium-layout.m
 import {attachPreviewMeetup} from './preview-meetup.mjs';
 import {applyWarmStudy} from './space-design.mjs';
 import {buildLunarAtrium as buildOpenCampus,atriumActions as openCampusActions} from './lunar-atrium.mjs';
-import {introSeatIndex, introEntrance, introBalloonPosition, hitsIntroDesk} from './intro-desk.mjs';
+import {introSeatIndex, introEntrance, introBalloonPosition, hitsIntroDesk, pickDesk} from './intro-desk.mjs';
 import {attachTourView} from './view-controls.mjs';
 import {attachAppearanceEditor} from '../office/appearance-editor.mjs';
 import {appearance} from '../office/contract.mjs';
@@ -326,6 +326,6 @@ document.addEventListener('keydown',e=>{const d=direction(e);if(!d||blocked||edi
 root.addEventListener('pointerup',e=>{if(!ready||blocked||editing||!view.isClick()||e.button!==0)return;const rect=root.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top,near=office.camera.position.clone().set(mx/office.cw*2-1,1-my/office.ch*2,-1).unproject(office.camera),far=office.camera.position.clone().set(mx/office.cw*2-1,1-my/office.ch*2,1).unproject(office.camera);if(officeIntro&&room==='office'&&guidedDemoPhase==='result'&&hitsIntroDesk(near,far,officeSeats)){
  target=null;keys.clear();office.campusAvatar.moving=false;
  send('action',{id:'office:demo'});return;
-}const p=room==='live'?intersectAtriumRay(near,far):office.campusFloorAt(mx,my);if(p){target=p;root.focus();budget.wake(performance.now());}});
+}if(room==='office'&&currentRole==='student'&&deskLive&&!guidedPreview){const seat=pickDesk(near,far,officeSeats,index=>deskProfiles.some(p=>p?.seatIndex===index)),person=deskProfiles.find(p=>p?.seatIndex===seat);if(person){target=null;keys.clear();office.campusAvatar.moving=false;send('office-desk-employee',{employeeId:person.employeeId});return;}}const p=room==='live'?intersectAtriumRay(near,far):office.campusFloorAt(mx,my);if(p){target=p;root.focus();budget.wake(performance.now());}});
 for(const b of document.querySelectorAll('[data-direction]')){b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(b.dataset.direction);budget.wake(performance.now());});for(const name of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(name,()=>keys.delete(b.dataset.direction));}
 window.addEventListener('resize',()=>{if(ready){if(guidedPreview)office.resize();applyRenderProfile(office.gl,root);view.resize();budget.wake(performance.now());office.draw();}});window.addEventListener('pagehide',()=>{guidedTransition?.cancel();environment?.destroy();mixer?.destroy();interiors?.destroy();meetup?.destroy();sceneBatch?.dispose();editor?.destroy();view?.destroy();office?.destroy();});
