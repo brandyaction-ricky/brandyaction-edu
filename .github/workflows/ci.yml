@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "claude/office-employee-click-20261125" ]; then
+            expected_main=3ccb21d11f0b2460d02811c713dc60850f716bb9
+            release_payload=ce5fc803d1b767ad216af0d7635fc84ffb67353d
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$release_payload"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            expected_files=$(printf '%s\n' public/campus/world/tour/intro-desk.mjs public/campus/world/tour/tour.mjs tests/campus-arrival-scene.test.mjs)
+            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
+            echo 'Verified the pinned office employee click change; no SQL or release control changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/arrival-teaser-20261124" ]; then
             expected_main=75da616f9dc77e293eeba93791b80ee67eca0da9
             release_payload=163bdfd3a59a0580823ad6ef5938c9137ac09c3e
