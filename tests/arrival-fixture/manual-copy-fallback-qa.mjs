@@ -51,6 +51,8 @@ try {
         await expect(manualPrompt).toBeFocused();
         expect(await manualPrompt.evaluate(element => element.value.length > 0 && element.selectionStart === 0 && element.selectionEnd === element.value.length)).toBe(true);
       }});
+      const officeWrites = await page.evaluate(() => window.__deniedClipboardWrites);
+      expect(officeWrites).toBe(1);
       await resumeExerciseFixture(page, 'work');
       await expect(step).toHaveAttribute('data-work-step', '0');
       await page.getByRole('button', {name: '예시 업무로 시작', exact: true}).click();
@@ -93,7 +95,8 @@ try {
       await expect(confirmed).toHaveAttribute('data-copied', 'true');
       await expect(status).toContainText('직접 복사한 매뉴얼을 메모장에 보관해 주세요');
       await expect(fallback).toHaveCount(0);
-      expect(await page.evaluate(() => window.__deniedClipboardWrites)).toBe(5);
+      const exerciseWrites = await page.evaluate(() => window.__deniedClipboardWrites);
+      expect(officeWrites + exerciseWrites).toBe(5);
       await page.screenshot({path: resolve(out, `${device}-manual-confirmed.png`)});
       expect(errors).toEqual([]);
       expect(apiRequests).toEqual([]);
