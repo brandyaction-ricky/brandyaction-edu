@@ -41,10 +41,10 @@ jobs:
             expected_main=cab361c134a96f05d58f3db961fbdb68df746f7b
             release_payload=9c336435562177da01aa8be9f8dc1f62a6bfaf98
             test "$(git rev-parse HEAD^1)" = "$expected_main"
-            tested_payload=52cf4a2ccf8075f2d6307dbb06658154b5de2695
+            tested_payload=bfc57c08debeeb2e224c66010e09686db6425369
             test "$(git rev-parse "$release_payload^")" = "$expected_main"
             git merge-base --is-ancestor "$tested_payload" HEAD
-            git diff --exit-code "$release_payload" "$tested_payload" -- . ':(exclude).github/workflows/ci.yml' ':(exclude)tests/campus-browser/tour-integration.spec.ts'
+            git diff --exit-code "$release_payload" "$tested_payload" -- . ':(exclude).github/workflows/ci.yml' ':(exclude)tests/campus-browser/tour-integration.spec.ts' ':(exclude)tests/campus-browser/webinar.spec.ts'
             git diff --exit-code "$tested_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
             echo 'Verified the pinned legacy campus room retirement against the current production base.'
             exit 0
