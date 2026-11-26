@@ -11,6 +11,7 @@ export type CampusScope = {
   courseId: string;
   cohortId: string;
   graduate?: boolean;
+  externalPartner?: true;
   courseTitle: string;
   cohortName: string;
 };

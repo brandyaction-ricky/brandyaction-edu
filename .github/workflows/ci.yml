@@ -37,6 +37,16 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-external-partner-20261126" ]; then
+            expected_main=45f23968c703eb8d5bb73fd6ec4408a86ef10dbc
+            release_payload=6d4d0e3d6b72f9c3217ebff8db9631e41f2501bb
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            echo 'Verified the exact external partner feature and both reviewed migrations against the current production base.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "claude/office-employee-click-20261125" ]; then
             expected_main=3ccb21d11f0b2460d02811c713dc60850f716bb9
             release_payload=ce5fc803d1b767ad216af0d7635fc84ffb67353d

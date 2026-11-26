@@ -23,7 +23,7 @@ function fixture() { return {
 }; }
 function database(data = fixture(), options = {}) {
   const calls = [];
-  return { data, calls, from(table) {
+  return { data, calls, rpc(name){assert.equal(name,'edu_my_external_partner_scopes');return Promise.resolve({data:[],error:null});},from(table) {
     let columns, mode = 'read', values, limit = Infinity; const filters = [], sorts = [];
     calls.push({ table, filters });
     return {

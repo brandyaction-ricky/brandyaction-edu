@@ -7,6 +7,7 @@ import { legacyLessonUnlocked } from './lesson-completion';
 import { isGraduate } from './alumni-access';
 import { publicLessonBlocks, validateLessonBlocks } from './lesson-blocks';
 import type { Row } from './platform';
+import { externalPartnerScopes, type ExternalPartnerScope } from './external-partner-access';
 
 type Actor = { id: string; role: string; status: string };
 type DB = ReturnType<typeof createAdminClient>;
@@ -96,6 +97,10 @@ export async function readReviewContent(actor: Actor, cohortId: string, lessonId
     if (snapshot.studentStateError) reviewFailure('학생 기준 잠금 상태를 확인하지 못했습니다.', 503);
     if (!snapshot.lessons.some(l => l.id === lessonId && l.studentUnlocked)) reviewFailure('학생 기준으로 아직 열리지 않은 수업입니다.');
   }
+  return publishedReviewContent(db, lessonId);
+}
+
+async function publishedReviewContent(db: DB, lessonId: string): Promise<ReviewContent> {
   const heads = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true'
     ? await rows(db.from('edu_lesson_block_heads').select('revision').eq('lesson_id', lessonId)) : [];
   const revision = heads[0]?.revision ? String(heads[0].revision) : null;
@@ -109,6 +114,11 @@ export async function readReviewContent(actor: Actor, cohortId: string, lessonId
 }
 export async function readReviewAsset(actor: Actor, cohort: string, lesson: string, asset: string | null, student = false, db = createAdminClient()) {
   const content = await readReviewContent(actor, cohort, lesson, student, db);
+  const cohortRow = await rows(db.from('cohorts').select('course_id').eq('id', cohort));
+  return publishedReviewAsset(db, content, String(cohortRow[0]?.course_id || ''), lesson, asset);
+}
+
+async function publishedReviewAsset(db: DB, content: ReviewContent, course: string, lesson: string, asset: string | null) {
   if (!asset) {
     const files = await rows(db.from('lesson_contents').select('resource_storage_path,resource_name').eq('lesson_id', lesson));
     if (!files[0]?.resource_storage_path) reviewFailure('학습 자료가 없습니다.', 404);
@@ -116,8 +126,58 @@ export async function readReviewAsset(actor: Actor, cohort: string, lesson: stri
   }
   const block = content.document?.blocks.find(b => b.assetId === asset && ['image', 'audio', 'video', 'file'].includes(b.type));
   if (!block) reviewFailure('이 수업에 게시된 자료만 열 수 있습니다.', 404);
-  const cohortRow = await rows(db.from('cohorts').select('course_id').eq('id', cohort));
-  const files = await rows(db.from('edu_lesson_media').select('path,name,kind,size').eq('id', asset).eq('course_id', cohortRow[0]?.course_id).eq('kind', block.type).not('ready_at', 'is', null));
+  const files = await rows(db.from('edu_lesson_media').select('path,name,kind,size').eq('id', asset).eq('course_id', course).eq('kind', block.type).not('ready_at', 'is', null));
   if (!files[0]) reviewFailure('게시된 자료를 찾지 못했습니다.', 404);
   return { bucket: 'lesson-content-media', path: String(files[0].path), name: String(files[0].name), kind: String(files[0].kind), size: Number(files[0].size) };
+}
+
+function partnerChoice(scope: ExternalPartnerScope) {
+  return { id: scope.id, courseId: scope.course_id, title: `${scope.course_title} · ${scope.cohort_name}` };
+}
+
+async function partnerScope(actor: Actor, access?: string, db = createAdminClient()) {
+  const scopes = actor.status === 'active' && actor.role === 'student' ? await externalPartnerScopes(actor.id, db) : [];
+  const scope = access ? scopes.find(row => row.id === access) : scopes[0];
+  if (!scope) reviewFailure('이용할 수 있는 협력자 권한을 확인해 주세요.');
+  return { scope, scopes };
+}
+
+export async function readPartnerCurriculum(actor: Actor, access?: string, db = createAdminClient()): Promise<CurriculumReview> {
+  const { scope, scopes } = await partnerScope(actor, access, db);
+  const weeks = await all(db, 'curriculum_weeks', 'id,course_id,week_number,title,is_published,archived_at', ['course_id', scope.course_id]);
+  const liveWeeks = weeks.filter(w => !w.archived_at && w.is_published === true);
+  const lessons = (await Promise.all(liveWeeks.map(w => all(db, 'curriculum_lessons', 'id,week_id,day_number,title,description,is_published,archived_at,updated_at', ['week_id', w.id])))).flat();
+  const visible = lessons.filter(l => !l.archived_at && l.is_published === true);
+  const days = curriculumDayNumbers({ curriculum_weeks: liveWeeks, curriculum_lessons: visible });
+  const weekById = new Map(liveWeeks.map(w => [w.id, w]));
+  visible.sort((a, b) => Number(weekById.get(String(a.week_id))?.week_number) - Number(weekById.get(String(b.week_id))?.week_number)
+    || Number(a.day_number) - Number(b.day_number) || a.id.localeCompare(b.id));
+  return { cohorts: scopes.map(partnerChoice), cohortId: scope.id, enrollmentId: null, studentStateError: false,
+    lessons: visible.map(l => {
+      const week = weekById.get(String(l.week_id))!;
+      return { id: l.id, title: String(l.title), description: String(l.description || ''), week: Number(week.week_number),
+        weekTitle: String(week.title), day: days.get(l.id) ?? Number(l.day_number), completed: false, studentUnlocked: true, updatedAt: String(l.updated_at || '') };
+    }),
+  };
+}
+
+async function partnerPublishedContent(actor: Actor, access: string, lesson: string, db: DB) {
+  const { scope } = await partnerScope(actor, access, db);
+  const visible = await rows(db.from('curriculum_lessons')
+    .select('id,curriculum_weeks!inner(course_id)')
+    .eq('id', lesson).eq('is_published', true).is('archived_at', null)
+    .eq('curriculum_weeks.course_id', scope.course_id).eq('curriculum_weeks.is_published', true)
+    .is('curriculum_weeks.archived_at', null));
+  if (!visible.length) reviewFailure('지정한 과정의 공개 수업만 열 수 있습니다.', 404);
+  return { scope, content: await publishedReviewContent(db, lesson) };
+}
+
+export async function readPartnerContent(actor: Actor, access: string, lesson: string, db = createAdminClient()) {
+  const { content } = await partnerPublishedContent(actor, access, lesson, db);
+  return content;
+}
+
+export async function readPartnerAsset(actor: Actor, access: string, lesson: string, asset: string | null, db = createAdminClient()) {
+  const { scope, content } = await partnerPublishedContent(actor, access, lesson, db);
+  return publishedReviewAsset(db, content, scope.course_id, lesson, asset);
 }

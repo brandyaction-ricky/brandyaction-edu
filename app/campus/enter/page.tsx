@@ -4,6 +4,8 @@ import {canReviewCampus,campusReviewPath} from '@/features/campus/operator-acces
 import theme from '@/features/campus/ui/theme.module.css';
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
+import {myExternalPartnerScopes} from '@/lib/external-partner-access';
+import {externalPartnerUrl} from '@/lib/external-partner-url';
 import {getAuthenticatedUser} from '@/lib/server-auth';
 import {createClient} from '@/lib/supabase/server';
 import {campusEntry,campusEntryPath} from '@/features/campus/entry';
@@ -26,6 +28,12 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  if(courses.error||cohorts.error)throw Error('클래스를 확인하지 못했습니다. 다시 시도해 주세요.');
  const options=candidates.filter(e=>courses.data?.some(c=>c.id===e.course_id)&&cohorts.data?.some(c=>c.id===e.cohort_id&&c.course_id===e.course_id));
  const chosen=cohort||options.length===1?options[0]:null;
+ if (!options.length) {
+  const partners = await myExternalPartnerScopes(db);
+  const partner = cohort ? partners.find(access => access.cohort_id === cohort) : partners[0];
+  if (partner) redirect(partners.length > 1 && !cohort ? externalPartnerUrl() : '/campus/workspace?' +
+   new URLSearchParams({ enrollmentId: partner.id, section: 'space', ...(welcome ? { welcome: '1' } : {}) }));
+ }
  if(chosen?.ready&&welcome)redirect('/campus/workspace?enrollmentId='+chosen.id+'&section=space&welcome=1');
  if(chosen&&!chosen.ready){const content=await readWelcome(chosen.cohort_id,'waiting');return <FourSpacesPreview review={{room:'welcome',role:'waiting'}} welcome={content} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'수강생'},scopes:[],selectedEnrollmentId:chosen.id,lessons:[],links:{classes:'/my/classes',questions:'/my/classes'},launchEligibility:null}}/>;}
  if(chosen?.ready&&!welcome)redirect('/campus/workspace?enrollmentId='+chosen.id+'&section=space');

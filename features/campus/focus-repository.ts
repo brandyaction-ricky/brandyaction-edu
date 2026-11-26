@@ -1,4 +1,5 @@
 import type { createClient } from '@/lib/supabase/server';
+import { myExternalPartnerScope } from '@/lib/external-partner-access';
 import type { Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { campusError, isCampusId } from './snapshot';
@@ -29,6 +30,10 @@ async function scope(db: Database, userId: string, enrollmentId: string, now: nu
   id(enrollmentId);
   const enrollment = await one(db.from('enrollments').select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at')
     .eq('id', enrollmentId).eq('user_id', userId).maybeSingle());
+  if (!enrollment) {
+    const access = await myExternalPartnerScope(db, enrollmentId);
+    if (access) return { ...access, externalPartner: true } as Row;
+  }
   if (!enrollment || !hasLearningAccess(enrollment, now)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   const [course, cohort] = await Promise.all([
     one(db.from('courses').select('id').eq('id', enrollment.course_id).eq('status', 'published').is('archived_at', null).maybeSingle()),
@@ -39,6 +44,11 @@ async function scope(db: Database, userId: string, enrollmentId: string, now: nu
 }
 // Never fetch lesson titles/bodies here: hidden lesson notes can still be finished.
 async function lessonVersion(db: Database, enrollment: Row, lessonId: string): Promise<string | null> {
+  if (enrollment.externalPartner === true) {
+    const result = await db.rpc('edu_campus_lesson_version', { p_access: enrollment.id, p_lesson: lessonId });
+    if (result.error) unavailable();
+    return typeof result.data === 'string' ? result.data : null;
+  }
   const lesson = await one(db.from('curriculum_lessons').select('id,week_id,updated_at')
     .eq('id', lessonId).eq('is_published', true).maybeSingle());
   if (!lesson) return null;

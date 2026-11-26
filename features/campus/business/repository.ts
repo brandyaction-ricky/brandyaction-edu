@@ -1,4 +1,5 @@
 import type { createClient } from '@/lib/supabase/server';
+import { myExternalPartnerScope } from '@/lib/external-partner-access';
 import { createHash } from 'node:crypto';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import type { Row } from '@/lib/platform';
@@ -11,6 +12,9 @@ async function result(query:PromiseLike<Result>){const r=await query;if(r.error)
 export async function assertBusinessScope(db:Database,userId:string,enrollmentId:string,now:number){
   if(!validId(enrollmentId)||!validId(userId))fail();
   const e=await result(db.from('enrollments').select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('id',enrollmentId).eq('user_id',userId).maybeSingle()) as Record<string,unknown>|null;
+  if (!e) {
+    if (await myExternalPartnerScope(db, enrollmentId)) return;
+  }
   if(!e||!hasLearningAccess(e as Row,now))fail(403);
   const [course,cohort,profile]=await Promise.all([result(db.from('courses').select('id').eq('id',e.course_id).eq('status','published').is('archived_at',null).maybeSingle()),result(db.from('cohorts').select('id').eq('id',e.cohort_id).eq('course_id',e.course_id).is('archived_at',null).maybeSingle()),result(db.from('profiles').select('id').eq('id',userId).eq('status','active').maybeSingle())]);
   if(!course||!cohort||!profile)fail(403);

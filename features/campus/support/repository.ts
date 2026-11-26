@@ -5,6 +5,7 @@ import {parseReviewPlan} from './review-planning';
 import {analyzeSupportDepth,type SupportDepthInput} from './depth-analytics';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { campusError } from '../snapshot';
+import { myExternalPartnerScope } from '@/lib/external-partner-access';
 import { id, text, parseIntake, parsePreferences, parseSession, initialPreferences, supportMetrics, type SupportState, type SupportRequest } from './domain';
 type Database=Awaited<ReturnType<typeof createClient>>;
 type Row=Record<string,unknown> & {id:string};
@@ -13,7 +14,19 @@ const unavailable=()=>campusError(503,'조회하지 못했습니다.');
 async function one(q:PromiseLike<Result>):Promise<Row|null>{const r=await q;if(r.error)unavailable();return r.data as Row|null;}
 async function all(q:PromiseLike<Result>):Promise<Row[]>{const r=await q;if(r.error||!Array.isArray(r.data)||(r.count!==undefined&&r.count!==null&&r.count!==r.data.length))unavailable();return r.data as Row[];}
 async function paged(make:(start:number,end:number)=>PromiseLike<Result>):Promise<Row[]>{const out:Row[]=[];let count:number|null=null;for(let start=0;start<20000;start+=500){const r=await make(start,start+499);if(r.error||!Array.isArray(r.data)||r.count==null||r.count>20000||(count!==null&&count!==r.count)||r.data.length!==Math.min(500,r.count-start))unavailable();count=r.count!;out.push(...r.data as Row[]);if(out.length===count){if(new Set(out.map(r=>r.id)).size!==out.length)unavailable();return out;}}return unavailable();}
-async function scope(db:Database,actor:string,enrollment:string){const e=await one(db.from('enrollments').select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('id',id(enrollment)).eq('user_id',actor).maybeSingle());if(!e||!hasLearningAccess(e))campusError(403,'수강권을 확인해 주세요.');const c=await one(db.from('courses').select('id').eq('id',e.course_id).eq('status','published').is('archived_at',null).maybeSingle());if(!c)campusError(403,'과정을 확인해 주세요.');const h=await one(db.from('cohorts').select('id').eq('id',e.cohort_id).eq('course_id',e.course_id).is('archived_at',null).maybeSingle());if(!h)campusError(403,'기수를 확인해 주세요.');return e;}
+async function scope(db: Database, actor: string, enrollment: string) {
+ const e = await one(db.from('enrollments').select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('id', id(enrollment)).eq('user_id', actor).maybeSingle());
+ if (!e) {
+  const partner = await myExternalPartnerScope(db, enrollment);
+  if (partner) return partner;
+ }
+ if (!e || !hasLearningAccess(e)) campusError(403, '수강권을 확인해 주세요.');
+ const c = await one(db.from('courses').select('id').eq('id', e.course_id).eq('status', 'published').is('archived_at', null).maybeSingle());
+ if (!c) campusError(403, '과정을 확인해 주세요.');
+ const h = await one(db.from('cohorts').select('id').eq('id', e.cohort_id).eq('course_id', e.course_id).is('archived_at', null).maybeSingle());
+ if (!h) campusError(403, '기수를 확인해 주세요.');
+ return e;
+}
 export async function loadSupport(db:Database,actor:string,enrollment:string,admin?:()=>Database,signals=false):Promise<SupportState>{
  const e=await scope(db,actor,enrollment);
  const [requests,prefs,sessions]=await Promise.all([
@@ -61,7 +74,9 @@ export async function saveSupport(db:Database,admin:()=>Database,actor:string,b:
 async function cohort(db:Database,cohortId:string){const c=await one(db.from('cohorts').select('id,course_id').eq('id',id(cohortId)).maybeSingle());if(!c)campusError(404,'기수를 확인해 주세요.');return c;}
 export async function loadSupportAdmin(db:Database,cohortId:string){
  const chosen=await cohort(db,cohortId);const enrollments=await paged((a,b)=>db.from('enrollments').select('id,user_id,status,revoked_at,access_starts_at,access_ends_at',{count:'exact'}).eq('cohort_id',cohortId).eq('course_id',chosen.course_id).order('id').range(a,b));
- const [requests,sessions]=await Promise.all([enrollments.length?all(db.from('edu_campus_support_requests').select('*',{count:'exact'}).in('enrollment_id',enrollments.map(e=>e.id)).order('created_at',{ascending:false}).limit(3000)):[],all(db.from('edu_campus_office_sessions').select('*',{count:'exact'}).eq('cohort_id',cohortId).order('starts_at',{ascending:false}).limit(500))]);
+ const partners=await paged((a,b)=>db.from('edu_external_partner_access').select('id',{count:'exact'}).eq('cohort_id',cohortId).eq('course_id',chosen.course_id).order('id').range(a,b));
+ const participants=[...enrollments,...partners].map(row=>row.id);
+ const [requests,sessions]=await Promise.all([participants.length?all(db.from('edu_campus_support_requests').select('*',{count:'exact'}).in('enrollment_id',participants).order('created_at',{ascending:false}).limit(3000)):[],all(db.from('edu_campus_office_sessions').select('*',{count:'exact'}).eq('cohort_id',cohortId).order('starts_at',{ascending:false}).limit(500))]);
  const [actions,bookings]=await Promise.all([requests.length?all(db.from('edu_campus_support_actions').select('*',{count:'exact'}).in('request_id',requests.map(r=>r.id)).order('created_at').limit(5000)):[],sessions.length?all(db.from('edu_campus_office_bookings').select('*',{count:'exact'}).in('session_id',sessions.map(s=>s.id)).limit(5000)):[]]);
  const weeks=await all(db.from('curriculum_weeks').select('id',{count:'exact'}).eq('course_id',chosen.course_id).limit(500));
  const lessons=weeks.length?await all(db.from('curriculum_lessons').select('id,title,day_number',{count:'exact'}).in('week_id',weeks.map(w=>w.id)).limit(1000)):[];
@@ -94,7 +109,7 @@ export async function saveSupportAdmin(db:Database,actor:string,b:Record<string,
   if(!['present','call','done'].includes(String(b.action)))campusError(400,'진행 상태를 확인해 주세요.');const visible=await one(db.from('edu_campus_office_sessions').select('id').eq('id',id(b.sessionId)).eq('cohort_id',cohortId).maybeSingle());if(!visible)campusError(404,'일정을 확인해 주세요.');
   const r=await db.rpc('edu_campus_office_queue',{p_actor:actor,p_session:b.sessionId,p_kind:b.action,p_booking:b.action==='present'?null:id(b.bookingId)});if(r.error){if(r.error.code==='23514')campusError(409,'대기열이 변경되었습니다.');unavailable();}
  }else if(b.kind==='followup'){
-  const requestId=id(b.requestId);const row=await one(db.from('edu_campus_support_requests').select('enrollment_id').eq('id',requestId).maybeSingle());if(!row)campusError(404,'요청을 확인해 주세요.');const e=await one(db.from('enrollments').select('id').eq('id',row.enrollment_id).eq('cohort_id',cohortId).maybeSingle());if(!e)campusError(403,'기수가 다릅니다.');
+  const requestId=id(b.requestId);const row=await one(db.from('edu_campus_support_requests').select('enrollment_id,user_id').eq('id',requestId).maybeSingle());if(!row)campusError(404,'요청을 확인해 주세요.');const linked=await db.rpc('edu_campus_participant_cohort',{p_actor:row.user_id,p_access:row.enrollment_id});if(linked.error)unavailable();if(linked.data!==cohortId)campusError(403,'기수가 다릅니다.');
   if(!['reply','handover','status'].includes(String(b.actionKind))||!['open','in_progress','resolved'].includes(String(b.status))||!Number.isInteger(b.revision)||Number(b.revision)<1)campusError(400,'지원 내용을 확인해 주세요.');
   const r=await db.rpc('edu_campus_support_followup',{p_actor:actor,p_request:requestId,p_action:id(b.id),p_revision:b.revision,p_kind:b.actionKind,p_content:text(b.content,4000),p_status:b.status});if(r.error){if(r.error.code==='23514')campusError(409,'기록이 바뀌었습니다.');unavailable();}
  }else campusError(400,'요청을 확인해 주세요.');return loadSupportAdmin(db,cohortId);
