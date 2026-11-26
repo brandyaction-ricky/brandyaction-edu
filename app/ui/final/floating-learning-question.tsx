@@ -122,7 +122,7 @@ export function FloatingLearningQuestion({ member, current, resumeLessons, exter
     if (target) window.dispatchEvent(new CustomEvent(learningQuestionCreatedEvent, { detail: target }));
   };
 
-  return <div className="floating-learning-question">
+  return <div className="floating-learning-question" hidden={externalTriggerOnly && !open}>
     {(open || selected) && <section id="floating-learning-question" role="dialog" aria-labelledby="floating-learning-question-title" hidden={!open} className="floating-learning-question-panel" onKeyDown={event => {
       if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); toggle(false); }
     }}>
