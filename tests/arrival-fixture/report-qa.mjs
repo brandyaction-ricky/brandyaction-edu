@@ -60,7 +60,7 @@ for (const [engine, viewport] of devices) {
       }
 
       const visited = [];
-      await finishOfficeReview(page, {audience:label, enterPersonal:false, inspect:async (station, desk) => {
+      await finishOfficeReview(page, {audience:label, inspect:async (station, desk) => {
         visited.push(station);
         await expect(page.locator('[data-work-step], #arrival-brief')).toHaveCount(0);
         await expect(action('무료 자료 받기')).toHaveCount(0);

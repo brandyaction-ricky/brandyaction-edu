@@ -1,4 +1,4 @@
-import {finishOfficeReview} from './review-office.mjs';
+import {finishOfficeReview, resumeExerciseFixture} from './review-office.mjs';
 import {chromium, expect} from '@playwright/test';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -25,7 +25,18 @@ try {
     const page = await context.newPage();
     const errors = [], apiRequests = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('request', request => {if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.url());});
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (!url.pathname.startsWith('/api/')) return;
+      if (url.origin === new URL(base).origin && url.pathname === '/api/campus/arrival/events' && request.method() === 'POST') {
+        // Navigation may flush page analytics. Clipboard contents must stay in the browser.
+        for (const sample of ['복사를 직접 마친 뒤', '확인된 사실과 제안을 구분하고']) {
+          expect(request.postData() ?? '').not.toContain(sample);
+        }
+        return;
+      }
+      apiRequests.push(request.url());
+    });
     const step = page.locator('[data-work-step]');
     async function copyPromptAndConfirm(copyLabel, responseLabel, answer) {
       await page.getByRole('button', {name: copyLabel, exact: true}).click();
@@ -51,7 +62,9 @@ try {
         await expect(manualPrompt).toBeFocused();
         expect(await manualPrompt.evaluate(element => element.value.length > 0 && element.selectionStart === 0 && element.selectionEnd === element.value.length)).toBe(true);
       }});
-      await page.getByRole('button', {name: /회사 업무에 AI를 써보고 싶어요/}).click();
+      const officeWrites = await page.evaluate(() => window.__deniedClipboardWrites);
+      expect(officeWrites).toBe(1);
+      await resumeExerciseFixture(page, 'work');
       await expect(step).toHaveAttribute('data-work-step', '0');
       await page.getByRole('button', {name: '예시 업무로 시작', exact: true}).click();
       await page.getByRole('button', {name: '이 기준으로 첫 업무 맡기기', exact: true}).click();
@@ -93,11 +106,12 @@ try {
       await expect(confirmed).toHaveAttribute('data-copied', 'true');
       await expect(status).toContainText('직접 복사한 매뉴얼을 메모장에 보관해 주세요');
       await expect(fallback).toHaveCount(0);
-      expect(await page.evaluate(() => window.__deniedClipboardWrites)).toBe(5);
+      const exerciseWrites = await page.evaluate(() => window.__deniedClipboardWrites);
+      expect(officeWrites + exerciseWrites).toBe(5);
       await page.screenshot({path: resolve(out, `${device}-manual-confirmed.png`)});
       expect(errors).toEqual([]);
       expect(apiRequests).toEqual([]);
-      results.push({device, viewport, passed: true, deniedWrites: 5, selectedContentStationPrompt: true, manualLength: selection.length, selectedEntireManual: true, falseCopiedLabelBeforeConfirmation: false, adjacentDenialStatus: true, explicitConfirmationLabel: '매뉴얼 복사됨', apiRequests: 0, errors});
+      results.push({device, viewport, passed: true, deniedWrites: 5, selectedContentStationPrompt: true, manualLength: selection.length, selectedEntireManual: true, falseCopiedLabelBeforeConfirmation: false, adjacentDenialStatus: true, explicitConfirmationLabel: '매뉴얼 복사됨', nonAnalyticsApiRequests: apiRequests.length, errors});
     } catch (error) {
       await page.screenshot({path: resolve(out, `${device}-failure.png`)});
       throw error;

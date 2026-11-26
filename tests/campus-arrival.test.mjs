@@ -167,28 +167,28 @@ test('copy status persists independently of AI completion and rejects unrecogniz
 
 test('back navigation follows the personal, example and direct-calendar paths', () => {
   const state = model.initialArrivalState();
-  for (const [step, expected] of [[0, 0], [8, 7], [1, 8], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 8]]) {
+  for (const [step, expected] of [[0, 0], [1, 7], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 7]]) {
     assert.equal(model.arrivalBackStep({...state, step}), expected);
   }
   assert.equal(model.arrivalBackStep({...state, step: 5, mode: 'example', experience: 'example-viewed'}), 1);
-  assert.equal(model.arrivalBackStep({...state, step: 7, audience: 'business', experience: 'self-reported'}), 5);
-  assert.equal(model.arrivalBackStep({...state, step: 7, audience: 'business', mode: 'example', experience: 'example-viewed'}), 5);
-  assert.equal(model.arrivalBackStep({...state, step: 7, hallReturnStep: 1}), 1);
+  assert.equal(model.arrivalBackStep({...state, step: 7, audience: 'business', experience: 'self-reported'}), 7);
+  assert.equal(model.arrivalBackStep({...state, step: 7, audience: 'business', mode: 'example', experience: 'example-viewed'}), 7);
+  assert.equal(model.arrivalBackStep({...state, step: 7, hallReturnStep: 1}), 7);
 });
 
-test('the delivered proposal and the exact return step survive reopening the walk', () => {
+test('legacy return markers preserve lounge visits and the delivered proposal', () => {
   const state = {...model.initialArrivalState(), proposalSent: true, station: 7, hallReturnStep: 2};
   state.answers.preparing = {a: '이번에 준비 중인 서비스', b: '고객에게 확인할 점'};
   const walking = model.parseArrivalState(model.serializeArrivalState(state));
   assert.equal(walking.station, 7);
-  assert.equal(walking.hallReturnStep, 2);
+  assert.equal(walking.loungeVisited, true);
   const inHall = model.parseArrivalState(model.serializeArrivalState({...walking, step: 7}));
-  assert.equal(model.arrivalBackStep(inHall), 2);
+  assert.equal(model.arrivalBackStep(inHall), 7);
   assert.equal(inHall.proposalSent, true);
   assert.deepEqual(inHall.answers.preparing, state.answers.preparing);
   const invalid = model.parseArrivalState(JSON.stringify({...state, proposalSent: 'true', hallReturnStep: 7}));
   assert.equal(invalid.proposalSent, false);
-  assert.equal(invalid.hallReturnStep, null);
+  assert.equal('hallReturnStep' in invalid, false);
 });
 
 test('the canon demo persists its phase and the retired desks resume on the active corridor', () => {
@@ -201,7 +201,7 @@ test('the canon demo persists its phase and the retired desks resume on the acti
   assert.equal(parse({station: 4, canonPhase: 5}).canonPhase, 0);
 });
 
-test('the audience selection resumes separately from the welcome introduction without losing drafts', () => {
+test('the retired audience selection reopens in the lounge without losing drafts', () => {
   const state = model.initialArrivalState();
   assert.equal(state.step, 0, 'new visitors start with the welcome introduction');
   state.step = 8; state.station = 6;
@@ -209,7 +209,7 @@ test('the audience selection resumes separately from the welcome introduction wi
   state.audience = 'exploring';
   state.answers.exploring = {a: '동료에게 엑셀 정리를 설명했어요.', b: '엑셀을 처음 쓰는 동료예요.'};
   const restored = model.parseArrivalState(model.serializeArrivalState(state));
-  assert.deepEqual(restored, state);
+  assert.deepEqual(restored, {...state, step: 7, station: 7, loungeVisited: true});
   assert.equal(restored.experience, 'none');
   const oldWelcome = model.parseArrivalState(JSON.stringify({...state, step: 0}));
   assert.equal(oldWelcome.step, 0, 'an older welcome draft remains on the welcome introduction');
@@ -235,7 +235,7 @@ test('visitors who reached the lounge, even by shortcut, return straight to it',
   for (const step of [1, 2, 3, 5, 7, 8]) {
     const restored = model.resumeArrivalRoute(model.parseArrivalState(JSON.stringify({...stored, step})));
     assert.deepEqual([restored.step, restored.station, restored.entryStarted, restored.loungeVisited], [7, 7, true, true]);
-    assert.deepEqual([restored.experience, restored.handoff, restored.hallReturnStep], ['none', 'ready', null]);
+    assert.deepEqual([restored.experience, restored.handoff], ['none', 'ready']);
     assert.deepEqual(restored.answers, stored.answers);
     assert.equal(restored.visitorAvatar, stored.visitorAvatar);
   }
