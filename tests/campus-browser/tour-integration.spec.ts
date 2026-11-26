@@ -1,16 +1,25 @@
 import {test,expect,type Page} from '@playwright/test';
 import {tourTasks,retiredTasks,menuHidden} from '../../features/campus/tour/tasks';
-const names={live:'문샷 라이브홀',welcome:'문샷 개강 준비실',study:'문샷 공부방',office:'내 AI 사무실'};
+const names={live:'문샷 라이브홀',library:'문샷 자료실',study:'문샷 공부방',office:'내 AI 사무실'};
 test.setTimeout(120000);
 async function room(page:Page,id:keyof typeof names){const map=page.getByRole('dialog',{name:'공간 이동',exact:true});if(!await map.isVisible())await page.getByRole('button',{name:'공간 이동',exact:true}).click();await map.getByRole('button',{name:names[id]+' 입장',exact:true}).click();}
 async function task(page:Page,title:string){await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();const menu=page.getByRole('region',{name:'이 공간에서 할 일',exact:true});await menu.getByLabel('할 일 검색').fill(title);await menu.getByRole('button',{name:title,exact:true}).click();}
 // The 3D desk sends action 'focus' with the host token; the stub world records the token from host messages.
 async function desk(page:Page){const f=page.frameLocator('iframe[title="문샷 캠퍼스 3D 미리보기"]');await expect.poll(()=>f.locator('body').evaluate(()=>(window as unknown as {__t?:string}).__t||'')).not.toBe('');await f.locator('body').evaluate(()=>parent.postMessage({source:'moonshot-tour',token:(window as unknown as {__t:string}).__t,type:'action',payload:{id:'focus'}},location.origin));}
 async function setup(page:Page){await page.route('**/campus/world/tour/index.html*',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><p>3D separately tested</p><script>addEventListener("message",e=>{if(e.data&&e.data.source==="moonshot-tour-host")window.__t=e.data.token;})</script>'}));await page.goto('/campus-tour');}
-for(const id of ['study','office','welcome','live'] as const)test(id+' exposes every existing task, with no server or external API calls',async({page})=>{
+for(const id of ['study','office','live'] as const)test(id+' exposes every existing task, with no server or external API calls',async({page})=>{
  const errors:string[]=[],api:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))api.push(r.method()+' '+r.url());});await setup(page);await page.getByLabel('지도에서 권한 체험').selectOption('admin');await room(page,id);
  for(const t of tourTasks.filter(t=>t.room===id&&!retiredTasks.has(t.id)&&!menuHidden.has(t.id))){await task(page,t.title);const d=page.locator('dialog[open]').last();await expect(d).toBeVisible();await expect(d.getByRole('status').filter({hasText:'필요한 도구'})).toHaveCount(0);await expect(d).not.toContainText('Application error');expect((await d.innerText()).length,t.id).toBeGreaterThan(60);await expect(d.getByRole('button',{name:/닫기$/}).first()).toBeVisible();await d.getByRole('button',{name:/닫기$/}).first().click();await expect(d).toBeHidden();}
  expect(errors).toEqual([]);expect(api).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+test('library opens its public resources directly from the room', async ({page})=>{
+ await setup(page);
+ await room(page,'library');
+ await page.getByRole('button',{name:'자료·다시보기',exact:true}).click();
+ const library=page.getByRole('dialog',{name:'자료·다시보기',exact:true});
+ await expect(library).toBeVisible();
+ await library.getByRole('button',{name:'자료·다시보기 닫기'}).click();
+ await expect(library).toBeHidden();
 });
 test('student menus exclude admin; guest cannot access private tools',async({page})=>{await setup(page);await room(page,'study');await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await expect(page.getByRole('button',{name:'기수별 학습 현황',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'할 일 목록 닫기'}).click();await page.getByRole('button',{name:'공간 이동',exact:true}).click();await page.getByLabel('지도에서 권한 체험').selectOption('guest');await room(page,'office');await expect(page.getByRole('dialog',{name:'공간 입장 안내',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'새 작업 요청'})).toHaveCount(0);});
 test('draft close confirmation, archive save/reopen and business contextual form',async({page})=>{await setup(page);await room(page,'office');await task(page,'내 사업 계획');const d=page.locator('dialog[open]').last();await expect(d.getByRole('navigation',{name:'사업 실행 도구'})).toBeHidden();await d.getByLabel('기록 제목').fill('아직 저장하지 않은 계획');page.once('dialog',x=>x.dismiss());await d.getByRole('button',{name:/닫기$/}).first().click();await expect(d).toBeVisible();await expect(d.getByLabel('기록 제목')).toHaveValue('아직 저장하지 않은 계획');page.once('dialog',x=>x.accept());await d.getByRole('button',{name:/닫기$/}).first().click();await task(page,'졸업 후 개인 보관함');await d.getByLabel('기록 제목').fill('다음 주 실행 계획');await d.getByLabel('내가 이어갈 내용').fill('고객의 문제를 다시 확인하고 한 장 지도를 수정한다.');await d.getByRole('button',{name:'개인 보관함에 저장',exact:true}).click();await expect(d.getByText('내 개인 보관 기록에 저장했습니다.',{exact:true})).toBeVisible();await d.getByRole('button',{name:/닫기$/}).first().click();await task(page,'졸업 후 개인 보관함');await expect(d.getByRole('heading',{name:'다음 주 실행 계획',exact:true})).toBeVisible();});

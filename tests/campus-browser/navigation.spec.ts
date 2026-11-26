@@ -81,3 +81,11 @@ test('slow space loading offers a usable fallback instead of a blank screen',asy
  await page.getByRole('button',{name:'가벼운 화면으로 시작',exact:true}).click();
  await expect(page.getByRole('navigation',{name:'문샷 공간 선택'})).toBeVisible();await expect(page.locator('iframe')).toHaveCount(0);
 });
+
+test('eligible learners have one workspace entry in the campus banner', async ({page}) => {
+ await page.goto('/learn/fixture');
+ const banner = page.getByRole('navigation', {name:'문샷 캠퍼스 바로가기'});
+ await expect(banner.getByRole('link')).toHaveCount(1);
+ await expect(banner.getByRole('link', {name:'작업 공간 입장 →'})).toHaveAttribute('href','/campus/enter');
+ await expect(banner.getByText('처음이라면 웰컴 안내')).toHaveCount(0);
+});

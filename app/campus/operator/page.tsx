@@ -6,7 +6,7 @@ import {campusUser} from '@/features/campus/entry-user';
 import {canReviewCampus} from '@/features/campus/operator-access';
 import {FourSpacesPreview} from '@/features/campus/tour/preview';
 import {isCampusId} from '@/features/campus/snapshot';
-import {rooms,type TourRoom} from '@/features/campus/tour/model';
+import {campusDestinations as rooms,type TourRoom} from '@/features/campus/tour/model';
 export const dynamic='force-dynamic';
 export const metadata={title:'문샷 캠퍼스 · 운영자 둘러보기',robots:{index:false,follow:false}};
 export default async function Page({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){

@@ -8,19 +8,19 @@ test('event configuration restricts public output, embed IDs, redirects, time wi
  const parsed=d.validateWebinar(config);assert.equal(parsed.slug,config.slug);const pub=d.projectWebinar(parsed);assert.equal(pub.revision,undefined);assert.equal(pub.status,undefined);assert.equal(pub.cohortId,undefined);assert.match(pub.checkoutPath,/utm_campaign=moonshot-open/);
  for(const patch of [{slug:'../admin'},{slug:'a'},{title:''},{detailPath:'//evil.test'},{detailPath:'/classes/a?next=//evil.test'},{kakaoUrl:'https://pf.kakao.com.evil.test/a'},{kakaoUrl:'https://a:b@pf.kakao.com/a'},{kakaoUrl:'javascript:alert(1)'},{kakaoUrl:'https://pf.kakao.com:123/a'},{kakaoUrl:'https://pf.kakao.com/a?redirect=https://evil.test'},{youtubeId:'<script>'},{cohortId:'bad'},{revision:'bad'},{endsAt:config.startsAt},{endsAt:'2027-01-01'},{startsAt:'bad'},{status:'visible'},{privateKey:'secret'}])assert.throws(()=>d.validateWebinar({...config,...patch}),JSON.stringify(patch));
 });
-test('an older welcome room default displays the new name while saved custom room titles stay intact',()=>{
+test('public webinars omit archived room cards and leave stored titles intact',()=>{
  const room={title:'문샷 웰컴 존',description:'',image:'',imageAlt:'',body:'',articles:[],tasks:[]};
  const event={...config,content:{welcome:room}};
- assert.equal(d.projectWebinar(event).content.welcome.title,'문샷 개강 준비실');
+ assert.equal(d.projectWebinar(event).content.welcome,undefined);
  assert.equal(event.content.welcome.title,'문샷 웰컴 존');
  const custom={...room,title:'우리 기수의 첫걸음'};
- assert.equal(d.projectWebinar({...event,content:{welcome:custom}}).content.welcome.title,custom.title);
+ assert.equal(d.projectWebinar({...event,content:{welcome:custom}}).content.welcome,undefined);
 });
-test('member access rejects foreign, refunded, expired, malformed windows and returns upcoming access only to welcome',()=>{
+test('member access rejects foreign, refunded, expired, malformed windows and sends upcoming buyers to the schedule',()=>{
  const base={id:id(8),user_id:id(2),cohort_id:id(1),status:'active',revoked_at:null,access_starts_at:'2026-01-01',access_ends_at:'2027-01-01'},now=Date.parse('2026-11-03');
  assert.equal(d.accessFor([base],id(2),id(1),now).kind,'member');
  for(const patch of [{user_id:id(3)},{cohort_id:id(4)},{status:'revoked'},{revoked_at:'2026-11-02'},{access_ends_at:'2026-11-03'},{access_ends_at:'oops'},{access_starts_at:'oops'},{id:'bad'}])assert.equal(d.accessFor([{...base,...patch}],id(2),id(1),now).kind,'offer');
- assert.deepEqual(d.accessFor([{...base,access_starts_at:'2026-12-01'}],id(2),id(1),now),{kind:'welcome',href:'/campus/enter?cohort='+id(1)+'&welcome=1'});assert.equal(d.accessFor([],id(2),id(1),now).kind,'offer');
+ assert.deepEqual(d.accessFor([{...base,access_starts_at:'2026-12-01'}],id(2),id(1),now),{kind:'welcome',href:'/campus/enter?cohort='+id(1)});assert.equal(d.accessFor([],id(2),id(1),now).kind,'offer');
 });
 test('anonymous session refresh exemption never includes private access, admins, other campus routes or malformed paths',()=>{
  for(const method of ['GET','HEAD'])assert.equal(isAnonymousWebinarRoute('/campus/live/moonshot-open',method),true);
@@ -88,7 +88,7 @@ test('operator capability is private, minimal and never grants anonymous or susp
  reset();assert.equal((await capability.GET(req('/',undefined,{'sec-fetch-site':'cross-site'}))).status,403);
 });
 test('webinar access recognizes active operators before any enrollment lookup',async()=>{
- for(const role of ['admin','staff']){reset();state.user={id:id(2),role,status:'active'};const response=await access.GET(req(),params);assert.deepEqual(await response.json(),{kind:'operator',href:'/campus/operator?room=welcome&cohort='+config.cohortId});assert.ok(!state.queries.includes('enrollments'));}
+ for(const role of ['admin','staff']){reset();state.user={id:id(2),role,status:'active'};const response=await access.GET(req(),params);assert.deepEqual(await response.json(),{kind:'operator',href:'/campus/operator?room=study&cohort='+config.cohortId});assert.ok(!state.queries.includes('enrollments'));}
 });
 
 test('event removal requires marketing access, origin and the selected revision',async()=>{

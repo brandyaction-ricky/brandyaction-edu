@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/retire-campus-welcome-1126" ]; then
+            expected_main=cab361c134a96f05d58f3db961fbdb68df746f7b
+            release_payload=9c336435562177da01aa8be9f8dc1f62a6bfaf98
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            tested_payload=bfc57c08debeeb2e224c66010e09686db6425369
+            test "$(git rev-parse "$release_payload^")" = "$expected_main"
+            git merge-base --is-ancestor "$tested_payload" HEAD
+            git diff --exit-code "$release_payload" "$tested_payload" -- . ':(exclude).github/workflows/ci.yml' ':(exclude)tests/campus-browser/tour-integration.spec.ts' ':(exclude)tests/campus-browser/webinar.spec.ts'
+            git diff --exit-code "$tested_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            echo 'Verified the pinned legacy campus room retirement against the current production base.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-classroom-lesson-scroll-20261126" ]; then
             expected_main=cd7deebb1233558f3203bea72c111f4d9eb505e3
             release_payload=7879ca2c514802d8429234adf2b121d2926044f7
