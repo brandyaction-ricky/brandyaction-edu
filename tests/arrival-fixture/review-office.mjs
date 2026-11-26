@@ -57,13 +57,27 @@ export async function openLoungeSchedule(page) {
   await expect(calendar).toBeVisible({timeout: 20000});
 }
 
-export async function openPersonalTrial(page, label = '내 AI 체험으로 가기') {
-  await page.getByLabel('체험 메뉴', {exact:true}).click();
-  await page.getByRole('button', {name:label, exact:true}).click();
+export async function expectCurrentExperienceMenu(page) {
+  const control = page.getByLabel('체험 메뉴', {exact: true});
+  await control.click();
+  const menu = page.locator('details[open]').filter({has: control});
+  await expect(menu.getByRole('button')).toHaveText(['체험 소개', '처음부터 보기']);
+  await control.click();
+}
+
+// Reopen a pre-existing exercise draft in the local fixture for compatibility checks.
+export async function resumeExerciseFixture(page, audience) {
+  await page.evaluate(audience => {
+    const key = 'moonshot:arrival:synthetic-local-qa:v1';
+    const draft = JSON.parse(localStorage.getItem(key));
+    if (!draft?.loungeVisited) throw Error('Expected a completed synthetic office visit');
+    localStorage.setItem(key, JSON.stringify({...draft, audience, step: 1, station: 6}));
+  }, audience);
+  await page.reload();
 }
 
 // The desktop and mobile clipboard fixtures can use the equivalent HTML entry when WebGL is unavailable.
-export async function finishOfficeReview(page, {walk, audience, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}, enterPersonal = true} = {}) {
+export async function finishOfficeReview(page, {walk, audience, inspect = async () => {}, beforeLeave = async () => {}, afterLeave = async () => {}} = {}) {
   const travel = walk ?? (async station => {
     if (station === 1) await startOfficeCase(page, audience);
     else await expect(station === 7 ? loungeScheduleButton(page) : page.getByRole('dialog', {name:['경쟁사 스파이','콘텐츠 담당자','정본 · 회사 업무 기준'][station - 2], exact:true})).toBeVisible({timeout:20000});
@@ -94,5 +108,5 @@ export async function finishOfficeReview(page, {walk, audience, inspect = async 
   }
   await travel(7);
   await expect(loungeScheduleButton(page)).toBeVisible({timeout:20000});
-  if (enterPersonal) await openPersonalTrial(page);
+  await expectCurrentExperienceMenu(page);
 }

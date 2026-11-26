@@ -1,7 +1,7 @@
 import {chromium, expect, webkit} from '@playwright/test';
 import {mkdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, openPersonalTrial, startOfficeCase, teamLeaderGuide} from './review-office.mjs';
+import {finishOfficeReview, loungeScheduleButton, openLoungeSchedule, expectCurrentExperienceMenu, resumeExerciseFixture, startOfficeCase, teamLeaderGuide} from './review-office.mjs';
 
 const linkFile = process.env.ARRIVAL_QA_LINK_FILE;
 const url = new URL(linkFile ? (await readFile(linkFile, 'utf8')).trim() : process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529/experience/moonshot');
@@ -148,7 +148,7 @@ for (const [device, engine, viewport] of [
     expect(response?.status()).toBe(200);
     expect(new URL(page.url()).origin).toBe(url.origin);
     await finishOfficeReview(page, {
-      walk, inspect, enterPersonal:false,
+      walk, inspect,
       beforeLeave: async () => {
         await expect(world).toHaveAttribute('data-moving','false');
       },
@@ -220,25 +220,23 @@ for (const [device, engine, viewport] of [
 
     await tap(button(page, '웰컴 라운지로 돌아가기'));
     await expect(loungeScheduleButton(page)).toBeVisible();
-    await openPersonalTrial(page);
-    await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toBeVisible();
-    await tap(button(page, '웰컴 라운지로 돌아가기'));
-    await expect(loungeScheduleButton(page)).toBeVisible();
-    await openLoungeSchedule(page);
-    await openPersonalTrial(page);
-    await tap(page.getByRole('button', {name:/이미 사업을 하고 있어요/}));
-    await tap(button(page, '내 상황으로 요청문 만들기'));
-    const productAnswer = page.getByLabel(/무엇을 판매하고/);
-    const factsAnswer = page.getByLabel(/가장 강조하고 싶은 상품의 특징/);
-    await productAnswer.fill('직접 적은 새로운 상품 정보');
-    await tap(button(page, '콘텐츠 담당자에게 적은 내용 가져오기'));
-    await expect(productAnswer).toHaveValue('직접 적은 새로운 상품 정보');
-    await expect(factsAnswer).toHaveValue(contentDraft.facts);
-    await expect(page.getByRole('status').filter({hasText:'비어 있던 칸에 가져왔어요.'})).toBeVisible();
-    await capture('content-reused');
+    await expectCurrentExperienceMenu(page);
+    const localFixture = ['127.0.0.1', 'localhost'].includes(url.hostname) && !url.searchParams.has('event');
+    if (localFixture) {
+      await resumeExerciseFixture(page, 'business');
+      await tap(button(page, '내 상황으로 요청문 만들기'));
+      const productAnswer = page.getByLabel(/무엇을 판매하고/);
+      const factsAnswer = page.getByLabel(/가장 강조하고 싶은 상품의 특징/);
+      await productAnswer.fill('직접 적은 새로운 상품 정보');
+      await tap(button(page, '콘텐츠 담당자에게 적은 내용 가져오기'));
+      await expect(productAnswer).toHaveValue('직접 적은 새로운 상품 정보');
+      await expect(factsAnswer).toHaveValue(contentDraft.facts);
+      await expect(page.getByRole('status').filter({hasText:'비어 있던 칸에 가져왔어요.'})).toBeVisible();
+      await capture('content-reused');
+    }
     expect(errors).toEqual([]);
     expect(externalAI).toEqual([]);
-    console.log(JSON.stringify({device, viewport, visited, canonExchanges:exchanges.length, calendar:true, contentDraftRestoredAndReused:true, errors, externalAI}));
+    console.log(JSON.stringify({device, viewport, visited, canonExchanges:exchanges.length, calendar:true, contentDraftRestoredAndReused:localFixture, errors, externalAI}));
   } catch (error) {
     await capture('canon-failure');
     throw error;

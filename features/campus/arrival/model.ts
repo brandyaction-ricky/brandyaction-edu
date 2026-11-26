@@ -9,8 +9,7 @@ export const ARRIVAL_STORAGE_KEY = 'moonshot:arrival:2026-12-07:v1';
 export const ARRIVAL_VERSION = 1;
 // JSON can use six characters to escape one stored UTF-16 code unit.
 export const ARRIVAL_STORAGE_LIMIT = 170_000;
-export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-export type PersonalTrialStep = 1 | 2 | 3 | 5 | 8;
+export type ArrivalStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type CorridorStation = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export const SPY_PHASES = ['intro', 'reviews', 'guide', 'handed-off'] as const;
 export type SpyPhase = typeof SPY_PHASES[number];
@@ -26,7 +25,6 @@ export type ArrivalState = {
   consentedCompanyRule: string;
   visitorAvatar: VisitorAvatarId;
   proposalSent: boolean;
-  hallReturnStep: PersonalTrialStep | null;
   loungeVisited: boolean;
   version: 1;
   step: ArrivalStep;
@@ -43,9 +41,9 @@ export type ArrivalState = {
   deskReview: {phase: OfficeDemoPhase; choice: OfficeDemoChoice};
 };
 export function initialArrivalState(): ArrivalState {
-  return {version: 1, step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, hallReturnStep: null, loungeVisited: false, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
+  return {version: 1, step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', canonPhase: 0, companyRule: null, consentedCompanyRule: '', visitorAvatar: DEFAULT_VISITOR_AVATAR, proposalSent: false, loungeVisited: false, audience: 'work', answers: {work: {a: '', b: ''}, business: {a: '', b: ''}, preparing: {a: '', b: ''}, exploring: {a: '', b: ''}}, mode: 'personal', experience: 'none', handoff: 'ready', revision: 'short', extra: '', contentDraft: parseContentStationDraft(undefined), workTrial: initialWorkTrialState(), deskReviewRevision: '', deskReview: {phase: 'draft', choice: 0}};
 }
-export function isPersonalTrialStep(value: unknown): value is PersonalTrialStep {
+function hasLegacyLoungeVisit(value: unknown): boolean {
   return value === 1 || value === 2 || value === 3 || value === 5 || value === 8;
 }
 function object(value: unknown): value is Record<string, unknown> {
@@ -62,8 +60,13 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     const value: unknown = JSON.parse(raw);
     if (!object(value) || value.version !== ARRIVAL_VERSION) return state;
     if (typeof value.step === 'number' && Number.isInteger(value.step) && value.step >= 0 && value.step <= 8) {
-      // Existing drafts return to the merged handoff and outcome screens.
-      state.step = value.step === 4 ? 3 : value.step === 6 ? 5 : value.step as ArrivalStep;
+      // Restore retired screens at their current destinations, keeping the saved answers.
+      switch (value.step) {
+        case 4: state.step = 3; break;
+        case 6: state.step = 5; break;
+        case 8: state.step = 7; break;
+        default: state.step = value.step as ArrivalStep;
+      }
     }
     if (isAudience(value.audience)) state.audience = value.audience;
     if (object(value.answers)) {
@@ -94,7 +97,6 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
       && value.consentedCompanyRule.length <= OFFICE_DEMO_LIMITS.rule) state.consentedCompanyRule = value.consentedCompanyRule;
     if (isVisitorAvatarId(value.visitorAvatar)) state.visitorAvatar = value.visitorAvatar;
     state.proposalSent = value.proposalSent === true;
-    if (isPersonalTrialStep(value.hallReturnStep)) state.hallReturnStep = value.hallReturnStep;
     // Existing personal exercises and calendar drafts reopen at their own destination.
     if (state.step === 7) state.station = 7;
     else if (state.step !== 0) state.station = 6;
@@ -110,7 +112,7 @@ export function parseArrivalState(raw: string | null | undefined): ArrivalState 
     } else if (state.spyPhase === 'handed-off') state.officeStation = 3;
     else if (state.spyPhase !== 'intro') state.officeStation = 2;
     state.entryStarted = value.entryStarted === true || state.step !== 0 || state.station !== 1;
-    state.loungeVisited = value.loungeVisited === true || state.step === 7 || state.station === 7 || state.officeStation === 7 || state.hallReturnStep !== null;
+    state.loungeVisited = value.loungeVisited === true || state.step === 7 || state.station === 7 || state.officeStation === 7 || hasLegacyLoungeVisit(value.hallReturnStep);
     state.contentDraft = parseContentStationDraft(value.contentDraft);
     state.workTrial = parseWorkTrialState(value.workTrial);
     return state;
@@ -126,14 +128,13 @@ export function serializeArrivalState(state: ArrivalState): string {
 export function resumeArrivalRoute(state: ArrivalState): ArrivalState {
   if (state.officeStation === 7 && state.spyPhase === 'handed-off' && state.step !== 0) return state;
   const onCorridor = !state.loungeVisited && state.step === 0 && state.station <= 4;
-  if (onCorridor && state.hallReturnStep === null && state.experience === 'none' && !state.workTrial.secondConfirmed) return state;
+  if (onCorridor && state.experience === 'none' && !state.workTrial.secondConfirmed) return state;
   const route = state.loungeVisited
     ? {step: 7, station: 7, entryStarted: true} as const
     : onCorridor ? {} : {step: 0, station: 1, officeStation: 1, entryStarted: false, spyPhase: 'intro', canonPhase: 0} as const;
   return {
     ...state,
     ...route,
-    hallReturnStep: null,
     mode: 'personal',
     experience: 'none',
     handoff: 'ready',
@@ -170,14 +171,13 @@ export function addPersonalRequestRule(request: string, rule: string): string {
 /** Back follows the visitor's chosen path, including the optional example route. */
 export function arrivalBackStep(state: ArrivalState): ArrivalStep {
   switch (state.step) {
-    case 8: return 7;
-    case 1: return 8;
+    case 1: return 7;
     case 2: return 1;
     case 3:
     case 4: return 2;
     case 5:
     case 6: return state.mode === 'example' ? 1 : 3;
-    case 7: return state.hallReturnStep ?? (state.experience !== 'none' && state.audience !== 'work' ? 5 : 8);
+    case 7: return 7;
     default: return 0;
   }
 }

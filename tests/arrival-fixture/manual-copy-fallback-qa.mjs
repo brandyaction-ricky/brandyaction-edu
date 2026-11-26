@@ -1,4 +1,4 @@
-import {finishOfficeReview} from './review-office.mjs';
+import {finishOfficeReview, resumeExerciseFixture} from './review-office.mjs';
 import {chromium, expect} from '@playwright/test';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -51,7 +51,7 @@ try {
         await expect(manualPrompt).toBeFocused();
         expect(await manualPrompt.evaluate(element => element.value.length > 0 && element.selectionStart === 0 && element.selectionEnd === element.value.length)).toBe(true);
       }});
-      await page.getByRole('button', {name: /회사 업무에 AI를 써보고 싶어요/}).click();
+      await resumeExerciseFixture(page, 'work');
       await expect(step).toHaveAttribute('data-work-step', '0');
       await page.getByRole('button', {name: '예시 업무로 시작', exact: true}).click();
       await page.getByRole('button', {name: '이 기준으로 첫 업무 맡기기', exact: true}).click();

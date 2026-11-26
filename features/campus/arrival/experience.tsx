@@ -2,8 +2,8 @@
 
 import {useEffect, useEffectEvent, useMemo, useRef, useState} from 'react';
 import {ArrowUpRight, ArrowRight, ArrowLeft, BookOpen, Check, Copy, CalendarDays, BriefcaseBusiness, Compass, Lightbulb, RotateCcw, X, MoreHorizontal, ChevronDown, FileText, MessageSquare, Play} from 'lucide-react';
-import {audiences, audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
-import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, ARRIVAL_CALENDAR_FILE, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, isPersonalTrialStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
+import {audienceContent, buildRevision, buildCriteria, revisionOptions, requestReady, type Audience, type Answers, ANSWER_LIMIT} from './content';
+import {initialArrivalState, parseArrivalState, resumeArrivalRoute, serializeArrivalState, reconcileArrivalOfficeCase, ARRIVAL_STORAGE_KEY, ARRIVAL_CALENDAR_FILE, SPY_PHASES, corridorNext, liveCountdownLabel, personalRequestRule, addPersonalRequestRule, googleCalendarUrl, arrivalBackStep, type ArrivalState, type ArrivalStep, type CorridorStation, type SpyPhase, type CanonPhase} from './model';
 import {CorridorScene} from './corridor-scene';
 import {onboardingGuideTitle, OnboardingProgram, type OnboardingGuide} from './onboarding-program';
 import {CorridorPanel} from './corridor-panel';
@@ -166,7 +166,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }, [hydrated, state.entryStarted, station]);
   const caseVisited = state.officeStation === 7;
   const workConfig = config.workTrial ?? DEFAULT_WORK_TRIAL;
-  const workActive = state.audience === 'work' && ![0, 7, 8].includes(step);
+  const workActive = state.audience === 'work' && ![0, 7].includes(step);
   const room = step === 7 ? 'live' : 'office';
   const content = {...audienceContent[state.audience], ...config.audiences[state.audience]};
   const answers = state.answers[state.audience];
@@ -327,7 +327,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     });
   }
   function headToHall() {
-    go(7, {station: 7, hallReturnStep: isPersonalTrialStep(step) ? step : 8});
+    go(7, {station: 7});
   }
   function returnToCorridor() {
     const lastDesk = caseVisited ? 4 : state.officeStation;
@@ -336,12 +336,8 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     if (sceneStatus === 'ready') restoreFloorFocus();
     else requestAnimationFrame(() => deskButton.current?.focus({preventScroll: true}));
   }
-  function openPersonalTrial() {
-    go(arrivalBackStep(state), {station: 6});
-  }
   function openOfficeCase() {
-    const hallReturnStep = isPersonalTrialStep(step) ? step : state.hallReturnStep;
-    go(0, {station: state.officeStation === 7 ? 1 : state.officeStation, hallReturnStep});
+    go(0, {station: state.officeStation === 7 ? 1 : state.officeStation});
   }
   function closeContentReplay() {
     setRevisitContent(false);
@@ -422,7 +418,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   }
 
   function update(patch: Partial<ArrivalState>) {setState(value => ({...reconcileArrivalOfficeCase(value, caseRevision), ...patch}));}
-  function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station' | 'hallReturnStep'> = {}) {
+  function go(next: ArrivalStep, route: Pick<Partial<ArrivalState>, 'station'> = {}) {
     resetWalkAssist();
     setGuidedStation(undefined);
     setDeskOpen(false);
@@ -445,11 +441,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
   function skipToLounge() {
     update({entryStarted: true, ...(entryAudience ? {audience: entryAudience} : {})});
     go(7, {station: 7});
-  }
-  function selectAudience(audience: Audience) {
-    update({audience, consentedCompanyRule: audience === state.audience ? state.consentedCompanyRule : '',
-      mode: 'personal', experience: 'none', handoff: 'ready', extra: '', step: 1});
-    setNotice(''); setCopyFallback('');
   }
   function answer(field: keyof Answers, value: string) {
     setState(previous => ({...reconcileArrivalOfficeCase(previous, caseRevision), experience: 'none', handoff: 'ready', answers: {...previous.answers, [previous.audience]: {...previous.answers[previous.audience], [field]: value}}}));
@@ -524,8 +515,6 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
           <button type="button" onClick={openOfficeCase}><BriefcaseBusiness size={16}/>사무실 사례 둘러보기</button>
           <button type="button" onClick={headToHall}><CalendarDays size={16}/>웰컴 라운지로 이동</button>
         </>}
-        {step === 7 && <button type="button" onClick={openPersonalTrial}><ArrowRight size={16} aria-hidden="true"/>{state.hallReturnStep === null ? '내 AI 체험으로 가기' : '내 AI 체험으로 돌아가기'}</button>}
-        {officeIntro && state.hallReturnStep !== null && <button type="button" onClick={() => go(state.hallReturnStep ?? 8, {station: 6})}><ArrowLeft size={16}/>내 AI 체험으로 돌아가기</button>}
         <button type="button" onClick={() => persistenceKey ? setShowReset(true) : reset()}><RotateCcw size={16}/>처음부터 보기</button>
       </div></details>
     </header>
@@ -572,15 +561,10 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
     </section> : <section className={`${s.dock} ${workActive ? s.workDock : ''} ${step === 3 && !workActive ? s.handoffDock : ''} ${step === 7 ? s.hallDock : ''} ${explore ? s.dockHidden : ''}`} aria-label="캠퍼스 체험 안내" inert={backgroundInert}>
       {workActive ? <WorkTrialPanel config={workConfig} state={state.workTrial} persistenceEnabled={Boolean(persistenceKey)} storageBlocked={storageBlocked}
         onChange={workTrial => update({workTrial, mode: workTrial.secondConfirmed && workTrial.secondAnswerExample ? 'example' : 'personal', experience: workTrial.secondConfirmed ? workTrial.secondAnswerExample ? 'example-viewed' : 'self-reported' : 'none'})}
-        onExit={() => go(8)} onLive={headToHall}/> : <>
-      <div className={s.dockTop}><span>{step === 8 ? '내 상황에 맞는 체험' : step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={step === 7 ? returnToLounge : () => go(arrivalBackStep(state), step === 8 ? {station: 7} : {})}><ArrowLeft size={14} aria-hidden="true"/>
-        {step === 7 || step === 8 ? '웰컴 라운지로 돌아가기' : '이전'}</button></div>
+        onExit={headToHall} onLive={headToHall}/> : <>
+      <div className={s.dockTop}><span>{step === 7 ? '무료 라이브 일정' : config.audiences[state.audience].label}</span><button type="button" className={s.back} onClick={step === 7 ? returnToLounge : step === 1 ? headToHall : () => go(arrivalBackStep(state))}><ArrowLeft size={14} aria-hidden="true"/>
+        {step === 7 || step === 1 ? '웰컴 라운지로 돌아가기' : '이전'}</button></div>
       <div ref={scrollArea} className={s.scrollArea} id="arrival-content" key={step}>
-        {step === 8 && <>
-          {title(<>지금 어떤 상황이신가요?</>, '가장 가까운 상황을 골라주세요. 나에게 맞는 결과 예시부터 보여드릴게요.')}
-          <div className={s.choices} aria-label="내 상황에 맞는 체험 선택">{audiences.map(id => {const Icon = icons[id]; return <button type="button" key={id} onClick={() => selectAudience(id)}><span className={s.choiceIcon}><Icon size={21}/></span><span><strong>{config.audiences[id].label}</strong><small>{config.audiences[id].goal}</small></span><ArrowRight size={17}/></button>;})}</div>
-          <div className={s.liveTeaser}><p>{dateLabel} {timeLabel} · 무료 라이브</p><strong>{config.liveTitle}</strong><button type="button" className={s.textButton} onClick={headToHall}>웰컴 라운지로 이동<ArrowRight size={16}/></button></div>
-        </>}
         {step === 1 && <>
           {title(config.audiences[state.audience].goal)}
           <article className={s.resultPaper}><div className={s.paperTop}><FileText size={16}/><span>이렇게 정리할 수 있습니다</span><small>체험용 예시</small></div><ResultExample text={content.example.before}/></article>
@@ -654,7 +638,7 @@ export function ArrivalExperience({config = DEFAULT_ARRIVAL, persistenceKey = AR
         {step !== 2 && step !== 3 && step !== 7 && notice && <p className={s.notice} role="status">{notice}</p>}
         {storageBlocked && <p className={s.fine} role="status">이 브라우저에서는 기록을 저장할 수 없어요. 화면을 닫기 전에 요청문을 복사해두세요.</p>}
       </div>
-      {step !== 8 && (step !== 7 || calendarLink) && <footer className={s.dockFooter}>
+      {(step !== 7 || calendarLink) && <footer className={s.dockFooter}>
         {step === 1 && <button type="button" className={progression.nextAction} onClick={personalStart}>내 상황으로 요청문 만들기<ArrowRight size={18}/></button>}
         {step === 2 && <><span className={s.footerHint}>{requestReady(answers) ? '입력한 내용으로 요청문을 만들 수 있어요.' : '짧게 한 문장씩 적어도 충분해요.'}</span><button type="submit" form="arrival-brief" className={progression.nextAction} disabled={!requestReady(answers)}>내 요청문 만들기<ArrowRight size={18}/></button></>}
         {step === 3 && prompt && (state.handoff === 'copied' ? <button type="button" className={progression.nextAction} onClick={() => {update({experience: 'self-reported', step: 5}); setNotice('');}}>답변을 받았어요<Check size={18}/></button> : <button type="button" className={s.primary} onClick={() => copy(prompt, true)}><Copy size={17}/>요청문 복사하기</button>)}

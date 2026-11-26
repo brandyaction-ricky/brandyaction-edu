@@ -1,7 +1,7 @@
 import {chromium, expect} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {firstSpyRequest, finishOfficeReview, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, passEntryTeaser, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
+import {firstSpyRequest, finishOfficeReview, resumeExerciseFixture, finishTeamLeaderVideo, loungeScheduleButton, openLoungeSchedule, passEntryTeaser, spyActions, startOfficeCase, teamLeaderGuide, teamLeaderNext} from './review-office.mjs';
 
 const base = process.env.ARRIVAL_QA_URL ?? 'http://127.0.0.1:4529';
 const output = process.env.ARRIVAL_QA_OUTPUT;
@@ -228,14 +228,14 @@ try {
       await page.evaluate(()=>document.fonts.ready);
       await capture('entry');
       await finishOfficeReview(page,{walk,inspect,beforeLeave,afterLeave});
-      await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toBeVisible();
+      await expect(page.getByRole('heading',{name:'지금 어떤 상황이신가요?'})).toHaveCount(0);
       if (mobile) {
-        await page.getByRole('button', {name:/이미 사업을 하고 있어요/}).tap();
+        await resumeExerciseFixture(page, 'business');
         await button(page,'입력 없이 예시로 계속하기').tap();
         await expect(page.getByText('체험 예시 확인')).toBeVisible();
         await button(page,'웰컴 라운지로 이동').tap();
       } else {
-        await page.getByRole('button',{name:/회사 업무에 AI/}).click();
+        await resumeExerciseFixture(page, 'work');
         await button(page,'예시 업무로 시작').click();
         await button(page,'이 기준으로 첫 업무 맡기기').click();
         await button(page,'예시 메모 넣기').click();
