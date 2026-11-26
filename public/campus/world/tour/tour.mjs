@@ -261,7 +261,38 @@ function refreshDeskLabels(){
  renderDeskMarkers();
  positionCurrentDeskMarkers();
 }
-function setMarkers(){layer.replaceChildren();markers=actions().filter(([id])=>!contentTasks||id.startsWith('destination:')||contentTasks.some(t=>t.id===id)).map(([id,label,hint,item])=>{const setting=contentTasks?.find(t=>t.id===id);if(setting?.custom){label=setting.title;hint=setting.description;}const b=document.createElement('button');b.className='tour-hotspot';const title=document.createElement('strong'),sub=document.createElement('small');title.textContent=label;sub.textContent=hint;b.append(title,sub);b.setAttribute('aria-label',label);if(room==='study'){b.title=[label,hint].filter(Boolean).join(' · ');if(hint)b.setAttribute('aria-description',hint);}b.onclick=e=>{e.stopPropagation();keys.clear();target=null;office.campusAvatar.moving=false;if(id.startsWith('destination:'))send('destination',{id:id.split(':')[1]});else send('action',{id});};layer.append(b);return{b,item};});renderDeskMarkers();}
+function setMarkers() {
+  layer.replaceChildren();
+  const waitingForStudyConfig = room === 'study' && document.body.dataset.studyControls === 'true' && !contentTasks;
+  const visible = actions().filter(([id]) => id.startsWith('destination:')
+    || (contentTasks ? contentTasks.some(task => task.id === id) : !waitingForStudyConfig));
+  markers = visible.map(([id, label, hint, item]) => {
+    const custom = contentTasks?.find(task => task.id === id && task.custom);
+    const b = document.createElement('button');
+    const title = document.createElement('strong');
+    const sub = document.createElement('small');
+    title.textContent = custom?.title ?? label;
+    sub.textContent = custom?.description ?? hint;
+    b.className = 'tour-hotspot';
+    b.append(title, sub);
+    b.setAttribute('aria-label', title.textContent);
+    if (room === 'study') {
+      b.title = [title.textContent, sub.textContent].filter(Boolean).join(' · ');
+      if (sub.textContent) b.setAttribute('aria-description', sub.textContent);
+    }
+    b.onclick = event => {
+      event.stopPropagation();
+      keys.clear();
+      target = null;
+      office.campusAvatar.moving = false;
+      if (id.startsWith('destination:')) send('destination', { id: id.split(':')[1] });
+      else send('action', { id });
+    };
+    layer.append(b);
+    return { b, item };
+  });
+  renderDeskMarkers();
+}
 function showRoom(id){if(!names[id]||!allowed(id))return;const previousRoom=room;prepareRoom(id);positions.set(guidedPreview?previousRoom:room,{x:office.campusAvatar?.x,y:office.campusAvatar?.y});room=id;if(guidedPreview&&ready&&previousRoom!==id)transitionGuidedRoom();document.body.dataset.room=id;if(!guidedPreview&&['study','office'].includes(id)){interiors??=attachInteriorInteractions({office,root,getRoom:()=>room,onMessage:text=>{keys.clear();target=null;budget.wake(performance.now()+4000);status.textContent=text;}});}else{interiors?.destroy();interiors=null;}mixer?.setRoom(id);document.getElementById('environment-open').hidden=guidedPreview||!['study','office'].includes(id);office.setEnvironment({lighting:guidedPreview?'bright':['study','office'].includes(id)?document.getElementById('lighting-select').value:'bright'});keys.clear();target=null;const p=positions.get(id);office.campusAvatar={...(Number.isFinite(p?.x)?p:info[id].spawn),roomId:id==='office'?'office':'study',moving:false,yaw:id==='live'?Math.PI+.12:Math.PI,studyPose:null};if(officeIntro&&id==='office')Object.assign(office.campusAvatar,introEntrance(officeSeats[introSeatIndex]));office.campusAvatar.jumpHeight=room==='live'?atriumHeightAt(office.campusAvatar.x,office.campusAvatar.y):0;setMarkers();view?.roomChanged();meetup?.roomChanged();if(ready||!officeFirst)budget.wake(performance.now());office.draw();showStatusHint();status.textContent=guidedPreview?'바닥을 눌러 이동 · 드래그로 둘러보기':matchMedia('(pointer:coarse), (max-width:650px)').matches?'바닥 터치 · 이동\n드래그 · 둘러보기\n두 손가락 · 확대':(publicVisitor&&id==='live'?'문샷 오픈 캠퍼스':names[id])+' · WASD 이동 · 클릭 이동 · 드래그 시점 · 스크롤 확대' ;send('room',{id});}
 // The control hint shows when a room opens, then fades so it never covers the room's bottom buttons (staff QA 11-17).
 let hintTimer=0;function showStatusHint(){status.classList.remove('faded');clearTimeout(hintTimer);hintTimer=setTimeout(()=>status.classList.add('faded'),6000);}

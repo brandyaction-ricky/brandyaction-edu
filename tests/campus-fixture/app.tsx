@@ -34,7 +34,9 @@ import {CampusWorkspace,WorkspaceLive} from '../../features/campus/ui/workspace'
 function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
 if(location.pathname==='/campus-tour-live'||location.pathname==='/campus/workspace'&&new URLSearchParams(location.search).get('tourLive')==='1'){
  const query=new URLSearchParams(location.search);
- return <FourSpacesLive operator={query.get('operator')==='1'} studyPresence={query.get('studyPresence')==='1'}/>;
+ const modules = query.get('community') === 'off'
+  ? { community: false, focus: true, support: true, business: true } : undefined;
+ return <FourSpacesLive operator={query.get('operator')==='1'} studyPresence={query.get('studyPresence')==='1'} modules={modules}/>;
 }
 if(location.pathname==='/campus-analytics')return <CampusAnalyticsPanel/>;
 if(location.pathname==='/office'&&new URLSearchParams(location.search).has('api'))return <OfficePanel snapshot={student} demo={false}/>;

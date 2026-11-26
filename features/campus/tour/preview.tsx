@@ -64,7 +64,12 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  useEffect(()=>{if(screenVideo)post('camera',{mode:'third'});},[screenVideo]);
  const visitorRef=useRef(visitor);useEffect(()=>{visitorRef.current=visitor;},[visitor]);
  const roomName=(id:TourRoom)=>managed[id]?.title||(visitor&&id==='live'?'문샷 오픈 캠퍼스':rooms.find(r=>r.id===id)?.name);
- const visibleTasks=(r:TourRoom,v:TourRole)=>contentTasks(managed,r,v).filter(t=>(!visitor||t.id!=='live-video')&&taskOpen(t.id,live?.modules));
+ const isVisitor = !!visitor;
+ const modules = live?.modules;
+ const visibleTasks = useCallback((roomId: TourRoom, viewerRole: TourRole) =>
+  contentTasks(managed, roomId, viewerRole).filter(task =>
+   (!isVisitor || task.id !== 'live-video') && taskOpen(task.id, modules)),
+ [managed, isVisitor, modules]);
  const avatarKey=visitor?'moonshot-webinar-avatar-v1':TOUR_AVATAR_KEY;
  const [arrival,setArrival]=useState(!!visitor);
  function visitorEntered(){post('meetup-start');if(visitorRef.current?.devPresence&&!devConnection.current){const epoch=devEpoch.current;void import('../webinar/dev-presence').then(m=>{if(epoch===devEpoch.current&&!devConnection.current)devConnection.current=m.connectDevVisitors(value=>post('dev-visitor-state',value),visitorRef.current?.presenceId);}).catch(()=>setNotice('동료 연결이 지연되고 있어요. 공간 체험은 계속할 수 있습니다.'));}setArrival(false);if(failed)setMapOpen(true);visitorRef.current?.onEnter();}
@@ -245,7 +250,13 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
   measure();
   return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
  }, [ready, room, tool, mapOpen]);
- useEffect(()=>{if(ready)post('content-config',{tasks:rooms.flatMap(r=>contentTasks(managed,r.id,role).filter(t=>!t.id.startsWith('content:')).map(t=>({...t,custom:!!managed[r.id]?.tasks.some(v=>v.id===t.id)})))});},[ready,managed,role]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(() => {
+  if (!ready) return;
+  const tasks = rooms.flatMap(r => visibleTasks(r.id, role)
+   .filter(task => !task.id.startsWith('content:'))
+   .map(task => ({ ...task, custom: !!managed[r.id]?.tasks.some(value => value.id === task.id) })));
+  post('content-config', { tasks });
+ }, [ready, managed, role, visibleTasks]);
  useEffect(()=>{if(ready)post('blocked',{value:!!(mapOpen||tool||gate||activityMenu||arrival||screenVideo)});},[mapOpen,tool,gate,activityMenu,arrival,ready,screenVideo]);
  function changeRole(next:TourRole){if(live||visitor)return;if(!mayLeave(true))return;setRole(next);setToolsVisited(false);setAiVisited(false);setHandoff(null);setPrevious('');setOfficeVisited(false);setGate(null);setTool('');setMapOpen(true);setActivityMenu(false);post('role',{role:next});if(!canEnter(next,room)){setRoom('live');post('room',{id:'live'});}}
  useEffect(()=>{if(live)return;const sync=(e:StorageEvent)=>{if(e.key===avatarKey&&e.storageArea===localStorage)post('appearance',readAvatar());};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);},[live,avatarKey]); // eslint-disable-line react-hooks/exhaustive-deps

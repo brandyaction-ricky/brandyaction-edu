@@ -147,6 +147,43 @@ test('study map signs share one touch size and open each destination without lea
   await expect(page.locator('[data-room="office"]')).toBeVisible();
 });
 
+test('with community off, study map and task menu omit feedback and the three remaining signs work', async ({page}) => {
+  test.setTimeout(90000);
+  // Observe the actual startup DOM as well as the settled room, since the host sends its config after scene startup.
+  await page.addInitScript(() => {
+    if (!location.pathname.startsWith('/campus/world/tour/')) return;
+    new MutationObserver(records => {
+      for (const record of records) for (const node of record.addedNodes) {
+        if (node instanceof Element && node.matches('button.tour-hotspot[aria-label="동료 피드백"]')) {
+          document.documentElement.dataset.feedbackSignWasShown = 'true';
+        }
+      }
+    }).observe(document, {childList: true, subtree: true});
+  });
+  await connect(page, false, true);
+  await page.goto(roomUrl + '&community=off');
+  const scene = page.frameLocator('iframe[title="문샷 캠퍼스 3D 미리보기"]');
+  const lesson = scene.getByRole('button', {name: '수업', exact: true});
+  await expect(lesson).toBeVisible({timeout: 75000});
+  await checkSceneActions(page, ['수업', '앉아서 집중', '내 AI 사무실'], 'overall');
+  await expect(scene.getByRole('button', {name: '동료 피드백', exact: true})).toHaveCount(0);
+  await expect(scene.locator('html')).not.toHaveAttribute('data-feedback-sign-was-shown', 'true');
+  await page.getByRole('button', {name: '이 공간에서 할 일', exact: true}).click();
+  const menu = page.getByRole('region', {name: '이 공간에서 할 일', exact: true});
+  await expect(menu.getByRole('button', {name: '수업', exact: true})).toBeVisible();
+  await expect(menu.getByRole('button', {name: '결과물·동료 피드백', exact: true})).toHaveCount(0);
+  await menu.getByRole('button', {name: '할 일 목록 닫기'}).click();
+
+  await lesson.click();
+  const dialog = page.getByRole('dialog', {name: '수업', exact: true});
+  await expect(dialog.getByText(body(2), {exact: true})).toBeVisible();
+  await dialog.getByRole('button', {name: '수업 닫기'}).click();
+  await scene.getByRole('button', {name: '앉아서 집중', exact: true}).click();
+  await page.getByRole('dialog', {name: '집중과 휴식', exact: true}).getByRole('button', {name: '집중과 휴식 닫기'}).click();
+  await scene.getByRole('button', {name: '내 AI 사무실', exact: true}).click();
+  await expect(page.locator('[data-room="office"]')).toBeVisible();
+});
+
 test('a long configured action title stays accessible in a fixed-size study map sign', async ({page}) => {
   test.setTimeout(90000);
   const custom = '함께 만든 결과물을 살펴보고 동료에게 자세한 피드백을 남겨 보세요';
