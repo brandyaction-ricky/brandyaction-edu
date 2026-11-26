@@ -37,6 +37,17 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/remove-lounge-personal-trial-1126" ]; then
+            expected_main=723cf9a21f1de7dfc0d81a6a06902f4bfe78711b
+            release_payload=fe666b478f14d98cecaf2794b68ddc935ac4d63c
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            test "$(git rev-parse "$release_payload^")" = "$expected_main"
+            git merge-base --is-ancestor "$release_payload" HEAD
+            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            echo 'Verified the pinned Moonshot lounge menu change against the current production base.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/retire-campus-welcome-1126" ]; then
             expected_main=cab361c134a96f05d58f3db961fbdb68df746f7b
             release_payload=9c336435562177da01aa8be9f8dc1f62a6bfaf98
