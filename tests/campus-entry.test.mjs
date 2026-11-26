@@ -12,7 +12,7 @@ test('entry distinguishes pre-start welcome from current learning without admitt
  for(const patch of [{status:'revoked'},{status:'refunded'},{revoked_at:'2026-11-03'},{user_id:id(4)},{cohort_id:id(4)},{access_ends_at:'2026-11-03'},{access_starts_at:'bad'},{access_ends_at:'bad'},{id:'bad'}])assert.equal(campusEntry({...enrollment,...patch},id(2),id(3),now),null);
 });
 test('share links contain cohort only and never an individual enrollment or identity',()=>{
- assert.equal(campusEntryPath(id(3),true),'/campus/enter?cohort='+id(3)+'&welcome=1');
+ assert.equal(campusEntryPath(id(3)),'/campus/enter?cohort='+id(3));
  assert.equal(campusEntryPath(id(3)),'/campus/enter?cohort='+id(3));
  assert.equal(campusEntryPath(),'/campus/enter');
  assert.ok(!campusEntryPath(id(3)).includes(enrollment.id));

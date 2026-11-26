@@ -12,7 +12,7 @@ export async function GET(request:Request,{params}:{params:Promise<{slug:string}
   const {slug}=await params,w=await readWebinar(slug);
   if(!w||w.status!=='published')fail('현재 공개된 행사가 아닙니다.',404);
   const user=await getAuthenticatedUser();if(!user)return privateReply({kind:'login',href:loginPath(slug)});
-  if(canReviewCampus(user))return privateReply({kind:'operator',href:campusReviewPath(w.cohortId,section==='space')});
+  if(canReviewCampus(user))return privateReply({kind:'operator',href:campusReviewPath(w.cohortId)});
   const db=await createClient();
   const result=await db.from('enrollments').select('id,user_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('user_id',user.id).eq('cohort_id',w.cohortId).eq('status','active').limit(20).abortSignal(AbortSignal.timeout(5000));
   if(result.error)throw result.error;

@@ -1,7 +1,7 @@
 /** Navigation hints never grant access: every destination still checks the current session. */
 export const campusSections = ['learning','space','community','business','support','ai','office','journal'] as const;
 export function validSection(value: string | null | undefined) { return campusSections.includes(value as typeof campusSections[number]) ? value! : 'learning'; }
-export const campusRooms = ['live','welcome','study','office','library'];
+export const campusRooms = ['live','study','office','library'];
 /** The room named in a campus address, so a reload or the way back from a lesson opens that room instead of the map. */
 export function requestedRoom(search: string): string | null { const room = new URLSearchParams(search).get('room'); return room && campusRooms.includes(room) ? room : null; }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -7,6 +7,6 @@ export function campusEntry(e:Enrollment,userId:string,cohortId:string,now=Date.
  if(!isCampusId(e.id)||e.user_id!==userId||e.cohort_id!==cohortId||e.status!=='active'||e.revoked_at||Number.isNaN(start)||Number.isNaN(end)||end<=now)return null;
  return {enrollmentId:e.id,ready:start<=now,startsAt:e.access_starts_at?String(e.access_starts_at):null};
 }
-export function campusEntryPath(cohortId?:string,welcome=false){
- return '/campus/enter'+(cohortId?'?cohort='+encodeURIComponent(cohortId)+(welcome?'&welcome=1':''):welcome?'?welcome=1':'');
+export function campusEntryPath(cohortId?:string){
+ return '/campus/enter'+(cohortId?'?cohort='+encodeURIComponent(cohortId):'');
 }

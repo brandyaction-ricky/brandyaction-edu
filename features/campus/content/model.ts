@@ -21,7 +21,7 @@ export function validateCampusContent(value:unknown):CampusContent{
 }
 /** Card/intro copy is public. Only authorized rooms expose inner articles and tasks. */
 export function visibleCampusContent(content:CampusContent={},role:TourRole='guest'):CampusContent{
- return Object.fromEntries(Object.entries(content).map(([id,c])=>{const allowed=role==='admin'||role==='student'||['live','library'].includes(id)||role==='waiting'&&id==='welcome';return[id,{...c,title:displayRoomTitle(id as TourRoom,c.title),articles:allowed?c.articles.filter(a=>a.published):[],tasks:allowed?c.tasks:[]}];}));
+ return Object.fromEntries(Object.entries(content).filter(([id])=>id!=='welcome').map(([id,c])=>{const allowed=role==='admin'||role==='student'||['live','library'].includes(id);return[id,{...c,title:displayRoomTitle(id as TourRoom,c.title),articles:allowed?c.articles.filter(a=>a.published):[],tasks:allowed?c.tasks:[]}];}));
 }
 export function contentTasks(content:CampusContent,room:TourRoom,role:TourRole):TourTask[]{
  const c=content[room];return [...(c?.body?[{id:'intro:'+room,room,group:'공간 안내',title:c.title+' 안내',description:c.description}]:[]),...tourTasks.filter(t=>t.room===room&&(!t.admin||role==='admin')).flatMap(t=>{const setting=c?.tasks.find(s=>s.id===t.id);return setting?.visible===false?[]:[{...t,...(setting?{title:setting.title,description:setting.description}:{})}];}),...(c?.articles||[]).filter(a=>a.published).map(a=>({id:'content:'+room+':'+a.id,room,group:'이 공간의 소식',title:a.title,description:'공지·자료 자세히 보기'}))];

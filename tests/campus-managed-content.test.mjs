@@ -11,7 +11,7 @@ test('the supplied fifth cohort preset keeps all 4 content sections and does not
 test('room content filters inner articles by role and publication while preserving public introductions',()=>{
  const article={id:'one',title:'Notice',body:'private course article',published:true,pinned:false,url:'',linkLabel:''};
  const source=content.validateCampusContent(Object.fromEntries(['live','library','welcome','study','office'].map(id=>[id,{...content.defaultRoom(id),articles:[article,{...article,id:'hidden',published:false}]}])));
- for(const role of ['guest','waiting','student']){const result=content.visibleCampusContent(source,role);assert.equal(result.library.articles.length,1);assert.equal(result.welcome.articles.length,role==='guest'?0:1);assert.equal(result.study.articles.length,role==='student'?1:0);assert.equal(result.office.articles.length,role==='student'?1:0);assert.ok(result.study.title);}
+ for(const role of ['guest','waiting','student']){const result=content.visibleCampusContent(source,role);assert.equal(result.library.articles.length,1);assert.equal(result.welcome,undefined);assert.equal(result.study.articles.length,role==='student'?1:0);assert.equal(result.office.articles.length,role==='student'?1:0);assert.ok(result.study.title);}
 });
 test('room editor rejects unknown tasks, unsafe images, malformed rich content and oversized content',()=>{
  const base=content.defaultRoom('welcome');
