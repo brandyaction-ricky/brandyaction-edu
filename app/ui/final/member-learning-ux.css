@@ -1,3 +1,7 @@
+.edu-front .account-main .class-enrolled .row-text > h2 {
+  font-size: var(--type-body);
+  line-height: 1.6;
+}
 .edu-front .member-learning-intro {
   padding: 28px;
   border: 1px solid var(--line);
