@@ -59,7 +59,8 @@ export async function readCurriculumReview(actor: Actor, options: { cohort?: str
   const days = curriculumDayNumbers(data);
   const visible = lessons.filter(l => cohortLessonVisible(data, cohortId, l)).sort((a, b) => Number(weeks.find(w => w.id === a.week_id)?.week_number) - Number(weeks.find(w => w.id === b.week_id)?.week_number) || Number(a.day_number) - Number(b.day_number) || a.id.localeCompare(b.id));
   const owned = await rows(db.from('enrollments').select('id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at,created_at').eq('user_id', actor.id).eq('cohort_id', cohortId).order('created_at', { ascending: false }));
-  const enrollment = owned.find(e => hasLearningAccess(e));
+  const activeEnrollments = owned.filter(e => hasLearningAccess(e));
+  const enrollment = activeEnrollments.find(e => e.id === options.enrollment) || activeEnrollments[0];
   let studentStateError = false;
   const completed = new Set<string>(), unlocked = new Set<string>();
   if (enrollment) {

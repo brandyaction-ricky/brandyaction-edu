@@ -74,3 +74,23 @@ test('live job inbox names the employee, titles the result by the task and point
  await expect(detail.getByRole('link',{name:'텔레그램에서 이어서 맡기기 ↗'})).toHaveAttribute('href','https://t.me/moonshot_notice_bot');
  await expect(page.getByRole('navigation',{name:'업무 페이지'})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
+
+test('entering from a lesson preserves its enrollment even if another cohort is listed first', async ({page}) => {
+ const other = {...student.scopes[0], enrollmentId:'00000000-0000-4000-8000-000000000099', cohortName:'다른 기수'};
+ await page.route('**/api/campus',r=>r.fulfill({json:{scopes:[other,...student.scopes]}}));
+ await page.goto('/learn/'+eid+'/'+student.lessons[0].id);
+ const nav=page.getByRole('navigation',{name:'문샷 캠퍼스 바로가기'});
+ const href='/campus/workspace?enrollmentId='+eid+'&section=space';
+ await expect(nav.getByRole('link',{name:'처음이라면 웰컴 안내'})).toHaveCount(0);
+ await nav.getByRole('link',{name:'작업 공간 입장 →'}).click();
+ await expect(page).toHaveURL(url=>url.pathname+url.search===href);
+});
+
+test('staff without a seat can open the selected public curriculum from the preview study room', async ({page}) => {
+ await setup(page);await page.goto('/operator-tour?cohort='+cohort);
+ await task(page,'수업');
+ await expect(page.getByText('운영자 미리보기입니다. 공개 커리큘럼에서 기수별 수업을 읽을 수 있어요.')).toBeVisible();
+ const link=page.getByRole('link',{name:'공개 커리큘럼 열기 →'});
+ await expect(link).toHaveAttribute('href','/my/curriculum-review?cohort='+cohort);
+ await link.click();await expect(page).toHaveURL(url=>url.pathname==='/my/curriculum-review'&&url.searchParams.get('cohort')===cohort);
+});

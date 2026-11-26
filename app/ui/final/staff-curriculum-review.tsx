@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { Check, Play, ChevronDown } from 'lucide-react';
 import { type CurriculumReview, type ReviewContent, reviewUrl } from '@/lib/staff-curriculum-review';
@@ -9,6 +10,8 @@ import { LessonText } from './lesson-text';
 import { Video } from './primitives';
 import './classroom-surface.css';
 import './staff-curriculum-review.css';
+
+const CampusEntryBar = dynamic(() => import('@/features/campus/ui/entry-bar').then(module => module.CampusEntryBar));
 
 function useReviewRead<T>(url: string) {
   const [attempt, retry] = useState(0);
@@ -26,7 +29,7 @@ function useReviewRead<T>(url: string) {
   }, [url, key]);
   return { ...(result?.key === key ? result : {}), retry: () => retry(n => n + 1) };
 }
-export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', initialLesson = '', partner = false, campusHref }: { enrollmentId?: string; initialCohort?: string; initialLesson?: string; partner?: boolean; campusHref?: string }) {
+export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', initialLesson = '', partner = false, campusHref, classroomCampus }: { enrollmentId?: string; initialCohort?: string; initialLesson?: string; partner?: boolean; campusHref?: string; classroomCampus?: { returnTo?: string } }) {
   const [cohort, setCohort] = useState(initialCohort);
   const [selectedLesson, setLesson] = useState(initialLesson);
   const [student, setStudent] = useState(false), [navOpen, setNavOpen] = useState(false);
@@ -40,6 +43,7 @@ export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', i
   const url = data && lesson && canOpen ? reviewUrl(data.cohortId, lesson.id, student, partner) : '';
   const content = useReviewRead<ReviewContent>(url);
   return <div className="learning-bg staff-curriculum-review"><div className="wrap">
+    {!partner && data && classroomCampus && <CampusEntryBar key={data.cohortId} enrollmentId={data.enrollmentId || undefined} reviewCohort={data.cohortId} returnTo={classroomCampus.returnTo}/>}
     <section className="staff-review-controls" aria-label={partner ? "협력자 커리큘럼" : "커리큘럼 검수 설정"}>
       <div className="between"><h1>{partner ? "협력자 커리큘럼" : "커리큘럼 검수"}</h1><Link className="btn small" href="/my">마이페이지로</Link></div>
       <p>{partner ? '공개된 수업을 원하는 순서로 볼 수 있습니다.' : '관리자·직원 공통 검수 모드입니다. 공개 수업을 열어 보며, 답변·완료 기록은 저장하지 않습니다.'}</p>

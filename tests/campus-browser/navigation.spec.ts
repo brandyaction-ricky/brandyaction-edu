@@ -82,8 +82,8 @@ test('slow space loading offers a usable fallback instead of a blank screen',asy
  await expect(page.getByRole('navigation',{name:'문샷 공간 선택'})).toBeVisible();await expect(page.locator('iframe')).toHaveCount(0);
 });
 
-test('eligible learners have one workspace entry in the campus banner', async ({page}) => {
- await page.goto('/learn/fixture');
+test('eligible learners have one workspace entry on the unscoped My Classes page', async ({page}) => {
+ await page.goto('/my/classes');
  const banner = page.getByRole('navigation', {name:'문샷 캠퍼스 바로가기'});
  await expect(banner.getByRole('link')).toHaveCount(1);
  await expect(banner.getByRole('link', {name:'작업 공간 입장 →'})).toHaveAttribute('href','/campus/enter');

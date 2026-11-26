@@ -41,6 +41,17 @@ test('ordinary, suspended and withdrawn users are denied before a privileged que
 test('other students enrollments cannot be used; no enrollment is created to review another cohort',async()=>{
  const f=fixture();await assert.rejects(api.readCurriculumReview(actor(),{enrollment:id(11)},f.db),{status:403});const before=JSON.stringify(f.tables);const snapshot=await api.readCurriculumReview(actor(),{cohort:id(4)},f.db);assert.equal(snapshot.enrollmentId,null);assert.equal(JSON.stringify(f.tables),before);
 });
+test('a direct class link keeps its own enrollment when two grants cover the same cohort',async()=>{
+ const f=fixture();
+ const original=f.tables.enrollments.find(e=>e.id===id(10));
+ f.tables.enrollments.unshift({...original,id:id(30),created_at:'2090-01-01'});
+ const selected=await api.readCurriculumReview(actor(),{enrollment:id(10)},f.db);
+ assert.equal(selected.enrollmentId,id(10));
+ original.access_ends_at='2020-01-01';
+ assert.equal((await api.readCurriculumReview(actor(),{enrollment:id(10)},f.db)).enrollmentId,id(30));
+ f.tables.enrollments[0].revoked_at='2020-01-01';
+ assert.equal((await api.readCurriculumReview(actor(),{enrollment:id(10)},f.db)).enrollmentId,null);
+});
 test('review reads a locked lesson but student mode fails closed, including a failed gate lookup',async()=>{
  const f=fixture();const content=await api.readReviewContent(actor(),id(3),id(7),false,f.db);assert.equal(content.body,'공개 본문');assert.equal(content.document.blocks[0].quiz.questions[0].correctIndex,undefined);assert.equal('draft' in content,false);assert.equal('submission' in content,false);
  await assert.rejects(api.readReviewContent(actor(),id(3),id(7),true,f.db),{status:403});f.failGate();const s=await api.readCurriculumReview(actor(),{},f.db);assert.equal(s.studentStateError,true);assert.ok(s.lessons.every(l=>!l.studentUnlocked));await assert.rejects(api.readReviewContent(actor(),id(3),id(6),true,f.db),{status:503});

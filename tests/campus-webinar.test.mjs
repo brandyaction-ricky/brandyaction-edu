@@ -87,8 +87,13 @@ test('operator capability is private, minimal and never grants anonymous or susp
  reset();state.authError=true;assert.equal((await capability.GET(req())).status,503);
  reset();assert.equal((await capability.GET(req('/',undefined,{'sec-fetch-site':'cross-site'}))).status,403);
 });
-test('webinar access recognizes active operators before any enrollment lookup',async()=>{
- for(const role of ['admin','staff']){reset();state.user={id:id(2),role,status:'active'};const response=await access.GET(req(),params);assert.deepEqual(await response.json(),{kind:'operator',href:'/campus/operator?room=study&cohort='+config.cohortId});assert.ok(!state.queries.includes('enrollments'));}
+test('webinar entry keeps staff in their eligible cohort and reserves review for operators without access',async()=>{
+ for(const role of ['admin','staff']){reset();state.user={id:id(2),role,status:'active'};const response=await access.GET(req(),params);assert.deepEqual(await response.json(),{kind:'operator',href:'/campus/operator?room=study&cohort='+config.cohortId});assert.ok(state.queries.includes('enrollments'));
+  state.enrollments=[{id:id(8),user_id:id(2),cohort_id:config.cohortId,status:'active'}];
+  assert.deepEqual(await (await access.GET(req(),params)).json(),{kind:'member',href:'/campus/workspace?enrollmentId='+id(8)+'&section=space'});
+  state.enrollments[0].access_starts_at='2099-01-01';
+  assert.deepEqual(await (await access.GET(req(),params)).json(),{kind:'welcome',href:'/campus/enter?cohort='+config.cohortId});
+ }
 });
 
 test('event removal requires marketing access, origin and the selected revision',async()=>{
