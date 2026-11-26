@@ -35,6 +35,7 @@
   box-shadow: 0 16px 44px #24272d26;
 }
 
+.floating-learning-question[hidden],
 .floating-learning-question-panel[hidden] { display: none; }
 
 .floating-learning-question-panel > header {

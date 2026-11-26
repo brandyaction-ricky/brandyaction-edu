@@ -6,7 +6,12 @@ test('student asks privately inside the actual classroom, retries without duplic
  await page.route('**/api/platform/lesson-questions',r=>{bodies.push(r.request().postDataJSON());saved=bodies.length>1;return r.fulfill(saved?{json:{question:{id:id(9)}}}:{status:503,json:{error:'응답 확인 실패'}});});
  await page.goto('/classroom-questions-test');
  await expect(page.getByText('학습하면서 바로 질문합니다.')).toBeVisible();
- await page.getByRole('link',{name:'이 수업에 질문 남기기'}).click();
+ const askLink = page.getByRole('link', { name: '이 수업에 질문 남기기' });
+ if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+   const allQuestions = page.getByRole('link', { name: '질문·답변 전체 보기' });
+   for (const link of [askLink, allQuestions]) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+ }
+ await askLink.click();
  await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();
  await page.getByRole('textbox',{name:'질문 제목',exact:true}).fill('실습 질문');
  await page.getByRole('textbox',{name:'질문 내용',exact:true}).fill('이 단계가 궁금해요');

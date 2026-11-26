@@ -32,16 +32,22 @@ import {CampusEntryBar} from '../../features/campus/ui/entry-bar';
 import {withCampusReturn} from '../../features/campus/ui/navigation';
 import {CampusWorkspace,WorkspaceLive} from '../../features/campus/ui/workspace';
 function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
-if((location.pathname==='/campus-tour-live'||location.pathname==='/campus/workspace'&&new URLSearchParams(location.search).get('tourLive')==='1'))return <FourSpacesLive operator={new URLSearchParams(location.search).get('operator')==='1'}/>;
+if(location.pathname==='/campus-tour-live'||location.pathname==='/campus/workspace'&&new URLSearchParams(location.search).get('tourLive')==='1'){
+ const query=new URLSearchParams(location.search);
+ const modules = query.get('community') === 'off'
+  ? { community: false, focus: true, support: true, business: true } : undefined;
+ return <FourSpacesLive operator={query.get('operator')==='1'} studyPresence={query.get('studyPresence')==='1'} modules={modules}/>;
+}
 if(location.pathname==='/campus-analytics')return <CampusAnalyticsPanel/>;
 if(location.pathname==='/office'&&new URLSearchParams(location.search).has('api'))return <OfficePanel snapshot={student} demo={false}/>;
 if(location.pathname==='/personal-office')return <div style={{padding:24,maxWidth:900,margin:'auto'}}><PersonalOffice enrollmentId={student.selectedEnrollmentId!} demo/></div>;
 if(location.pathname==='/welcome-account-preview')return <FourSpacesPreview snapshot={student} review={{room:'welcome',role:'waiting'}} welcome={{settings:cohortFiveWelcome(),resources:[]}}/>;
 if(location.pathname==='/welcome-five-preview')return <FourSpacesPreview snapshot={student} review={{room:'welcome'}} welcome={{settings:cohortFiveWelcome(),resources:[]}}/>;
 if(location.pathname==='/welcome-preview'){const saved=JSON.parse(localStorage.getItem('moonshot-tour-webinars')||'[]')[0];return <FourSpacesPreview snapshot={student} review={{room:'welcome'}} welcome={{content:saved?.content,settings:saved?.welcome||{...DEFAULT_WELCOME,notices:[{id:'notice-test',title:'첫 수업 준비 안내',body:'수업 전 노트북과 질문 한 가지를 준비해 주세요.\n공지의 두 번째 문단입니다.',url:'https://example.com/guide',linkLabel:'준비 안내 보기',published:true,pinned:true},{id:'hidden',title:'숨긴 공지',body:'비공개',url:'',linkLabel:'',published:false,pinned:false}]},resources:saved?.resources||[{id:'welcome-video',kind:'youtube',title:'지난 라이브 함께 보기',description:'웰컴 화면 재생 확인용 예시입니다.',url:'https://www.youtube.com/watch?v=abcdefghijk',published:true}]}}/>;}
-if(location.pathname==='/operator-tour')return <FourSpacesPreview snapshot={{...student,scopes:[],selectedEnrollmentId:null,lessons:[]}} review={{room:'welcome'}}/>;
+if(location.pathname==='/operator-tour')return <FourSpacesPreview snapshot={{...student,scopes:[],selectedEnrollmentId:null,lessons:[]}} review={{room:new URLSearchParams(location.search).has('cohort')?'study':'welcome',cohortId:new URLSearchParams(location.search).get('cohort') || undefined}}/>;
 if(location.pathname==='/campus-tour')return <FourSpacesPreview snapshot={student} adminSnapshot={admin} welcome={new URLSearchParams(location.search).has('welcome')?{settings:DEFAULT_WELCOME,resources:[{id:'welcome-video',kind:'youtube',title:'지난 라이브 함께 보기',description:'검수용 영상',url:'https://www.youtube.com/watch?v=abcdefghijk',published:true}]}:undefined}/>;
-if(location.pathname.startsWith('/learn/'))return <><CampusEntryBar returnTo={new URLSearchParams(location.search).get('campusReturn')||undefined}/><main style={{padding:32}}><h1>예시 수업 · 한 장 지도 작성</h1><p>이동·복귀 검수용 가상 수업입니다. 실제 학습 기록은 저장하지 않습니다.</p></main></>;
+if(location.pathname==='/my/classes')return <><CampusEntryBar/><main><h1>내 클래스</h1></main></>;
+if(location.pathname.startsWith('/learn/'))return <><CampusEntryBar enrollmentId={location.pathname.split('/')[2]} returnTo={new URLSearchParams(location.search).get('campusReturn')||undefined}/><main style={{padding:32}}><h1>예시 수업 · 한 장 지도 작성</h1><p>이동·복귀 검수용 가상 수업입니다. 실제 학습 기록은 저장하지 않습니다.</p></main></>;
 if(location.pathname==='/webinar')return <WebinarRoom event={{...webinarEvent,ambientCount:Number(new URLSearchParams(location.search).get('ambient')||0),resources:new URLSearchParams(location.search).has('library')?[{id:'qa-file',kind:'file',title:'검수용 무료 자료',description:'가상 다운로드 자료',url:'https://files.example.test/moonshot.pdf',published:true},{id:'qa-video',kind:'youtube',title:'검수용 다시보기',description:'재생 연결 확인용 가상 영상',url:'https://www.youtube.com/watch?v=abcdefghijk',published:true},{id:'qa-hidden',kind:'file',title:'비공개 검수 자료',description:'노출하지 않는 자료',url:'https://files.example.test/private.pdf',published:false}]:[],youtubeId:new URLSearchParams(location.search).has('video')?'abcdefghijk':''}} demo={!new URLSearchParams(location.search).has('api')}/>;
 if(['/event-preview','/event-admin-preview'].includes(location.pathname))return <EventFixture/>;
 if(location.pathname==='/webinar-admin')return <WebinarAdmin/>;

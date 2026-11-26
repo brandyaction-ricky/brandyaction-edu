@@ -16,7 +16,6 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  const q=await searchParams,cohort=typeof q.cohort==='string'?q.cohort:undefined;
  if(q.cohort!==undefined&&(!cohort||!isCampusId(cohort)))notFound();
  const user=await getAuthenticatedUser();if(!user)redirect('/login?next='+encodeURIComponent(campusEntryPath(cohort)));
- if(canReviewCampus(user))redirect(campusReviewPath(cohort));
  const db=await createClient();let query=db.from('enrollments').select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('user_id',user.id).eq('status','active').order('created_at',{ascending:false}).limit(200);
  if(cohort)query=query.eq('cohort_id',cohort);
  const r=await query;if(r.error)throw Error('수강권을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
@@ -25,8 +24,9 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  const [courses,cohorts]=ids.length?await Promise.all([db.from('courses').select('id,title').in('id',ids).eq('status','published').is('archived_at',null),db.from('cohorts').select('id,name,course_id').in('id',cohortIds).is('archived_at',null)]):[{data:[],error:null},{data:[],error:null}];
  if(courses.error||cohorts.error)throw Error('클래스를 확인하지 못했습니다. 다시 시도해 주세요.');
  const options=candidates.filter(e=>courses.data?.some(c=>c.id===e.course_id)&&cohorts.data?.some(c=>c.id===e.cohort_id&&c.course_id===e.course_id));
- const chosen=cohort||options.length===1?options[0]:null;
+ const chosen=cohort ? options.find(e=>e.ready) || options[0] : options.length===1 ? options[0] : null;
  if (!options.length) {
+  if (canReviewCampus(user)) redirect(campusReviewPath(cohort));
   const partners = await myExternalPartnerScopes(db);
   const partner = cohort ? partners.find(access => access.cohort_id === cohort) : partners[0];
   if (partner) redirect(partners.length > 1 && !cohort ? externalPartnerUrl() : '/campus/workspace?' +

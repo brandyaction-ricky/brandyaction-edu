@@ -51,6 +51,7 @@
 .checkout-coupon-notice{margin-top:var(--space-3);color:#1673a6}
 .checkout-applied-coupon-actions{display:flex;align-items:center;gap:var(--space-3);flex:none}
 .checkout-applied-coupon-actions .link{border:0;background:transparent;padding:0;cursor:pointer}
+@media(pointer:coarse){.checkout-applied-coupon-actions .link{min-height:44px;min-width:44px}}
 .checkout-coupon-dialog{width:min(460px,calc(100vw - 32px))}
 .checkout-coupon-dialog>div{display:flex;min-height:100%;flex-direction:column}
 .checkout-coupon-dialog .field{margin-top:var(--space-4)}
@@ -93,3 +94,5 @@
   --line: var(--border-default);
 }
 :focus-visible { outline: 2px solid #315f9a; outline-offset: 2px; }
+
+#classroom-lesson-body{scroll-margin-top:calc(var(--header-height,64px) + 8px)}

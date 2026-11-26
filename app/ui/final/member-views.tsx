@@ -174,10 +174,12 @@ function EnrolledCard({
   data,
   enrollment: e,
   blockLearningEnabled,
+  heading: Heading = 'h3',
 }: {
   data: Data;
   enrollment: Row;
   blockLearningEnabled: boolean;
+  heading?: 'h2' | 'h3';
 }) {
   const c = rows(data, "courses").find((c) => c.id === e.course_id),
     cohort = rows(data, "cohorts").find((c) => c.id === e.cohort_id),
@@ -202,7 +204,7 @@ function EnrolledCard({
             </Badge>
             <Badge>{t(cohort, "name")}</Badge>
           </div>
-          <h3 className="mt8">{t(c, "title") || "클래스"}</h3>
+          <Heading className="mt8">{t(c, "title") || "클래스"}</Heading>
           <p className="meta">
             {t(c, "schedule_label") || t(c, "duration_label")}
           </p>
@@ -1327,7 +1329,7 @@ export function MemberViews({
           )}
           {enrollments.map((e) => (
             <div key={e.id}>
-              <EnrolledCard data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
+              <EnrolledCard data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} heading="h2" />
               {hasLearningAccess(e) && !isGraduate(e, rows(data, 'courses').find(course => course.id === e.course_id), rows(data, 'cohorts').find(cohort => cohort.id === e.cohort_id)) && (
                 <LiveSchedule data={data} cohortId={t(e, "cohort_id")} />
               )}

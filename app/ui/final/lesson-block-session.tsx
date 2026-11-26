@@ -42,7 +42,7 @@ async function request<T>(url: string, body?: unknown, signal?: AbortSignal): Pr
   return data;
 }
 
-function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRevision, onCompleted, campusGuided, renderContinuation, completed }: { renderContinuation?: RenderContinuation; completed?: boolean; campusGuided?: boolean; snapshot: Snapshot; lessonId: string; enrollmentId: string; readOnly: boolean; onSelectRevision: (revision: string | null) => void; onCompleted?: () => void }) {
+function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRevision, onCompleted, campusGuided, inRoom, renderContinuation, completed }: { renderContinuation?: RenderContinuation; completed?: boolean; campusGuided?: boolean; inRoom?: boolean; snapshot: Snapshot; lessonId: string; enrollmentId: string; readOnly: boolean; onSelectRevision: (revision: string | null) => void; onCompleted?: () => void }) {
   const practice = snapshot.practice?.enabled === true;
   const draft = practice ? snapshot.practice?.draft : snapshot.draft;
   const canPractice = practice && snapshot.revision === snapshot.currentRevision;
@@ -66,7 +66,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
   const reopenRequest = useRef<string | null>(null);
   const [reopening, setReopening] = useState(false);
   const locked = !practice && !canEditBlockSubmission(submission);
-  const reviewPrompts = locked && !readOnly && !historical && !submitting && !submitUncertain;
+  const reviewPrompts = (snapshot.staffPreview === true || (locked && !readOnly)) && !historical && !submitting && !submitUncertain;
   const submissionState = submission && blockSubmissionState(submission);
   const submissionHistory = submission ? [submission, ...(snapshot.submissions || []).filter(item => item.id !== submission.id)] : snapshot.submissions || [];
   const credited = useRef(false);
@@ -91,12 +91,12 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
       if (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search) return;
       if (!window.confirm('저장되지 않은 답변이 있습니다. 이 화면을 나가면 현재 입력을 잃을 수 있습니다. 이동할까요?')) { event.preventDefault(); event.stopPropagation(); }
     }
-    if (!campusGuided) {
+    if (!campusGuided && !inRoom) {
       window.addEventListener('beforeunload', unload);
       document.addEventListener('click', leaving, true);
     }
     return () => { window.removeEventListener('beforeunload', unload); document.removeEventListener('click', leaving, true); unsubscribe(); autosave.dispose(); saver.current = null; };
-  }, [snapshot, lessonId, enrollmentId, historical, readOnly, practice, canPractice, draft, campusGuided]);
+  }, [snapshot, lessonId, enrollmentId, historical, readOnly, practice, canPractice, draft, campusGuided, inRoom]);
   function change(next: LessonBlockAnswers) {
     if (submitError && !submitUncertain) setSubmitError('');
     valuesRef.current = next;
@@ -153,7 +153,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
       : historical ? <div className="lb-session-notice">이전 수업에서 작성한 답변입니다. 읽기만 할 수 있습니다. <button className="btn small" type="button" onClick={() => select(null)}>현재 수업으로</button></div>
       : null}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
-    {campusGuided && <CampusLessonGuard dirty={status.phase !== 'saved'} busy={uploading || submitting || reopening || status.phase === 'saving'} />}
+    {(campusGuided || inRoom) && <CampusLessonGuard dirty={status.phase !== 'saved'} busy={uploading || submitting || reopening || status.phase === 'saving'} />}
     <LessonPages lessonId={lessonId} continuation={!historical && renderContinuation?.(Boolean((locked || readOnly || completed) && !uploading && !submitting && !reopening && status.phase === 'saved'))} positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
     {snapshot.document && <LessonBlockView pageBlocks={pageBlocks} showChecklist={last} floatingAudio={!campusGuided} showOutline={!campusGuided} document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} filesReadOnly={practice} readOnly={(readOnly && !canPractice) || historical || submitting || submitUncertain || locked} reviewPrompts={reviewPrompts} grade={(readOnly && !canPractice) || historical || locked ? undefined : grade} />}
     {(!readOnly || canPractice) && !historical && !locked && (status.phase !== 'saved' || pageHasInputs(pageBlocks, last)) && <LessonSaveStatus status={status} hasDraft={Boolean(draft)} practice={practice} onSave={() => void saver.current?.flush()} />}
@@ -183,11 +183,11 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
 
 // Integrate only after the lesson-block DB migration is installed. Existing
 // lesson_contents are rendered via fallback when no block document exists.
-type SessionProps = { renderContinuation?: RenderContinuation; completed?: boolean; campusGuided?: boolean; lessonId: string; enrollmentId: string; readOnly?: boolean; fallback?: ReactNode; onCompleted?: () => void };
+type SessionProps = { renderContinuation?: RenderContinuation; completed?: boolean; campusGuided?: boolean; inRoom?: boolean; lessonId: string; enrollmentId: string; readOnly?: boolean; fallback?: ReactNode; onCompleted?: () => void };
 export function LessonBlockSession(props: SessionProps) {
   return <SessionLoader key={`${props.enrollmentId}:${props.lessonId}`} {...props} />;
 }
-function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onCompleted, campusGuided, completed, renderContinuation }: SessionProps) {
+function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onCompleted, campusGuided, inRoom, completed, renderContinuation }: SessionProps) {
   const [selection, setSelection] = useState<{ revision: string | null; reload: number }>({ revision: null, reload: 0 });
   const [loaded, setLoaded] = useState<{ key: string; snapshot?: Snapshot; error?: string } | null>(null);
   const key = `${enrollmentId}:${lessonId}:${selection.revision || ''}:${selection.reload}`;
@@ -207,10 +207,10 @@ function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onC
   const intro = material?.description && <p>{material.description}</p>;
   const resource = material?.resourceName && <ResourceRow content={{id: lessonId, lesson_id: lessonId, resource_name: material.resourceName}} />;
   if (!loaded.snapshot?.document) return campusGuided && material
-    ? <>{intro}<LegacyCampusLesson material={material} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} completed={completed} onCompleted={onCompleted} renderContinuation={renderContinuation} />{resource}</>
+    ? <>{intro}<LegacyCampusLesson material={material} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly || loaded.snapshot?.staffPreview === true} completed={completed} onCompleted={onCompleted} renderContinuation={renderContinuation} />{resource}</>
     : <>{fallback}</>;
   if (!canRenderLessonBlocks(loaded.snapshot.document)) return <p role="alert">학습 도구를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>;
-  return <>{intro}<SessionContent completed={completed} renderContinuation={renderContinuation} campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly || loaded.snapshot.staffPreview === true} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
+  return <>{intro}<SessionContent completed={completed} renderContinuation={renderContinuation} inRoom={inRoom} campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly || loaded.snapshot.staffPreview === true} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
 }
 
 export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, completed, onCompleted, renderContinuation }: SessionProps & { material: CampusMaterial }) {

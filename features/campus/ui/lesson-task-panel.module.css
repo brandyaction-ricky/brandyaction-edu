@@ -11,3 +11,41 @@
 .readerTools :global(.floating-learning-question):not(:has([role="dialog"]:not([hidden]))){position:static}
 .readerTools :global(.floating-learning-question-panel){max-width:calc(100vw - 32px)}
 .reader>details{margin-block:1.5rem}.reader>details>summary{cursor:pointer;padding-block:.6rem;font-weight:600}
+
+/* The campus dialog supplies the page surface and padding. Keep the normal classroom's content typography. */
+.regularClassroom {
+  min-width: 0;
+  background: transparent;
+  font-family: inherit;
+}
+.regularClassroom :global(.learning-content),
+.regularClassroom :global(.lesson-header),
+.regularClassroom :global(.reading) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.regularClassroom :global(.lesson-header) {
+  margin: 0 0 1rem;
+}
+.regularClassroom :global(.lesson-header .flex) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+.regularClassroom :global(.lesson-header p:empty),
+.regularClassroom :global(.lesson-header .meta:empty) {
+  display: none;
+}
+.regularClassroom :global(.reading) {
+  max-width: 68ch;
+  margin: 0;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.regularClassroom :global(.reading p) {
+  color: #25374a;
+}

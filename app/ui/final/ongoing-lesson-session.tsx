@@ -31,7 +31,7 @@ function PeriodSession({snapshot,lessonId,enrollmentId,select,readOnly,renderCon
  const visibleHistory = currentHistory ? [currentHistory,...history.filter(item=>Date.parse(item.periodStart)!==Date.parse(snapshot.periodStart))].sort((a,b)=>Date.parse(b.periodStart)-Date.parse(a.periodStart)) : history;
  const completedCount=snapshot.stats.completed+(completion&&!snapshot.completion?1:0);
  const context={lessonId,enrollmentId,revision:snapshot.revision,periodStart:snapshot.periodStart};
- useUnsavedLearningChanges(!readOnly&&(status.phase!=='saved'||uploading||busy||uncertain));
+ useUnsavedLearningChanges(!readOnly&&(status.phase!=='saved'||uploading||busy||uncertain), !readOnly&&(uploading||busy||status.phase==='saving'));
  useEffect(()=>{if(historical||readOnly)return;const autosave=new LessonBlockAutosave(snapshot.draft?.values||{blocks:{},checklist:[]},snapshot.draft?.writeId||null,write=>request(endpoint,{action:'draft',lessonId,enrollmentId,revision:snapshot.revision,periodStart:snapshot.periodStart,...write}));saver.current=autosave;const off=autosave.subscribe(()=>setStatus(autosave.getSnapshot()));return()=>{off();autosave.dispose();saver.current=null;};},[snapshot,lessonId,enrollmentId,historical,readOnly]);
  function change(next:LessonBlockAnswers){valuesRef.current=next;setValues(next);saver.current?.change(next);}
  function move(period:string|null){if((saver.current?.hasUnsaved()||uploading||uncertain)&&!window.confirm('현재 입력이나 저장 결과를 아직 확인하지 못했습니다. 답변을 내려받은 뒤 이동해 주세요. 그래도 이동할까요?'))return;select(period);}

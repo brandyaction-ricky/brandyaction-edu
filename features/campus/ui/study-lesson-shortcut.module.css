@@ -1,28 +1,28 @@
-/* Same card as .studyEntry in ../space/panel.module.css: the two stack in the study room, so width, spacing, type and buttons match. */
 .card {
-  box-sizing: border-box;
-  width: min(300px, calc(100vw - 32px));
-  margin-bottom: 6px;
-  padding: 12px 14px;
-  border: 1px solid #cad7e3;
-  border-radius: 14px;
-  background: #fff;
-  color: #193552;
-  box-shadow: 0 3px 14px #06172826;
+  min-width: 0;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+  color: #f2f7ff;
 }
-.card h2 { margin: 0; font-size: 15px; line-height: 1.45; }
-.card p { margin: 5px 0 0; font-size: 13px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
-.card p[role="status"] { font-size: 12px; font-weight: 400; color: #526981; }
-.actions { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 8px; }
-.card button { min-height: 40px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; border: 1px solid #b8cede; border-radius: 8px; color: #214e79; background: #f4f8fc; cursor: pointer; }
-.actions button:first-child { color: white; background: #214e79; border-color: #214e79; }
-.card button:focus-visible { outline: 2px solid #2770aa; outline-offset: 2px; }
-@media (max-width: 650px) { .card { width: calc(100vw - 24px); } }
-
-/* Phone: one row (title left, buttons right) so the two cards do not cover the room. */
-@media (max-width: 650px) {
-  .card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 10px; padding: 10px 12px; }
-  .card h2 { grid-column: 1; font-size: 12px; font-weight: 600; color: #526981; }
-  .card p { grid-column: 1; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .actions { grid-column: 2; grid-row: 1 / span 2; flex-direction: column; margin-top: 0; }
+.card h2 { margin: 0; color: #b5cadd; font-size: 12px; font-weight: 600; line-height: 1.4; }
+.card p { grid-column: 1; margin: 0; font-size: 14px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.card p[role="status"] { grid-column: 1 / -1; font-size: 13px; font-weight: 400; color: #d4e2ee; }
+.actions { grid-column: 2; grid-row: 1 / span 2; display: grid; gap: 4px; }
+.card button {
+  min-height: 44px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  border: 1px solid #586f86;
+  border-radius: 8px;
+  color: #e3efff;
+  background: #20384e;
+  cursor: pointer;
 }
+.actions button:first-child { color: #112840; background: #deedff; border-color: #deedff; }
+.card button:focus-visible { outline: 2px solid #97c9ff; outline-offset: 2px; }

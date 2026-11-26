@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 const id=(n:number)=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`;
 async function backend(page:Page){
  const writes:string[]=[],reads:string[]=[];let contentError=false;
+ await page.route('**/api/campus', route=>route.fulfill({json:{scopes:[{enrollmentId:id(99),cohortId:id(8),courseTitle:'문샷',cohortName:'다른 기수'},{enrollmentId:id(10),cohortId:id(3),courseTitle:'문샷',cohortName:'4기'}]}}));
  await page.route('**/api/platform/curriculum-review?**',async route=>{
   const req=route.request(),p=new URL(req.url()).searchParams;
   if(req.method()!=='GET'){writes.push(req.method());await route.fulfill({status:405});return;}
@@ -82,4 +83,36 @@ test('staff can use prompt generators without writing answers or changing studen
  await expect(generate).toBeEnabled();
  expect(api.writes).toEqual([]);
  expect(lessonWrites).toEqual([]);
+});
+
+test('the selected curriculum opens its own campus and a cohort change discards the previous return path', async ({page}) => {
+ await backend(page);
+ const work='/campus/workspace?enrollmentId='+id(10)+'&section=space';
+ await page.goto('/staff-curriculum-review-test');
+ const nav=page.getByRole('navigation',{name:'문샷 캠퍼스 바로가기'});
+ await expect(nav.getByRole('link',{name:'작업 공간 입장 →'})).toHaveAttribute('href',work);
+ await expect(nav.getByRole('link',{name:'처음이라면 웰컴 안내'})).toHaveCount(0);
+ const previous=work+'&room=study';
+ await page.goto('/staff-curriculum-review-test?campusReturn='+encodeURIComponent(previous));
+ await expect(nav.getByRole('link',{name:'← 캠퍼스로 돌아가기'})).toHaveAttribute('href',previous);
+ await page.getByLabel('검수할 과정·기수').selectOption(id(4));
+ await expect(nav.getByRole('link',{name:'캠퍼스 미리보기 →'})).toHaveAttribute('href','/campus/operator?room=study&cohort='+id(4));
+ await expect(nav.getByRole('link',{name:'← 캠퍼스로 돌아가기'})).toHaveCount(0);
+ await page.getByLabel('검수할 과정·기수').selectOption(id(3));
+ await expect(nav.getByRole('link',{name:'← 캠퍼스로 돌아가기'})).toHaveAttribute('href',previous);
+});
+
+test('a failed campus access check can be retried without losing the current lesson', async ({page}) => {
+ await backend(page);let available=false;
+ await page.route('**/api/campus', async route=>{
+  if (!available) return route.fulfill({status:503,json:{error:'가상 조회 실패'}});
+  await route.fulfill({json:{scopes:[{enrollmentId:id(10),cohortId:id(3),courseTitle:'문샷',cohortName:'4기'}]}});
+ });
+ await page.goto('/staff-curriculum-review-test');
+ const nav=page.getByRole('navigation',{name:'문샷 캠퍼스 바로가기'});
+ await expect(nav.getByRole('status')).toHaveText('캠퍼스 이용 권한을 확인하지 못했어요.');
+ available=true;
+ await nav.getByRole('button',{name:'다시 확인'}).click();
+ await expect(nav.getByRole('link',{name:'작업 공간 입장 →'})).toHaveAttribute('href','/campus/workspace?enrollmentId='+id(10)+'&section=space');
+ await expect(page.getByRole('heading',{name:'첫 수업 본문',exact:true})).toBeVisible();
 });

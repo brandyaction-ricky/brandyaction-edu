@@ -18,8 +18,13 @@
 .card.card :global(.google-id-signin:has(> .btn) > .google-id-button:empty) { display: none; }
 .card.card :global(.email-auth > .btn) { margin-top: 0; }
 .card.card :global(.email-auth) { margin-top: 0; }
+.card :global(.email-auth input) { scroll-margin-block: .75rem; }
+@media (any-pointer: coarse) {
+  .card :global(.email-auth .notice > button.text-link) { min-height: 44px; }
+}
 @media (max-width: 680px) {
   .card.card { padding: var(--space-6); }
+  .card :global(.form-bottom a) { display: inline-flex; align-items: center; min-height: 44px; }
 }
 .recoveryLinks {
   display: flex;

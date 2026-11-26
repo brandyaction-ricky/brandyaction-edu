@@ -31,6 +31,8 @@ test('lesson navigation keeps the selected lesson visible without scrolling the 
   await expect(page.getByRole('heading',{name:'두 번째 내용'})).toBeInViewport();
   await page.getByRole('button',{name:'학습 맨 위로'}).click();
   await expect(page.locator('.learning-progress-summary')).toBeInViewport();
+  await expect(page.locator('.lesson-outline summary')).toBeFocused();
+  await expect(page.locator('.lesson-outline summary')).toBeInViewport();
   const logo=page.locator('.lb-image-open img[alt="어사이드 로고"]');
   const screen=page.locator('.lb-image-open img[alt="로고 설정 화면"]');
   await expect(logo).toBeVisible();
@@ -41,4 +43,23 @@ test('lesson navigation keeps the selected lesson visible without scrolling the 
   await page.getByRole('button',{name:'닫기'}).click();
   expect(writes).toBe(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('keyboard users can bypass the lesson list and continue inside the current lesson', async ({ page }) => {
+  await page.route('**/api/platform/lesson-questions?**', route => route.fulfill({ json: { questions: [], hasMore: false } }));
+  await page.goto('/classroom-questions-test?graduate');
+  const skip = page.getByRole('link', { name: '학습 목차 건너뛰고 수업 본문으로 이동' });
+  const body = page.getByRole('region', { name: '수업 본문' });
+  await expect(body.getByRole('heading', { name: '첫 학습' })).toBeVisible();
+  await expect(skip).not.toBeInViewport();
+  for (let step = 0; step < 10 && !(await skip.evaluate(link => link === document.activeElement)); step++) {
+    await page.keyboard.press('Tab');
+  }
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeInViewport();
+  await page.keyboard.press('Enter');
+  await expect(body).toBeFocused();
+  await expect(body.getByRole('heading', { name: '첫 학습' })).toBeInViewport();
+  await page.keyboard.press('Tab');
+  expect(await body.evaluate(section => section.contains(document.activeElement))).toBe(true);
 });

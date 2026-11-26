@@ -17,9 +17,6 @@ test('authenticated tour uses account profile and preserves private fields on av
 test('revoked membership cannot keep a usable room or claim avatar success',async({page})=>{
  await setup(page);let deny=false;await page.route('**/api/campus/space**',r=>deny?r.fulfill({status:403,json:{error:'수강권이 종료되었습니다.'}}):r.fulfill({json:{profile:defaultProfile('동료'),peers:[],messages:[],seats:[]}}));await page.goto('/campus/workspace?tourLive=1&enrollmentId='+eid);await room(page);await expect(page.getByRole('button',{name:'내 캐릭터',exact:true})).toBeEnabled();deny=true;await page.frameLocator('iframe').getByRole('button',{name:'검수용 캐릭터 저장'}).click();await expect(page.getByRole('heading',{name:'수강권을 다시 확인해 주세요'})).toBeVisible();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByText(/내 계정에 저장했어요/)).toHaveCount(0);
 });
-test('real lesson opening rechecks membership and keeps a campus return route',async({page})=>{
- await setup(page);await page.route('**/api/campus/space**',r=>r.fulfill({json:{profile:defaultProfile('동료'),peers:[],messages:[],seats:[]}}));let reads=0;await page.route('**/api/campus?**',r=>{reads++;return r.fulfill({json:student});});await page.goto('/campus/workspace?tourLive=1&enrollmentId='+eid);await room(page);await task(page,'수업');await page.getByRole('combobox',{name:'수업 선택'}).selectOption(student.lessons[4].id);await page.getByRole('button',{name:/^수업 (열기|다시 보기)$/}).click();await expect(page).toHaveURL(/\/learn\//);expect(reads).toBe(2);await expect(page.getByRole('link',{name:'← 캠퍼스로 돌아가기'})).toHaveAttribute('href',/enrollmentId=/);
-});
 test('business record uses the authenticated API and reopens from server data',async({page})=>{
  await setup(page);await page.route('**/api/campus/space**',r=>r.fulfill({json:{profile:defaultProfile('동료'),peers:[],messages:[],seats:[]}}));let records:Record<string,unknown>[]=[];const writes:Record<string,unknown>[]=[];
  await page.route('**/api/campus/business**',r=>{if(r.request().method()==='POST'){const b=r.request().postDataJSON();writes.push(b);const record={...b,user_id:student.viewer.id,enrollment_id:eid,revision:1,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),archived_at:null};records=[record];return r.fulfill({json:{record}});}return r.fulfill({json:{records,nextCursor:null,links:[],replies:[],cases:[]}});});
@@ -73,4 +70,15 @@ test('live job inbox names the employee, titles the result by the task and point
  await expect(detail).toContainText('수정을 요청한 초안');await expect(detail).toContainText('공지\n목요일 저녁 8시\n• 링크는 당일 발송');await expect(detail).not.toContainText('**');
  await expect(detail.getByRole('link',{name:'텔레그램에서 이어서 맡기기 ↗'})).toHaveAttribute('href','https://t.me/moonshot_notice_bot');
  await expect(page.getByRole('navigation',{name:'업무 페이지'})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+
+test('entering from a lesson preserves its enrollment even if another cohort is listed first', async ({page}) => {
+ const other = {...student.scopes[0], enrollmentId:'00000000-0000-4000-8000-000000000099', cohortName:'다른 기수'};
+ await page.route('**/api/campus',r=>r.fulfill({json:{scopes:[other,...student.scopes]}}));
+ await page.goto('/learn/'+eid+'/'+student.lessons[0].id);
+ const nav=page.getByRole('navigation',{name:'문샷 캠퍼스 바로가기'});
+ const href='/campus/workspace?enrollmentId='+eid+'&section=space';
+ await expect(nav.getByRole('link',{name:'처음이라면 웰컴 안내'})).toHaveCount(0);
+ await nav.getByRole('link',{name:'작업 공간 입장 →'}).click();
+ await expect(page).toHaveURL(url=>url.pathname+url.search===href);
 });

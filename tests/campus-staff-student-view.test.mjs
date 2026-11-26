@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 
 test('staff with an enrollment get the member screen as students; without one they keep the review',()=>{
  const page=readFileSync('app/campus/workspace/page.tsx','utf8');
- assert.match(page,/if\(staff&&!q\.enrollmentId&&!\(await hasEnrollment\(user\.id\)\)\)redirect\(campusReviewPath\(\)\)/);
+ assert.match(page,/if\(staff&&!q\.enrollmentId&&!\(await hasEnrollment\(user\.id\)\)\)redirect\('\/campus\/enter'\)/);
  assert.match(page,/operator=\{\(!staff\|\|asAdmin\)&&!!await getOperatorUser\('members',user\)\}/);
 });
 test('staff and administrators always have the office, students only behind the switch or a pilot',()=>{

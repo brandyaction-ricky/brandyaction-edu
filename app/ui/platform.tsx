@@ -117,6 +117,7 @@ const editorLoading = () => <AdminLoadingState title="편집기를 준비하고 
 const AdminCatalog = dynamic(() => import('./final/admin-catalog').then(module => module.AdminCatalog), { loading: () => <AdminLoadingState /> });
 const CustomerWorkspace = dynamic(() => import('./final/customer-workspace').then(module => module.CustomerWorkspace), { loading: () => <AdminLoadingState /> });
 const Checkout = dynamic(() => import('./final/checkout').then(module => module.Checkout), { loading: () => <p role="status">결제 정보를 준비하고 있습니다.</p> });
+const CampusEntryBar = dynamic(() => import('@/features/campus/ui/entry-bar').then(module => module.CampusEntryBar));
 const Classroom = dynamic(() => import('./final/classroom').then(module => module.Classroom), { loading: () => <p role="status">수업을 준비하고 있습니다.</p> });
 const ProductEditor = dynamic(() => import('./final/admin-editors').then(module => module.ProductEditor), { loading: editorLoading });
 const CurriculumEditor = dynamic(() => import('./final/curriculum-editor').then(module => module.CurriculumEditor), { loading: editorLoading });
@@ -212,11 +213,13 @@ export function Platform({
   path,
   user: initialUser,
   adminContent,
+  classroomCampus,
   preview,
 }: {
   path: string[];
   user: User | null;
   adminContent?: ReactNode;
+  classroomCampus?: { returnTo?: string };
   // Server-read name and summary of a public class/article, shown (and crawled) while the page loads.
   preview?: { title: string; summary: string };
 }) {
@@ -909,9 +912,10 @@ export function Platform({
       />
     );
   else if (staffCurriculumReview)
-    body = <StaffCurriculumReview key={user!.id + ':' + path.join('/')} enrollmentId={path[1]} initialLesson={path[2] || ''}/>;
+    body = <StaffCurriculumReview key={user!.id + ':' + path.join('/')} enrollmentId={path[1]} initialLesson={path[2] || ''} classroomCampus={classroomCampus}/>;
   else if (learning)
     body = (
+      <>{classroomCampus && <CampusEntryBar enrollmentId={path[1]} returnTo={classroomCampus.returnTo}/>}
       <Classroom
         progression={questionProgression}
         key={user?.id}
@@ -921,7 +925,7 @@ export function Platform({
         send={send}
         loading={loading}
         missionId={searchParams.get("mission")}
-      />
+      /></>
     );
   else if (path[0] === "checkout" || path[0] === "apply") body = checkout();
   else if (["order-complete", "applied", "payment"].includes(path[0]))

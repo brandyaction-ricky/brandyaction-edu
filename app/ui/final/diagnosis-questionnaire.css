@@ -356,3 +356,7 @@
   .edu-n6 .intro-rules p{display:block}
   .edu-n6 .intro-rules p span{display:block;margin-top:2px}
 }
+@media (any-pointer: coarse) {
+  .edu-n6 .prev-btn,
+  .edu-n6 .panel > .dlg-btn { min-height: 44px; }
+}

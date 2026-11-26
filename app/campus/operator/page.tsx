@@ -1,4 +1,3 @@
-import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {readWelcome} from '@/features/campus/welcome/server';
 import {notFound} from 'next/navigation';
@@ -15,7 +14,7 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  if(q.cohort!==undefined&&(typeof q.cohort!=='string'||!isCampusId(q.cohort)))notFound();
  const room=typeof q.room==='string'&&rooms.some(r=>r.id===q.room)?q.room as TourRoom:'study';
  const event=typeof q.event==='string'?await readWebinar(q.event):null;
- const welcome=await readWelcome(typeof q.cohort==='string'?q.cohort:event?.cohortId);
- const studyPreview=!!await getOperatorUser('products',user);
- return <FourSpacesPreview welcome={welcome} review={{room,studyPreview}} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'운영자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/admin',questions:'/admin'},launchEligibility:null}}/>;
+ const cohortId=typeof q.cohort==='string'?q.cohort:event?.cohortId;
+ const welcome=await readWelcome(cohortId);
+ return <FourSpacesPreview welcome={welcome} review={{room,cohortId}} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'운영자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/admin',questions:'/admin'},launchEligibility:null}}/>;
 }

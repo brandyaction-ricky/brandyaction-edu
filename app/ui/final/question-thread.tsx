@@ -58,7 +58,7 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
  const imagesEnabled = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
  const locked = busy || uncertain || stale || !state.data?.canFollowUp;
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null; imageId?: string } | null>(null);
- useUnsavedLearningChanges(Boolean(content) || image.draft || busy || uncertain);
+ useUnsavedLearningChanges(Boolean(content) || image.draft || busy || uncertain, busy || image.busy);
  const statusChange = useRef(onStatusChange);
  useEffect(() => { statusChange.current = onStatusChange; }, [onStatusChange]);
  const status = state.data?.question.status;

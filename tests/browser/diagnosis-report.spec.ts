@@ -122,6 +122,23 @@ test('reader keeps the footer out of a small screen and closing restores focus',
   expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
   const frameBox=(await page.locator('iframe').boundingBox())!;
   expect(frameBox.height).toBeGreaterThan(460);expect(frameBox.y+frameBox.height).toBe(568);
+  await page.evaluate(()=>document.documentElement.style.fontSize='125%');
+  const saveButton = dialog.getByRole('button', { name: 'PDF로 저장 · 인쇄' });
+  const closeButton = dialog.getByRole('button', { name: '보고서 닫기' });
+  const checkToolbar = async () => {
+    const [saveBox, closeBox] = await Promise.all([saveButton.boundingBox(), closeButton.boundingBox()]);
+    expect(saveBox!.y).toBeCloseTo(closeBox!.y, 0);
+    expect(Math.min(saveBox!.height, closeBox!.height)).toBeGreaterThanOrEqual(44);
+    expect((await page.locator('iframe').boundingBox())!.height).toBeGreaterThan(460);
+    for (const button of [saveButton, closeButton]) {
+      expect(await button.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    }
+    expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  };
+  await checkToolbar();
+  // Wider fallback glyphs and user text spacing must fit without hiding either action.
+  await page.addStyleTag({ content: '.diagnosis-report-reader-tools button { font-family: monospace; letter-spacing: .12em; word-spacing: .16em; }' });
+  await checkToolbar();
   await page.screenshot({path:test.info().outputPath('diagnosis-report-small-screen.png')});
   // WebKit suppresses key listeners inside a script-disabled sandbox; mobile uses the persistent close control.
   if(browserName==='webkit') await page.getByRole('button',{name:'보고서 닫기'}).click();

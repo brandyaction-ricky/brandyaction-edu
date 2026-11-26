@@ -116,7 +116,12 @@ test('zero coupon checkout previews server amount, removes coupon and never load
   await page.getByRole('radio',{name:'카드·간편결제',exact:true}).check();
   await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('ADMIN_QA');await page.getByRole('button',{name:'등록',exact:true}).click();
   await expect(page.getByText('최종 금액 0원 · 결제창 없이 신청을 완료합니다.')).toBeVisible();
-  await page.getByRole('button',{name:'등록 취소',exact:true}).click();await expect(page.getByRole('heading',{name:'결제 수단',exact:true})).toBeVisible();
+  const removeCoupon = page.getByRole('button', { name: '등록 취소', exact: true });
+  if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+    const box = (await removeCoupon.boundingBox())!;
+    expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
+  }
+  await removeCoupon.click();await expect(page.getByRole('heading',{name:'결제 수단',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('ADMIN_QA');await page.getByRole('button',{name:'등록',exact:true}).click();
   await page.getByRole('button',{name:'필수 항목 한 번에 선택'}).click();
   await expect(page.locator('input[name="agreement"]')).toBeChecked();

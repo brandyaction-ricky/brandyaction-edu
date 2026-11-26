@@ -1,16 +1,22 @@
 import { safeNext } from '@/lib/platform';
 import { isValidPassword, PASSWORD_REQUIREMENT } from '@/lib/auth-validation';
 
+export class EmailFormError extends Error {
+  constructor(readonly field: 'name' | 'email' | 'password' | 'confirm', message: string) {
+    super(message);
+  }
+}
+
 export function emailAddress(value: string) {
   const email = value.trim();
-  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Error('이메일 주소를 확인해 주세요.');
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new EmailFormError('email', '이메일 주소를 확인해 주세요.');
   return email;
 }
 export function signupValues(name: string, email: string, password: string, confirm: string) {
   const full_name = name.trim();
-  if (!full_name || full_name.length > 80) throw Error('이름을 80자 이내로 입력해 주세요.');
-  if (!isValidPassword(password) || password.length > 128) throw Error(PASSWORD_REQUIREMENT);
-  if (password !== confirm) throw Error('비밀번호가 일치하지 않습니다.');
+  if (!full_name || full_name.length > 80) throw new EmailFormError('name', '이름을 80자 이내로 입력해 주세요.');
+  if (!isValidPassword(password) || password.length > 128) throw new EmailFormError('password', PASSWORD_REQUIREMENT);
+  if (password !== confirm) throw new EmailFormError('confirm', '비밀번호가 일치하지 않습니다.');
   return { email: emailAddress(email), password, options: { data: { full_name } } };
 }
 export function emailCallback(origin: string, next: string) {

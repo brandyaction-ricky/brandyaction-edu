@@ -45,18 +45,19 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  const LessonFocus = root==='learn'&&process.env.EDU_CAMPUS_ENABLED==='true'&&!campusPrivateRelease()&&process.env.EDU_CAMPUS_SPACE_ENABLED==='true' ? (await import('@/features/campus/space/lesson-focus')).LessonFocus : null;
  const campusPage=process.env.EDU_CAMPUS_ENABLED==='true'&&['my','learn'].includes(root),campusBack=campusPage?(await searchParams)?.campusReturn:undefined;
  // The bar itself shows the entry only to someone with a campus-eligible enrollment.
- const CampusEntryBar=campusPage?(await import('@/features/campus/ui/entry-bar')).CampusEntryBar:null;
- const returnTo=CampusEntryBar?campusBack:undefined;
+ const CampusEntryBar=campusPage&&root==='my'?(await import('@/features/campus/ui/entry-bar')).CampusEntryBar:null;
+ const returnTo=typeof campusBack==='string'?campusBack:undefined;
+ const classroomCampus=campusPage&&root==='learn'?{returnTo}:undefined;
  // Crawlers read the server HTML: give public pages their name and summary before the client loads the rest.
  const item=['classes','articles'].includes(root)&&section?await publicItem(root,section):null;
  const ld=path.length===0?jsonLd([{'@context':'https://schema.org','@type':'WebSite',name:EDU_SITE_NAME,alternateName:brand.alternateName,url:SITE_URL+'/'},{'@context':'https://schema.org',...brand}])
   :item&&!item.unlisted&&root==='classes'?jsonLd({'@context':'https://schema.org','@type':'Course',name:item.title,description:item.description||item.title,url:`${SITE_URL}/classes/${section}`,provider:brand}):null;
- const platform=item||ld?<>{ld}<Platform path={path} user={null} preview={item?{title:item.title,summary:item.description}:undefined}/></>:<Platform path={path} user={null}/>;
+ const platform=classroomCampus?<Platform path={path} user={null} classroomCampus={classroomCampus}/>:item||ld?<>{ld}<Platform path={path} user={null} preview={item?{title:item.title,summary:item.description}:undefined}/></>:<Platform path={path} user={null}/>;
  if (!path.length && (await import('@/lib/home-consultation-enabled')).homeConsultationEnabled()) {
   const { PublicHomeConsultation } = await import('@/app/ui/final/home-consultation');
   return <>{platform}<PublicHomeConsultation /></>;
  }
- return CampusEntryBar||LessonFocus?<>{CampusEntryBar&&<CampusEntryBar returnTo={typeof returnTo==='string'?returnTo:undefined}/>}{platform}{LessonFocus&&<LessonFocus/>}</>:platform;
+ return CampusEntryBar||LessonFocus?<>{CampusEntryBar&&<CampusEntryBar returnTo={returnTo}/>}{platform}{LessonFocus&&<LessonFocus/>}</>:platform;
 }
 
 // Search titles per public section (CEO 11-09: 브랜디에듀 · AI 마케팅 · AI 자동화).

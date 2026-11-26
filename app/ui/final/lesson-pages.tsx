@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicBlockDocument, PublicLessonBlock } from '@/lib/lesson-blocks';
 import { practiceSteps } from '@/lib/lesson-practice-steps';
 import { lessonSections, withoutBlankPages } from '@/lib/lesson-reading-pages';
@@ -50,10 +50,21 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
     }
     catch { return 0; }
   });
-  const position = useRef<HTMLParagraphElement>(null), body = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const focusAfterMove = useRef(false);
   // Audio playing when the reader moves on keeps going in a small bar instead of stopping (QA M4).
   const [carry, setCarry] = useState<{ src: string; time: number; rate: number; label: string; page: number } | null>(null);
   const toc = useRef<HTMLElement>(null), start = useRef<HTMLProgressElement>(null);
+  function focusTask() {
+    body.current?.focus({ preventScroll: true });
+    start.current?.scrollIntoView({ block: 'start' });
+  }
+  useLayoutEffect(() => {
+    if (focusAfterMove.current) {
+      focusAfterMove.current = false;
+      focusTask();
+    }
+  }, [index]);
   // Keep the current task visible inside the short, scrollable task list.
   useEffect(() => { const list = toc.current, item = list?.querySelector<HTMLElement>('[aria-current=step]'); if (list && item) list.scrollTop = item.offsetTop - list.offsetTop - 8; }, [index, pages.length]);
   if (!pages.length) return <>{children(undefined, true)}{enabled && continuation}</>;
@@ -62,14 +73,15 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
   function move(next: number) {
     const playing = Array.from(body.current?.querySelectorAll('audio') ?? []).find(a => !a.paused && !a.ended && (a.currentSrc || a.src));
     if (playing) setCarry({ src: playing.currentSrc || playing.src, time: playing.currentTime, rate: playing.playbackRate, label: playing.closest('figure')?.querySelector('figcaption')?.textContent?.trim() || playing.getAttribute('aria-label') || '음성 자료', page });
-    setIndex(next);
+    if (next === index) focusTask();
+    else {
+      focusAfterMove.current = true;
+      setIndex(next);
+    }
     try { if (positionKey) localStorage.setItem(positionKey, String(next)); } catch { /* Storage is optional. */ }
-    position.current?.focus({ preventScroll: true });
-    // Land on the task itself, not on top of the task list.
-    (start.current ?? position.current)?.scrollIntoView({ block: 'start' });
   }
   return <div className="lb-pages">
-    <p ref={position} tabIndex={-1} aria-live="polite" className="lb-page-position">오늘의 작업 {page + 1} / {pages.length} · {labels[page]}</p>
+    <p aria-live="polite" className="lb-page-position">오늘의 작업 {page + 1} / {pages.length} · {labels[page]}</p>
     {pages.length > 1 && <nav ref={toc} aria-label="오늘의 작업 목차" className="lb-page-toc"><ol>
       {pages.map((_, n) => <li key={n}><button type="button" aria-current={n === page ? 'step' : undefined} disabled={busy} onClick={() => move(n)}><span>{n + 1}</span>{labels[n]}</button></li>)}
     </ol></nav>}
@@ -79,7 +91,7 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
       <audio key={carry.src} src={carry.src} controls autoPlay aria-label={carry.label} onLoadedMetadata={e => { e.currentTarget.currentTime = carry.time; e.currentTarget.playbackRate = carry.rate; }} onEnded={() => setCarry(null)} />
       <button type="button" className="btn small" onClick={() => setCarry(null)}>닫기</button>
     </div>}
-    <div ref={body}>{children(pages[page], last)}</div>
+    <div ref={body} role="group" aria-label={labels[page]} tabIndex={-1}>{children(pages[page], last)}</div>
     {(pages.length > 1 || continuation) && <nav aria-label="작업 이동">
       {pages.length > 1 && <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 작업</button>}
       {!last && <button type="button" className="btn primary" disabled={busy} onClick={() => move(page + 1)}>다음 작업 · {labels[page + 1]}</button>}

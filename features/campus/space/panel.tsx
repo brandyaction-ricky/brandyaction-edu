@@ -77,7 +77,14 @@ export function SpacePanel({snapshot,demo,journal=false,support=true,studyEntry,
  const post=useCallback((type:string,payload:Record<string,unknown>={})=>{const target=frame.current?.contentWindow;if(token&&target&&shouldSendWorldState(worldState.current,type,payload))target.postMessage({source:'moonshot-host',token,type,payload},window.location.origin);},[token]);
  function openEnvironment(){if(onOpenEnvironment){onOpenEnvironment();return;}frame.current?.scrollIntoView({block:'center'});setToolsOpen(false);post('environment-open');}
  const command=useCallback(async(cmd:Partial<SpaceCommand>&{kind:string})=>{if(!transport.current)throw new Error('먼저 캠퍼스에 입장해 주세요.');return transport.current.command(cmd);},[]);
- function statusError(e:unknown){setError(e instanceof Error?e.message:'공간 연결을 확인하지 못했습니다.');}
+ function statusError(error:unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (!message || /NEXT_PUBLIC_|^Supabase |Failed to fetch|Load failed|NetworkError|^Unexpected token/i.test(message)) {
+   setError('동료와 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  } else {
+   setError(message);
+  }
+ }
  async function act(fn:()=>Promise<void>,kind:'foreground'|'auto-entry'='foreground'){if(operation.current)return;operation.current=true;setPending(kind);setError('');try{await fn();}catch(e){statusError(e);}finally{operation.current=false;if(mounted.current)setPending(null);}}
  useEffect(()=>{mounted.current=true;queueMicrotask(()=>{if(mounted.current){setToken(crypto.randomUUID());setSessionId(crypto.randomUUID());}});return()=>{mounted.current=false;void audio.current?.stop();transport.current?.close();transport.current=null;};},[]);
  useEffect(()=>{if(!cohortId)return;let ignore=false;transport.current?.close();transport.current=null;queueMicrotask(()=>{if(!ignore){setActive(false);setState(null);setWorldReady(false);setError('');}});
@@ -234,10 +241,11 @@ export function SpacePanel({snapshot,demo,journal=false,support=true,studyEntry,
  const peers=state?.peers||[];
  const entryCard=studyEntry?.host&&createPortal(
   <section className={styles.studyEntry} aria-label="지금 공부 중인 수강생">
-   <header><h2>지금 공부 중</h2>{active&&<span>{Math.max(peers.length,state?.peerCount??0)}명</span>}</header>
-   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}{(state?.peerCount??0)>peers.length&&<li className={styles.rosterMore}>외 {(state?.peerCount??0)-peers.length}명</li>}</ul>
-    :<p role="status">{state?.controls?.paused?'공부방 참여가 잠시 중지됐어요.':busy||(!state&&!error)?'동료를 확인하고 있어요…':error||'동료 연결을 해제했어요.'}</p>}
-   <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':error===SPACE_REPLACED?'여기서 계속하기':'공부방에 참여하기'}</button>
+   {active ? <details className={styles.studyRoster}>
+    <summary>지금 공부 중 <strong>{Math.max(peers.length,state?.peerCount??0)}명</strong></summary>
+    <ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}{(state?.peerCount??0)>peers.length&&<li className={styles.rosterMore}>외 {(state?.peerCount??0)-peers.length}명</li>}</ul>
+   </details> : <div><h2>지금 공부 중</h2><p role="status">{state?.controls?.paused?'공부방 참여가 잠시 중지됐어요.':busy||(!state&&!error)?'동료를 확인하고 있어요…':error||'동료 연결을 해제했어요.'}</p></div>}
+   <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':error===SPACE_REPLACED?'여기서 계속하기':error?'다시 연결':'공부방에 참여하기'}</button>
   </section>,studyEntry.host);
  if(toolsPane)return <><section className={styles.space} aria-label="공부방 도구">
   <div className={styles.toolStatus}>{demo
