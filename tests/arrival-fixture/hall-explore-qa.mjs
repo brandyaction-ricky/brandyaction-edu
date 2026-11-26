@@ -1,5 +1,5 @@
 import {chromium, expect, webkit} from '@playwright/test';
-import {loungeScheduleButton, openLoungeSchedule, openPersonalTrial} from './review-office.mjs';
+import {loungeScheduleButton, openLoungeSchedule, expectCurrentExperienceMenu, passEntryTeaser} from './review-office.mjs';
 
 const url = new URL('/experience/moonshot', process.env.ARRIVAL_QA_URL || 'http://127.0.0.1:4535');
 for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
@@ -101,10 +101,27 @@ for (const [engine, mobile] of [[chromium, false], [webkit, true]]) {
     await expect(world).toHaveAttribute('data-free-roam','true');
     await openLoungeSchedule(page);
     await expect(personalTrial).toHaveCount(0);
-    await openPersonalTrial(page, '내 AI 체험으로 돌아가기');
-    await expect(world).toHaveAttribute('data-station','6');
+    await expectCurrentExperienceMenu(page);
+    await expect(world).toHaveAttribute('data-station','7');
     const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('moonshot:arrival:synthetic-local-qa:v1')));
-    expect(persisted).toMatchObject({canonPhase:3, hallReturnStep:8, answers:{business:{a:'브라우저에 남긴 연습 입력'}}});
+    expect(persisted).toMatchObject({canonPhase:3, loungeVisited:true, answers:{business:{a:'브라우저에 남긴 연습 입력'}}});
+    const fresh = await browser.newPage({viewport:size, isMobile:mobile, hasTouch:mobile});
+    await fresh.goto(url.href);
+    await passEntryTeaser(fresh);
+    await expectCurrentExperienceMenu(fresh);
+    await fresh.getByRole('button', {name:/웰컴 라운지로 바로 가기/}).click();
+    await expect(loungeScheduleButton(fresh)).toBeVisible();
+    await expectCurrentExperienceMenu(fresh);
+    const menu = fresh.getByLabel('체험 메뉴', {exact:true});
+    await menu.click();
+    await fresh.getByRole('button', {name:'체험 소개', exact:true}).click();
+    await fresh.getByRole('dialog', {name:'체험 소개'}).getByLabel('소개 닫기').click();
+    await menu.click();
+    await fresh.getByRole('button', {name:'처음부터 보기', exact:true}).click();
+    await fresh.getByRole('dialog').getByRole('button', {name:'지우고 처음부터'}).click();
+    await passEntryTeaser(fresh);
+    await fresh.getByRole('radio', {name:'이미 사업을 하고 있어요'}).check();
+    await expect(fresh.getByRole('button', {name:'이 상황으로 시작'})).toBeEnabled();
     console.log(engine.name(), {initial,afterKeys,afterPointer,arrivals:beforeArrivals, countdown:18, agenda:4, returnedToDesk:4, draftPreserved:true});
   } finally { await browser.close(); }
 }
