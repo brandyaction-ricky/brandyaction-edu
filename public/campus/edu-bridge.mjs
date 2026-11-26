@@ -42,6 +42,10 @@ export function createEduBridge({ fetcher = globalThis.fetch.bind(globalThis), n
     const lesson = snapshot.lessons.find(l => l.id === lessonId);
     if (!lesson || (missionId && !lesson.missions.some(m => m.id === missionId))) throw problem('수업 또는 과제 공개 상태가 변경되었습니다. 목록을 새로 확인해 주세요.', 403);
     // Construct only known EDU routes; never navigate to a URL supplied by an office bot.
+    if (!missionId && snapshot.scopes.some(scope => scope.enrollmentId === enrollmentId && scope.externalPartner === true)) {
+      navigate('/my/partner-access?' + new URLSearchParams({ access: enrollmentId, lesson: lessonId }));
+      return;
+    }
     navigate(`/learn/${enrollmentId}/${lessonId}` + (missionId ? `/mission?mission=${missionId}` : ''));
   }
   return {

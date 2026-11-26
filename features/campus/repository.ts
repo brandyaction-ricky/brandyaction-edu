@@ -4,6 +4,9 @@ import type { createClient } from '@/lib/supabase/server';
 import type { Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { campusError, campusScopes, campusSnapshot } from './snapshot';
+import { externalPartnerUrl } from '@/lib/external-partner-url';
+import { myExternalPartnerScope, type ExternalPartnerScope } from '@/lib/external-partner-access';
+import type { CampusScope } from './contracts';
 import {cohortWeekVisible,cohortLessonVisible} from '@/lib/cohort-curriculum-visibility';
 
 type Database = Awaited<ReturnType<typeof createClient>>;
@@ -17,12 +20,21 @@ async function rows(query: PromiseLike<ReadResult>): Promise<Row[]> {
 }
 const ids = (values: unknown[]) => [...new Set(values.map(String))];
 
+function partnerCampusScope(access: ExternalPartnerScope): CampusScope {
+  return { enrollmentId: access.id, cohortId: access.cohort_id, courseId: access.course_id,
+    courseTitle: access.course_title, cohortName: access.cohort_name, externalPartner: true };
+}
+
 /** Just the verified scope of one enrollment: no curriculum reads. For handlers that only need the cohort. */
 export async function loadCampusScope(db: Database, viewer: { id: string }, enrollmentId: string, now = Date.now()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
     .eq('user_id', viewer.id).eq('id', enrollmentId).eq('status', 'active').limit(1))).filter(e => hasLearningAccess(e, now));
-  if (!enrollments.length) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  if (!enrollments.length) {
+    const access = await myExternalPartnerScope(db, enrollmentId);
+    if (access) return partnerCampusScope(access);
+    campusError(403, '현재 이용 가능한 캠퍼스 권한을 확인해 주세요.');
+  }
   const [courses, cohorts] = await Promise.all([
     rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(1)),
     rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(1)),
@@ -31,11 +43,22 @@ export async function loadCampusScope(db: Database, viewer: { id: string }, enro
   if (!scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   return scope;
 }
-export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null; role?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from' | 'rpc'> | Promise<Pick<Database, 'from' | 'rpc'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
+export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null; role?: string | null; status?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from' | 'rpc'> | Promise<Pick<Database, 'from' | 'rpc'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
     .eq('user_id', viewer.id).eq('status', 'active').order('created_at', { ascending: false }).limit(200))).filter(e => hasLearningAccess(e, now));
-  if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
+  if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) {
+    const access = await myExternalPartnerScope(db, enrollmentId);
+    if (!access) campusError(403, '현재 이용 가능한 캠퍼스 권한을 확인해 주세요.');
+    const scope = partnerCampusScope(access);
+    const { readPartnerCurriculum } = await import('@/lib/staff-curriculum-review-server');
+    const review = await readPartnerCurriculum({ id: viewer.id, role: viewer.role || '', status: viewer.status || '' }, access.id);
+    const snapshot = campusSnapshot({ viewer, scopes: [scope], enrollmentId, now });
+    snapshot.lessons = review.lessons.map(lesson => ({ id: lesson.id, title: lesson.title, week: lesson.week, day: lesson.day,
+      href: externalPartnerUrl(access.id, lesson.id), completed: false, locked: false, missions: [], version: lesson.updatedAt || '' }));
+    snapshot.links = { ...snapshot.links, classes: externalPartnerUrl(access.id) };
+    return snapshot;
+  }
   const [courses, cohorts] = enrollments.length ? await Promise.all([
     rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
     rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),

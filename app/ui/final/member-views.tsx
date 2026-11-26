@@ -1,4 +1,5 @@
 "use client";
+import { PartnerCurriculumLink } from './partner-curriculum-link';
 import { CourseReviewButton } from "./product-reviews";
 import usability from './usability.module.css';
 import { curriculumDay } from '@/lib/curriculum-days';
@@ -1319,6 +1320,7 @@ export function MemberViews({
             title="내 클래스"
             description="나의 배움과 다음 일정을 확인하세요."
           />
+          {user.role === 'student' && <PartnerCurriculumLink key={user.id} userId={user.id}/>}
           {user.role === 'student' && active.some(enrollment => rows(data, 'courses').some(course =>
             course.id === enrollment.course_id && course.category === 'paid_class')) && (
             <Link className="btn small" href="/my/profile#learning-reminders">학습 알림 신청 내역</Link>

@@ -1123,7 +1123,7 @@ export function Platform({
                 setPage={setAdminPage}
                 exportCsv={downloadCsv}
                 send={send}
-                onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
+          onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
                 tools={
                   ["cohorts", "missions", "customers"].includes(section.key) ? (
                     <AdminWorkflows
@@ -1180,6 +1180,7 @@ export function Platform({
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
+          canManagePartners={user?.role === 'admin'}
           onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
@@ -1259,6 +1260,7 @@ function LegacyEditor({
   save,
   archive,
   deleteMember,
+  canManagePartners = false,
 }: {
   section: Section;
   row?: Row;
@@ -1269,6 +1271,7 @@ function LegacyEditor({
   save: (values: Record<string, unknown>, requestId?: string) => Promise<void>;
   archive?: () => void;
   deleteMember?: () => void;
+  canManagePartners?: boolean;
 }) {
   const ref = useAdminDialog();
   const requestId = useRef(crypto.randomUUID());
@@ -1530,7 +1533,7 @@ function LegacyEditor({
                 </div>
               )}
               {section.key === "customers" && row && (
-                <CustomerWorkspace member={row} tab={memberTab} onTabChange={setMemberTab}>
+                <CustomerWorkspace member={row} canManagePartners={canManagePartners} tab={memberTab} onTabChange={setMemberTab}>
                 <div className="customer-detail">
                   <div className="customer-account-summary">
                     <div className="setting-line"><span>계정 상태</span><AdminStatusBadge status={row.status === 'suspended' ? 'suspended' : 'active'} label={row.status === 'suspended' ? '이용 제한' : '정상'}/></div>

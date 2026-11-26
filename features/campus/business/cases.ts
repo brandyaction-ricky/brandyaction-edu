@@ -35,5 +35,12 @@ export function caseEvidencePreview(records:{id:string;revision:number;kind:Busi
 export function evidenceValue(value:string|number|boolean){return String(value);}
 export const evidenceIsLink=(v:unknown):v is string=>typeof v==='string'&&safeUrl(v);
 export async function loadCases(db:Database,actor:string,enrollmentId:string,cursor:string|null=null){if(!validId(enrollmentId)||(cursor&&!validId(cursor)))fail();let q=db.from('edu_campus_business_cases').select(caseColumns).eq('user_id',actor).eq('enrollment_id',enrollmentId).order('id').limit(101);if(cursor)q=q.gt('id',cursor);const r=await q;if(r.error||!Array.isArray(r.data))fail(503);return {cases:r.data.slice(0,100),nextCursor:r.data.length>100?r.data[99].id:null};}
-export async function loadAdminCases(db:Database,cohortId:string,cursor:string|null=null){if(!validId(cohortId)||(cursor&&!validId(cursor)))fail();let q=db.from('edu_campus_business_cases').select(`${caseColumns},enrollments!inner(cohort_id)`).eq('enrollments.cohort_id',cohortId).order('id').limit(201);if(cursor)q=q.gt('id',cursor);const r=await q;if(r.error||!Array.isArray(r.data))fail(503);return {cases:r.data.slice(0,200).map(c=>Object.fromEntries(Object.entries(c).filter(([k])=>k!=='enrollments'))),nextCursor:r.data.length>200?r.data[199].id:null};}
+export async function loadAdminCases(db: Database, cohortId: string, cursor: string | null = null) {
+  if (!validId(cohortId) || (cursor && !validId(cursor))) fail();
+  let q = db.from('edu_campus_admin_case_scopes').select(caseColumns).eq('cohort_id', cohortId).order('id').limit(201);
+  if (cursor) q = q.gt('id', cursor);
+  const r = await q;
+  if (r.error || !Array.isArray(r.data)) fail(503);
+  return { cases: r.data.slice(0, 200), nextCursor: r.data.length > 200 ? r.data[199].id : null };
+}
 export async function mutateCase(db:Database,actor:string,raw:unknown,admin=false){const command=validateCaseCommand(raw,admin),r=await db.rpc('edu_campus_business_case_command',{p_actor:actor,p_command:command});if(r.error){const statuses:Record<string,number>={'42501':403,'23514':400,'23505':409,'P0002':404,'40001':409};fail(statuses[r.error.code]||503);}return r.data;}

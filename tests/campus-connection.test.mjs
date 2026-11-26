@@ -33,7 +33,7 @@ function fixture() {
 }
 function database(data, { failTable, truncateTable, gates } = {}) {
   const calls = [];
-  return { calls, rpc(name, args) { calls.push({ rpc: name, args }); return Promise.resolve(gates ? { data: gates, error: null } : { data: null, error: { code: '42501' } }); }, from(table) {
+  return { calls, rpc(name, args) { if(name==='edu_my_external_partner_scopes')return Promise.resolve({data:[],error:null}); calls.push({ rpc: name, args }); return Promise.resolve(gates ? { data: gates, error: null } : { data: null, error: { code: '42501' } }); }, from(table) {
     const filters = []; let columns, limit = Infinity;
     calls.push({ table, filters });
     const query = {

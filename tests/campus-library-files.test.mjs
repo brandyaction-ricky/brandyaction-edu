@@ -14,7 +14,7 @@ test('registering unrelated paid files or mismatched event/download URL is rejec
 
 const member=await load('app/api/campus/library/route.ts');
 test('member library rejects foreign or revoked enrollment before querying published resources',async()=>{
- const old=process.env.EDU_CAMPUS_ENABLED;process.env.EDU_CAMPUS_ENABLED='true';try{reset();let readEvents=0;state.db.from=table=>({filters:[],select(){return this},eq(k,v){this.filters.push([k,v]);return this},async maybeSingle(){assert.equal(table,'enrollments');assert.ok(this.filters.some(([k,v])=>k==='user_id'&&v===id));return{data:null}},like(){readEvents++;return this}});
+ const old=process.env.EDU_CAMPUS_ENABLED;process.env.EDU_CAMPUS_ENABLED='true';try{reset();let readEvents=0;state.db.rpc=(name)=>{assert.equal(name,'edu_external_partner_scopes');return Promise.resolve({data:[],error:null});};state.db.from=table=>({filters:[],select(){return this},eq(k,v){this.filters.push([k,v]);return this},async maybeSingle(){assert.equal(table,'enrollments');assert.ok(this.filters.some(([k,v])=>k==='user_id'&&v===id));return{data:null}},like(){readEvents++;return this}});
  const request=new Request('https://edu.test/api/campus/library?enrollmentId='+id);assert.equal((await member.GET(request)).status,403);assert.equal(readEvents,0);state.operator=null;assert.equal((await member.GET(request)).status,401);assert.equal((await member.GET(new Request(request,{headers:{origin:'https://foreign.test'}}))).status,403);
  }finally{if(old===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=old;}
 });

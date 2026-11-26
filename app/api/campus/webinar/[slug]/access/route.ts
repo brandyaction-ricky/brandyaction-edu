@@ -1,4 +1,5 @@
 import {canReviewCampus,campusReviewPath} from '@/features/campus/operator-access';
+import { myExternalPartnerScopes } from '@/lib/external-partner-access';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createClient } from '@/lib/supabase/server';
 import { accessFor, fail, loginPath } from '@/features/campus/webinar/domain';
@@ -16,6 +17,10 @@ export async function GET(request:Request,{params}:{params:Promise<{slug:string}
   const result=await db.from('enrollments').select('id,user_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('user_id',user.id).eq('cohort_id',w.cohortId).eq('status','active').limit(20).abortSignal(AbortSignal.timeout(5000));
   if(result.error)throw result.error;
   const access=accessFor(result.data||[],user.id,w.cohortId);
+  if (access.kind !== 'member') {
+    const partner = (await myExternalPartnerScopes(db)).find(scope => scope.cohort_id === w.cohortId);
+    if (partner) return privateReply({ kind: 'member', href: '/campus/workspace?' + new URLSearchParams({ enrollmentId: partner.id, section }) });
+  }
   return privateReply(access.kind==='member'?{...access,href:access.href+'&section='+section}:access);
  }catch(e){return problem(e);}
 }
