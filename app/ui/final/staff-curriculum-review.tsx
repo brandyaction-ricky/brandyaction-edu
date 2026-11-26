@@ -59,6 +59,7 @@ export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', i
     {snapshot.error ? <div role="alert">{snapshot.error}<button className="btn" onClick={snapshot.retry}>{partner ? "권한 다시 확인" : "검수 화면 다시 확인"}</button></div> : !data ? <p role="status">커리큘럼을 불러오고 있습니다.</p> : <>
       <div className="learning-top"><h2>{data.cohorts.find(c => c.id === data.cohortId)?.title}</h2><p className="meta">{partner ? `${data.lessons.length}개 공개 수업 · 읽기 전용` : <>{data.studentStateError ? '완료 기록 확인 필요' : `${data.lessons.filter(l => l.completed).length}개 학습 완료`} · 검수 열람은 진도에 반영되지 않습니다.</>}</p></div>
       <button className="btn learning-mobile-toggle" aria-expanded={navOpen} aria-controls="review-lesson-list" onClick={() => setNavOpen(!navOpen)}>학습 목록<ChevronDown/></button>
+      <a className="skip" href="#classroom-lesson-body" onClick={() => setNavOpen(false)}>학습 목차 건너뛰고 수업 본문으로 이동</a>
       <div className="learning-layout">
         <aside id="review-lesson-list" className={'learning-nav ' + (navOpen ? 'open' : '')} aria-label="학습 목록">
           {[...new Set(data.lessons.map(l => l.week))].map(week => <section className="lesson-week" key={week}><div className="lesson-week-title">WEEK {week} · {data.lessons.find(l => l.week === week)?.weekTitle}</div>
@@ -67,7 +68,7 @@ export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', i
               return <button key={l.id} className={'lesson-nav ' + (l.id === lesson?.id ? 'active' : '')} aria-current={l.id === lesson?.id ? 'page' : undefined} aria-disabled={locked} onClick={() => { if (!locked) { setLesson(l.id); setNavOpen(false); } }}>{l.completed ? <Check/> : <Play/>}<span><span className="meta">DAY {l.day}{locked ? ' · 잠김' : ''}</span><b>{l.title}</b></span></button>;
             })}</section>)}
         </aside>
-        <div className="learning-content">
+        <div id="classroom-lesson-body" className="learning-content" role="region" aria-label="수업 본문" tabIndex={-1}>
           {!lesson ? <p>{selectedLesson ? '공개된 수업 목록에서 확인할 수 없는 수업입니다. 목록에서 다시 선택해 주세요.' : '이 기수에 공개된 수업이 없습니다.'}</p> : !canOpen ? <p role="status">학생 기준으로 잠긴 수업입니다. ‘전체 수업 열람’으로 전환하면 검수할 수 있습니다.</p> : <>
             <header className="lesson-header"><span>DAY {lesson.day}{!partner && (lesson.completed ? ' · 학습 완료' : ' · 미완료')} · 읽기 전용</span><h1>{lesson.title}</h1><p>{lesson.description}</p></header>
             {content.error ? <div role="alert">{content.error}<button className="btn" onClick={content.retry}>수업 다시 확인</button></div> : !content.data ? <p role="status">수업을 불러오고 있습니다.</p> : <ReviewBody key={url + ':' + content.data.revision} content={content.data} cohort={data.cohortId} lesson={lesson.id} student={student} partner={partner}/>}

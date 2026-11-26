@@ -120,11 +120,25 @@ test('actual desktop photo enlarges with keyboard and Escape restores focus; onl
 });
 
 test('store, account and connection questions are explained without overwhelming the guide or leaking URL parameters', async ({ page }) => {
-  await setup(page); await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text: string) => { (window as unknown as { copied: string }).copied = text; } } }); });
+  await setup(page);
   await page.goto('/app-install-test?token=synthetic-only'); await panel(page).getByRole('button', { name: '그림 보며 따라 하기' }).click();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, 'writeText', {
+      configurable: true,
+      value: async (text: string) => { document.documentElement.dataset.copiedAddress = text; },
+    });
+  });
   await panel(page).getByRole('button', { name: '주소 복사', exact: true }).click();
-  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(new URL('/my', page.url()).href);
-  await panel(page).getByText('앱스토어에서 검색해도 안 나와요', { exact: true }).click(); await expect(panel(page)).toContainText('다운로드하는 앱이 아니에요');
+  await expect(page.locator('html')).toHaveAttribute('data-copied-address', new URL('/my', page.url()).href);
+  const storeQuestion = panel(page).getByText('앱스토어에서 검색해도 안 나와요', { exact: true });
+  if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+    expect((await storeQuestion.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await storeQuestion.tap({ position: { x: 30, y: 5 } });
+  } else {
+    await storeQuestion.click();
+  }
+  await expect(storeQuestion.locator('..')).toHaveAttribute('open', '');
+  await expect(panel(page)).toContainText('다운로드하는 앱이 아니에요');
   await panel(page).getByText('새로 가입하거나 결제해야 하나요?', { exact: true }).click(); await expect(panel(page)).toContainText('수강 신청할 때 쓴 계정');
   await panel(page).getByText('아이콘을 추가하면 인터넷 없이도 볼 수 있나요?', { exact: true }).click(); await expect(panel(page)).toContainText('인터넷 연결이 필요해요');
 });

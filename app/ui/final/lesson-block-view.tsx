@@ -124,6 +124,7 @@ function lessonOutline(blocks: PublicLessonBlock[]): OutlineItem[] {
 
 export function LessonBlockView({ document, values, onChange, readOnly = false, filesReadOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false, reviewPrompts = false, floatingAudio = false, showOutline = false, pageBlocks, showChecklist = true }: { pageBlocks?: PublicLessonBlock[]; showChecklist?: boolean; showOutline?: boolean; floatingAudio?: boolean; livePrompts?: boolean; reviewPrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; filesReadOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
   const blocksRef = useRef<HTMLDivElement>(null);
+  const outlineToggle = useRef<HTMLElement>(null);
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
   const embeddedImages = useMemo(() => lessonEmbeddedImageIds(document.blocks), [document.blocks]);
   const visibleBlocks = useMemo(() => document.blocks.filter(block => !embeddedImages.has(block.id)), [document.blocks, embeddedImages]);
@@ -181,10 +182,13 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
     heading.focus({ preventScroll: true });
   }
   return <div ref={blocksRef} className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
-    {outline.length > 1 && <details className="lesson-outline"><summary>이 수업 목차 <span>{outline.length}개 항목</span></summary><nav aria-label="이 수업 목차"><ol>{outline.map(item => <li key={`${item.blockId}:${item.index}`}><button type="button" onClick={() => goToBlock(item)}>{item.label}</button></li>)}</ol></nav></details>}
+    {outline.length > 1 && <details className="lesson-outline"><summary ref={outlineToggle}>이 수업 목차 <span>{outline.length}개 항목</span></summary><nav aria-label="이 수업 목차"><ol>{outline.map(item => <li key={`${item.blockId}:${item.index}`}><button type="button" onClick={() => goToBlock(item)}>{item.label}</button></li>)}</ol></nav></details>}
     <LessonTag label={document.presentation?.tagLabel} />
     {(pageBlocks ?? visibleBlocks).map(renderBlock)}
-    {showOutline && outline.length > 1 && <div className="lesson-back-to-top"><button type="button" className="btn small" onClick={() => (blocksRef.current?.closest('.learning-content') || blocksRef.current)?.scrollIntoView({ block: 'start', behavior: 'auto' })}>학습 맨 위로 ↑</button></div>}
+    {showOutline && outline.length > 1 && <div className="lesson-back-to-top"><button type="button" className="btn small" onClick={() => {
+      outlineToggle.current?.focus({ preventScroll: true });
+      (blocksRef.current?.closest('.learning-content') || blocksRef.current)?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    }}>학습 맨 위로 ↑</button></div>}
     {showChecklist && document.checklist.length > 0 && <fieldset className="lb-card" disabled={readOnly}><legend>오늘의 체크리스트</legend>{document.checklist.map(item => <label className="lb-choice" key={item.id}><input type="checkbox" checked={values.checklist.includes(item.id)} onChange={event => onChange({ ...values, checklist: event.target.checked ? [...values.checklist, item.id] : values.checklist.filter(id => id !== item.id) })} />{item.label}{item.required ? ' (필수)' : ''}</label>)}</fieldset>}
   </div>;
 }

@@ -291,6 +291,28 @@ test('campus save feedback stays below the answers and page buttons stay togethe
   expect(await pages.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 });
 
+test('keyboard navigation continues inside the selected task after a page turn or an outline selection', async ({ page }) => {
+  await page.route('**/api/platform/lesson-blocks**', route => route.fulfill({ json: {
+    revision, currentRevision: revision, editable: true, draft: null, previousDrafts: [], document: {
+      schemaVersion: 1, checklist: [], blocks: [
+        { id: 'first', type: 'heading', content: '시작하기' },
+        { id: 'text', type: 'text', content: '첫 작업입니다.' },
+        { id: 'second', type: 'heading', content: '메모하기' },
+        { id: 'memo', type: 'question', question: { kind: 'text', label: '메모 입력', required: false } },
+      ],
+    },
+  } }));
+  await page.goto('/lesson-blocks-test?guided');
+  await page.getByRole('button', { name: /^다음 작업/ }).press('Enter');
+  const body = page.getByRole('group', { name: '메모하기' });
+  await expect(body).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(body.getByRole('textbox', { name: '메모 입력' })).toBeFocused();
+  const toc = page.getByRole('navigation', { name: '오늘의 작업 목차' });
+  await toc.getByRole('button', { name: /메모하기/ }).press('Enter');
+  await expect(body).toBeFocused();
+});
+
 test('audio playing when the campus reader moves to the next task keeps going in a small bar (QA M4)', async ({ page }) => {
   await mock(page);
   const wav = Buffer.alloc(44 + 8000 * 2 * 30);

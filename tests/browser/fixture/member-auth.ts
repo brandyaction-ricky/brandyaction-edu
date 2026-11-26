@@ -1,9 +1,18 @@
 // No real Supabase configuration or credentials are used by browser fixtures.
+async function submitEmailForm(action: 'sign-in' | 'sign-up', credentials: { email: string; password: string }) {
+  const response = await fetch('/synthetic-auth/' + action, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credentials),
+  });
+  return response.json();
+}
+
 export function createClient() {
   return { storage: { from: (bucket: string) => ({ uploadToSignedUrl: async (path: string, token: string, file: File, options: { contentType: string }) => {
     const response = await fetch('/synthetic-storage/upload?path=' + encodeURIComponent(path), { method: 'PUT', body: file, headers: { 'Content-Type': options.contentType, 'X-Fixture-Bucket': bucket } });
     return response.ok ? { data: { path }, error: null } : { error: { message: '합성 파일 전송 실패' } };
   } }) }, auth: {
+    signInWithPassword: (credentials: { email: string; password: string }) => submitEmailForm('sign-in', credentials),
+    signUp: (credentials: { email: string; password: string }) => submitEmailForm('sign-up', credentials),
     resetPasswordForEmail: async (email: string, options: {redirectTo: string}) => {
       const response = await fetch('/synthetic-auth/reset', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,...options})});
       return {error: response.ok ? null : {status:response.status}};

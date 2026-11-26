@@ -289,6 +289,7 @@ export function Classroom({
           학습 목록
           <ChevronDown />
         </button>
+        <a className="skip" href="#classroom-lesson-body" onClick={() => setNavOpen(false)}>학습 목차 건너뛰고 수업 본문으로 이동</a>
         <div className="learning-layout">
           <aside
             ref={navRef}
@@ -333,7 +334,7 @@ export function Classroom({
               </section>
             ))}
           </aside>
-          <div className="learning-content">
+          <div id="classroom-lesson-body" className="learning-content" role="region" aria-label="수업 본문" tabIndex={-1}>
             <LearningProgress complete={lessons.filter(l => completedIds.has(l.id)).length} total={lessons.length} label="현재 공개된 학습 진도"/>
             {lesson && canOpen(lesson.id) ? (
               <>

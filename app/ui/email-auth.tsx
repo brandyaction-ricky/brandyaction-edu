@@ -2,23 +2,44 @@
 import Link from 'next/link';
 import { FindEmail } from './find-email';
 import styles from './final/auth-layout.module.css';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_REQUIREMENT } from '@/lib/auth-validation';
-import { afterEmailLogin, emailAddress, emailAuthError, emailCallback, emailConfirmRedirect, signupValues } from '@/lib/email-auth';
+import { afterEmailLogin, emailAddress, emailAuthError, emailCallback, emailConfirmRedirect, EmailFormError, signupValues } from '@/lib/email-auth';
 
 export function EmailAuth({ signup, next, disabled = false, supportUrl }: { signup: boolean; next: string; disabled?: boolean; supportUrl: string }) {
   const [panel, setPanel] = useState<'email' | 'password' | 'hint' | null>(null);
   const forgot = panel === 'password';
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const [invalidField, setInvalidField] = useState<EmailFormError['field'] | null>(null);
+  function clearError() {
+    setError('');
+    setInvalidField(null);
+  }
   function toggle(nextPanel: 'email' | 'password' | 'hint') {
     setPanel(panel === nextPanel ? null : nextPanel);
-    setError('');
+    clearError();
     setNotice('');
     setResend(false);
   }
   const [pending, setPending] = useState(false), [notice, setNotice] = useState(''), [error, setError] = useState('');
   const [email, setEmail] = useState(''), [resend, setResend] = useState(false), [seconds, setSeconds] = useState(0);
   const busy = useRef(false);
+  useLayoutEffect(() => {
+    const input = formRef.current?.querySelector('input');
+    input?.focus({ preventScroll: true });
+    input?.scrollIntoView({ block: 'nearest' });
+  }, [panel]);
+  useLayoutEffect(() => {
+    if (!error || pending) return;
+    if (document.activeElement !== document.body && !formRef.current?.contains(document.activeElement)) return;
+    const field = invalidField && formRef.current?.elements.namedItem(invalidField);
+    (field instanceof HTMLInputElement ? field : errorRef.current)?.focus();
+  }, [error, pending, invalidField]);
+  function fieldError(name: EmailFormError['field']) {
+    return invalidField === name ? { 'aria-invalid': true, 'aria-describedby': 'email-auth-error' } : {};
+  }
   useEffect(() => { if (!seconds) return; const timer = setTimeout(() => setSeconds(s => Math.max(0, s - 1)), 1000); return () => clearTimeout(timer); }, [seconds]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (busy.current) return;
@@ -42,7 +63,10 @@ export function EmailAuth({ signup, next, disabled = false, supportUrl }: { sign
         if (error) { if (error.code === 'email_not_confirmed') setResend(true); throw Error(emailAuthError(error)); }
         location.assign(afterEmailLogin(data.user.user_metadata, next));
       }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '잠시 후 다시 시도해 주세요.'); }
+    } catch (cause) {
+      setInvalidField(cause instanceof EmailFormError ? cause.field : null);
+      setError(cause instanceof Error ? cause.message : '잠시 후 다시 시도해 주세요.');
+    }
     finally { busy.current = false; setPending(false); }
   }
   async function resendEmail() {
@@ -63,17 +87,17 @@ export function EmailAuth({ signup, next, disabled = false, supportUrl }: { sign
     </div>}
     {panel === 'hint' && <FindEmail supportUrl={supportUrl} />}
     {(panel === 'email' || forgot) && <div id="email-auth-form" className="mt24">
-      <form onSubmit={submit}>
+      <form ref={formRef} onSubmit={submit} onChange={clearError}>
         <h2>{forgot ? '비밀번호 찾기' : signup ? '이메일 회원가입' : '이메일 로그인'}</h2>
         <fieldset disabled={pending || disabled} className="email-auth-fields">
-          {signup && !forgot && <label className="field"><span>이름</span><input name="name" autoComplete="name" required maxLength={80} /></label>}
-          <label className="field"><span>이메일</span><input name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} /></label>
-          {!forgot && <label className="field"><span>비밀번호</span><input name="password" type="password" autoComplete={signup ? 'new-password' : 'current-password'} required minLength={signup ? 8 : undefined} maxLength={128} />{signup && <small>{PASSWORD_REQUIREMENT}</small>}</label>}
-          {signup && !forgot && <label className="field"><span>비밀번호 확인</span><input name="confirm" type="password" autoComplete="new-password" required maxLength={128} /></label>}
+          {signup && !forgot && <label className="field"><span>이름</span><input name="name" autoComplete="name" required maxLength={80} {...fieldError('name')} /></label>}
+          <label className="field"><span>이메일</span><input name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} {...fieldError('email')} /></label>
+          {!forgot && <label className="field"><span>비밀번호</span><input name="password" type="password" aria-label="비밀번호" aria-describedby={signup ? 'signup-password-rule' : undefined} autoComplete={signup ? 'new-password' : 'current-password'} required minLength={signup ? 8 : undefined} maxLength={128} {...fieldError('password')} />{signup && <small id="signup-password-rule">{PASSWORD_REQUIREMENT}</small>}</label>}
+          {signup && !forgot && <label className="field"><span>비밀번호 확인</span><input name="confirm" type="password" autoComplete="new-password" required maxLength={128} {...fieldError('confirm')} /></label>}
           <button className="btn primary full" disabled={pending || (forgot && seconds > 0)}>{pending ? '처리 중…' : forgot ? seconds ? `${seconds}초 후 다시 요청` : '재설정 메일 받기' : signup ? '인증 메일 받고 가입하기' : '로그인'}</button>
         </fieldset>
       </form>
-      {error && <p className="notice mt16" role="alert">{error}</p>}
+      {error && <p id="email-auth-error" ref={errorRef} tabIndex={-1} className="notice mt16" role="alert">{error}</p>}
       {notice && <p className="notice mt16" role="status">{notice}</p>}
       {resend && !forgot && <button type="button" className="btn full mt16" disabled={pending || seconds > 0} onClick={() => void resendEmail()}>{seconds ? `${seconds}초 후 인증 메일 다시 받기` : '인증 메일 다시 받기'}</button>}
       {signup && <p className="meta mt16">이메일 확인 후 <Link href="/policies/terms" target="_blank">이용약관</Link>과 <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의를 진행합니다.</p>}
