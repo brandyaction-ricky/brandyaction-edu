@@ -94,7 +94,9 @@ export function ReviewBody({ content, cohort, lesson, student, partner }: { cont
     /> : <p role="alert">이 수업의 학습 도구를 표시하지 못했습니다.</p> : <>
       {safeUrl(content.video) && <Video url={safeUrl(content.video)}/>}
       {safeUrl(content.external) && <a className="btn" target="_blank" rel="noopener noreferrer" href={safeUrl(content.external)}>외부 학습 열기</a>}
-      <section className="reading"><LessonText text={content.body || '학습 콘텐츠를 준비하고 있습니다.'}/></section>
+      <section className="reading">
+        <div className="reading-copy"><LessonText text={content.body || '학습 콘텐츠를 준비하고 있습니다.'}/></div>
+      </section>
     </>}
     {content.resourceName && <a className="btn" href={reviewUrl(cohort, lesson, student, partner) + '&resource=1'}>{content.resourceName} 내려받기</a>}
   </>;

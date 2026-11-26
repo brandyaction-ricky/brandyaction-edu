@@ -17,8 +17,10 @@ export function RoomPublishedLesson({access, lesson, partner = false}: {access: 
   const result = useReviewRead<ReviewContent>(reviewUrl(access, lesson, false, partner));
   if (result.error) return <p role="alert">{result.error} <button className="btn" onClick={result.retry}>수업 다시 확인</button></p>;
   if (!result.data) return <p role="status">공개 수업을 불러오고 있어요.</p>;
-  return <><p className="meta">읽기 전용 · 학습 기록은 저장되지 않습니다.</p>
-    <ReviewBody key={lesson + ':' + result.data.revision} content={result.data} cohort={access} lesson={lesson} student={false} partner={partner}/></>;
+  return <div className={`edu-front ${styles.regularClassroom}`}>
+    <p className="meta">읽기 전용 · 학습 기록은 저장되지 않습니다.</p>
+    <ReviewBody key={lesson + ':' + result.data.revision} content={result.data} cohort={access} lesson={lesson} student={false} partner={partner}/>
+  </div>;
 }
 
 // Staff without an enrollment use the same server-checked list and published revision as curriculum review.

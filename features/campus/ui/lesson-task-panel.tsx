@@ -90,10 +90,12 @@ function RoomLessons({snapshot, initialLesson, initialMission, mayLeave, onCompl
         : choice.mission || !guided ? <RoomClassroom key={lesson.id + ':' + (choice.mission || '')} scope={scope} lesson={lesson.id} day={lesson.day} title={lesson.title} reviewNavigation={reviewNavigation} progression={progression} mission={choice.mission} onNavigate={navigate} onCompleted={onCompleted}/>
         : <>
           {!lesson.staffPreview && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && <div className={styles.readerTools}><FloatingLearningQuestion key={enrollment + ':' + lesson.id} member={snapshot.viewer.id} current={{enrollmentId: enrollment, lessonId: lesson.id, label: lesson.day + '일차 · ' + lesson.title, recent: true}}/></div>}
-          <GuidedSession campusGuided lessonId={lesson.id} enrollmentId={enrollment} readOnly={scope.graduate || lesson.staffPreview} completed={lesson.completed}
-            onCompleted={onCompleted} renderContinuation={ready => <NextLessonAction end="현재 공개된 마지막 수업입니다." position={next && position(next)}
-              reason={!ready ? '학습 완료 또는 제출 후 이동할 수 있어요.' : next && !open(next) ? gateReason(next.id) || '아직 열리지 않은 수업입니다.' : undefined}
-              onOpen={() => {if (ready && next) navigate(next.id);}}/>}/>
+          <div className={`edu-front ${styles.regularClassroom}`}>
+            <GuidedSession campusGuided lessonId={lesson.id} enrollmentId={enrollment} readOnly={scope.graduate || lesson.staffPreview} completed={lesson.completed}
+              onCompleted={onCompleted} renderContinuation={ready => <NextLessonAction end="현재 공개된 마지막 수업입니다." position={next && position(next)}
+                reason={!ready ? '학습 완료 또는 제출 후 이동할 수 있어요.' : next && !open(next) ? gateReason(next.id) || '아직 열리지 않은 수업입니다.' : undefined}
+                onOpen={() => {if (ready && next) navigate(next.id);}}/>}/>
+          </div>
           {previous && <button type="button" className="btn" disabled={!open(previous)} onClick={() => navigate(previous.id)}>이전 학습</button>}
           {!lesson.staffPreview && lesson.missions.length > 0 && <div className={styles.tasks}><h3>이 수업의 과제</h3>{lesson.missions.map(item =>
             <div className={styles.task} key={item.id}><div><strong>{item.title}</strong><p>{statusText[item.status]}</p></div>

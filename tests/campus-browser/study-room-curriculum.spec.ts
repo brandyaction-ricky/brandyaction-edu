@@ -1,8 +1,9 @@
-import {expect, test, type Page} from '@playwright/test';
+import {expect, test, type Locator, type Page} from '@playwright/test';
 import {student} from '../campus-fixture/data';
 import {withExistingCohortVisibility} from '../browser/fixture/cohort-visibility';
 import {defaultProfile} from '../../features/campus/space/domain';
 import {defaultRoom} from '../../features/campus/content/model';
+import {serializeLessonDocument} from '../../lib/lesson-body';
 
 const scope = student.scopes[0];
 const lessons = student.lessons.slice(0, 3).map((item, index) => ({
@@ -10,6 +11,48 @@ const lessons = student.lessons.slice(0, 3).map((item, index) => ({
 }));
 const [first, second, locked] = lessons;
 const body = (day: number) => `공개 본문 ${day} · 고객과 나눈 대화에서 다음 질문을 찾습니다.`;
+const referenceUrl = 'https://example.test/study-guide';
+const lines = ['첫 문단입니다.', '다음 줄입니다.', '새 문단입니다.', '참고 자료'];
+const multilineBody = lines[0] + '\r\n' + lines[1] + '\r\n\r\n' + lines[2] + '\r\n[' + lines[3] + '](' + referenceUrl + ')';
+const richDocument = {schemaVersion: 1, checklist: [], blocks: [
+  {id: 'readable-heading', type: 'heading', content: '실습 순서'},
+  {id: 'readable-text', type: 'text', content: serializeLessonDocument({type: 'doc', content: [
+    {type: 'paragraph', content: [{type: 'text', text: '먼저 본문을 읽으세요.'}]},
+    {type: 'bulletList', content: [{type: 'listItem', content: [{type: 'paragraph', content: [
+      {type: 'text', text: '검토할 자료', marks: [{type: 'link', attrs: {href: referenceUrl}}]},
+    ]}]}]},
+  ]})},
+]};
+
+async function expectMultilineReading(dialog: Locator) {
+  await expect(dialog.getByRole('link', {name: lines[3], exact: true})).toHaveAttribute('href', referenceUrl);
+  // textContent keeps author line breaks even when CSS collapses them. Measure the painted glyphs.
+  const top = await dialog.evaluate((root, labels) => {
+    return labels.map(label => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = node.textContent?.indexOf(label) ?? -1;
+        if (index < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + label.length);
+        return range.getBoundingClientRect().top;
+      }
+      throw Error('Missing lesson text: ' + label);
+    });
+  }, lines);
+  const lineHeight = top[1] - top[0];
+  expect(lineHeight, 'explicit next line').toBeGreaterThan(12);
+  expect(top[2] - top[1], 'blank line between paragraphs').toBeGreaterThan(lineHeight * 1.4);
+  expect(top[3] - top[2], 'link starts on next line').toBeGreaterThan(12);
+}
+
+async function expectRichReading(dialog: Locator) {
+  await expect(dialog.getByRole('heading', {name: '실습 순서'})).toBeVisible();
+  await expect(dialog.getByText('먼저 본문을 읽으세요.', {exact: true})).toBeVisible();
+  const link = dialog.getByRole('listitem').getByRole('link', {name: '검토할 자료', exact: true});
+  await expect(link).toHaveAttribute('href', referenceUrl);
+}
 const roomUrl = '/campus/workspace?' + new URLSearchParams({
   tourLive: '1', studyPresence: '1', enrollmentId: scope.enrollmentId, room: 'study',
 });
@@ -23,7 +66,7 @@ async function simpleScene(page: Page) {
   }));
 }
 
-async function connect(page: Page, guidedLessons = false, realScene = false) {
+async function connect(page: Page, guidedLessons = false, realScene = false, publishedBody = body) {
   if (!realScene) await simpleScene(page);
   const data = withExistingCohortVisibility({
     enrollments: [{id: scope.enrollmentId, course_id: scope.courseId, cohort_id: scope.cohortId, status: 'active'}],
@@ -54,7 +97,7 @@ async function connect(page: Page, guidedLessons = false, realScene = false) {
     if (deny) return route.fulfill({status: 403, json: {error: '수강 권한을 다시 확인해 주세요.'}});
     return route.fulfill({json: {
       user: {id: student.viewer.id, role: 'student'},
-      data: {...data, lesson_contents: [{id: 'content-' + lesson!.id, lesson_id: lesson!.id, body_text: body(lesson!.day)}]},
+      data: {...data, lesson_contents: [{id: 'content-' + lesson!.id, lesson_id: lesson!.id, body_text: publishedBody(lesson!.day)}]},
     }});
   });
   return {reads, revoke: () => {deny = true;}};
@@ -249,6 +292,14 @@ test('the room discards previously read content when the next member read is den
   await verifyRoom(page);
 });
 
+test('a learner sees the author line breaks and link in a legacy lesson inside the room', async ({page}) => {
+  await connect(page, false, false, () => multilineBody);
+  await page.goto(roomUrl);
+  await page.getByRole('region', {name: '이어서 할 수업·실습'}).getByRole('button', {name: '수업 열기'}).click();
+  await expectMultilineReading(page.getByRole('dialog', {name: '수업', exact: true}));
+  await verifyRoom(page);
+});
+
 test('staff without enrollment can read and switch published lessons inside their preview room', async ({page}) => {
   const requested: string[] = [];
   await simpleScene(page);
@@ -259,7 +310,7 @@ test('staff without enrollment can read and switch published lessons inside thei
     const lesson = lessons.find(item => item.id === query.get('lesson'));
     if (lesson) {
       requested.push(lesson.id);
-      return route.fulfill({json: {revision: 'published-1', body: body(lesson.day), video: '', external: '', document: null}});
+      return route.fulfill({json: {revision: 'published-1', body: multilineBody, video: '', external: '', document: lesson.id === first.id ? null : richDocument}});
     }
     return route.fulfill({json: {
       cohorts: [{id: scope.cohortId, courseId: scope.courseId, title: scope.cohortName}],
@@ -271,9 +322,9 @@ test('staff without enrollment can read and switch published lessons inside thei
   await page.getByRole('button', {name: '이 공간에서 할 일', exact: true}).click();
   await page.getByRole('region', {name: '이 공간에서 할 일'}).getByRole('button', {name: '수업', exact: true}).click();
   const dialog = page.getByRole('dialog', {name: '수업', exact: true});
-  await expect(dialog.getByText(body(1), {exact: true})).toBeVisible();
+  await expectMultilineReading(dialog);
   await dialog.getByRole('combobox', {name: '수업 선택'}).selectOption(second.id);
-  await expect(dialog.getByText(body(2), {exact: true})).toBeVisible();
+  await expectRichReading(dialog);
   await expect(dialog.getByRole('button', {name: '학습 완료하기', exact: true})).toHaveCount(0);
   await expect(page).toHaveURL(url => url.pathname === '/operator-tour' && url.searchParams.get('cohort') === scope.cohortId);
   expect(requested).toEqual([first.id, second.id]);
@@ -337,15 +388,15 @@ test('a partner can read a later published lesson with their own access and no s
     const lesson = lessons.find(item => item.id === params.get('lesson'));
     expect(lesson).toBeDefined();
     reviewReads.push(lesson!.id);
-    return route.fulfill({json: {revision: 'published-2', body: body(lesson!.day), video: '', external: '', document: null}});
+    return route.fulfill({json: {revision: 'published-2', body: multilineBody, video: '', external: '', document: lesson!.id === first.id ? null : richDocument}});
   });
   await page.goto(roomUrl);
   await page.getByRole('button', {name: '이 공간에서 할 일', exact: true}).click();
   await page.getByRole('region', {name: '이 공간에서 할 일'}).getByRole('button', {name: '수업', exact: true}).click();
   const dialog = page.getByRole('dialog', {name: '수업', exact: true});
-  await expect(dialog.getByText(body(1), {exact: true})).toBeVisible();
+  await expectMultilineReading(dialog);
   await dialog.getByRole('combobox', {name: '수업 선택'}).selectOption(locked.id);
-  await expect(dialog.getByText(body(3), {exact: true})).toBeVisible();
+  await expectRichReading(dialog);
   await expect(dialog.getByRole('button', {name:'학습 완료하기',exact:true})).toHaveCount(0);
   await verifyRoom(page);
   expect(memberReads).toEqual([]);
