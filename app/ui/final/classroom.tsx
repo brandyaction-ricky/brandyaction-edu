@@ -64,7 +64,7 @@ export function Classroom({
   const ownProgression = useLessonProgression(path[1], blockLearningEnabled && !sharedProgression);
   const progression = sharedProgression ?? ownProgression;
   const navigationKey = progression.lessons?.map(item => `${item.lessonId}:${item.track}:${item.ongoing}`).join("|");
-  // Scroll only the lesson list; opening a lesson must not move the page itself.
+  // Center the selected item inside the list independently of the lesson links' scroll target.
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const nav = navRef.current;
@@ -134,6 +134,7 @@ export function Classroom({
     entry = entries.find((x) => x.mission.id === missionId) || entries[0];
   const lessonHref =
     "/learn/" + enrollment.id + (lesson ? "/" + lesson.id : "");
+  const lessonStartHref = (id: string) => `/learn/${enrollment.id}/${id}#top`;
   const legacyCompletion = lesson && !graduate && !selectedGate?.ongoing ? (
     <button
       className="btn dark"
@@ -297,7 +298,7 @@ export function Classroom({
           >
             {blockLearningEnabled && hasTracks && <nav aria-label="학습 종류">{(['daily', 'learning', 'ongoing', null] as const).map(track => {
               const first = progression.lessons?.filter(item => group(item) === track && allLessons.some(lesson => lesson.id === item.lessonId)).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
-              return first && <Link className="btn small mb16" key={track || 'legacy'} aria-current={group(selectedGate) === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : track === 'learning' ? '별도 학습' : track === 'ongoing' ? '지속 챌린지' : '기타 학습'}</Link>;
+              return first && <Link className="btn small mb16" key={track || 'legacy'} aria-current={group(selectedGate) === track ? 'page' : undefined} href={lessonStartHref(first.lessonId)}>{track === 'daily' ? '데일리 미션' : track === 'learning' ? '별도 학습' : track === 'ongoing' ? '지속 챌린지' : '기타 학습'}</Link>;
             })}</nav>}
             {weeks.filter(w => lessons.some(l => l.week_id === w.id)).map((w) => (
               <section className="lesson-week" key={w.id}>
@@ -314,7 +315,7 @@ export function Classroom({
                       }
                       aria-current={l.id === lesson?.id ? "page" : undefined}
                       aria-disabled={!canOpen(l.id)}
-                      href={"/learn/" + enrollment.id + "/" + l.id}
+                      href={lessonStartHref(l.id)}
                       onClick={event => { if (!canOpen(l.id)) event.preventDefault(); else setNavOpen(false); }}
                     >
                       {completedIds.has(l.id) ? (
@@ -420,12 +421,7 @@ export function Classroom({
                   {current > 0 ? (
                     <Link
                       className="btn"
-                      href={
-                        "/learn/" +
-                        enrollment.id +
-                        "/" +
-                        lessons[current - 1].id
-                      }
+                      href={lessonStartHref(lessons[current - 1].id)}
                     >
                       <ArrowLeft />
                       이전 학습
@@ -437,12 +433,7 @@ export function Classroom({
                   {current < lessons.length - 1 && ((graduate || done || selectedGate?.ongoing) && canOpen(lessons[current + 1].id) ? (
                     <Link
                       className="btn"
-                      href={
-                        "/learn/" +
-                        enrollment.id +
-                        "/" +
-                        lessons[current + 1].id
-                      }
+                      href={lessonStartHref(lessons[current + 1].id)}
                     >
                       다음 학습 · {t(lessons[current + 1], 'title')}
                       <ArrowRight />

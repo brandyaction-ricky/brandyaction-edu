@@ -1,6 +1,6 @@
 import {expect,test,type Page} from '@playwright/test';
 const id=(n:number)=>`aaaaaaac-1111-4111-8111-${String(n).padStart(12,'0')}`;
-async function studentBackend(page:Page){
+async function studentBackend(page:Page, { longLesson = false } = {}){
  const completed=new Set<string>(),reads:string[]=[],drafts=new Map<string,Record<string,unknown>>(),submissions=new Map<string,Record<string,unknown>>();let fail=false;
  await page.route('**/api/platform/lesson-blocks**',async route=>{
   const params=new URL(route.request().url()).searchParams;
@@ -10,7 +10,9 @@ async function studentBackend(page:Page){
     await route.fulfill({json:{lessons:[10,11,12,13,14].map(n=>({lessonId:id(n),track:n===14?null:n<12?'daily':'learning',dayNumber:n===14?null:n%2+1,isUnlocked:n%2===0||completed.has(id(n-1)),automaticApproval:n<12,reason:n%2===1?'이전 학습을 완료해 주세요.':''}))}});return;
    }
    const lesson=params.get('lesson')!;reads.push(lesson);const daily=[id(10),id(11)].includes(lesson);
-   await route.fulfill({json:{document:{schemaVersion:1,blocks:[{id:'t',type:'text',content:daily?'데일리 미션 본문':'별도 학습 본문'}],checklist:[],completion:{mode:daily?'mentor':'self',requireAnswers:false,requireQuizPass:!daily}},revision:id(99),currentRevision:id(99),draft:drafts.get(lesson)||null,submission:submissions.get(lesson)||null,previousDrafts:[],editable:true}});return;
+   const content = daily ? '데일리 미션 본문' : '별도 학습 본문';
+   const blocks = longLesson ? Array.from({ length: 45 }, (_, index) => ({ id: `t${index}`, type: 'text', content: `${content} ${index + 1}` })) : [{ id: 't', type: 'text', content }];
+   await route.fulfill({json:{document:{schemaVersion:1,blocks,checklist:[],completion:{mode:daily?'mentor':'self',requireAnswers:false,requireQuizPass:!daily}},revision:id(99),currentRevision:id(99),draft:drafts.get(lesson)||null,submission:submissions.get(lesson)||null,previousDrafts:[],editable:true}});return;
   }
   const body=route.request().postDataJSON(),lesson=body.lessonId;
   if(body.action==='draft'){const draft={writeId:body.requestId,values:body.values,updatedAt:new Date().toISOString()};drafts.set(lesson,draft);await route.fulfill({json:draft});return;}
@@ -31,8 +33,34 @@ test('automatic daily approval opens the next lesson; separate learning has its 
  await expect(page.locator('.lesson-header')).toContainText('학습 완료');await page.getByRole('link',{name:/^다음 학습 · 데일리 둘째 날$/}).click();await expect(page.locator('.lesson-header')).toContainText('데일리 둘째 날');
  if(await page.getByRole('button',{name:/학습 목차|학습 목록/}).isVisible())await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
  await page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'별도 학습',exact:true}).click();await expect(page.getByText('별도 학습 본문',{exact:true})).toBeVisible();await expect(page.locator('.lesson-header')).toContainText('DAY 1');await expect(page.locator('.lesson-header')).not.toContainText('DAY 11');await expect(page.getByRole('button',{name:'학습 완료 후 다음 학습'})).toBeDisabled();
- await page.getByRole('button',{name:'학습 완료하기',exact:true}).click();await expect(page.getByRole('link',{name:/^다음 학습 ·/})).toHaveAttribute('href',`/learn/${id(1)}/${id(13)}`);
+ await page.getByRole('button',{name:'학습 완료하기',exact:true}).click();await expect(page.getByRole('link',{name:/^다음 학습 ·/})).toHaveAttribute('href',`/learn/${id(1)}/${id(13)}#top`);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('separate-learning.png'),fullPage:true});
+});
+
+test('lesson navigation opens the next, previous, and selected lesson at its introduction', async ({ page }) => {
+  await studentBackend(page, { longLesson: true });
+  await page.goto(`/learn/${id(1)}/${id(10)}`);
+  await page.getByRole('button', { name: '미션 제출하기' }).click();
+
+  const next = page.getByRole('link', { name: '다음 학습 · 데일리 둘째 날' });
+  await next.scrollIntoViewIfNeeded();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  await next.click();
+  await expectLessonStart('데일리 둘째 날');
+
+  await page.getByRole('link', { name: '이전 학습', exact: true }).click();
+  await expectLessonStart('데일리 첫날');
+
+  const menu = page.getByRole('button', { name: /학습 목차|학습 목록/ });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole('complementary', { name: '학습 목록' }).getByRole('link', { name: /데일리 둘째 날/ }).click();
+  await expectLessonStart('데일리 둘째 날');
+
+  async function expectLessonStart(title: string) {
+    await expect(page).toHaveURL(/#top$/);
+    await expect(page.locator('.lesson-header').getByRole('heading', { name: title })).toBeInViewport();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  }
 });
 test('settings retry the identical write after a lost acknowledgment and retain saved values on reopening',async({page},info)=>{
  let saved={cohortId:id(3),writeId:null as string|null,autoApproveThroughWeek:null as number|null},lost=true;const writes:Record<string,unknown>[]=[];
