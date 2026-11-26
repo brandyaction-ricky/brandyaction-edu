@@ -5,6 +5,7 @@ import { hasLearningAccess } from '@/lib/platform-rules';
 import { productDigitalSections, productResources } from '@/lib/product-metadata';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 import { recordLearningUsage } from '@/lib/learning-usage-server';
+import { lessonDownloadLocation } from '@/lib/lesson-download-location';
 export async function GET(request: Request) {
     try { return await deliver(request); }
     catch { return Response.json({ error: '자료를 준비하거나 이용 기록을 저장하지 못했습니다. 다시 시도해 주세요.' }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } }); }
@@ -47,10 +48,10 @@ async function deliver(request: Request) {
                 }
             }
         }
-        const { data, error } = await admin.storage.from('course-resources').createSignedUrl(item.path, 60, { download: item.name });
+        const { data, error } = await admin.storage.from('course-resources').createSignedUrl(item.path, 60);
         if (error || !data) return Response.json({ error: '자료를 다운로드하지 못했습니다.' }, { status: 503 });
         if (user && usageEnrollment) await recordLearningUsage(user, usageEnrollment, 'material_download', resource!);
-        return new Response(null, { status: 303, headers: { 'Cache-Control': 'private, no-store', Vary: 'Cookie', Location: data.signedUrl } });
+        return new Response(null, { status: 303, headers: { 'Cache-Control': 'private, no-store', Vary: 'Cookie', Location: lessonDownloadLocation(data.signedUrl, item.name) } });
     }
     if (!user) return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
     const lesson = params.get('lesson');
@@ -73,11 +74,11 @@ async function deliver(request: Request) {
     const { data: content } = await db.from('lesson_contents').select('resource_storage_path,resource_name').eq('lesson_id', lesson).single();
     if (!content?.resource_storage_path)
         return Response.json({ error: '자료를 이용할 권한이 없습니다.' }, { status: 403 });
-    const { data, error } = await createAdminClient().storage.from('course-resources').createSignedUrl(content.resource_storage_path, 60, { download: content.resource_name || true });
+    const { data, error } = await createAdminClient().storage.from('course-resources').createSignedUrl(content.resource_storage_path, 60);
     if (error || !data)
         return Response.json({ error: '자료를 다운로드하지 못했습니다.' }, { status: 503 });
     if (usageEnrollment) await recordLearningUsage(user, usageEnrollment, 'material_download', lesson);
-    return new Response(null, { status: 303, headers: { 'Cache-Control': 'private, no-store', Vary: 'Cookie', Location: data.signedUrl } });
+    return new Response(null, { status: 303, headers: { 'Cache-Control': 'private, no-store', Vary: 'Cookie', Location: lessonDownloadLocation(data.signedUrl, content.resource_name || true) } });
 }
 
 // HEAD probes must not issue download links or create usage evidence.

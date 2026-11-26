@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { createClient } from '@supabase/supabase-js';
 const built = await build({ entryPoints:['lib/staff-curriculum-review-server.ts'], bundle:true, write:false, platform:'node', format:'esm', plugins:[{name:'isolated-admin',setup(b){b.onResolve({filter:/supabase\/admin$/},()=>({path:'admin',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:'export function createAdminClient(){throw Error("No external DB in this test")}'}));}}] });
 const api=await import('data:text/javascript;base64,'+Buffer.from(built.outputFiles[0].text + "\n//# sourceURL=staff-review-test-bundle.mjs").toString('base64'));
 const id=n=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`;
@@ -68,13 +69,16 @@ test('legacy and graduate access is calculated from existing IDs without fabrica
  process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='false';const f=fixture();const s=await api.readCurriculumReview(actor(),{},f.db);assert.ok(s.lessons.every(l=>l.studentUnlocked));assert.equal(s.lessons[1].completed,false);
  f.tables.lesson_progress=[];f.tables.cohorts[0].status='completed';const g=await api.readCurriculumReview(actor(),{},f.db);assert.ok(g.lessons.every(l=>l.studentUnlocked&&!l.completed));
 });
-test('the HTTP route enforces authentication, current role and input scope; exposes GET only',async()=>{
+async function reviewRoute() {
  const compiled=await build({entryPoints:['app/api/platform/curriculum-review/route.ts'],bundle:true,write:false,platform:'node',format:'esm',plugins:[{name:'route-fixtures',setup(b){
   b.onResolve({filter:/lib\/server-auth$/},()=>({path:'auth',namespace:'fixture'}));
   b.onResolve({filter:/supabase\/admin$/},()=>({path:'db',namespace:'fixture'}));
   b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='auth'?'export async function getAuthenticatedUser(){return globalThis.__reviewActor}':'export function createAdminClient(){return globalThis.__reviewDB}'}));
  }}]});
- const route=await import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text+'\n//# sourceURL=review-route-test.mjs').toString('base64'));
+ return import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text+'\n//# sourceURL=review-route-test.mjs').toString('base64'));
+}
+test('the HTTP route enforces authentication, current role and input scope; exposes GET only',async()=>{
+ const route=await reviewRoute();
  assert.equal(route.POST,undefined);assert.equal(route.PATCH,undefined);process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED='true';const f=fixture();globalThis.__reviewDB=f.db;
  try{
   for(const [a,status] of [[null,401],[actor('student'),403],[actor('staff','suspended'),403]]){globalThis.__reviewActor=a;assert.equal((await route.GET(new Request('http://localhost/api/platform/curriculum-review'))).status,status)}
@@ -83,4 +87,59 @@ test('the HTTP route enforces authentication, current role and input scope; expo
   assert.equal((await route.GET(new Request('http://localhost/api/platform/curriculum-review?enrollment='+id(11)))).status,403);
   const response=await route.GET(new Request(`http://localhost/api/platform/curriculum-review?cohort=${id(3)}&lesson=${id(7)}`));assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);const json=await response.json();assert.equal(json.document.blocks[0].quiz.questions[0].correctIndex,undefined);assert.equal(JSON.stringify(json).includes('resource_storage_path'),false);
  }finally{delete globalThis.__reviewActor;delete globalThis.__reviewDB;}
+});
+
+test('review redirects preserve published filenames and only authorized downloads receive a signed URL', async () => {
+ const route = await reviewRoute();
+ const { db, tables } = fixture();
+ const requests = [];
+ // Exercise the installed Storage SDK serializer with a synthetic signing response.
+ db.storage = createClient('https://storage.test', 'fixture-key', {
+  auth: { persistSession: false, autoRefreshToken: false },
+  global: { fetch: async (url, options) => {
+   const path = new URL(url).pathname;
+   requests.push(path);
+   assert.equal(JSON.parse(options.body).expiresIn, 60);
+   return Response.json({ signedURL: path.slice('/storage/v1'.length) + '?token=fixture-signature' });
+  } },
+ }).storage;
+ const get = query => route.GET(new Request('https://edu.test/api/platform/curriculum-review?' + new URLSearchParams({
+  cohort: id(3), lesson: id(7), ...query,
+ })));
+ globalThis.__reviewDB = db;
+ globalThis.__reviewActor = actor();
+ process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'true';
+ try {
+  const file = tables.edu_lesson_media[0];
+  for (const name of ['가상고객10건.csv', '질문 + 100% & # %EA.csv']) {
+   file.name = name;
+   const response = await get({ asset: id(16), download: '1' });
+   assert.equal(response.status, 303);
+   const location = new URL(response.headers.get('location'));
+   assert.deepEqual(location.searchParams.getAll('download'), [name]);
+   assert.equal(location.searchParams.get('token'), 'fixture-signature');
+   assert.equal(location.pathname, '/storage/v1/object/sign/lesson-content-media/media/file');
+  }
+  tables.lesson_contents[0].resource_name = null;
+  const legacy = await get({resource:'1'});
+  assert.equal(legacy.status, 303);
+  assert.equal(new URL(legacy.headers.get('location')).searchParams.get('download'), '학습 자료');
+
+  const block = tables.edu_lesson_block_versions[0].document.blocks.find(row => row.assetId === file.id);
+  block.type = 'image';
+  file.kind = 'image';
+  file.name = '연습 그림.png';
+  const inline = await get({asset:id(16)});
+  assert.equal(inline.status, 303);
+  assert.equal(new URL(inline.headers.get('location')).searchParams.has('download'), false);
+  const signedCount = requests.length;
+  const metadata = await get({asset:id(16),metadata:'1'});
+  assert.equal((await metadata.json()).name, file.name);
+  assert.equal((await get({asset:id(16),student:'1'})).status, 403);
+  assert.equal((await get({asset:id(17)})).status, 404);
+  assert.equal(requests.length, signedCount);
+ } finally {
+  delete globalThis.__reviewActor;
+  delete globalThis.__reviewDB;
+ }
 });

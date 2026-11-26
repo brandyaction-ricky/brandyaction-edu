@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
+import { lessonDownloadLocation } from '@/lib/lesson-download-location';
 import { uuid } from '@/lib/edu-workflows';
 import { answerFileSpec, matchesAnswerFile } from '@/lib/lesson-files';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
@@ -71,8 +72,9 @@ export async function GET(request: Request) {
     const { data: file, error } = await db.rpc('edu_read_answer_file', { p_actor: actor.id, p_file: id(params.get('file')), p_submission: params.has('submission') ? id(params.get('submission')) : null });
     if (error) throw error;
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
-    const signed = await db.storage.from(bucket).createSignedUrl(file.path, 60, { download: file.kind === 'file' || params.get('download') === '1' ? file.name : false });
+    const signed = await db.storage.from(bucket).createSignedUrl(file.path, 60);
     if (signed.error) throw signed.error;
-    return new Response(null, { status: 303, headers: { ...headers, Location: signed.data.signedUrl } });
+    const download = file.kind === 'file' || params.get('download') === '1' ? file.name : false;
+    return new Response(null, { status: 303, headers: { ...headers, Location: lessonDownloadLocation(signed.data.signedUrl, download) } });
   } catch (error) { return failure(error); }
 }

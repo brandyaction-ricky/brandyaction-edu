@@ -1,3 +1,4 @@
+import * as downloadLocation from '../lib/lesson-download-location.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ function harness({user={id},dbError=null,size=8,mime='image/png',bytes=png,ready
  const file={id,owner_id:id,course_id:id,name,size:8,kind,content_type:'image/png',extension:'png',path:`${id}/${id}.png`,sha256,ready_at:ready?'2026-09-28T12:00:00Z':null};
  const storage={createSignedUploadUrl:async(path,options)=>{storageCalls.push({action:'upload',path,options});return{data:{signedUrl:'https://storage.test/signed-upload',token:'private-token'}};},info:async()=>({data:{size,contentType:mime}}),download:async()=>({data:new Blob([bytes])}),createSignedUrl:async(path,seconds,options)=>{storageCalls.push({action:'read',path,seconds,options});return{data:{signedUrl}};}};
  const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='edu_complete_lesson_media'?{id,name:file.name,kind,size}:file,error:typeof dbError==='function'?dbError(args):dbError};},storage:{from:bucket=>{assert.equal(bucket,'lesson-content-media');return storage;}}};
- const route=compile('app/api/platform/lesson-media/route.ts',{'node:crypto':crypto,'@/lib/lesson-media':files,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>db}});
+ const route=compile('app/api/platform/lesson-media/route.ts',{'node:crypto':crypto,'@/lib/lesson-download-location':downloadLocation,'@/lib/lesson-media':files,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>db}});
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-media',{method:'POST',headers:origin?{origin}:{},body:JSON.stringify(body)}));
  const get=(query=`asset=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-media?'+query));
  return{post,get,calls,storageCalls,body:{action:'prepare',courseId:id,name:'test.png',size:8,kind:'image',requestId:id}};
@@ -29,7 +30,7 @@ test('complete validates stored metadata and actual bytes before server-generate
  const ready=harness({ready:true});assert.equal((await ready.post({action:'complete',assetId:id})).status,200);assert.equal(ready.calls.length,1);
 });
 test('reading verifies media and lesson/submission association before a five-minute private redirect',async()=>{
- const h=harness({kind:'video'}),res=await h.get(`asset=${id}&submission=${id}`);assert.equal(res.status,303);assert.equal(res.headers.get('cache-control'),'private, no-store');assert.equal(h.calls[0].args.p_submission,id);assert.equal(h.storageCalls[0].seconds,300);assert.equal(h.storageCalls[0].options.download,false);
+ const h=harness({kind:'video'}),res=await h.get(`asset=${id}&submission=${id}`);assert.equal(res.status,303);assert.equal(res.headers.get('cache-control'),'private, no-store');assert.equal(h.calls[0].args.p_submission,id);assert.equal(h.storageCalls[0].seconds,300);assert.equal(res.headers.get('location'),'https://storage.test/short-lived');
  const forbidden=harness({dbError:{message:'BLOCK_FORBIDDEN'}});assert.equal((await forbidden.get()).status,403);assert.equal(forbidden.storageCalls.length,0);
  const broken=harness({dbError:{message:'secret DB data'}});assert.doesNotMatch(await(await broken.get()).text(),/secret DB data/);
 });
@@ -52,12 +53,12 @@ test('migration receipt denies anonymous/foreign authors, pending bytes, missing
 });
 test('download-only attachments force Content-Disposition even when download query is omitted, after authorization',async()=>{
  const h=harness({kind:'file'}),response=await h.get(`asset=${id}&lesson=${id}&enrollment=${id}&revision=${id}`);
- assert.equal(response.status,303);assert.equal(h.storageCalls[0].options.download,'test.png');assert.equal(h.calls[0].args.p_lesson,id);assert.equal(h.calls[0].args.p_enrollment,id);assert.equal(h.calls[0].args.p_revision,id);
+ assert.equal(response.status,303);assert.equal(new URL(response.headers.get('location')).searchParams.get('download'),'test.png');assert.equal(h.calls[0].args.p_lesson,id);assert.equal(h.calls[0].args.p_enrollment,id);assert.equal(h.calls[0].args.p_revision,id);
  const metadata=harness({kind:'file'}),res=await metadata.get(`asset=${id}&metadata=1`);assert.equal(res.status,200);assert.equal((await res.json()).kind,'file');assert.equal(metadata.storageCalls.length,0);
  const denied=harness({kind:'file',dbError:{message:'BLOCK_FORBIDDEN'}});assert.equal((await denied.get(`asset=${id}&download=1`)).status,403);assert.equal(denied.storageCalls.length,0);
 });
 test('download filenames retain Korean and reserved characters without altering the signed token',async()=>{
- for(const name of ['수업 자료.pdf','다운로드+100% & 참고.pdf',"따옴표'와(괄호).pdf"]){
+ for(const name of ['가상고객10건.csv','문자 그대로 %EA.csv','수업 자료.pdf','다운로드+100% & 참고.pdf',"따옴표'와(괄호).pdf"]){
   const signedUrl='https://storage.test/object/sign/course/file.pdf?token=ey.test.signature&download='+encodeURIComponent(encodeURIComponent(name));
   for(const [kind,query] of [['file',''],['image','&download=1']]){
    const h=harness({kind,name,signedUrl}),res=await h.get(`asset=${id}`+query),url=new URL(res.headers.get('location'));
