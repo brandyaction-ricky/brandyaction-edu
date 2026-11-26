@@ -241,6 +241,8 @@ test('a mentor question draft survives a cancelled lesson change and cancelled r
   await expect(popup).toBeVisible();
   await page.goBack();
   await expect(popup).toBeHidden();
+  await expect(dialog.getByRole('button', {name: '이 학습에 질문하기'})).toBeFocused();
+  await expect(dialog.getByRole('button', {name: '질문하기', exact: true})).toHaveCount(0);
   await expect(dialog.getByRole('heading', {name: second.title, exact: true})).toHaveCount(1);
   await dialog.getByRole('button', {name: '이 학습에 질문하기'}).click();
   await popup.getByRole('button', {name: '멘토에게 질문', exact: true}).click();
