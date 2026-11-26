@@ -1,8 +1,10 @@
 'use client';
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { hasStoredAiDraft } from '@/lib/curriculum-ai-draft';
+import { CampusLessonContext } from '@/features/campus/ui/draft-guard';
+import { holdBack } from '@/features/campus/ui/back-close';
 import type { QuestionContext } from '@/lib/question-hub';
 import { CurriculumAiConversation } from './curriculum-ai-conversation';
 import { learningQuestionCreatedEvent, openFloatingQuestionEvent } from './learning-question-dialog';
@@ -11,7 +13,8 @@ import './floating-learning-question.css';
 
 const contextKey = (context?: QuestionContext) => context ? context.enrollmentId + ':' + context.lessonId : '';
 
-export function FloatingLearningQuestion({ member, current, resumeLessons }: { member: string; current?: QuestionContext; resumeLessons?: ReadonlyMap<string, string> }) {
+export function FloatingLearningQuestion({ member, current, resumeLessons, externalTriggerOnly = false }: { externalTriggerOnly?: boolean; member: string; current?: QuestionContext; resumeLessons?: ReadonlyMap<string, string> }) {
+  const inRoom = useContext(CampusLessonContext);
   const pageLesson = contextKey(current);
   const [panel, setPanel] = useState<{ open: boolean; selected?: QuestionContext; pageLesson?: string }>({ open: false });
   const [contexts, setContexts] = useState<QuestionContext[]>();
@@ -22,6 +25,7 @@ export function FloatingLearningQuestion({ member, current, resumeLessons }: { m
   const composer = useRef({ dirty: false, locked: false });
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
+  const externalTrigger = useRef<HTMLElement | null>(null);
   const openRef = useRef(false);
   const storageKey = 'edu-floating-question:' + member;
   const onCurrentPage = panel.pageLesson === pageLesson;
@@ -82,8 +86,15 @@ export function FloatingLearningQuestion({ member, current, resumeLessons }: { m
   function toggle(open: boolean) {
     if (open) { setCreated(false); setNewAnswer(false); }
     save({ open, selected: target });
-    requestAnimationFrame(() => (open ? close : trigger).current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => {
+      const back = externalTrigger.current?.isConnected ? externalTrigger.current : trigger.current;
+      (open ? close.current : back)?.focus({ preventScroll: true });
+    });
   }
+  const closeRoomQuestion = useEffectEvent(() => toggle(false));
+  useEffect(() => {
+    if (inRoom && open) return holdBack(() => closeRoomQuestion());
+  }, [inRoom, open]);
   const openFor = useCallback((next?: QuestionContext) => {
     if (targetKey && next && targetKey !== contextKey(next)
       && (composer.current.locked || (composer.current.dirty && !window.confirm('작성 중인 첨부 또는 멘토 질문을 닫고 수업을 바꿀까요?')))) return;
@@ -95,7 +106,10 @@ export function FloatingLearningQuestion({ member, current, resumeLessons }: { m
   }, [save, targetKey, current]);
 
   useEffect(() => {
-    const open = (event: Event) => openFor((event as CustomEvent<QuestionContext>).detail);
+    const open = (event: Event) => {
+      if (event.target instanceof HTMLButtonElement) externalTrigger.current = event.target;
+      openFor((event as CustomEvent<QuestionContext>).detail);
+    };
     window.addEventListener(openFloatingQuestionEvent, open);
     return () => window.removeEventListener(openFloatingQuestionEvent, open);
   }, [openFor]);
@@ -110,7 +124,7 @@ export function FloatingLearningQuestion({ member, current, resumeLessons }: { m
 
   return <div className="floating-learning-question">
     {(open || selected) && <section id="floating-learning-question" role="dialog" aria-labelledby="floating-learning-question-title" hidden={!open} className="floating-learning-question-panel" onKeyDown={event => {
-      if (event.key === 'Escape' && !event.defaultPrevented) { event.stopPropagation(); toggle(false); }
+      if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); toggle(false); }
     }}>
       <header><h2 id="floating-learning-question-title">질문하기</h2><button ref={close} type="button" className="icon-btn" aria-label="닫기" onClick={() => toggle(false)}><X size={18} aria-hidden="true"/></button></header>
       <div className="floating-learning-question-body">
@@ -137,7 +151,7 @@ export function FloatingLearningQuestion({ member, current, resumeLessons }: { m
         <div className="floating-question-links"><Link href="/my/questions?view=general">결제·환불·계정은 일반 문의로</Link><Link href="/my/questions?view=mine">내 질문 모아보기</Link></div>
       </div>
     </section>}
-    {!open && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-label={newAnswer ? "질문하기 · 새 답변" : undefined} aria-expanded={open} aria-controls={open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!open)}>
+    {!open && !externalTriggerOnly && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-label={newAnswer ? "질문하기 · 새 답변" : undefined} aria-expanded={open} aria-controls={open || selected ? 'floating-learning-question' : undefined} onClick={() => { externalTrigger.current = null; toggle(!open); }}>
       <MessageCircle size={17} aria-hidden="true"/>질문하기
       {newAnswer && <span className="floating-question-unread" role="status">새 답변</span>}
     </button>}

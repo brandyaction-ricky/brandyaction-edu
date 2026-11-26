@@ -13,9 +13,9 @@ import './staff-curriculum-review.css';
 
 const CampusEntryBar = dynamic(() => import('@/features/campus/ui/entry-bar').then(module => module.CampusEntryBar));
 
-function useReviewRead<T>(url: string) {
+export function useReviewRead<T>(url: string, keepDuringRefresh = false) {
   const [attempt, retry] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: T; error?: string }>();
+  const [result, setResult] = useState<{ url: string; key: string; data?: T; error?: string }>();
   const key = `${url}:${attempt}`;
   useEffect(() => {
     if (!url) return;
@@ -23,11 +23,13 @@ function useReviewRead<T>(url: string) {
     void fetch(url, { cache: 'no-store', credentials: 'same-origin', signal: abort.signal }).then(async response => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '검수 화면을 불러오지 못했습니다.');
-      if (!abort.signal.aborted) setResult({ key, data });
-    }).catch(error => { if (!abort.signal.aborted) setResult({ key, error: error.message }); });
+      if (!abort.signal.aborted) setResult({ url, key, data });
+    }).catch(error => { if (!abort.signal.aborted) setResult({ url, key, error: error.message }); });
     return () => abort.abort();
   }, [url, key]);
-  return { ...(result?.key === key ? result : {}), retry: () => retry(n => n + 1) };
+  // Refreshing progress must not unmount unsaved answers in another form in this lesson.
+  const display = result?.key === key || (keepDuringRefresh && result?.url === url && result.data !== undefined);
+  return { ...(display ? result : {}), retry: () => retry(n => n + 1) };
 }
 export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', initialLesson = '', partner = false, campusHref, classroomCampus }: { enrollmentId?: string; initialCohort?: string; initialLesson?: string; partner?: boolean; campusHref?: string; classroomCampus?: { returnTo?: string } }) {
   const [cohort, setCohort] = useState(initialCohort);
@@ -78,7 +80,7 @@ export function StaffCurriculumReview({ enrollmentId = '', initialCohort = '', i
     </>}
   </div></div>;
 }
-function ReviewBody({ content, cohort, lesson, student, partner }: { content: ReviewContent; cohort: string; lesson: string; student: boolean; partner: boolean }) {
+export function ReviewBody({ content, cohort, lesson, student, partner }: { content: ReviewContent; cohort: string; lesson: string; student: boolean; partner: boolean }) {
   return <>
     {content.document ? canRenderLessonBlocks(content.document) ? <LessonBlockView
       document={content.document}

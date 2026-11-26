@@ -1,5 +1,6 @@
 'use client';
-import {useEffect,useId} from 'react';
+import {createContext,useEffect,useId} from 'react';
+export const CampusLessonContext = createContext(false);
 const drafts=new Map<string,{dirty:boolean;locked:boolean;scope?:string;visible?:boolean}>();
 let approvedUntil=0;
 export function campusDraftState(scope?:string,visibleOnly=false){const values=[...drafts.values()].filter(v=>(!scope||v.scope===scope)&&(!visibleOnly||v.visible!==false));return {dirty:values.some(v=>v.dirty),locked:values.some(v=>v.locked)};}
@@ -15,4 +16,4 @@ function internalLink(event:MouseEvent){
  if(state.dirty){if(!window.confirm('저장하지 않은 내용이 있습니다. 내용을 버리고 이동할까요?')){event.preventDefault();event.stopPropagation();return;}approvedUntil=Date.now()+1000;}
 }
 /** Only mounted draft flags, never text or attachments. One listener also guards Next.js links. */
-export function useCampusDraftGuard(dirty:boolean,locked:boolean,scope?:string,visible=true){const key=useId();useEffect(()=>{if(!drafts.size){window.addEventListener('beforeunload',unload);document.addEventListener('click',internalLink,true);}drafts.set(key,{dirty,locked,scope,visible});return()=>{drafts.delete(key);if(!drafts.size){window.removeEventListener('beforeunload',unload);document.removeEventListener('click',internalLink,true);}};},[key,dirty,locked,scope,visible]);}
+export function useCampusDraftGuard(dirty:boolean,locked:boolean,scope?:string,visible=true){const key=useId();useEffect(()=>{if(!dirty&&!locked)return;if(!drafts.size){window.addEventListener('beforeunload',unload);document.addEventListener('click',internalLink,true);}drafts.set(key,{dirty,locked,scope,visible});return()=>{drafts.delete(key);if(!drafts.size){window.removeEventListener('beforeunload',unload);document.removeEventListener('click',internalLink,true);}};},[key,dirty,locked,scope,visible]);}

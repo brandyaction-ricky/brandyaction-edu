@@ -119,3 +119,16 @@ body[data-office-intro="true"] .guided-example-action:after {
 body[data-office-intro="true"] .guided-example-action span {
  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
+
+/* The member study room owns its environment button in the outer toolbar. */
+body[data-study-controls=true][data-room=study] #environment-open { display: none; }
+body[data-study-controls=true][data-room=study] #status {
+  bottom: max(72px,env(safe-area-inset-bottom));
+}
+@media(max-width:650px) {
+  /* The host already reserves the footer on portrait phones. Keep the last row
+     free for touch controls and leave the centre for projected room signs. */
+  body[data-study-controls=true][data-room=study] :is(#status,.tour-pad) {
+    bottom: max(8px,env(safe-area-inset-bottom));
+  }
+}

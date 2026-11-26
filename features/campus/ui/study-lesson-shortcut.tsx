@@ -18,14 +18,14 @@ export function StudyLessonShortcut({snapshot,onOpen}: {
   const enrollment = snapshot.selectedEnrollmentId || '';
   const scope = snapshot.scopes.find(s => s.enrollmentId === enrollment);
   const blocks = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
-  const gates = useLessonProgression(enrollment, blocks && snapshot.lessons.length > 0, snapshot.fetchedAt);
+  const gates = useLessonProgression(enrollment, blocks && !scope?.externalPartner && snapshot.lessons.length > 0, snapshot.fetchedAt);
   const lessons = snapshot.lessons;
   const firstUnfinished = lessons.findIndex(l => !l.completed);
-  const unlocked = lessons.filter((lesson, index) => scope?.graduate || (blocks
-    ? gates.lessons?.some(g => g.lessonId === lesson.id && g.isUnlocked)
-    : lesson.completed || firstUnfinished === index));
+  const unlocked = lessons.filter((lesson, index) => scope?.graduate || scope?.externalPartner || lesson.staffPreview || (blocks
+    ? !lesson.locked && gates.lessons?.some(g => g.lessonId === lesson.id && g.isUnlocked)
+    : lesson.locked !== true && (lesson.locked === false || lesson.completed || firstUnfinished === index)));
   const lesson = unlocked.find(l => !l.completed || (!scope?.graduate && pendingPractice(l))) ?? unlocked.at(-1);
-  const mission = lesson && !scope?.graduate ? pendingPractice(lesson) : undefined;
+  const mission = lesson && !scope?.graduate && !scope?.externalPartner && !lesson.staffPreview ? pendingPractice(lesson) : undefined;
 
   return <section className={styles.card} aria-label="이어서 할 수업·실습">
     <h2>이어서 할 수업·실습</h2>

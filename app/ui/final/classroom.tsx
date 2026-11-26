@@ -47,6 +47,7 @@ export function Classroom({
   loading,
   missionId,
   progression: sharedProgression,
+  room,
   blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   path: string[];
@@ -57,6 +58,7 @@ export function Classroom({
   missionId: string | null;
   blockLearningEnabled?: boolean;
   progression?: ReturnType<typeof useLessonProgression>;
+  room?: { day: number; question: ReactNode; navigate: (lesson: string, mission?: string) => void; completed: () => void };
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
@@ -91,9 +93,9 @@ export function Classroom({
               : "수강 권한을 확인할 수 없습니다."
           }
         />
-        <Link className="btn mt24" href="/my/classes">
+        {!room && <Link className="btn mt24" href="/my/classes">
           내 클래스 보기
-        </Link>
+        </Link>}
       </div>
     );
   const course = (data.courses || []).find(
@@ -110,7 +112,7 @@ export function Classroom({
   const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? (allLessons.some(item => item.id === id) ? curriculumDay(data, allLessons.find(item => item.id === id)) : fallback);
   const group = (gate?: LessonGate) => gate?.ongoing ? 'ongoing' : gate?.track;
   const hasTracks = progression.lessons?.some(item => group(item) != null);
-  const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${lessonDay(id, fallback)}`;
+  const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${room && id === lessonPathId ? room.day : lessonDay(id, fallback)}`;
   const lessons = allLessons.filter(item => !hasTracks || !selectedGate || progression.lessons?.some(gate => gate.lessonId === item.id && group(gate) === group(selectedGate)))
       .sort((a, b) => selectedGate?.track ? (progression.lessons?.find(item => item.lessonId === a.id)?.dayNumber || 0) - (progression.lessons?.find(item => item.lessonId === b.id)?.dayNumber || 0) : 0),
     lesson = lessons.find((l) => l.id === path[2]) || lessons[0],
@@ -131,7 +133,7 @@ export function Classroom({
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
-    entry = entries.find((x) => x.mission.id === missionId) || entries[0];
+    entry = entries.find((x) => x.mission.id === missionId) || (room && missionId ? undefined : entries[0]);
   const lessonHref =
     "/learn/" + enrollment.id + (lesson ? "/" + lesson.id : "");
   const lessonStartHref = (id: string) => `/learn/${enrollment.id}/${id}#top`;
@@ -160,10 +162,11 @@ export function Classroom({
       )}
     </button>
   ) : null;
+  if (room && (!lesson || lesson.id !== lessonPathId || !canOpen(lesson.id))) return <p role="status">{progression.error || selectedGate?.reason || (blockLearningEnabled && !progression.lessons ? "수업 개방 상태를 확인하고 있어요." : "이 수업은 아직 열 수 없습니다.")}{progression.error && <button className="btn" onClick={progression.reload}>다시 확인</button>}</p>;
   if (path[3] === "mission")
     return (
-      <div className="account-bg">
-        <div className="wrap pb64">
+      <div className={room ? undefined : "account-bg"}>
+        <div className={room ? undefined : "wrap pb64"}>
           <Heading
             title="미션 제출 · 피드백"
             description={[
@@ -174,12 +177,13 @@ export function Classroom({
               .filter(Boolean)
               .join(" · ")}
           />
-          <div className="breadcrumbs">
+          {!room && <div className="breadcrumbs">
             <Link href="/my">마이페이지</Link>
             <span>/</span>
             <Link href="/my/missions">내 미션</Link>
             <span>/ 미션 상세</span>
-          </div>
+          </div>}
+          {room?.question}
           {entry ? (
             <div className="mission-guide">
               <div className="stack">
@@ -197,10 +201,10 @@ export function Classroom({
                   send={send}
                 /> : <section className="panel pad mt32"><h2>{t(entry.mission, 'title')}</h2><p className="reading-copy mt16">{t(entry.mission, 'instructions')}</p><p className="meta mt16">졸업생 열람 모드 · 새 미션 제출은 종료되었습니다.</p>{entry.submission && <div className="mt24"><h3>마지막 제출 내용</h3>{Boolean((entry.submission.response as Record<string, unknown> | null)?.text) && <p className="reading-copy">{String((entry.submission.response as Record<string, unknown>).text)}</p>}{safeUrl((entry.submission.response as Record<string, unknown> | null)?.url) && <a className="link" href={safeUrl((entry.submission.response as Record<string, unknown>).url)} target="_blank" rel="noreferrer">제출한 결과물 링크</a>}{Boolean(entry.submission.reviewer_feedback) && <div className="notice mt16"><b>운영자 피드백</b><p>{t(entry.submission, 'reviewer_feedback')}</p></div>}</div>}</section>}
                 {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && lesson && <LessonQuestions enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")}/>}
-                <Link className="link" href={lessonHref}>
+                {room ? <button type="button" className="btn" onClick={() => room.navigate(lesson.id)}>수업 본문으로</button> : <Link className="link" href={lessonHref}>
                   <ArrowLeft />
                   학습실로
-                </Link>
+                </Link>}
               </div>
               <aside className="mission-meta">
                 <h3>미션 안내</h3>
@@ -264,10 +268,10 @@ export function Classroom({
       </div>
     );
   return (
-    <div className="learning-bg">
-      <div className="wrap">
+    <div className={room ? undefined : "learning-bg"}>
+      <div className={room ? undefined : "wrap"}>
         {graduate && <details className="graduate-learning-notice"><summary>졸업생 모드 · 학습·질문 이용 안내</summary><p>최신 공개 커리큘럼을 보고 질문할 수 있습니다. {blockLearningEnabled && '개인 실습 입력·저장과 프롬프트 생성도 계속 이용할 수 있습니다. '}공식 미션 제출과 멘토 검수는 종료되었습니다.</p></details>}
-        <div className="learning-top">
+        {!room && <><div className="learning-top">
           <div>
             <h1>{t(course, "title")}</h1>
             <p className="meta">
@@ -289,9 +293,9 @@ export function Classroom({
           학습 목록
           <ChevronDown />
         </button>
-        <a className="skip" href="#classroom-lesson-body" onClick={() => setNavOpen(false)}>학습 목차 건너뛰고 수업 본문으로 이동</a>
-        <div className="learning-layout">
-          <aside
+        <a className="skip" href="#classroom-lesson-body" onClick={() => setNavOpen(false)}>학습 목차 건너뛰고 수업 본문으로 이동</a></>}
+        <div className={room ? undefined : "learning-layout"}>
+          {!room && <aside
             ref={navRef}
             id="classroom-lesson-list"
             className={"learning-nav " + (navOpen ? "open" : "")}
@@ -333,11 +337,12 @@ export function Classroom({
                   ))}
               </section>
             ))}
-          </aside>
+          </aside>}
           <div id="classroom-lesson-body" className="learning-content" role="region" aria-label="수업 본문" tabIndex={-1}>
-            <LearningProgress complete={lessons.filter(l => completedIds.has(l.id)).length} total={lessons.length} label="현재 공개된 학습 진도"/>
+            {!room && <LearningProgress complete={lessons.filter(l => completedIds.has(l.id)).length} total={lessons.length} label="현재 공개된 학습 진도"/>}
             {lesson && canOpen(lesson.id) ? (
               <>
+                {room?.question}
                 <header className="lesson-header">
                   <div className="flex gap8">
                     <Badge>{lessonLabel(lesson.id, num(lesson, "day_number"))}</Badge>
@@ -346,12 +351,12 @@ export function Classroom({
                     </Badge>
                     <span className="meta">{t(lesson, "duration_label")}</span>
                   </div>
-                  <h1>{t(lesson, "title")}</h1>
+                  {!room && <h1>{t(lesson, "title")}</h1>}
                   <p>{t(lesson, "description")}</p>
                   {done && Boolean(complete.find(progress => progress.lesson_id === lesson.id)?.completed_at) && <p className="lesson-completed-at">완료한 날 · {date(complete.find(progress => progress.lesson_id === lesson.id)?.completed_at)}</p>}
-                  <a className="link" href="#lesson-questions">이 수업에 질문 남기기</a>
+                  {!room && <a className="link" href="#lesson-questions">이 수업에 질문 남기기</a>}
                 </header>
-                <LessonContent enabled={blockLearningEnabled} readOnly={graduate} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
+                <LessonContent inRoom={!!room} enabled={blockLearningEnabled} readOnly={graduate} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); room?.completed(); } }}>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
@@ -406,20 +411,21 @@ export function Classroom({
                         <Badge color={x.status === "approved" ? "green" : ""}>
                           {x.status === "draft" ? "제출 전" : labels[x.status]}
                         </Badge>
-                        {(!graduate || x.submission) && <Link className="btn primary" href={x.href}>
+                        {(!graduate || x.submission) && (room ? <button type="button" className="btn primary" onClick={() => room.navigate(lesson.id, x.mission.id)}>{x.status === "draft" ? "미션 작성하기" : "제출·피드백 확인"}</button> : <Link className="btn primary" href={x.href}>
                           {x.status === "draft"
                             ? "미션 작성하기"
                             : "제출·피드백 확인"}
                           <ArrowRight />
-                        </Link>}
+                        </Link>)}
                       </div>
                     </section>
                   ))}
                 </section>}
                 <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
+                {room && <DiagnosisEntry key={enrollment.id} courseId={t(enrollment, 'course_id')}/>}
                 <section className="lesson-review-invite" aria-label="수강 후기 작성"><div><b>이번 수업은 어떠셨나요?</b><p>수강 경험을 다른 분들과 나눠 주세요.</p></div><CourseReviewButton courseId={String(enrollment.course_id)} courseTitle={t(course, 'title')}/></section>
                 <div className="lesson-bottom">
-                  {current > 0 ? (
+                  {current > 0 ? room ? <button className="btn" disabled={!canOpen(lessons[current-1].id)} onClick={() => room.navigate(lessons[current-1].id)}><ArrowLeft/> 이전 학습</button> : (
                     <Link
                       className="btn"
                       href={lessonStartHref(lessons[current - 1].id)}
@@ -431,7 +437,7 @@ export function Classroom({
                     <span />
                   )}
                   {!blockLearningEnabled && legacyCompletion}
-                  {current < lessons.length - 1 && ((graduate || done || selectedGate?.ongoing) && canOpen(lessons[current + 1].id) ? (
+                  {current < lessons.length - 1 && ((graduate || done || selectedGate?.ongoing) && canOpen(lessons[current + 1].id) ? room ? <button className="btn" onClick={() => room.navigate(lessons[current+1].id)}>다음 학습 · {t(lessons[current+1], "title")} <ArrowRight/></button> : (
                     <Link
                       className="btn"
                       href={lessonStartHref(lessons[current + 1].id)}
@@ -455,6 +461,6 @@ export function Classroom({
   );
 }
 
-function LessonContent({ enabled, readOnly, lessonId, enrollmentId, children, legacyCompletion, onCompleted }: { enabled: boolean; readOnly: boolean; lessonId: string; enrollmentId: string; children: ReactNode; legacyCompletion: ReactNode; onCompleted: () => void }) {
-  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} fallback={<>{children}{legacyCompletion}</>} onCompleted={onCompleted} /> : <>{children}</>;
+function LessonContent({ inRoom, enabled, readOnly, lessonId, enrollmentId, children, legacyCompletion, onCompleted }: { inRoom: boolean; enabled: boolean; readOnly: boolean; lessonId: string; enrollmentId: string; children: ReactNode; legacyCompletion: ReactNode; onCompleted: () => void }) {
+  return enabled ? <LessonBlockSession inRoom={inRoom} key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} fallback={<>{children}{legacyCompletion}</>} onCompleted={onCompleted} /> : <>{children}</>;
 }

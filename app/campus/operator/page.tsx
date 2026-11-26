@@ -1,4 +1,3 @@
-import {getOperatorUser} from '@/lib/operator-permissions';
 import {readWebinar} from '@/features/campus/webinar/server';
 import {readWelcome} from '@/features/campus/welcome/server';
 import {notFound} from 'next/navigation';
@@ -17,6 +16,5 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  const event=typeof q.event==='string'?await readWebinar(q.event):null;
  const cohortId=typeof q.cohort==='string'?q.cohort:event?.cohortId;
  const welcome=await readWelcome(cohortId);
- const studyPreview=!!await getOperatorUser('products',user);
- return <FourSpacesPreview welcome={welcome} review={{room,studyPreview,cohortId}} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'운영자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/admin',questions:'/admin'},launchEligibility:null}}/>;
+ return <FourSpacesPreview welcome={welcome} review={{room,cohortId}} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'운영자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/admin',questions:'/admin'},launchEligibility:null}}/>;
 }

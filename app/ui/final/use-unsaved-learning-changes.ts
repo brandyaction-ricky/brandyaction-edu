@@ -1,9 +1,12 @@
 "use client";
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
+import { CampusLessonContext, useCampusDraftGuard } from '@/features/campus/ui/draft-guard';
 const checkedNavigation = new WeakSet<Event>();
-export function useUnsavedLearningChanges(dirty: boolean) {
+export function useUnsavedLearningChanges(dirty: boolean, saving = false) {
+  const inRoom = useContext(CampusLessonContext);
+  useCampusDraftGuard(inRoom && dirty, inRoom && saving, 'campus-lesson');
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty || inRoom) return;
     const unload = (event: BeforeUnloadEvent) => {event.preventDefault();event.returnValue='';};
     const navigate = (event: MouseEvent) => {
       if (event.defaultPrevented || checkedNavigation.has(event)) return;
@@ -20,5 +23,5 @@ export function useUnsavedLearningChanges(dirty: boolean) {
     };
     window.addEventListener('beforeunload',unload); document.addEventListener('click',navigate,true);
     return ()=>{window.removeEventListener('beforeunload',unload);document.removeEventListener('click',navigate,true);};
-  },[dirty]);
+  },[dirty,inRoom]);
 }

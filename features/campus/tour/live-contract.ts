@@ -15,7 +15,6 @@ export type TourLiveConnection={
  avatar:TourAvatar|null;
  level:number|null;
  saveAvatar:(value:TourAvatar)=>Promise<TourAvatar>;
- onOpen:(lessonId:string,missionId?:string)=>void;
  onRefresh:()=>void;
  onSelect:(enrollmentId:string)=>void;
 };

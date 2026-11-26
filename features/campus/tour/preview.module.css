@@ -153,3 +153,127 @@ p.loading{pointer-events:none}
 .mapGroup{display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;font-size:15px;color:#18324f;letter-spacing:-.02em}.mapGroup:first-of-type{margin-top:4px}.mapGroup small{font-size:12px;font-weight:500;color:#64788d}
 .eventGrid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important}.eventGrid .miniature{height:84px}.eventGrid .destinationBody{padding:12px 14px}.eventGrid .destinationBody h3{font-size:15px}.eventGrid .destinationBody p{display:none}.eventGrid .miniFloor{bottom:6px;height:60px}.eventGrid .miniBack{top:12px;height:30px}.eventGrid .miniDesk{top:50px}.eventGrid .miniDesk2{top:40px}
 @media(max-width:650px){.eventGrid{grid-template-columns:1fr!important}.eventGrid .miniature{display:none}}
+
+/* Keep the interactive floor clear between the lesson shelf and camera controls. */
+.root[data-shared-study] .top {
+  gap: 8px;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+}
+.root[data-shared-study] .brand {
+  flex: 0 1 auto;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+.root[data-shared-study] .brand small { display: none; }
+.root[data-shared-study] .brand strong { font-size: 14px; }
+.root[data-shared-study] .miniFocus {
+  top: calc(max(12px, env(safe-area-inset-top)) + 58px);
+  right: max(12px, env(safe-area-inset-right));
+  left: max(12px, env(safe-area-inset-left));
+  width: auto;
+  max-width: 368px;
+}
+.studyShelf {
+  width: 100%;
+  border: 1px solid #445c73;
+  border-radius: 12px;
+  background: #0e2033f7;
+  box-shadow: 0 3px 12px #020b153b;
+}
+.studyShelf[hidden] { display: none; }
+.studyShelf > section + div:not(:empty) { border-top: 1px solid #3b5065; }
+.studyShelf section button { font-size: 13px; }
+.studyShelf .loading { color: #dae6f1; }
+.root[data-shared-study] .miniFocus > aside { width: 100%; margin-top: 6px; }
+.root[data-shared-study] .bottom {
+  display: flex;
+  justify-content: center;
+  align-items: end;
+}
+.root[data-shared-study] .bottomActions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  background: #0e2033f7;
+  border: 1px solid #445c73;
+  border-radius: 12px;
+}
+.root[data-shared-study] .bottomActions button {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 12px;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #eef6ff;
+  font-size: 13px;
+  touch-action: manipulation;
+}
+.root[data-shared-study] .bottomActions button:is(:hover,:focus-visible,[aria-expanded=true]) { background: #293f57; }
+.root[data-shared-study] .activity { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 60px); }
+@media(max-width: 650px) {
+  .root[data-shared-study] .bottomActions button { padding: 6px 9px; }
+  .root[data-shared-study] .brand { padding: 7px 9px; }
+}
+@media(max-width: 380px) {
+  .root[data-shared-study] .bottomActions button { flex-direction: column; gap: 2px; min-height: 46px; padding: 4px 8px; font-size: 12px; }
+}
+@media(max-height: 500px) and (min-width: 500px) {
+  .root[data-shared-study] .miniFocus { max-width: min(290px, 36vw); }
+  .root[data-shared-study] .bottom { justify-content: flex-end; }
+}
+
+/* The narrow study scene has its own canvas between the controls. Its hotspots
+   cannot fall behind the current lesson when its title wraps or a roster opens. */
+@media(max-width: 650px) and (min-height: 500px) {
+  .root[data-shared-study][data-editing=false]:not([data-flat]) {
+    display: grid;
+    grid-template-columns: minmax(0,1fr);
+    grid-template-rows: auto auto minmax(0,1fr) auto;
+  }
+  .root[data-shared-study][data-editing=false]:not([data-flat]) :is(.top,.miniFocus,.bottom) {
+    position: relative;
+    inset: auto;
+  }
+  .root[data-shared-study][data-editing=false]:not([data-flat]) .top {
+    grid-area: 1 / 1;
+    margin: max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));
+  }
+  .root[data-shared-study][data-editing=false]:not([data-flat]) .miniFocus {
+    grid-area: 2 / 1;
+    justify-self: start;
+    width: calc(100% - max(12px,env(safe-area-inset-left)) - max(12px,env(safe-area-inset-right)));
+    margin: 6px 0 0 max(12px,env(safe-area-inset-left));
+  }
+  .root[data-shared-study][data-editing=false]:not([data-flat]) .scene {
+    grid-area: 3 / 1;
+    position: relative;
+    inset: auto;
+    z-index: 0;
+    min-height: 0;
+  }
+  .root[data-shared-study][data-editing=false]:not([data-flat]) .bottom {
+    grid-area: 4 / 1;
+    padding: 4px max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+  }
+}
+@media(max-width: 650px) {
+  .root[data-shared-study] .bottomActions button {
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 9px;
+    font-size: 12px;
+  }
+}
+@media(max-width:380px) {
+  .root[data-shared-study] .brand { flex-shrink: 0; padding-inline: 6px; }
+  .root[data-shared-study] .brand strong { font-size: 13px; }
+  .root[data-shared-study] .topButtons .exitButton { min-width: 60px; padding-inline: 6px; }
+  .root[data-shared-study] .topButtons .primary { padding-inline: 7px; }
+}

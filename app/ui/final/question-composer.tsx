@@ -38,7 +38,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [error, setError] = useState(''), [contextError, setContextError] = useState(''), [contextNote, setContextNote] = useState(''), [contextVersion, setContextVersion] = useState(0);
   const gate = useRef(false), retry = useRef<Record<string, unknown> | null>(null), imagePicker = useRef<QuestionImagePickerHandle>(null), touchedContext = useRef(Boolean(initialContext || order));
   const locked = busy || uncertain, imagesEnabled = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
-  useUnsavedLearningChanges(Boolean(content || title || image.draft) || busy || uncertain);
+  useUnsavedLearningChanges(Boolean(content || title || image.draft) || busy || uncertain, busy || image.busy);
   useEffect(() => { onStateChange?.({ dirty: Boolean(content || title || image.draft), locked: busy || uncertain || image.busy }); }, [content, title, image.draft, image.busy, busy, uncertain, onStateChange]);
   useEffect(() => {
     const abort = new AbortController(); let alive = true;

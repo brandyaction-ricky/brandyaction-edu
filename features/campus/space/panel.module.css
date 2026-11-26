@@ -48,34 +48,53 @@
 .spatial .fallbackGuide{position:absolute;bottom:20px;right:20px;z-index:15;min-height:44px;background:#18334b;color:#f0f7ff;border-color:#5a7b97}
 
 .studyEntry {
-  box-sizing:border-box;
-  width:min(300px,calc(100vw - 32px));
-  padding:12px 14px;
-  margin-bottom:6px;
-  border:1px solid #cad7e3;
-  border-radius:14px;
-  background:#fff;
-  color:#193552;
-  box-shadow:0 3px 14px #06172826;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0 10px;
+  color: #f2f7ff;
 }
-.studyEntry header {display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.studyEntry h2 {margin:0;font-size:15px;line-height:1.45}
-.studyEntry header span,.studyEntry p {font-size:12px;color:#526981}
-.studyEntry p {margin:5px 0 8px}
-.studyEntry ul {margin:7px 0;padding:0;list-style:none;max-height:min(24dvh,12rem);overflow:auto;border-block:1px solid #e0e7ee}
-.studyEntry li {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;min-height:34px;padding:4px 0}
-.studyEntry li+li {border-top:1px solid #edf1f4}
-.rosterName {grid-column:1;font-size:13px;font-weight:600;overflow-wrap:anywhere}
-.rosterFocus {display:contents}
-.rosterFocus>span:first-child {grid-column:1;grid-row:2;font-size:12px;color:#415e75}
-.rosterFocus time {font-variant-numeric:tabular-nums}
-.rosterFocus>button,.rosterFocus>span:last-child {grid-column:2;grid-row:1 / span 2;align-self:center}
-.rosterFocus>span:last-child {font-size:12px;font-weight:600;color:#246351}
-.studyEntry button {min-height:40px;padding:6px 12px;border:1px solid #214e79;border-radius:8px;background:#214e79;color:white;cursor:pointer;font-size:13px;font-weight:600}
-.studyEntry button:disabled {opacity:.6}
-.studyEntry .rosterFocus button {background:#f4f8fc;border-color:#b8cede;color:#214e79}
-.studyEntry button:focus-visible {outline:2px solid #2770aa;outline-offset:2px}
-@media(max-width:650px){.studyEntry{width:calc(100vw - 24px)}}
+.studyEntry h2 { margin: 4px 0; font-size: 13px; }
+.studyEntry p { margin: 4px 0; font-size: 12px; color: #d1deed; }
+.studyEntry > div { min-width: 0; }
+.studyRoster { min-width: 0; flex: 1; }
+.studyRoster summary {
+  display: list-item;
+  width: fit-content;
+  min-height: 44px;
+  padding: 12px 2px;
+  line-height: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #d4e2ee;
+}
+.studyRoster summary strong { margin-left: 4px; color: #fff; }
+.studyRoster ul { margin: 0 0 8px; padding: 0; max-height: min(20dvh,10rem); overflow: auto; list-style: none; }
+.studyRoster li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 6px; padding: 6px 0; align-items: center; border-top: 1px solid #42556a; }
+.rosterName { grid-column: 1; font-size: 13px; overflow-wrap: anywhere; }
+.rosterFocus { display: contents; }
+.rosterFocus > span:first-child { grid-column: 1; grid-row: 2; font-size: 12px; color: #cbdaea; }
+.rosterFocus time { font-variant-numeric: tabular-nums; }
+.rosterFocus > button,.rosterFocus > span:last-child { grid-column: 2; grid-row: 1 / span 2; }
+.rosterFocus > span:last-child { color: #97e8c9; font-size: 12px; }
+.studyEntry button {
+  flex-shrink: 0;
+  min-height: 44px;
+  border: 0;
+  padding: 7px 4px;
+  background: transparent;
+  color: #d4eaff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+  cursor: pointer;
+}
+.studyEntry button:disabled { opacity: .65; }
+.studyEntry :is(button,summary):focus-visible { outline: 2px solid #97c9ff; outline-offset: -2px; border-radius: 5px; }
 .journalForm{display:grid;gap:4px;margin:14px 0 4px;padding:14px;border:1px solid #cad7e3;border-radius:12px;background:#fff;text-align:left}
 .journalForm h4{margin:0;font-size:15px;line-height:1.45}
 .journalForm>p{margin:2px 0 4px;font-size:12px;line-height:1.6;color:#526981}
@@ -86,15 +105,6 @@
 .toolStatus .caption,.toolStatus .demo{margin:0;font-size:13px}
 .toolStatus .controls{display:flex;margin:0;gap:10px;justify-content:flex-end;font-size:13px}
 .toolStatus .controls>button{flex:none}
-
-/* Phone: the entry card takes one row so the room and its signs stay visible; the names are in 동료와 대화. */
-@media(max-width:650px){
-.studyEntry{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:10px 12px}
-.studyEntry header{grid-column:1;justify-content:flex-start}
-.studyEntry ul{display:none}
-.studyEntry p{grid-column:1;margin:2px 0 0}
-.studyEntry>button{grid-column:2;grid-row:1 / span 2}
-}
 
 .presenceNote{flex:1 1 200px;min-width:0;text-align:left}
 

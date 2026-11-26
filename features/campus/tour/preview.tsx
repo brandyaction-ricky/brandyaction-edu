@@ -20,7 +20,7 @@ import {LibraryScreen} from '../webinar/library-screen';
 import type {CampusResource} from '../webinar/resources';
 import {ResourceLibrary} from '../webinar/resource-library';
 import {lazy,Suspense,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
-import {Map,LockKeyhole,ArrowUpRight,Maximize,Minimize,Orbit,DoorOpen,Users} from 'lucide-react';
+import {SlidersHorizontal,Scan,Eye,List,Map,LockKeyhole,ArrowUpRight,Maximize,Minimize,Orbit,DoorOpen,Users} from 'lucide-react';
 import type {TourLiveConnection} from './live-contract';
 import type {CampusSnapshot} from '../contracts';
 import type {CampusAdminSnapshot} from '../admin-metrics';
@@ -33,6 +33,7 @@ const FeaturePanel=lazy(()=>import('./feature-panels'));
 const SpaceTools=lazy(()=>import('../space/panel').then(m=>({default:m.SpacePanel})));
 
 import {LessonTaskPanel} from '../ui/lesson-task-panel';
+const OperatorRoomCurriculum=lazy(()=>import('../ui/room-classroom').then(module=>({default:module.OperatorRoomCurriculum})));
 import {TOUR_AVATAR_KEY,readTourAvatar,tourAvatar} from './appearance';
 import {CampusWindow} from '../ui/campus-window';
 import {requestedRoom} from '../ui/navigation';
@@ -49,7 +50,7 @@ const STORAGE='moonshot-four-spaces-preview-v1';
 function readProgress(key=STORAGE):Progress{try{const p=JSON.parse(localStorage.getItem(key)||'null');if(p&&typeof p.video==='boolean'&&Array.isArray(p.quiz)&&p.quiz.length<=20&&p.quiz.every((v:unknown)=>v===null||typeof v==='boolean')&&Array.isArray(p.level)&&p.level.length<=12&&p.level.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=-1&&Number(v)<3))return p;}catch{}return emptyProgress();}
 export type TourVisitor={content?:CampusContent;analyticsScope?:string;presenceId?:string;devPresence?:boolean;qaCrowd?:boolean;ambientCount?:number;operatorReview?:boolean;operatorEvent?:string;title:string;renderGate:(room:TourRoom)=>ReactNode;renderTool:(tool:string,onPlay?:(item:CampusResource)=>void)=>ReactNode;onEnter:()=>void;onActivity:(tool:string)=>void};
 type OfficeDeskJob = {id:string; name:string; jobId:string; status:'running'|'review'};
-export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,welcome}:{welcome?:{settings:WelcomeSettings;resources:CampusResource[];content?:CampusContent};review?:{room:TourRoom;role?:'waiting'|'student';studyPreview?:boolean;cohortId?:string;lessonContent?:ReactNode;returnHref?:string};snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor}){
+export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,welcome}:{welcome?:{settings:WelcomeSettings;resources:CampusResource[];content?:CampusContent};review?:{room:TourRoom;role?:'waiting'|'student';cohortId?:string;lessonContent?:ReactNode;returnHref?:string};snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor}){
  const welcomeSettings=welcome?.settings||live?.welcomeSettings||DEFAULT_WELCOME;
  const assessment=welcomeSettings.assessment||DEFAULT_ASSESSMENT;
  const currentAssessmentKey=welcomeAssessmentKey(assessment);
@@ -76,6 +77,13 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const initialRoom = !visitor && requestedStart && requestedStart !== 'welcome' ? requestedStart : defaultRoom;
  const [role,setRole]=useState<TourRole>(visitor?'guest':review?(review.role||'admin'):live?.role||'student'),[room,setRoom]=useState<TourRoom>(initialRoom),[mapOpen,setMapOpen]=useState(!visitor&&!review&&!live),[tool,setTool]=useState(review?.lessonContent ? 'learning' : ''),[gate,setGate]=useState<TourRoom|null>(null),[ready,setReady]=useState(false),[failed,setFailed]=useState(false),[notice,setNotice]=useState(''),[progress,setProgress]=useState<Progress>(emptyProgress),[storageReady,setStorageReady]=useState(false),[editing,setEditing]=useState(false),[camera,setCamera]=useState(visitor?'third':'overall'),[activityMenu,setActivityMenu]=useState(false);
  const [studyCardHost,setStudyCardHost]=useState<HTMLDivElement|null>(null);
+ const environmentTrigger = useRef<HTMLButtonElement|null>(null);
+ useEffect(() => {
+  if (!editing && environmentTrigger.current) {
+   environmentTrigger.current.focus({preventScroll:true});
+   environmentTrigger.current = null;
+  }
+ }, [editing]);
  const [enteredStudy,setEnteredStudy]=useState(false);
  const firstDeskRead=useRef(false);
  const [deskFrameVisible,setDeskFrameVisible]=useState(false);
@@ -128,6 +136,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  useEffect(()=>{const change=()=>setFullscreen(document.fullscreenElement===shell.current);document.addEventListener('fullscreenchange',change);return()=>document.removeEventListener('fullscreenchange',change);},[]);
  const [selectedLesson,setSelectedLesson]=useState('');
  const [requestedLesson,setRequestedLesson]=useState('');
+ const [requestedMission,setRequestedMission]=useState<string>();
  const frame=useRef<HTMLIFrameElement>(null),shell=useRef<HTMLDivElement>(null),token=useRef(''),state=useRef({role,room,tool,mapOpen,gate,camera});
  useEffect(()=>{
   const node=shell.current;if(!node)return;
@@ -171,6 +180,13 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  function mayLeave(all=false){if(welcomeSaving){setNotice('준비 기록을 저장하고 있어요. 잠시 후 이동해 주세요.');return false;}const g=campusDraftState(undefined,!all);const locked=campusDraftState().locked;if(locked){setNotice('저장 중이에요. 마친 뒤 이동해 주세요.');return false;}return (!all&&(['ai','office'].includes(tool)||!!spacePane(tool)))||!g.dirty||window.confirm('저장하지 않은 내용이 있습니다. 내용을 버리고 이동할까요?');}
  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),6000);return()=>clearTimeout(timer);},[notice]);
  function closeTask(){if(!mayLeave())return;setTool('');setPrevious('');}
+ function rememberStudentRoom(id:TourRoom){
+  if(!live || role!=='student')return;
+  const url=new URL(window.location.href);
+  if(url.searchParams.get('room')===id)return;
+  url.searchParams.set('room',id);
+  history.replaceState(history.state,'',url);
+ }
  function canVisit(id:TourRoom){return canEnter(role,id)||visitor?.operatorReview===true;}
  async function exitCampus(){if(!mayLeave(true))return;if(document.fullscreenElement)try{await document.exitFullscreen();}catch{}window.location.assign(review?.returnHref || (visitor?'/':review&&review.role!=='waiting'?'/admin':'/my/classes'));}
  // A document navigation releases the WebGL scene/presence and rechecks operator auth.
@@ -178,17 +194,18 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  function enter(id:TourRoom){if(id==='welcome')return;post('meetup-start');if(!mayLeave())return;if(visitorRef.current?.operatorReview&&!['live','library'].includes(id)){const q=new URLSearchParams({room:id});if(visitorRef.current.operatorEvent)q.set('event',visitorRef.current.operatorEvent);window.location.assign('/campus/operator?'+q);return;}if(!canEnter(role,id)){setMapOpen(false);setActivityMenu(false);setGate(id);return;}let first=false;if(id==='office'&&live&&role==='student'){try{const key='campus:office-guide:v1:'+snapshot.viewer.id;first=!localStorage.getItem(key);if(first)localStorage.setItem(key,'seen');}catch{}}
  setRoom(id);setMapOpen(false);setGate(null);setTool(first?'office-guide':'');setPrevious('');setActivityMenu(false);setNotice('');post('room',{id});
  // 들어온 공간을 주소에 적어 둔다. 새로고침하거나 수업에서 돌아올 때 지도 대신 이 공간이 열린다.
- if(live&&role==='student'){try{const u=new URL(location.href);u.searchParams.set('room',id);history.replaceState(history.state,'',u);}catch{}}}
+ rememberStudentRoom(id);}
  function selectTask(id:string){const t=managedTask(id);if(!t||!taskOpen(id,live?.modules)||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;
   // 조명·배경음은 버튼 하나뿐인 중간 화면을 거치지 않고 3D 화면의 설정 창을 바로 연다.
   if(id==='sound'&&ready&&!failed&&room===t.room){setTool('');setPrevious('');setMapOpen(false);setActivityMenu(false);setNotice('');post('environment-open');return;}
-  if(room!==t.room){setRoom(t.room);post('room',{id:t.room});}setPrevious('');if(id==='learning')setRequestedLesson('');setTool(id);visitorRef.current?.onActivity(id);if(id==='legacy-space')setReady(false);setMapOpen(false);setActivityMenu(false);setNotice('');if(id==='office')setOfficeVisited(true);if(id==='ai')setAiVisited(true);const pane=spacePane(id);if(pane){setToolsPane(pane);setToolsVisited(true);}if(id==='focus')post('sit');}
+  if(room!==t.room){setRoom(t.room);post('room',{id:t.room});rememberStudentRoom(t.room);}setPrevious('');if(id==='learning'){setRequestedLesson('');setRequestedMission(undefined);}setTool(id);visitorRef.current?.onActivity(id);if(id==='legacy-space')setReady(false);setMapOpen(false);setActivityMenu(false);setNotice('');if(id==='office')setOfficeVisited(true);if(id==='ai')setAiVisited(true);const pane=spacePane(id);if(pane){setToolsPane(pane);setToolsVisited(true);}if(id==='focus')post('sit');}
  function open(id:string){if(visibleTasks(room,role).some(t=>t.id===id)){if(id==='office')setOfficeFilter(null);selectTask(id);}}
  function openLesson(id:string,missionId?:string){if(!mayLeave(true))return;track('lesson_open',id);if(live){
-   if(!missionId && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED==='true' && canEnter(role,'study') && snapshot.lessons.some(lesson=>lesson.id===id)){
-     setRequestedLesson(id);setPrevious(tool==='learning'?'':tool);setRoom('study');post('room',{id:'study'});setTool('learning');return;
-   }
-   live.onOpen(id,missionId);return;
+   const lesson=snapshot.lessons.find(row=>row.id===id);
+   if(!canEnter(role,'study')){setGate('study');return;}
+   if(!lesson || missionId && !lesson.missions.some(item=>item.id===missionId)){setNotice('현재 공개된 수업과 과제 목록에서 확인할 수 없어요.');return;}
+   setRequestedLesson(id);setRequestedMission(missionId);setPrevious(tool==='learning'?'':tool);
+   setRoom('study');post('room',{id:'study'});rememberStudentRoom('study');setMapOpen(false);setActivityMenu(false);setTool('learning');return;
  }setPrevious(tool);setSelectedLesson(snapshot.lessons.find(l=>l.id===id)?.title||'오늘 수업');setTool('lesson');}
  function ask(value:{lessonId:string;context:string}){if(!mayLeave(true))return;setPrevious(tool);setHandoff(value);setAiVisited(true);setTool('ai');}
  // 주소에 공간이 적혀 있으면(새로고침, 수업에서 돌아옴) 지도 대신 그 공간으로 바로 들어간다.
@@ -264,8 +281,8 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const waitingForOffice=useRef(false);
  const startTourFrame=useCallback(()=>{
   setDeskFrameVisible(false);
-  post('init',{studentOffice,personalOffice:studentOffice&&desksVisible&&deskLoaded&&previousDeskView.current?JSON.parse(previousDeskView.current):null,visitor:!!visitor,devPresence:visitor?.devPresence===true||live?.publicPresence===true,qaCrowd:visitor?.qaCrowd===true,ambientCount:visitor?.ambientCount||0,operatorReview:visitor?.operatorReview===true});
- },[studentOffice,desksVisible,deskLoaded,visitor,live?.publicPresence]);
+  post('init',{studentOffice,studyControls:!!live?.studyPresence&&role==='student',personalOffice:studentOffice&&desksVisible&&deskLoaded&&previousDeskView.current?JSON.parse(previousDeskView.current):null,visitor:!!visitor,devPresence:visitor?.devPresence===true||live?.publicPresence===true,qaCrowd:visitor?.qaCrowd===true,ambientCount:visitor?.ambientCount||0,operatorReview:visitor?.operatorReview===true});
+ },[studentOffice,desksVisible,deskLoaded,visitor,live?.publicPresence,live?.studyPresence,role]);
  useEffect(()=>{
   if(sceneStarted&&waitingForOffice.current&&frame.current){
    waitingForOffice.current=false;startTourFrame();
@@ -307,20 +324,20 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  </section> : null;
  const sceneLoading=!ready&&!deskShortcuts&&!(studentOffice&&deskFrameVisible)&&!mapOpen&&tool!=='legacy-space'
   ? !failed&&<p className={styles.loading} role="status">공간과 캐릭터를 준비하고 있어요…</p> : null;
- return <div ref={shell} className={styles.root} data-room={room} data-editing={editing} data-flat={flatOffice||flatRoom?'':undefined}>
- {room==='welcome'&&accountWelcome&&(welcomeSaving>0||welcomeError)&&<div className={styles.accountSave} role={welcomeError?'alert':'status'}>{welcomeError||'준비 기록을 저장하고 있어요…'}{welcomeError&&<button onClick={()=>{if(welcomeLoaded.current){for(const command of welcomeFailed.current.values())void saveWelcome(command).catch(()=>{});}else window.location.reload();}}>다시 시도</button>}</div>}<LibraryScreen roomLabel={room==='welcome'?'개강 준비실':'자료실'} video={screenVideo} onClose={()=>{setScreenVideo(null);setTool(room==='welcome'?'video':'library:replay');}}/><header className={styles.top} data-campus-chrome><div className={styles.brand}><Orbit size={23}/><div><strong>{roomName(room)}</strong>{room==='office'&&live&&role==='student'?<button type="button" className={styles.officeHelp} aria-label="개인 사무실 이용 안내" onClick={()=>{if(mayLeave()){setTool('office-guide');setActivityMenu(false);}}}>사무실 이용 안내 →</button>:<small>{room==='library'?'누구나 꺼내 보는 무료 자료':room==='office'?'나만의 개인 공간':room==='live'?(visitor?'AI 마케팅을 배우고 실행하는 곳':'모두에게 열린 공간'):room==='welcome'?welcomeSettings.title:'함께 실행하는 수강생 공간'}</small>}</div></div><div className={styles.topButtons}><button disabled={editing} className={styles.primary} onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setActivityMenu(false);setMapOpen(true);}}><Map size={17}/>공간 이동</button><button disabled={editing} aria-label={fullscreen?'전체화면 종료':'전체화면'} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else if(shell.current?.requestFullscreen)void shell.current.requestFullscreen().catch(()=>setNotice('이 브라우저에서는 현재 화면 크기로 이용해 주세요.'));else setNotice('이 브라우저에서는 전체화면을 지원하지 않아요. 현재 화면에서 모든 기능을 이용할 수 있어요.');}}>{fullscreen?<Minimize size={18}/>:<Maximize size={18}/>}</button><button disabled={editing} className={styles.exitButton} aria-label="캠퍼스 나가기" onClick={()=>void exitCampus()}><DoorOpen size={18}/><span>나가기</span></button></div></header>
+ return <div ref={shell} className={styles.root} data-room={room} data-shared-study={sharedStudy || undefined} data-editing={editing} data-flat={flatOffice||flatRoom?'':undefined}>
+ {room==='welcome'&&accountWelcome&&(welcomeSaving>0||welcomeError)&&<div className={styles.accountSave} role={welcomeError?'alert':'status'}>{welcomeError||'준비 기록을 저장하고 있어요…'}{welcomeError&&<button onClick={()=>{if(welcomeLoaded.current){for(const command of welcomeFailed.current.values())void saveWelcome(command).catch(()=>{});}else window.location.reload();}}>다시 시도</button>}</div>}<LibraryScreen roomLabel={room==='welcome'?'개강 준비실':'자료실'} video={screenVideo} onClose={()=>{setScreenVideo(null);setTool(room==='welcome'?'video':'library:replay');}}/><header className={styles.top} data-campus-chrome><div className={styles.brand}><Orbit size={23}/><div><strong>{roomName(room)}</strong>{room==='office'&&live&&role==='student'?<button type="button" className={styles.officeHelp} aria-label="개인 사무실 이용 안내" onClick={()=>{if(mayLeave()){setTool('office-guide');setActivityMenu(false);}}}>사무실 이용 안내 →</button>:<small>{room==='library'?'누구나 꺼내 보는 무료 자료':room==='office'?'나만의 개인 공간':room==='live'?(visitor?'AI 마케팅을 배우고 실행하는 곳':'모두에게 열린 공간'):room==='welcome'?welcomeSettings.title:'함께 실행하는 수강생 공간'}</small>}</div></div><div className={styles.topButtons}><button disabled={editing} className={styles.primary} onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setActivityMenu(false);setMapOpen(true);}}><Map size={17}/>공간 이동</button><button disabled={editing} aria-label={fullscreen?'전체화면 종료':'전체화면'} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else if(shell.current?.requestFullscreen)void shell.current.requestFullscreen().catch(()=>setNotice('이 브라우저에서는 현재 화면 크기로 이용해 주세요.'));else setNotice('이 브라우저에서는 전체화면을 지원하지 않아요. 현재 화면에서 모든 기능을 이용할 수 있어요.');}}>{fullscreen?<Minimize size={18}/>:<Maximize size={18}/>}</button><button disabled={editing} className={styles.exitButton} aria-label="캠퍼스 나가기" title={live?'내 클래스로 나가기':undefined} onClick={()=>void exitCampus()}><DoorOpen size={18}/><span>나가기</span></button></div></header>
  <div className={styles.scene}>{bridge&&(sceneStarted||studentOffice&&!mapOpen&&!tool)&&!deferSceneForChat&&tool!=='legacy-space'&&<iframe title="문샷 캠퍼스 3D 미리보기" ref={frame} src={'/campus/world/tour/index.html'+(process.env.NEXT_PUBLIC_CAMPUS_LOCAL_MEETUP==='true'&&typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('meet')==='1'?'?previewMeetup=1'+(new URLSearchParams(window.location.search).get('qaChat')==='1'?'&qaChat=1':''):'')+'#bridge='+bridge} sandbox="allow-scripts allow-same-origin" onLoad={()=>{if(sceneStarted)startTourFrame();else waitingForOffice.current=true;}}/>}</div>
  {flatOffice}
  {flatRoom}
  {staffPerson&&snapshot.selectedEnrollmentId&&<EmployeeCard key={staffPerson.employeeId} enrollmentId={snapshot.selectedEnrollmentId} person={staffPerson} onClose={()=>setStaffCard(null)}
    onInbox={()=>{setStaffCard(null);setOfficeFilter({id:staffPerson.employeeId,name:staffPerson.name});selectTask('office');}}
    onJob={jobId=>{setStaffCard(null);setOfficeFilter({id:staffPerson.employeeId,name:staffPerson.name,jobId});selectTask('office');}}/>}
- <footer className={styles.bottom} data-campus-chrome>{!live&&!visitor&&!review&&<details className={styles.qa}><summary>미리보기 · {roleNames[role]}</summary><label>입장 권한 체험<select disabled={editing} aria-label="입장 권한 체험" value={role} onChange={e=>changeRole(e.target.value as TourRole)}>{Object.entries(roleNames).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><p>가상 계정입니다. 실제 권한·결제·서버 기록은 바뀌지 않아요.</p></details>}{live&&<Link className={styles.backLink} href="/my/classes">내 클래스로</Link>}{review&&<span className={styles.reviewLabel}>{review.returnHref?<Link href={review.returnHref}>수업 검수로 돌아가기</Link>:review.role==='waiting'?<Link href="/my/classes">내 클래스 · 개강 전 준비</Link>:'운영자 둘러보기 · 모든 공간 입장 가능'}</span>}<div className={styles.bottomActions}>{!failed&&<><button disabled={!ready||editing} onClick={()=>{setActivityMenu(false);post('camera',{mode:'overall'});}}>공간 전체 보기</button><button disabled={!ready||editing} onClick={()=>{setActivityMenu(false);post('camera',{mode:camera==='third'?'first':'third'});}}>{camera==='third'?'1인칭으로 보기':'3인칭으로 보기'}</button></>}<button disabled={editing} aria-expanded={room==='library'?undefined:activityMenu} onClick={()=>{if(room==='library'){open('library:all');return;}setTaskQuery('');setActivityMenu(v=>!v);}}>{room==='library'?'자료·다시보기':'이 공간에서 할 일'}</button>{!failed&&<button disabled={!ready||editing||!!live&&!visitor&&!review&&!live.avatar} aria-label="내 캐릭터" onClick={()=>{setActivityMenu(false);post('blocked',{value:false});post('appearance-open');}}><Users size={17}/><span>내 캐릭터</span></button>}</div></footer>
+ <footer className={styles.bottom} data-campus-chrome>{!live&&!visitor&&!review&&<details className={styles.qa}><summary>미리보기 · {roleNames[role]}</summary><label>입장 권한 체험<select disabled={editing} aria-label="입장 권한 체험" value={role} onChange={e=>changeRole(e.target.value as TourRole)}>{Object.entries(roleNames).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><p>가상 계정입니다. 실제 권한·결제·서버 기록은 바뀌지 않아요.</p></details>}{live&&!sharedStudy&&<Link className={styles.backLink} href="/my/classes">내 클래스로</Link>}{review&&<span className={styles.reviewLabel}>{review.returnHref?<Link href={review.returnHref}>수업 검수로 돌아가기</Link>:review.role==='waiting'?<Link href="/my/classes">내 클래스 · 개강 전 준비</Link>:'운영자 둘러보기 · 모든 공간 입장 가능'}</span>}<div className={styles.bottomActions}>{!failed&&<><button aria-label="공간 전체 보기" disabled={!ready||editing} onClick={()=>{setActivityMenu(false);post('camera',{mode:'overall'});}}>{sharedStudy?<><Scan size={17}/><span>전체 보기</span></>:'공간 전체 보기'}</button><button aria-label={camera==='third'?'1인칭으로 보기':'3인칭으로 보기'} disabled={!ready||editing} onClick={()=>{setActivityMenu(false);post('camera',{mode:camera==='third'?'first':'third'});}}>{sharedStudy?<><Eye size={17}/><span>{camera==='third'?'1인칭':'3인칭'}</span></>:camera==='third'?'1인칭으로 보기':'3인칭으로 보기'}</button></>}<button aria-label={room==='library'?'자료·다시보기':'이 공간에서 할 일'} disabled={editing} aria-expanded={room==='library'?undefined:activityMenu} onClick={()=>{if(room==='library'){open('library:all');return;}setTaskQuery('');setActivityMenu(v=>!v);}}>{sharedStudy?<><List size={17}/><span>할 일</span></>:room==='library'?'자료·다시보기':'이 공간에서 할 일'}</button>{!failed&&<button disabled={!ready||editing||!!live&&!visitor&&!review&&!live.avatar} aria-label="내 캐릭터" onClick={()=>{setActivityMenu(false);post('blocked',{value:false});post('appearance-open');}}><Users size={17}/><span>내 캐릭터</span></button>}{sharedStudy&&!failed&&<button type="button" aria-label="조명·배경음" disabled={!ready||editing} onClick={event=>{environmentTrigger.current=event.currentTarget;setActivityMenu(false);post('environment-open');}}><SlidersHorizontal size={17}/><span>환경</span></button>}</div></footer>
  {visitor&&arrival&&!editing&&<section className={styles.arrival} aria-label="방문자 입장"><small>MOONSHOT OPEN CAMPUS</small><h1>{visitor.title}</h1><p>10% 더 나아지는 것을 넘어,<br/>내 일을 10배 다르게 바꿔볼 가능성.<br/>AI 마케팅 기지를 직접 둘러보세요.</p><p className={styles.arrivalGuide}>바닥의 파란 화살표를 따라 문샷 자료실로 가면<br/>무료 자료와 라이브 다시보기를 만날 수 있어요.</p><button className={styles.primary} disabled={!ready} onClick={()=>{post('blocked',{value:false});post('appearance-open');}}>캐릭터 꾸미고 입장</button><button disabled={!ready&&!failed} onClick={visitorEntered}>{failed?'공간 안내로 입장':'이 캐릭터로 바로 입장'}</button><small>가입 없이 체험 · 캐릭터는 이 브라우저에만 저장돼요.<br/>닉네임에 개인정보를 넣지 마세요.</small></section>}
  <div className={styles.miniFocus}>
-  {sharedStudy&&<div hidden={mapOpen||!!tool||!!gate||editing||activityMenu}>
-   <div ref={setStudyCardHost}/>
+  {sharedStudy&&<div className={styles.studyShelf} hidden={mapOpen||!!tool||!!gate||editing||activityMenu}>
    {!mapOpen&&!tool&&!gate&&!editing&&!activityMenu&&managedTask('learning')&&<StudyLessonShortcut snapshot={snapshot} onOpen={openLesson}/>}
+   <div ref={setStudyCardHost}/>
    {sceneLoading}
   </div>}
   {!flatOffice&&deskShortcuts}
@@ -331,18 +348,14 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  {notice&&!tool&&<p className={styles.notice} role="status">{notice}<button aria-label="안내 닫기" onClick={()=>setNotice('')}>×</button></p>}
  <CampusWindow backCloses open={mapOpen} title="공간 이동" onClose={()=>setMapOpen(false)}><div className={styles.mapIntro}><p>MOONSHOT CAMPUS</p><h2>오늘의 도약은 어디에서?</h2><span>목적에 맞는 공간으로 들어가세요.</span>{!live&&!visitor&&!review&&<label className={styles.mapRole}>누구의 입장을 볼까요?<select aria-label="지도에서 권한 체험" value={role} onChange={e=>changeRole(e.target.value as TourRole)}>{Object.entries(roleNames).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select><small>미리보기 전용 · 실제 계정과 무관</small></label>}{live&&<p>{snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId)?.cohortName} · {snapshot.viewer.displayName}</p>}</div>{(()=>{const card=(r:typeof rooms[number],i:number)=><button key={r.id} className={`${styles.destination} ${styles[r.id]}`} aria-label={roomName(r.id)+' 입장'} onClick={()=>enter(r.id)}><div className={styles.miniature}>{managed[r.id]?.image&&<img className={styles.roomCover} src={managed[r.id]?.image} alt={managed[r.id]?.imageAlt||roomName(r.id)}/>}<div className={styles.miniFloor}/><div className={styles.miniBack}/><div className={styles.miniDesk}/><div className={styles.miniDesk2}/>{i>=0&&<span>0{i+1}</span>}</div><div className={styles.destinationBody}><small>{r.tag}</small><h3>{roomName(r.id)}{!canVisit(r.id)&&<LockKeyhole size={16}/>}</h3><p>{managed[r.id]?.description||(visitor&&r.id==='live'?'내 캐릭터로 걷고, 문샷에서의 하루를 먼저 만나봐요.':r.description)}</p><div><span>{r.access}</span><strong>{room===r.id?'현재 공간':canVisit(r.id)?'입장하기':'입장 안내'} →</strong></div></div></button>;const own=role==='student'||role==='admin';if(!own)return <div className={styles.mapGrid}>{rooms.map(card)}</div>;const list=(ids:TourRoom[])=>rooms.map((r,i)=>[r,i] as const).filter(([r])=>ids.includes(r.id)).map(([r])=>card(r,-1));return <><h3 className={styles.mapGroup}>내 학습 공간</h3><div className={styles.mapGrid}>{list(['study','office'])}</div><h3 className={styles.mapGroup}>행사 공간 <small>무료 자료 · 지난 라이브</small></h3><div className={`${styles.mapGrid} ${styles.eventGrid}`}>{list(['live','library'])}</div></>;})()}<p className={styles.mapNote}><DoorOpen size={16}/>현재 권한: {visitor?.operatorReview?'관리자':roleNames[role]} · 잠긴 공간은 눌러서 입장 조건을 확인할 수 있어요.</p></CampusWindow>
  <CampusWindow backCloses open={!!gate} small={!visitor} title="공간 입장 안내" onClose={()=>setGate(null)}>{visitor&&gate?visitor.renderGate(gate):<div className={styles.gate}><LockKeyhole size={38}/><h2>{rooms.find(r=>r.id===gate)?.name}</h2><p>{role==='waiting'?'수강 시작일부터 열리는 공간이에요.':'문샷 수강권이 필요한 공간이에요. 라이브홀에서 교육 내용을 먼저 둘러보세요.'}</p><button className={styles.primary} onClick={()=>enter('live')}>라이브홀로 돌아가기</button>{role!=='waiting'&&<button onClick={()=>{enter('live');setTool('offer');}}>수강 신청·상담 안내 보기</button>}</div>}</CampusWindow>
- <CampusWindow backCloses open={!!tool} title={taskTitle(tool)} onClose={closeTask}>
- <div className={styles.taskTrail}><span>{roomName(room)} / {taskTitle(tool)}</span><div>{previous&&<button onClick={()=>{if(mayLeave()){setTool(previous);setPrevious('');}}}>← 이전 작업</button>}<button onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setTaskQuery('');setActivityMenu(true);}}>이 공간의 다른 할 일</button></div></div>
+ <CampusWindow backCloses open={!!tool} title={taskTitle(tool)} context={tool==='learning'?roomName(room):undefined} onClose={closeTask}>
+ {tool!=='learning'&&<div className={styles.taskTrail}><span>{roomName(room)} / {taskTitle(tool)}</span><div>{previous&&<button onClick={()=>{if(mayLeave()){setTool(previous);setPrevious('');}}}>← 이전 작업</button>}<button onClick={()=>{if(!mayLeave())return;setTool('');setPrevious('');setTaskQuery('');setActivityMenu(true);}}>이 공간의 다른 할 일</button></div></div>}
  {notice&&<p className={styles.inlineNotice} role="status">{notice}</p>}
  <div className={styles.featureSurface} onClickCapture={event=>{const a=(event.target as Element).closest('a');if(live||visitor||review||!a||a.hasAttribute('download')||a.getAttribute('href')?.startsWith('blob:'))return;const href=a.getAttribute('href')||'';if(!href||href.startsWith('#'))return;event.preventDefault();event.stopPropagation();const lesson=snapshot.lessons.find(l=>l.href===href);if(lesson)openLesson(lesson.id);else if(href.includes('archive'))selectTask('archive');else if(href.includes('questions'))selectTask(role==='admin'&&href.includes('admin')?'admin:support':'ai');else setNotice('이 링크는 실제 서비스에서 연결됩니다. 미리보기에서는 외부로 이동하지 않아요.');}}>
  <Suspense fallback={<p role="status">필요한 도구를 열고 있어요…</p>}>
  {review?.lessonContent && tool==='learning' && review.lessonContent}
- {review&&(isFeature(tool)||(tool==='learning'&&!review.lessonContent))&&<section className={styles.lesson}><h2>{titles[tool]}</h2>
-  {review.role==='waiting' ? <p>수강 시작일부터 수업과 작업 공간을 이용할 수 있어요.</p> : tool==='learning' ? <>
-   <p>운영자 미리보기입니다. 공개 커리큘럼에서 기수별 수업을 읽을 수 있어요.</p>
-   <Link href={'/my/curriculum-review'+(review.cohortId?'?cohort='+encodeURIComponent(review.cohortId):'')}>공개 커리큘럼 열기 →</Link>
-   {review.studyPreview&&<> · <Link href={'/admin/campus/study'+(review.cohortId?'?cohort='+encodeURIComponent(review.cohortId):'')}>공부방 수업 미리보기 →</Link></>}
-  </> : <><p>운영자 미리보기입니다. 내 수강권으로 이용할 수 있는 작업 공간은 내 클래스에서 선택하세요.</p><Link href="/my/classes">내 클래스 보기 →</Link> <Link href="/admin">관리자 화면으로 →</Link></>}
+ {review&&(isFeature(tool)||(tool==='learning'&&!review.lessonContent))&&<section className={styles.lesson}>{tool!=='learning' && <h2>{titles[tool]}</h2>}
+  {review.role==='waiting' ? <p>수강 시작일부터 수업과 작업 공간을 이용할 수 있어요.</p> : tool==='learning' ? <OperatorRoomCurriculum initialCohort={review.cohortId}/>  : <><p>운영자 미리보기입니다. 내 수강권으로 이용할 수 있는 작업 공간은 내 클래스에서 선택하세요.</p><Link href="/my/classes">내 클래스 보기 →</Link> <Link href="/admin">관리자 화면으로 →</Link></>}
  </section>}
  {!review&&isFeature(tool)&&!['ai','office'].includes(tool)&&<FeaturePanel key={role+tool} id={tool} archive={!live||!!live.modules?.business} snapshot={snapshot} demo={demo} onRefresh={live?.onRefresh} onSelect={live?.onSelect} adminSnapshot={adminSnapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}
  <div hidden={tool!=='ai'}>{!review&&aiVisited&&canEnter(role,'study')&&<FeaturePanel key={role+JSON.stringify(handoff)} id="ai" demo={demo} active={tool==='ai'} snapshot={snapshot} handoff={handoff} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
@@ -354,7 +367,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
 
  {tool==='office-guide'&&<OfficeFirstVisit onEmployees={()=>selectTask('bots')} onInbox={()=>{setOfficeFilter(null);selectTask('office');}}/>}
  {tool==='bots'&&<>{review&&<p>운영자 연습 공간이에요. 여기서 배치한 직원은 이 브라우저에만 저장됩니다.</p>}<PersonalOffice onJobs={employee=>{setOfficeFilter({...employee});selectTask('office');}} enrollmentId={snapshot.selectedEnrollmentId||''} demo={demo} onChange={document=>post('personal-office',{document})}/><button className={styles.toolLink} onClick={()=>{setOfficeFilter(null);selectTask('office');}}>이 사무실의 업무 관리 열기 →</button></>}
- {!review&&tool==='learning'&&<LessonTaskPanel key={snapshot.selectedEnrollmentId} initialLesson={requestedLesson} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
+ {!review&&tool==='learning'&&<LessonTaskPanel key={[snapshot.selectedEnrollmentId,requestedLesson,requestedMission].join(':')} initialLesson={requestedLesson} initialMission={requestedMission} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
  {tool==='lesson'&&<div className={styles.lesson}><small>미리보기용 수업 안내</small><h2>{selectedLesson}</h2><p>실제 서비스에서는 해당 수강권으로 공개된 수업과 과제를 연결합니다. 이 화면은 동선 확인용 예시입니다.</p><button onClick={()=>{setTool(previous||'learning');setPrevious('');}}>수업 목록으로</button></div>}
  {tool==='intro:'+room&&canEnter(role,room)&&<article className={styles.managedArticle}><h2>{managed[room]?.title}</h2><LessonText text={managed[room]?.body||''}/></article>}
  {tool.startsWith('content:')&&canEnter(role,room)&&(()=>{const a=managed[room]?.articles.find(a=>'content:'+room+':'+a.id===tool&&a.published);return a?<article className={styles.managedArticle}><h2>{a.title}</h2>{a.image&&<img src={a.image} alt={a.imageAlt||a.title}/>}<LessonText text={a.body}/>{a.url&&<a href={a.url} target="_blank" rel="noopener noreferrer">{a.linkLabel} ↗</a>}</article>:null;})()}

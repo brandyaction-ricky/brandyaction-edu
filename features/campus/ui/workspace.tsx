@@ -40,13 +40,23 @@ export function CampusWorkspace({snapshot,demo=false,initialSection='learning',s
 
  const [handoff,setHandoff]=useState<{lessonId:string;context:string}|null>(null);
  const [visited,setVisited]=useState(()=>new Set([initialSection]));
+ const [requestedLesson,setRequestedLesson]=useState<{id:string;mission?:string}|null>(null);
  function ask(value:{lessonId:string;context:string}){const g=campusDraftState('campus-ai');if(g.locked){setNotice('현재 AI 답변이 끝난 후 새 질문을 넘겨 주세요.');return;}if(g.dirty&&!window.confirm('AI 화면에 작성 중인 질문이 있습니다. 새 질문으로 바꿀까요?'))return;setHandoff(value);navigate('ai');}
- function open(id:string,mission?:string){const g=campusDraftState();if(g.locked){setNotice('저장이 끝난 후 수업을 열어 주세요.');return;}if(g.dirty&&!window.confirm('저장하지 않은 내용이 있습니다. 내용을 버리고 수업으로 이동할까요?'))return;onOpen(id,mission);}
+ function mayLeaveLesson(){
+  const draft=campusDraftState();
+  if(draft.locked){setNotice('저장이 끝난 후 이동해 주세요.');return false;}
+  return !draft.dirty||window.confirm('저장하지 않은 내용이 있습니다. 내용을 버리고 이동할까요?');
+ }
+ function open(id:string,mission?:string){
+  if(!mayLeaveLesson())return;
+  if(spaceFirst&&!demo){setRequestedLesson({id,mission});navigate('learning');return;}
+  onOpen(id,mission);
+ }
  function refresh(){const g=campusDraftState();if(g.locked){setNotice('저장이 끝난 후 새로고침해 주세요.');return;}if(g.dirty&&!window.confirm('저장하지 않은 내용이 있습니다. 내용을 버리고 새로고침할까요?'))return;onRefresh();}
  function changeScope(id:string){const guard=campusDraftState();if(guard.locked){setNotice('저장이나 답변을 기다리고 있어요. 완료 후 기수를 변경해 주세요.');return;}if(guard.dirty&&!window.confirm('저장하지 않은 작성 내용이 있어요. 내용을 버리고 기수를 변경할까요?'))return;writeRoute(section,immersive,false,id);onSelect(id);}
- function navigate(value:string,back=false){if(!sections.some(s=>s[0]===value))return;if(!spaceFirst&&section==='space'&&value!=='space'){const g=campusDraftState('campus-space');if(g.locked){setNotice('저장을 마친 후 이동해 주세요.');return;}if(g.dirty&&!window.confirm('저장하지 않은 공간 설정이 있어요. 내용을 버리고 이동할까요?'))return;}if(value===section){setMenuOpen(false);return;}setTrail(old=>back?old.slice(0,-1):[...old,section]);setSection(value);setVisited(old=>new Set([...old,value]));setMenuOpen(false);writeRoute(value,spaceFirst||immersive);setNotice('');requestAnimationFrame(()=>heading.current?.focus());}
+ function navigate(value:string,back=false){if(!sections.some(s=>s[0]===value))return;if(spaceFirst&&!demo&&section==='learning'&&value!==section){if(!mayLeaveLesson())return;setRequestedLesson(null);}if(!spaceFirst&&section==='space'&&value!=='space'){const g=campusDraftState('campus-space');if(g.locked){setNotice('저장을 마친 후 이동해 주세요.');return;}if(g.dirty&&!window.confirm('저장하지 않은 공간 설정이 있어요. 내용을 버리고 이동할까요?'))return;}if(value===section){setMenuOpen(false);return;}setTrail(old=>back?old.slice(0,-1):[...old,section]);setSection(value);setVisited(old=>new Set([...old,value]));setMenuOpen(false);writeRoute(value,spaceFirst||immersive);setNotice('');requestAnimationFrame(()=>heading.current?.focus());}
  const panels=<>
- <div hidden={section!=='learning'}>{visited.has('learning')&&(spaceFirst?<LessonTaskPanel snapshot={snapshot} live={!demo} onOpen={open} onCompleted={refresh}/>:<LearnerDashboard snapshot={snapshot} demo={demo} onOpen={open} onSelect={changeScope} onRefresh={refresh}/>)}</div>
+ <div hidden={section!=='learning'}>{visited.has('learning')&&(spaceFirst ? (section==='learning' && <LessonTaskPanel key={[snapshot.selectedEnrollmentId,requestedLesson?.id,requestedLesson?.mission].join('/')} initialLesson={requestedLesson?.id} initialMission={requestedLesson?.mission} snapshot={snapshot} live={!demo} mayLeave={mayLeaveLesson} onOpen={open} onCompleted={refresh}/>) : <LearnerDashboard snapshot={snapshot} demo={demo} onOpen={open} onSelect={changeScope} onRefresh={refresh}/>)}</div>
  <div hidden={section!=='community'}>{visited.has('community')&&(community||<CommunityPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} onOpen={open}/>)}</div>
  <div hidden={section!=='business'}>{visited.has('business')&&<BusinessPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} onOpenLesson={open} onAsk={ask}/>}</div>
  <div hidden={section!=='support'}>{visited.has('support')&&<SupportPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} onOpen={open} onAsk={ask}/>}</div>
