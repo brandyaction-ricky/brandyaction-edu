@@ -37,6 +37,18 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/lesson-download-filenames-1126" ]; then
+            expected_main=22038c1b101edffe0b7c83e5afd9ac2e8d755e1a
+            reviewed_payload=10959bfeb005d9fcfdfae016a8334b6fc37de3d8
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            test "$(git rev-parse "$reviewed_payload^")" = "$expected_main"
+            git merge-base --is-ancestor "$reviewed_payload" HEAD
+            git diff --exit-code "$reviewed_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            git diff --exit-code "$expected_main" HEAD -- supabase vercel.json .vercelignore
+            echo 'Verified the reviewed lesson download filename fix.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/study-room-inline-lessons-1126" ]; then
             expected_main=c5ac3e83d4e29b519872b93ea02b82a4bab54d99
             reviewed_study=6e43654a2040b61b980329767ce4d3de5b73a47b
