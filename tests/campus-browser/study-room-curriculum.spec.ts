@@ -2,6 +2,7 @@ import {expect, test, type Page} from '@playwright/test';
 import {student} from '../campus-fixture/data';
 import {withExistingCohortVisibility} from '../browser/fixture/cohort-visibility';
 import {defaultProfile} from '../../features/campus/space/domain';
+import {defaultRoom} from '../../features/campus/content/model';
 
 const scope = student.scopes[0];
 const lessons = student.lessons.slice(0, 3).map((item, index) => ({
@@ -63,6 +64,105 @@ function verifyRoom(page: Page) {
   return expect(page).toHaveURL(url => url.pathname === '/campus/workspace' &&
     url.searchParams.get('room') === 'study' && url.searchParams.get('enrollmentId') === scope.enrollmentId);
 }
+
+const studyActions = ['수업', '앉아서 집중', '동료 피드백', '내 AI 사무실'];
+
+async function checkSceneActions(page: Page, names: string[], camera: string) {
+  const scene = page.frameLocator('iframe[title="문샷 캠퍼스 3D 미리보기"]');
+  await expect(scene.locator('#office')).toHaveAttribute('data-camera-mode', camera);
+  const actions = scene.locator('#hotspots > button');
+  await expect(actions).toHaveCount(names.length);
+  await expect(async () => {
+    const boxes = await actions.evaluateAll(buttons => {
+      const frame = window.frameElement!;
+      const origin = frame.getBoundingClientRect();
+      return buttons.filter(button => button.getClientRects().length).map(button => {
+        const rect = button.getBoundingClientRect();
+        const title = button.querySelector('strong')!;
+        // Check the inside corners as well as the center. A top-level HUD may obscure the iframe.
+        const xs = [rect.left + 8, rect.left + rect.width / 2, rect.right - 8];
+        const ys = [rect.top + 8, rect.top + rect.height / 2, rect.bottom - 8];
+        const obstructions: string[] = [];
+        for (const x of xs) for (const y of ys) {
+          const inside = document.elementFromPoint(x, y);
+          const outside = parent.document.elementFromPoint(origin.x + x, origin.y + y);
+          const obstruction = outside === frame ? inside : outside;
+          if (outside !== frame || !button.contains(inside)) {
+            obstructions.push(`${Math.round(x)},${Math.round(y)} ${obstruction?.getAttribute('aria-label') || obstruction?.className || 'outside canvas'}`);
+          }
+        }
+        return {label: button.getAttribute('aria-label'), x: rect.x, y: rect.y, w: rect.width,
+          h: rect.height, obstructions, titleFits: title.scrollWidth <= title.clientWidth
+            && title.scrollHeight <= title.clientHeight + 1};
+      });
+    });
+    if (camera === 'overall') expect(boxes.map(box => box.label).sort()).toEqual([...names].sort());
+    if (camera === 'third') expect(boxes.length).toBeGreaterThan(0);
+    for (const [index, box] of boxes.entries()) {
+      expect(box.w, box.label!).toBeCloseTo(96, 2);
+      expect(box.h, box.label!).toBeCloseTo(44, 2);
+      if (studyActions.includes(box.label!)) expect(box.titleFits, box.label!).toBe(true);
+      expect(box.obstructions, box.label!).toEqual([]);
+      for (const other of boxes.slice(index + 1)) {
+        const gap = Math.max(box.x - other.x - other.w, other.x - box.x - box.w,
+          box.y - other.y - other.h, other.y - box.y - box.h);
+        expect(gap, box.label + ' / ' + other.label).toBeGreaterThanOrEqual(7.5);
+      }
+    }
+  }).toPass({timeout: 8000});
+}
+
+test('study map signs share one touch size and open each destination without leaving the room UI', async ({page}, info) => {
+  test.setTimeout(150000);
+  await connect(page, false, true);
+  const mobile = info.project.name === 'mobile';
+  const sizes = mobile ? [[320, 568], [844, 390], [479, 800]] : [[768, 1024], [1440, 900]];
+  await page.setViewportSize({width: sizes[0][0], height: sizes[0][1]});
+  await page.goto(roomUrl);
+  const scene = page.frameLocator('iframe[title="문샷 캠퍼스 3D 미리보기"]');
+  await expect(scene.getByRole('button', {name: '수업', exact: true})).toBeVisible({timeout: 90000});
+  for (const [width, height] of sizes) {
+    await page.setViewportSize({width, height});
+    await test.step(`${width} × ${height}`, async () => {
+      await checkSceneActions(page, studyActions, 'overall');
+      await page.getByRole('button', {name: '3인칭으로 보기', exact: true}).click();
+      await checkSceneActions(page, studyActions, 'third');
+      await page.getByRole('button', {name: '1인칭으로 보기', exact: true}).click();
+      await checkSceneActions(page, studyActions, 'first');
+      await page.getByRole('button', {name: '공간 전체 보기', exact: true}).click();
+      await expect(scene.locator('#office')).toHaveAttribute('data-camera-mode', 'overall');
+    });
+  }
+  for (const [label, title] of [['수업', '수업'], ['앉아서 집중', '집중과 휴식'], ['동료 피드백', '결과물·동료 피드백']]) {
+    const sign = scene.getByRole('button', {name: label, exact: true});
+    if (mobile) await sign.tap(); else await sign.click();
+    const dialog = page.getByRole('dialog', {name: title, exact: true});
+    await expect(dialog).toBeVisible();
+    if (label === '수업') await expect(dialog.getByText(body(2), {exact: true})).toBeVisible();
+    await dialog.getByRole('button', {name: title + ' 닫기', exact: true}).click();
+    await verifyRoom(page);
+  }
+  const office = scene.getByRole('button', {name: '내 AI 사무실', exact: true});
+  if (mobile) await office.tap(); else await office.click();
+  await expect(page.locator('[data-room="office"]')).toBeVisible();
+});
+
+test('a long configured action title stays accessible in a fixed-size study map sign', async ({page}) => {
+  test.setTimeout(90000);
+  const custom = '함께 만든 결과물을 살펴보고 동료에게 자세한 피드백을 남겨 보세요';
+  await connect(page, false, true);
+  await page.route('**/api/campus/library?**', route => route.fulfill({json: {resources: [], content: {
+    study: {...defaultRoom('study'), tasks: [{id: 'feedback', title: custom, description: '피드백', visible: true}]},
+  }}}));
+  await page.goto(roomUrl);
+  const scene = page.frameLocator('iframe[title="문샷 캠퍼스 3D 미리보기"]');
+  const sign = scene.getByRole('button', {name: custom, exact: true});
+  await expect(sign).toBeVisible({timeout: 75000});
+  await expect(sign).toHaveAttribute('title', custom + ' · 피드백');
+  await checkSceneActions(page, studyActions.map(name => name === '동료 피드백' ? custom : name), 'overall');
+  await sign.click();
+  await expect(page.getByRole('dialog', {name: custom, exact: true})).toBeVisible();
+});
 
 test('study shortcut and 3D lesson hotspot open published content in the same study room', async ({page}) => {
   test.setTimeout(90000);

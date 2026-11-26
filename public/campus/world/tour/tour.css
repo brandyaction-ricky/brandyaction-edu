@@ -132,3 +132,39 @@ body[data-study-controls=true][data-room=study] #status {
     bottom: max(8px,env(safe-area-inset-bottom));
   }
 }
+
+body[data-room=study] #hotspots > .tour-hotspot {
+  box-sizing: border-box;
+  width: var(--study-sign-width);
+  height: var(--study-sign-height);
+  padding: 3px 5px;
+  place-content: center;
+  gap: 0;
+  text-align: center;
+  background: #102a40;
+  border: 1px solid #80acc6;
+  border-radius: 9px;
+  box-shadow: 0 2px 6px #03101c55;
+}
+body[data-room=study] #hotspots > .tour-hotspot:hover { background: #194667; }
+body[data-room=study] #hotspots > .tour-hotspot strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: 650 13px/17px LocalKR, system-ui, sans-serif;
+}
+body[data-room=study] #hotspots > .tour-hotspot small { display: none; }
+body[data-room=study] #hotspots > .tour-hotspot::after {
+  left: var(--stem-x);
+  top: var(--stem-y);
+  width: var(--stem-length);
+  height: 1px;
+  border: 0;
+  background: #9ccbe2;
+  transform-origin: 0 50%;
+  transform: rotate(var(--stem-angle));
+  pointer-events: none;
+}
