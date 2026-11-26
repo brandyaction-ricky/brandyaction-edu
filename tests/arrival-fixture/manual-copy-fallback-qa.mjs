@@ -25,7 +25,18 @@ try {
     const page = await context.newPage();
     const errors = [], apiRequests = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('request', request => {if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.url());});
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (!url.pathname.startsWith('/api/')) return;
+      if (url.origin === new URL(base).origin && url.pathname === '/api/campus/arrival/events' && request.method() === 'POST') {
+        // Navigation may flush page analytics. Clipboard contents must stay in the browser.
+        for (const sample of ['복사를 직접 마친 뒤', '확인된 사실과 제안을 구분하고']) {
+          expect(request.postData() ?? '').not.toContain(sample);
+        }
+        return;
+      }
+      apiRequests.push(request.url());
+    });
     const step = page.locator('[data-work-step]');
     async function copyPromptAndConfirm(copyLabel, responseLabel, answer) {
       await page.getByRole('button', {name: copyLabel, exact: true}).click();
@@ -100,7 +111,7 @@ try {
       await page.screenshot({path: resolve(out, `${device}-manual-confirmed.png`)});
       expect(errors).toEqual([]);
       expect(apiRequests).toEqual([]);
-      results.push({device, viewport, passed: true, deniedWrites: 5, selectedContentStationPrompt: true, manualLength: selection.length, selectedEntireManual: true, falseCopiedLabelBeforeConfirmation: false, adjacentDenialStatus: true, explicitConfirmationLabel: '매뉴얼 복사됨', apiRequests: 0, errors});
+      results.push({device, viewport, passed: true, deniedWrites: 5, selectedContentStationPrompt: true, manualLength: selection.length, selectedEntireManual: true, falseCopiedLabelBeforeConfirmation: false, adjacentDenialStatus: true, explicitConfirmationLabel: '매뉴얼 복사됨', nonAnalyticsApiRequests: apiRequests.length, errors});
     } catch (error) {
       await page.screenshot({path: resolve(out, `${device}-failure.png`)});
       throw error;
