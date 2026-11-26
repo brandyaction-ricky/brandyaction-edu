@@ -1,3 +1,4 @@
+import * as downloadLocation from '../lib/lesson-download-location.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,12 +8,12 @@ const id='11111111-1111-4111-8111-111111111111';
 const png=Uint8Array.from([137,80,78,71,13,10,26,10]);
 function compile(file,mocks={}){const out={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>mocks[name]);return out;}
 const files=compile('lib/lesson-files.ts');
-function harness({user={id},dbError=null,size=8,mime='image/png',bytes=png,ready=false,kind='image'}={}){
+function harness({user={id},dbError=null,size=8,mime='image/png',bytes=png,ready=false,kind='image',name='test.png'}={}){
  const calls=[],storageCalls=[];
- const file={id,owner_id:id,name:'test.png',size:8,kind,content_type:'image/png',extension:'png',path:`${id}/${id}.png`,ready_at:ready?'2026-09-28':null};
- const storage={createSignedUploadUrl:async(path,options)=>{storageCalls.push({action:'upload',path,options});return{data:{signedUrl:'https://storage.test/signed-upload',token:'private-token'}};},info:async()=>({data:{size,contentType:mime}}),download:async()=>({data:new Blob([bytes])}),createSignedUrl:async(path,seconds,options)=>{storageCalls.push({action:'read',path,seconds,options});return{data:{signedUrl:'https://storage.test/short-lived'}};}};
+ const file={id,owner_id:id,name,size:8,kind,content_type:'image/png',extension:'png',path:`${id}/${id}.png`,ready_at:ready?'2026-09-28':null};
+ const storage={createSignedUploadUrl:async(path,options)=>{storageCalls.push({action:'upload',path,options});return{data:{signedUrl:'https://storage.test/signed-upload',token:'private-token'}};},info:async()=>({data:{size,contentType:mime}}),download:async()=>({data:new Blob([bytes])}),createSignedUrl:async(path,seconds,options)=>{storageCalls.push({action:'read',path,seconds,options});return{data:{signedUrl:'https://storage.test/short-lived?token=test-signature'}};}};
  const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='edu_complete_answer_file'?{id,name:file.name,kind,size}:file,error:dbError};},storage:{from:bucket=>{assert.equal(bucket,'lesson-answer-files');return storage;}}};
- const route=compile('app/api/platform/lesson-files/route.ts',{'node:crypto':crypto,'@/lib/lesson-files':files,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>db}});
+ const route=compile('app/api/platform/lesson-files/route.ts',{'node:crypto':crypto,'@/lib/lesson-download-location':downloadLocation,'@/lib/lesson-files':files,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>db}});
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-files',{method:'POST',headers:origin?{origin}:{},body:JSON.stringify(body)}));
  const get=(query=`file=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-files?'+query));
  return{post,get,calls,storageCalls,body:{action:'prepare',lessonId:id,enrollmentId:id,revision:id,blockId:'proof',name:'test.png',size:8,kind:'image',requestId:id}};
@@ -29,7 +30,11 @@ test('complete validates stored metadata and actual bytes before server-generate
  const ready=harness({ready:true});assert.equal((await ready.post({action:'complete',fileId:id})).status,200);assert.equal(ready.calls.length,1);
 });
 test('reading verifies file and submission association before short-lived private redirect; archives always download',async()=>{
- const h=harness({kind:'file'}),res=await h.get(`file=${id}&submission=${id}`);assert.equal(res.status,303);assert.equal(res.headers.get('cache-control'),'private, no-store');assert.equal(h.calls[0].args.p_submission,id);assert.equal(h.storageCalls[0].seconds,60);assert.equal(h.storageCalls[0].options.download,'test.png');
+ const name='제출 자료 100% + & %EA.zip';
+ const h=harness({kind:'file',name}),res=await h.get(`file=${id}&submission=${id}`);assert.equal(res.status,303);assert.equal(res.headers.get('cache-control'),'private, no-store');assert.equal(h.calls[0].args.p_submission,id);assert.equal(h.storageCalls[0].seconds,60);
+ const location=new URL(res.headers.get('location'));
+ assert.deepEqual(location.searchParams.getAll('download'),[name]);
+ assert.equal(location.searchParams.get('token'),'test-signature');
  const forbidden=harness({dbError:{message:'BLOCK_FORBIDDEN'}});assert.equal((await forbidden.get()).status,403);assert.equal(forbidden.storageCalls.length,0);
  const broken=harness({dbError:{message:'secret DB data'}});assert.doesNotMatch(await(await broken.get()).text(),/secret DB data/);
 });

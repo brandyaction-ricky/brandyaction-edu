@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
+import { lessonDownloadLocation } from '@/lib/lesson-download-location';
 import { uuid } from '@/lib/edu-workflows';
 import { lessonMediaSpec, matchesLessonMedia } from '@/lib/lesson-media';
 const bucket = 'lesson-content-media';
@@ -78,11 +79,9 @@ export async function GET(request: Request) {
     if (error?.message === 'BLOCK_LESSON_LOCKED' && params.has('enrollment') && !params.has('submission') && ['admin', 'staff'].includes(String((actor as { role?: string }).role))) ({ data: file, error } = await read(null));
     if (error) throw error;
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
-    const signed = await db.storage.from(bucket).createSignedUrl(file.path, 300, { download: file.kind === 'file' || params.get('download') === '1' ? file.name : false });
+    const signed = await db.storage.from(bucket).createSignedUrl(file.path, 300);
     if (signed.error) throw signed.error;
-    const location = new URL(signed.data.signedUrl);
-    // Normalize only the filename: Storage SDK versions may encode this query twice.
-    if (file.kind === 'file' || params.get('download') === '1') location.searchParams.set('download', file.name);
-    return new Response(null, { status: 303, headers: { ...headers, Location: location.href } });
+    const download = file.kind === 'file' || params.get('download') === '1' ? file.name : false;
+    return new Response(null, { status: 303, headers: { ...headers, Location: lessonDownloadLocation(signed.data.signedUrl, download) } });
   } catch (error) { return failure(error); }
 }

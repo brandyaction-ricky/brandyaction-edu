@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from '@/lib/server-auth';
+import { lessonDownloadLocation } from '@/lib/lesson-download-location';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { canReviewCurriculum } from '@/lib/staff-curriculum-review';
 import { readCurriculumReview, readReviewContent, readReviewAsset, readPartnerCurriculum, readPartnerContent, readPartnerAsset, reviewId } from '@/lib/staff-curriculum-review-server';
@@ -20,9 +21,10 @@ export async function GET(request: Request) {
         const asset = p.has('asset') ? reviewId(p.get('asset')) : null;
         const file = partner ? await readPartnerAsset(actor, cohort, lesson, asset) : await readReviewAsset(actor, cohort, lesson, asset, student);
         if (p.get('metadata') === '1') return Response.json({ name: file.name, kind: file.kind, size: file.size }, { headers });
-        const signed = await createAdminClient().storage.from(file.bucket).createSignedUrl(file.path, 60, { download: file.kind === 'file' || p.get('download') === '1' ? file.name : false });
+        const signed = await createAdminClient().storage.from(file.bucket).createSignedUrl(file.path, 60);
         if (signed.error) throw signed.error;
-        return new Response(null, { status: 303, headers: { ...headers, Location: signed.data.signedUrl } });
+        const download = file.kind === 'file' || p.get('download') === '1' ? file.name : false;
+        return new Response(null, { status: 303, headers: { ...headers, Location: lessonDownloadLocation(signed.data.signedUrl, download) } });
       }
       return Response.json(partner ? await readPartnerContent(actor, cohort, lesson) : await readReviewContent(actor, cohort, lesson, student), { headers });
     }
