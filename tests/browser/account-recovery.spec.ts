@@ -32,14 +32,20 @@ test('login offers both recovery paths before opening the login form', async ({ 
   await expect(page.getByLabel('비밀번호', { exact: true })).toBeVisible();
 });
 
-test('a returning student sees the masked hint without entering an order and can remove it', async ({ page }) => {
+test('a returning student sees the masked hint without entering an order and can remove it', async ({ page }, info) => {
   await page.goto('/member-header-test');
   await expect.poll(() => page.evaluate(() => localStorage.getItem('edu-recent-login-hint-v1'))).toContain('q***@example.test');
   await page.goto('/public-data-test?publicScreen=login');
   await page.getByRole('button', { name: '이메일 찾기', exact: true }).click();
   await expect(page.getByText('q***@example.test', { exact: true })).toBeVisible();
   await expect(page.locator('#email-hint-form p').filter({ hasText: 'q***@example.test' })).toBeFocused();
-  await page.getByRole('button', { name: '이 기기에서 힌트 지우기' }).click();
+  const clearHint = page.getByRole('button', { name: '이 기기에서 힌트 지우기' });
+  if (info.project.use.hasTouch) {
+    await clearHint.scrollIntoViewIfNeeded();
+    await expect.poll(async () => (await clearHint.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const bounds = (await clearHint.boundingBox())!;
+    await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + 2);
+  } else await clearHint.click();
   await expect(page.getByLabel('주문번호')).toBeFocused();
   await page.reload();
   await page.getByRole('button', { name: '이메일 찾기', exact: true }).click();

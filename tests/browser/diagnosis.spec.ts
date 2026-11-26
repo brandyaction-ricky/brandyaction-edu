@@ -54,10 +54,19 @@ test('failed boundary save keeps the answer and allows an explicit retry without
   await page.reload();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
   const input=page.getByRole('textbox');await input.fill('저장하고 이어갈 합성 답변');await expect.poll(()=>state.current.answers.find(a=>a.questionId===id(20))?.value).toContain('합성 답변');
 });
-test('conflicting edits stop further writes and reloading requires a deliberate choice',async({page})=>{
+test('conflicting edits stop further writes and reloading requires a deliberate choice',async({page},info)=>{
   const state=await api(page,{started:true,conflict:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'2 B에 더 가까워요'}).click();
   await expect(page.getByRole('alert')).toContainText('다른 화면');await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();await expect(page.getByRole('radio').first()).toBeDisabled();
-  await page.getByRole('button',{name:'서버 응답 다시 불러오기'}).click();await page.getByRole('button',{name:'취소',exact:true}).click();expect(state.writes).toBe(1);await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();
+  await page.getByRole('button',{name:'서버 응답 다시 불러오기'}).click();
+  const cancel = page.getByRole('button',{name:'취소',exact:true});
+  if (info.project.use.hasTouch) {
+    await cancel.scrollIntoViewIfNeeded();
+    await expect.poll(async () => (await cancel.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const bounds = (await cancel.boundingBox())!;
+    await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + 2);
+  } else await cancel.click();
+  await expect(cancel).toBeHidden();
+  expect(state.writes).toBe(1);await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();
 });
 test('18-second expiry never answers or advances automatically and still accepts a response',async({page})=>{
   await api(page,{started:true});await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();

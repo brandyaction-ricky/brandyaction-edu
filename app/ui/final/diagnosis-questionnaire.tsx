@@ -38,6 +38,8 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   const [busy,setBusy]=useState(false), [error,setError]=useState(''), [saveError,setSaveError]=useState('');
   const [saveStatus,setSaveStatus]=useState<'unsaved'|'saving'|'saved'|'error'>('saved');
   const [conflict,setConflict]=useState(false),[confirmReload,setConfirmReload]=useState(false),[confirmSubmit,setConfirmSubmit]=useState(false);
+  const conflictNotice = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (conflict) conflictNotice.current?.focus(); }, [conflict]);
   const [confirmedInstructions,setConfirmedInstructions]=useState(false),[timerLeft,setTimerLeft]=useState(PAIR_SECONDS);
   const [checkMiss,setCheckMiss]=useState<string|null>(null);
   const [speedMiss,setSpeedMiss]=useState<string|null>(null),[neutralBlock,setNeutralBlock]=useState(false);
@@ -283,8 +285,8 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
       </div>}
       {confirmSubmit && <div className="panel" role="region" aria-label="제출 전 확인"><h2 className="panel-title" ref={submitHeading} tabIndex={-1}>답변을 제출할까요?</h2><p className="panel-sub">제출하면 정밀 보고서 제작이 시작되고 답변을 바꿀 수 없습니다. 보고서와 MD 파일이 준비되면 이곳에서 받을 수 있어요.</p><button className="cta-btn" disabled={busy || conflict} onClick={() => void finish()}>{busy ? '제출 확인 중…' : '답변 제출하기'}</button><button className="prev-btn" disabled={busy} onClick={() => setConfirmSubmit(false)}>계속 수정하기</button></div>}
       {error && <p role="alert">{error}</p>}
-      {saveError && <div role="alert" className="save-toast">{saveError}{!conflict && <button className="dlg-btn" onClick={() => void persist().catch(() => {})}>저장 다시 시도</button>}</div>}
-      {conflict && <div className="panel"><p className="panel-sub">다른 창의 저장 내용과 충돌했습니다. 현재 입력은 이 화면에 남아 있습니다.</p>
+      {saveError && !conflict && <div role="alert" className="save-toast">{saveError}<button className="dlg-btn" onClick={() => void persist().catch(() => {})}>저장 다시 시도</button></div>}
+      {conflict && <div className="panel"><p className="panel-sub" role="alert" ref={conflictNotice} tabIndex={-1}>다른 화면에서 저장한 응답과 충돌했습니다. 현재 입력은 이 화면에 남아 있습니다. 서버 응답을 불러올지 선택해 주세요.</p>
         {!confirmReload ? <button className="cta-btn" disabled={busy} onClick={() => setConfirmReload(true)}>서버 응답 다시 불러오기</button>
           : <><p className="panel-sub">불러오면 이 창의 저장되지 않은 입력을 서버에 저장된 응답으로 바꿉니다.</p>
             <button className="cta-btn" disabled={busy} onClick={() => void reloadSaved()}>{busy ? '불러오는 중…' : '서버 응답으로 바꾸기'}</button>
