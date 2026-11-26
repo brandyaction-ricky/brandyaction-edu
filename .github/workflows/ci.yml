@@ -42,7 +42,7 @@ jobs:
             release_payload=fe666b478f14d98cecaf2794b68ddc935ac4d63c
             test "$(git rev-parse HEAD^1)" = "$expected_main"
             test "$(git rev-parse "$release_payload^")" = "$expected_main"
-            tested_payload=06b1e47903b75fe162de5fb0a69582ed79c3d85b
+            tested_payload=b666baeb4967a7649722ea8893589fd35c6d3c05
             git merge-base --is-ancestor "$release_payload" "$tested_payload"
             git merge-base --is-ancestor "$tested_payload" HEAD
             git diff --exit-code "$release_payload" "$tested_payload" -- . ':(exclude).github/workflows/ci.yml' ':(exclude)tests/arrival-fixture/manual-copy-fallback-qa.mjs'
