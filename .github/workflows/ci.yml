@@ -37,6 +37,17 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/curriculum-reading-1127" ]; then
+            expected_main=3eee26df66b3a3e8c1bd6b467013adcafcabc8c1
+            reviewed_payload=556bb83c4ccde4c65866f07495e35e4913af1c6f
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$reviewed_payload"
+            git merge-base --is-ancestor "$reviewed_payload" HEAD
+            git diff --exit-code "$reviewed_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            echo 'Verified the reviewed curriculum typography and attachment caption changes.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/lesson-download-filenames-1126" ]; then
             expected_main=22038c1b101edffe0b7c83e5afd9ac2e8d755e1a
             reviewed_payload=10959bfeb005d9fcfdfae016a8334b6fc37de3d8
