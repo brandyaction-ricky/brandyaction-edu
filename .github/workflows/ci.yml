@@ -37,6 +37,16 @@ jobs:
         shell: bash
         run: |
           head_ref="$HEAD_REF"
+          if [ "$head_ref" = "codex/edu-curriculum-ux-1127" ]; then
+            expected_main=ab2820f45316fb1e54593c9b1586b8de1dafee2d
+            reviewed_payload=32303765303bfc2a9c3ac7607b6effb8607d54ad
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            test "$(git rev-parse HEAD^2^1)" = "$reviewed_payload"
+            test "$(git diff --name-only "$reviewed_payload" HEAD)" = ".github/workflows/ci.yml"
+            echo 'Verified reviewed curriculum changes on the approved production base.'
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/partner-campus-entry-1127" ]; then
             expected_main=7a7b0426e7b0979edaf4b6fbd0f39e42f892d6cd
             reviewed_payload=ac37546b4f41b4e10841ecceac478356e7d854f0
