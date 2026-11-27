@@ -1,6 +1,17 @@
 // The floor stripe, keyboard movement and tap destinations share this centreline.
 const controls = [[2.2,13],[2.2,10],[1.8,8],[.8,6.1],[-.6,4.2],[-1.4,2.8],[-1.6,1],[-1.6,-2.5],[-1.75,-4],[-2,-5.8]];
-export const trail = controls.map(([x,z]) => ({x,z,length:0}));
+function curve(a,b,c,d,t) {
+  return b+.5*t*((c-a)+t*((2*a-5*b+4*c-d)+t*(-a+3*b-3*c+d)));
+}
+export const trail=[];
+for(let i=0;i<controls.length-1;i++){
+  const a=controls[Math.max(0,i-1)],b=controls[i],c=controls[i+1],d=controls[Math.min(controls.length-1,i+2)];
+  for(let step=0;step<5;step++){
+    const t=step/5;
+    trail.push({x:curve(a[0],b[0],c[0],d[0],t),z:curve(a[1],b[1],c[1],d[1],t),length:0});
+  }
+}
+trail.push({x:controls.at(-1)[0],z:controls.at(-1)[1],length:0});
 for (let i=1;i<trail.length;i++) trail[i].length=trail[i-1].length+Math.hypot(trail[i].x-trail[i-1].x,trail[i].z-trail[i-1].z);
 export const end = trail.at(-1).length;
 export const seat = {x:-2,z:-6.49};

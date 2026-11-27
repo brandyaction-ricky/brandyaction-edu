@@ -7,7 +7,7 @@ canvas:focus-visible { outline: 2px solid #477eff; outline-offset: -2px; }
 header { position: absolute; top: max(18px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; align-items: center; gap: 11px; color: white; font-size: 13px; font-weight: 650; text-shadow: 0 1px 4px #102233; pointer-events: none; }
 .wordmark { letter-spacing: .09em; font-size: 15px; font-weight: 850; }
 .divider { width: 1px; height: 14px; background: #ffffff80; }
-button { font: inherit; cursor: pointer; }
+button { font: inherit; cursor: pointer; touch-action: manipulation; }
 button:focus-visible { outline: 3px solid #5685ff; outline-offset: 3px; }
 #restart { pointer-events: auto; margin-left: auto; background: #152634c9; color: white; border: 1px solid #ffffff40; width: 44px; height: 44px; border-radius: 50%; font: 24px system-ui; }
 .card { position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: min(380px, calc(100% - 48px)); background: #faf9f4f7; border: 1px solid #ffffffae; border-radius: 12px; padding: 17px 20px; box-shadow: 0 6px 24px #10203326; }

@@ -33,7 +33,7 @@ async function start(){
   const keys=new Set(), reduced=matchMedia('(prefers-reduced-motion: reduce)');
   let distance=0, goal=null, seated=false, settle=0, viewBlend=0, previous=0, frame=0, phase='', first=true, lost=false;
   const insideAt=projectedDistance(-1.6,-.45);
-  function stage(){return seated?'seated':distance>=end-.015?'seat':distance>=insideAt?'study':'entry';}
+  function stage(){return seated?'seated':distance>=end-.003&&goal===null?'seat':distance>=insideAt?'study':'entry';}
   function keyDirection(){return Number(keys.has('ArrowUp')||keys.has('KeyW'))-Number(keys.has('ArrowDown')||keys.has('KeyS'));}
   function syncUI(){
     const state=stage(), moving=goal!==null||keyDirection()!==0;
@@ -64,7 +64,7 @@ async function start(){
         else if(goal!==null){
           const delta=goal-distance;
           distance+=Math.sign(delta)*Math.min(Math.abs(delta),4*step);
-          if(Math.abs(goal-distance)<.003){distance=goal;goal=null;}
+          if(Math.abs(goal-distance)<.015){distance=goal;goal=null;}
         }
       });
     }
@@ -92,7 +92,7 @@ async function start(){
     canvas.dataset.drawCalls=String(renderer.info.render.calls);
     document.body.style.setProperty('--progress',(distance/end).toFixed(3));
     syncUI();first=false;
-    if(goal!==null||direction||settle>0||Math.abs(Number(seated)-viewBlend)>.001)frame=requestAnimationFrame(draw);
+    if(moving||goal!==null||direction||settle>0||Math.abs(Number(seated)-viewBlend)>.001)frame=requestAnimationFrame(draw);
     else previous=0;
   }
   function wake(){if(!frame&&!document.hidden&&!lost){if(!previous)previous=performance.now();frame=requestAnimationFrame(draw);}}
