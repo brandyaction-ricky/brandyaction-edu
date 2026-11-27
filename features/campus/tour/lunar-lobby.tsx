@@ -9,25 +9,27 @@ export function isLobbyRoom(value: unknown): value is LobbyRoom {
   return value === 'study' || value === 'office' || value === 'live' || value === 'library';
 }
 
-export function LunarLobby({avatar, exit, onEnter, onMap}: {exit: {href: string; label: string}; avatar?: TourAvatar | null; onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
+export function LunarLobby({from, avatar, exit, onEnter, onMap}: {from: Exclude<LobbyRoom, 'live'> | null; exit: {href: string; label: string}; avatar?: TourAvatar | null; onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
   // Snapshot cosmetic choices on entry; a profile refresh must not reset a walk in progress.
   const [sceneUrl] = useState(() => {
     const look = avatar ?? readTourAvatar(TOUR_AVATAR_KEY);
     const appearance = new URLSearchParams({gender: look.gender, model: String(look.model),
       coat: look.coat, hairColor: look.hairColor, skinColor: look.skinColor, pantsColor: look.pantsColor});
+    if (from) appearance.set('from',from);
     return '/experience/study-walk/scene#' + appearance;
   });
   const frame = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== location.origin) return;
+      if (event.data?.type === 'moonshot-watch-stage') onEnter('live');
       if (event.data?.type === 'moonshot-lobby-arrived' && isLobbyRoom(event.data.room)) onEnter(event.data.room);
     }
     window.addEventListener('message', receive);
     return () => window.removeEventListener('message', receive);
   }, [onEnter]);
-  return <main className={styles.lobby} aria-label="문샷 캠퍼스 공용 로비">
-    <iframe ref={frame} src={sceneUrl} title="달 풍경 로비" />
+  return <main className={styles.lobby} aria-label="문샷 캠퍼스">
+    <iframe ref={frame} src={sceneUrl} title="달 풍경 캠퍼스" />
     <nav className={styles.actions} aria-label="캠퍼스 이동">
       <button onClick={onMap}>공간 이동</button>
       <a href={exit.href}>{exit.label} <span aria-hidden="true">→</span></a>

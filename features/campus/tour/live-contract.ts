@@ -5,6 +5,7 @@ import type {TourAvatar} from './appearance';
 import type {TourRole} from './model';
 import type {TourModules} from './tasks';
 export type TourLiveConnection={
+ stageProgram?:import('../webinar/domain').StageProgram | null;
  studyPresence?:boolean;
  modules?:TourModules;
  publicPresence?:boolean;

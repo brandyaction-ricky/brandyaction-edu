@@ -20,3 +20,15 @@ test('changing the destination mid-walk starts at the current position and reach
     }
   }
 });
+
+test('each room exit is a walkable point with a route to the other doors', () => {
+  assert.deepEqual(Object.keys(doors).sort(), ['library','office','study']);
+  for (const [source, door] of Object.entries(doors)) {
+    for (const target of Object.keys(doors)) {
+      const path = routeFrom(door, target);
+      assert.deepEqual([path[0].x,path[0].z],[door.x,door.z]);
+      assert.deepEqual([path.at(-1).x,path.at(-1).z],[doors[target].x,doors[target].z]);
+      assert.equal(path.at(-1).length === 0, source === target);
+    }
+  }
+});

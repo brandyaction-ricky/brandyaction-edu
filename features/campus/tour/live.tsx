@@ -30,11 +30,12 @@ export function FourSpacesLive({lunarLobby=false,operator=false,publicPresence=f
 }
 function ConnectedCampus({lunarLobby,snapshot,operator,publicPresence,studyPresence,modules,error,onRefresh,onSelect}:{lunarLobby:boolean;snapshot:CampusSnapshot;operator:boolean;publicPresence:boolean;studyPresence:boolean;modules?:TourModules;error:string;onRefresh:()=>void;onSelect:(id:string)=>void}){
  const [content,setContent]=useState<CampusContent>({});
+ const [stageProgram,setStageProgram]=useState<import('../webinar/domain').StageProgram|null>(null);
  const [welcomeSettings,setWelcomeSettings]=useState<WelcomeSettings>();
  const [libraryResources,setLibraryResources]=useState<CampusResource[]>([]),[libraryError,setLibraryError]=useState('');
 
  const [avatar,setAvatar]=useState<TourAvatar|null>(null),[failure,setFailure]=useState(''),[denied,setDenied]=useState(false),[revision,setRevision]=useState(0),[level,setLevel]=useState<number|null>(null);
- useEffect(()=>{const controller=new AbortController();void fetch('/api/campus/library?enrollmentId='+snapshot.selectedEnrollmentId,{cache:'no-store',signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'자료실을 불러오지 못했어요.');setLibraryResources(d.resources);setWelcomeSettings(d.welcome);setContent(d.content||{});setLibraryError('');}).catch(e=>{if(e.name!=='AbortError')setLibraryError(e.message);});return()=>controller.abort();},[snapshot.selectedEnrollmentId,revision]);
+ useEffect(()=>{const controller=new AbortController();void fetch('/api/campus/library?enrollmentId='+snapshot.selectedEnrollmentId,{cache:'no-store',signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'자료실을 불러오지 못했어요.');setStageProgram(d.stageProgram||null);setLibraryResources(d.resources);setWelcomeSettings(d.welcome);setContent(d.content||{});setLibraryError('');}).catch(e=>{if(e.name!=='AbortError')setLibraryError(e.message);});return()=>controller.abort();},[snapshot.selectedEnrollmentId,revision]);
  const cohort=snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId)!.cohortId,writing=useRef(false),epoch=useRef(0),session=useRef('');
  useEffect(()=>{session.current=crypto.randomUUID();const controller=new AbortController();let stop=false;
  async function read(){if(stop||document.hidden||writing.current)return;const ticket=epoch.current;try{const r=await fetch('/api/campus/space?cohortId='+encodeURIComponent(cohort),{credentials:'same-origin',cache:'no-store',signal:controller.signal});const d=await r.json();if(!r.ok){if([401,403].includes(r.status))setDenied(true);throw Error(d.error||'캐릭터 정보를 확인하지 못했어요.');}if(!stop&&ticket===epoch.current&&!writing.current){setAvatar(tourAvatar(d.profile));setFailure('');}}catch(e){if(!stop&&(e as Error).name!=='AbortError')setFailure((e as Error).message);}}
@@ -47,5 +48,5 @@ function ConnectedCampus({lunarLobby,snapshot,operator,publicPresence,studyPrese
  }finally{writing.current=false;}}
  if(denied)return <CampusFrame><h1>수강권을 다시 확인해 주세요</h1><p>이 공간을 계속 이용할 수 없습니다. 내 클래스에서 현재 권한을 확인해 주세요.</p><Link href="/my/classes">내 클래스</Link></CampusFrame>;
  const Space=lunarLobby?LunarCampus:Campus;
- return <><Space snapshot={snapshot} live={{studyPresence,modules,publicPresence,libraryResources,welcomeSettings,content,role:operator?'admin':'student',avatar,level,saveAvatar,onRefresh,onSelect}}/>{(error||failure||libraryError)&&<div role="alert" style={{position:'fixed',top:90,left:24,zIndex:100,background:'#fff',color:'#9f1239',padding:12,borderRadius:12}}>{error||failure||libraryError} <button onClick={()=>{setRevision(v=>v+1);onRefresh();}}>다시 확인</button></div>}</>;
+ return <><Space snapshot={snapshot} live={{stageProgram,studyPresence,modules,publicPresence,libraryResources,welcomeSettings,content,role:operator?'admin':'student',avatar,level,saveAvatar,onRefresh,onSelect}}/>{(error||failure||libraryError)&&<div role="alert" style={{position:'fixed',top:90,left:24,zIndex:100,background:'#fff',color:'#9f1239',padding:12,borderRadius:12}}>{error||failure||libraryError} <button onClick={()=>{setRevision(v=>v+1);onRefresh();}}>다시 확인</button></div>}</>;
 }

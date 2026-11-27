@@ -1,10 +1,9 @@
 // The paint, picking and avatar movement all use these same floor coordinates.
-const trunk = [[2.2,13], [2.2,10], [1.7,8.5]];
+const trunk = [[0,11], [0,9.4], [0,8.3]];
 export const doors = {
-  study:   {label:'공부방',        x:-1.75, z:.25, points:[[1,6.1],[-.65,4.1],[-1.6,2.4],[-1.75,.25]]},
-  office:  {label:'내 AI 사무실', x:-8.1, z:3.3, points:[[-.7,7.5],[-5.8,6.3],[-7.7,5.3],[-8.1,3.3]]},
-  live:    {label:'라이브홀',     x:7.5,  z:2.1, points:[[3.4,7.3],[6.4,5.5],[7.5,4.1],[7.5,2.1]]},
-  library: {label:'자료실',      x:3.55, z:3.1, points:[[2.65,7.7],[3.4,6.3],[3.55,4.9],[3.55,3.1]]},
+  study: {label:'공부방', x:-3.65, z:3.35, points:[[-1.6,7.1],[-3.65,5.25],[-3.65,3.35]]},
+  library: {label:'자료실', x:-6.85, z:1.45, points:[[-4.7,7.7],[-6.85,5.6],[-6.85,1.45]]},
+  office: {label:'내 AI 사무실', x:4.45, z:3.25, points:[[2.3,7.1],[4.45,5.3],[4.45,3.25]]},
 };
 function measure(pairs) {
   const path = [];
@@ -57,6 +56,13 @@ export function nearestPoint(path,x,z) {
   return {gap,length};
 }
 export function routeFrom(position,destination) {
+  const door=doors[destination];
+  const aisle=5.65;
+  if(position.z<=aisle){
+    const start=[position.x,position.z], end=[door.x,door.z];
+    if(Math.abs(position.x-door.x)<.01)return measure([start,end]);
+    return measure(rounded([start,[position.x,aisle],[door.x,aisle],end]));
+  }
   const target=routes[destination];
   const [source,nearest] = Object.keys(routes).map(id=>[id,nearestPoint(routes[id],position.x,position.z)])
     .sort((a,b)=>a[1].gap-b[1].gap)[0];

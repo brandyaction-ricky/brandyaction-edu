@@ -8,11 +8,20 @@ const canvas = document.querySelector('#walk-scene');
 const title = document.querySelector('#title'), hint = document.querySelector('#hint');
 const walk = document.querySelector('#next'), picks = [...document.querySelectorAll('[data-room]')];
 const track = document.querySelector('.track');
-let destination = null, position = entrance, path = [], length = 0, distance = 0;
+const params = new URLSearchParams(location.hash.slice(1));
+const from = params.get('from');
+const returnDoor = Object.hasOwn(doors, from) ? doors[from] : null;
+let destination = null, position = returnDoor ?? entrance, path = [], length = 0, distance = 0;
 let goal = null, sent = false, ready = false, failed = false;
 const keys = new Set();
 let showLine = () => {}, wake = () => {};
 
+const watch = document.querySelector('#watch');
+function openStage() {
+  goal=null; keys.clear(); guide();
+  window.parent.postMessage({type:'moonshot-watch-stage'}, location.origin);
+}
+watch.onclick=openStage;
 function arrive() {
   if (!destination || sent) return;
   sent = true; goal = null; keys.clear();
@@ -26,7 +35,7 @@ function guide() {
   walk.hidden = !destination;
   track.hidden = !destination;
   hint.textContent = failed ? '3D 대신 선택한 공간으로 바로 들어갈 수 있어요.' :
-    !destination ? '공간을 고르면 바닥에 파란 길이 나타나요.' :
+    !destination ? (returnDoor ? returnDoor.label+' 문 앞이에요. 다음 공간을 골라주세요.' : '갈 곳을 고르면 문 앞까지 파란 길이 이어져요.') :
     moving ? '문에 도착하면 공간이 열려요.' : '파란 선을 누르거나 따라 걷기를 선택하세요.';
 }
 function choose(id) {
@@ -61,7 +70,7 @@ async function start() {
   const scene=new T.Scene();scene.background=new T.Color(0x050d20);
   scene.add(new T.HemisphereLight(0xfff5df,0x83939e,1.9));
   const sun=new T.DirectionalLight(0xffedcf,2.15);sun.position.set(6,10,4);scene.add(sun);
-  const appearance=Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+  const appearance=Object.fromEntries(params);
   appearance.model=Number(appearance.model);
   const avatarModel=resolveAvatarModel(appearance);
   const asset=avatarModel.gender+'-'+'abcdef'[avatarModel.model];
@@ -91,6 +100,7 @@ async function start() {
     scene.add(stripe);
   };
   if(destination)showLine(path);
+  const screen=scene.getObjectByName('live-stage-screen');
   const camera=new T.PerspectiveCamera(51,1,.08,145),ray=new T.Raycaster(),ndc=new T.Vector2();
   const floor=new T.Plane(new T.Vector3(0,1,0),0),hit=new T.Vector3();
   let previous=0,frame=0,settle=.25, lookOffset=0;
@@ -116,10 +126,11 @@ async function start() {
     shadow.position.set(position.x,.031,position.z);
     const narrow=camera.aspect<.83;
     // Pull back at entry so the concourse reads as one space; follow the walker at each door.
-    camera.position.set(position.x+(narrow?.45:1.4),narrow?3.3:2.95,position.z+(narrow?7.2:6.55));
+    const entryView=narrow?Math.max(0,Math.min(1,(position.z-5.8)/5.2)):0;
+    camera.position.set(position.x*.82-entryView*.75,narrow?3.75+entryView*.7:3.15,position.z+(narrow?8.5+7.1*entryView:6.0));
     const targetOffset=destination?(doors[destination].x-position.x)*(narrow?.7:.3):0;
     lookOffset+=(targetOffset-lookOffset)*Math.min(1,dt*8);
-    camera.lookAt(position.x-(narrow?.27:1.0)+lookOffset,1.65,position.z-4.7);
+    camera.lookAt(position.x*.78+lookOffset-entryView*.75,narrow?.95+entryView*.55:1.55,position.z-5.6);
     renderer.render(scene,camera);
     canvas.dataset.playerX=position.x.toFixed(2);canvas.dataset.playerZ=position.z.toFixed(2);
     if(destination){document.body.style.setProperty('--progress',String(length?distance/length:1));if(distance>=length-.001){arrive();return;}}
@@ -144,8 +155,9 @@ async function start() {
     down=null;const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);
     ray.setFromCamera(ndc,camera);
     for(const [id,door] of Object.entries(doors)){
-      if(ray.ray.distanceToPoint(new T.Vector3(door.x,3.05,door.z))<.79){choose(id);goal=length;guide();wake();return;}
+      if(ray.ray.distanceToPoint(new T.Vector3(door.x,2.15,door.z-.6))<1.42){choose(id);goal=length;guide();wake();return;}
     }
+    if(screen && ray.intersectObject(screen).length){openStage();return;}
     if(!destination||!ray.ray.intersectPlane(floor,hit))return;
     goal=nearestPoint(path,hit.x,hit.z).length;canvas.focus({preventScroll:true});guide();wake();
   });

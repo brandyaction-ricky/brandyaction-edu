@@ -3,3 +3,8 @@
 .actions { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); display: flex; align-items: center; gap: 6px; }
 .actions :is(button,a) { min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 13px; text-decoration: none; border-radius: 24px; border: 1px solid #ffffff55; color: #fff; background: #172c3ded; font-weight: 700; cursor: pointer; }
 .actions :is(button,a):focus-visible { outline: 3px solid #84adff; }
+
+.player { display:block; width:100%; aspect-ratio:16/9; height:auto; background:#192636; border:0; border-radius:8px; }
+.caption { font-size:14px; color:#455665; }
+.destinations { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0; }
+.destinations button { min-height:46px; padding:10px; font:inherit; font-weight:650; border:1px solid #cbd4d9; border-radius:8px; color:#223d51; background:white; cursor:pointer; }
