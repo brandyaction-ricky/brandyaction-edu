@@ -1,0 +1,30 @@
+* { box-sizing: border-box; }
+:root { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #192b36; }
+html, body, main { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+main { position: relative; background: #263d4e; }
+canvas { width: 100%; height: 100%; display: block; touch-action: none; outline: 0; }
+canvas:focus-visible { outline: 2px solid #477eff; outline-offset: -2px; }
+header { position: absolute; top: max(18px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; align-items: center; gap: 11px; color: white; font-size: 13px; font-weight: 650; text-shadow: 0 1px 4px #102233; pointer-events: none; }
+.wordmark { letter-spacing: .09em; font-size: 15px; font-weight: 850; }
+.divider { width: 1px; height: 14px; background: #ffffff80; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid #5685ff; outline-offset: 3px; }
+#restart { pointer-events: auto; margin-left: auto; background: #152634c9; color: white; border: 1px solid #ffffff40; width: 44px; height: 44px; border-radius: 50%; font: 24px system-ui; }
+.card { position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: min(380px, calc(100% - 48px)); background: #faf9f4f7; border: 1px solid #ffffffae; border-radius: 12px; padding: 17px 20px; box-shadow: 0 6px 24px #10203326; }
+.position { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 650; color: #394e62; }
+.position i { width: 7px; height: 7px; border-radius: 50%; background: #305dd9; }
+.track { width: 66px; height: 3px; background: #c8cfd2; margin-left: auto; }
+.track span { display: block; width: 100%; height: 100%; background: #305dd9; transform: scaleX(var(--progress, 0)); transform-origin: left; }
+h1 { font-size: 22px; line-height: 1.3; letter-spacing: -.05em; margin: 7px 0 12px; }
+.actions { display:flex; align-items:center; gap:12px; justify-content:space-between; }
+p { margin: 0; font-size: 13px; line-height: 1.55; color: #455765; word-break: keep-all; }
+#next { background: #183748; color: white; font-weight: 700; font-size: 14px; padding: 12px 17px; min-height: 44px; border: 0; border-radius: 7px; white-space: nowrap; }
+#next:hover { background: #264b62; }
+#next:disabled { background: #556773; cursor: wait; }
+[hidden] { display: none !important; }
+@media(max-width: 600px) {
+ header {left:16px;right:16px;top:max(12px, env(safe-area-inset-top));}
+ .card {left:12px;bottom:max(12px,env(safe-area-inset-bottom));width:calc(100% - 24px);padding:12px 15px;}
+ h1 {font-size:20px;margin:5px 0 8px;}
+}
+@media(max-height: 480px) { .card {bottom:6px; padding:8px 12px;} h1 {font-size:17px;margin:3px 0;} }
