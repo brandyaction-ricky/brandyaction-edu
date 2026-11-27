@@ -60,3 +60,7 @@
   .reader > .top label { flex: none; }
   .reader > .top > button { align-self: flex-start; }
 }
+
+.loadingLines { display: grid; gap: .75rem; padding-block: 1rem; }
+.loadingLines span { height: .8rem; background: #e5eaf1; border-radius: .25rem; }
+.loadingLines span:last-child { width: 68%; }

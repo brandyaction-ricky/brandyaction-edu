@@ -1,9 +1,9 @@
 /** Navigation hints never grant access: every destination still checks the current session. */
 export const campusSections = ['learning','space','community','business','support','ai','office','journal'] as const;
 export function validSection(value: string | null | undefined) { return campusSections.includes(value as typeof campusSections[number]) ? value! : 'learning'; }
-export const campusRooms = ['live','study','office','library'];
+export const campusRooms = ['live','study','office','library'] as const;
 /** The room named in a campus address, so a reload or the way back from a lesson opens that room instead of the map. */
-export function requestedRoom(search: string): string | null { const room = new URLSearchParams(search).get('room'); return room && campusRooms.includes(room) ? room : null; }
+export function requestedRoom(search: string) { const room = new URLSearchParams(search).get('room'); return campusRooms.find(value => value === room) ?? null; }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function requestedEnrollment(search: string): string | null { const id = new URLSearchParams(search).get('enrollmentId'); return id && uuid.test(id) ? id : null; }
 export function campusReturnPath(value: string | null): string | null {
@@ -14,7 +14,7 @@ export function campusReturnPath(value: string | null): string | null {
   const q = new URLSearchParams({enrollmentId:id,section:validSection(u.searchParams.get('section'))});
   if (u.searchParams.get('view') === 'immersive') q.set('view','immersive');
   // The room the learner was in, so the way back opens that room instead of the map.
-  const room = u.searchParams.get('room'); if (room && campusRooms.includes(room)) q.set('room', room);
+  const room = requestedRoom(u.search); if (room) q.set('room', room);
   return '/campus/workspace?' + q;
  } catch { return null; }
 }

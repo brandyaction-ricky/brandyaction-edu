@@ -108,5 +108,5 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   // Staff/admins keep the mark but can open the lesson (read-only preview, CEO 11-18).
   const staff = viewer.role === 'admin' || viewer.role === 'staff';
   if (open) snapshot.lessons = snapshot.lessons.map(l => { const locked = !open.some(g => g.lessonId === l.id && g.isUnlocked); return staff && locked ? { ...l, locked: false, staffPreview: true } : { ...l, locked }; });
-  return { ...snapshot, guidedLessons };
+  return { ...snapshot, guidedLessons, staffPublicationReader: staff };
 }

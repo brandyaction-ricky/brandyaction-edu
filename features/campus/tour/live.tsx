@@ -8,7 +8,7 @@ import Link from 'next/link';
 import {CampusFrame} from '../ui/dashboard';
 import type {CampusSnapshot} from '../contracts';
 import {createEduBridge,type EduBridge,type BridgeState} from '@/public/campus/edu-bridge.mjs';
-import {requestedEnrollment} from '../ui/navigation';
+import {requestedEnrollment,requestedRoom} from '../ui/navigation';
 import {tourAvatar,type TourAvatar} from './appearance';
 import type {TourModules} from './tasks';
 import {campusDraftState} from '../ui/draft-guard';
@@ -17,7 +17,13 @@ const Campus=dynamic(()=>import('./preview').then(m=>m.FourSpacesPreview),{loadi
 export function FourSpacesLive({operator=false,publicPresence=false,studyPresence=false,modules}:{operator?:boolean;publicPresence?:boolean;studyPresence?:boolean;modules?:TourModules}){
  const [state,setState]=useState<BridgeState>({status:'loading',snapshot:null}),[error,setError]=useState('');
  const bridge=useRef<EduBridge|null>(null),selected=useRef<string|null>(null);
- useEffect(()=>{const b=createEduBridge({onState:next=>setState(old=>next.status==='loading'&&old.status==='ready'?old:next)});bridge.current=b;
+ useEffect(()=>{
+   void import('./preview').catch(() => {});
+   const b=createEduBridge({onState:next=>{
+     // A scope list with a recommendation is an intermediate result on automatic entry.
+     if(next.status==='ready' && !next.snapshot.selectedEnrollmentId && next.snapshot.scopes.length) return;
+     setState(old=>next.status==='loading'&&old.status==='ready'&&old.snapshot.selectedEnrollmentId===selected.current?old:next);
+   }});bridge.current=b;
  selected.current=requestedEnrollment(location.search);let disposed=false;void b.load(selected.current).then(data=>{if(!disposed&&!selected.current&&data.scopes[0]){selected.current=data.scopes[0].enrollmentId;const u=new URL(location.href);u.searchParams.set('enrollmentId',selected.current);history.replaceState(history.state,'',u);return b.load(selected.current);}}).catch(()=>{});
  const refresh=()=>{if(!document.hidden&&!campusDraftState().dirty&&!campusDraftState().locked&&selected.current)void b.load(selected.current).catch(()=>{});};const timer=setInterval(refresh,60000);document.addEventListener('visibilitychange',refresh);
  return()=>{disposed=true;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);b.dispose();bridge.current=null;};},[]);
@@ -45,5 +51,5 @@ function ConnectedCampus({snapshot,operator,publicPresence,studyPresence,modules
  const next={...before.profile,...tourAvatar(value)},saved=await fetch('/api/campus/space',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'profile',cohortId:cohort,sessionId:session.current,profile:next})}),data=await saved.json();if(!saved.ok){if([401,403].includes(saved.status))setDenied(true);throw Error(data.error||'저장하지 못했어요.');}const result=tourAvatar(data.profile);setAvatar(result);window.dispatchEvent(new CustomEvent('campus:avatar-saved',{detail:{cohortId:cohort,appearance:result}}));return result;
  }finally{writing.current=false;}}
  if(denied)return <CampusFrame><h1>수강권을 다시 확인해 주세요</h1><p>이 공간을 계속 이용할 수 없습니다. 내 클래스에서 현재 권한을 확인해 주세요.</p><Link href="/my/classes">내 클래스</Link></CampusFrame>;
- return <><Campus snapshot={snapshot} live={{studyPresence,modules,publicPresence,libraryResources,welcomeSettings,content,role:operator?'admin':'student',avatar,level,saveAvatar,onRefresh,onSelect}}/>{(error||failure||libraryError)&&<div role="alert" style={{position:'fixed',top:90,left:24,zIndex:100,background:'#fff',color:'#9f1239',padding:12,borderRadius:12}}>{error||failure||libraryError} <button onClick={()=>{setRevision(v=>v+1);onRefresh();}}>다시 확인</button></div>}</>;
+ return <><Campus snapshot={snapshot} live={{initialRoom:requestedRoom(location.search) ?? undefined,studyPresence,modules,publicPresence,libraryResources,welcomeSettings,content,role:operator?'admin':'student',avatar,level,saveAvatar,onRefresh,onSelect}}/>{(error||failure||libraryError)&&<div role="alert" style={{position:'fixed',top:90,left:24,zIndex:100,background:'#fff',color:'#9f1239',padding:12,borderRadius:12}}>{error||failure||libraryError} <button onClick={()=>{setRevision(v=>v+1);onRefresh();}}>다시 확인</button></div>}</>;
 }

@@ -2,13 +2,13 @@ import type {CampusContent} from '../content/model';
 import type {WelcomeSettings} from '../welcome/content';
 import type {CampusResource} from '../webinar/resources';
 import type {TourAvatar} from './appearance';
-import type {TourRole} from './model';
+import type {TourRole,TourRoom} from './model';
 import type {TourModules} from './tasks';
 export type TourLiveConnection={
  studyPresence?:boolean;
  modules?:TourModules;
  publicPresence?:boolean;
- initialRoom?:'welcome';
+ initialRoom?:TourRoom;
  libraryResources?:CampusResource[];
  welcomeSettings?:WelcomeSettings; content?:CampusContent;
  role:Exclude<TourRole,'guest'|'expired'>;

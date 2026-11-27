@@ -227,6 +227,9 @@ export function Platform({
   const admin = path[0] === "admin";
   const account = path[0] === "my";
   const learning = path[0] === "learn";
+  useEffect(() => {
+    if (learning) void import('./final/classroom').catch(() => {});
+  }, [learning]);
   const [support, setSupport] = useState({ email: "", url: "" });
   const [loadedData, setData] = useState<Data>({});
   const [user, setUser] = useState(() =>
