@@ -27,8 +27,8 @@ export function buildStudyWalkSet(T,scene) {
     mesh.position.set(x,y,z);scene.add(mesh);
   }
   // The audience faces the stage from the entrance. Both side aisles stay clear to the doors.
-  box(stone,0,-.16,4,25,.3,24);
-  box(ivory,0,-.015,4,17,.035,22);
+  box(stone,0,-.16,14,25,.3,44);
+  box(ivory,0,-.015,14,17,.035,42);
   // Daylight is painted once. The floor needs no realtime lights or shadow passes.
   const finish=document.createElement('canvas');finish.width=768;finish.height=640;
   const brush=finish.getContext('2d');
@@ -42,8 +42,8 @@ export function buildStudyWalkSet(T,scene) {
   for(let i=0;i<9;i++){brush.beginPath();brush.moveTo(i*96,0);brush.lineTo(i*96,640);brush.stroke();}
   for(let i=0;i<8;i++){brush.beginPath();brush.moveTo(0,i*90);brush.lineTo(768,i*90);brush.stroke();}
   const paving=new T.CanvasTexture(finish);paving.colorSpace=T.SRGBColorSpace;
-  const tile=new T.Mesh(new T.PlaneGeometry(25,24),new T.MeshBasicMaterial({map:paving}));
-  tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,4);scene.add(tile);
+  const tile=new T.Mesh(new T.PlaneGeometry(25,44),new T.MeshBasicMaterial({map:paving}));
+  tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,14);scene.add(tile);
   for(const x of [-8.4,8.4])box(edge,x,.009,4,.055,.012,22);
   for(const z of [-5,-1,3,7,11,15])box(stone,0,.005,z,16.8,.012,.022);
   for(const z of [-8,1,12]){
