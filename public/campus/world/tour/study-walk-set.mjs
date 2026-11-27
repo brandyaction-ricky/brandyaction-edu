@@ -1,39 +1,7 @@
-// The floor stripe, keyboard movement and tap destinations share this centreline.
-const controls = [[2.2,13],[2.2,10],[1.8,8],[.8,6.1],[-.6,4.2],[-1.4,2.8],[-1.6,1],[-1.6,-2.5],[-1.75,-4],[-2,-5.8]];
-function curve(a,b,c,d,t) {
-  return b+.5*t*((c-a)+t*((2*a-5*b+4*c-d)+t*(-a+3*b-3*c+d)));
-}
-export const trail=[];
-for(let i=0;i<controls.length-1;i++){
-  const a=controls[Math.max(0,i-1)],b=controls[i],c=controls[i+1],d=controls[Math.min(controls.length-1,i+2)];
-  for(let step=0;step<5;step++){
-    const t=step/5;
-    trail.push({x:curve(a[0],b[0],c[0],d[0],t),z:curve(a[1],b[1],c[1],d[1],t),length:0});
-  }
-}
-trail.push({x:controls.at(-1)[0],z:controls.at(-1)[1],length:0});
-for (let i=1;i<trail.length;i++) trail[i].length=trail[i-1].length+Math.hypot(trail[i].x-trail[i-1].x,trail[i].z-trail[i-1].z);
-export const end = trail.at(-1).length;
-export const seat = {x:-2,z:-6.49};
-export function pointAt(distance) {
-  const i=trail.findIndex(p=>p.length>=distance);
-  if(i===0)return trail[0];
-  if(i<0)return trail.at(-1);
-  const a=trail[i-1], b=trail[i], t=(distance-a.length)/(b.length-a.length);
-  return {x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};
-}
-export function projectedDistance(x,z) {
-  let nearest=Infinity, result=0;
-  for(let i=1;i<trail.length;i++){
-    const a=trail[i-1], b=trail[i], dx=b.x-a.x, dz=b.z-a.z;
-    const t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz)));
-    const gap=Math.hypot(x-a.x-dx*t,z-a.z-dz*t);
-    if(gap<nearest){nearest=gap;result=a.length+t*(b.length-a.length);}
-  }
-  return result;
-}
+import {doors} from './lobby-paths.mjs';
 
 export function buildStudyWalkSet(T,scene) {
+  const seat={x:-2,z:-6.49};
   const ink=0x263a48, graphite=0x31404c, ivory=0xe3dac7, stone=0xccbeaa;
   const blue=0x2653bd, wood=0xbe9267, edge=0xe4c49a, navy=0x294359, steel=0x52606a;
   const cube=new T.BoxGeometry(1,1,1), cylinder=new T.CylinderGeometry(.5,.5,1,14);
@@ -104,11 +72,6 @@ export function buildStudyWalkSet(T,scene) {
   box(stone,0,-.12,7,27,.24,18);
   box(0xc7ad8e,-3,-.1,-6,15,.2,14);
   finishFloor(0,7,27,18,false);finishFloor(-3,-6.3,15,13,true);
-  for(let i=1;i<trail.length;i++){
-    const a=trail[i-1],b=trail[i],dx=b.x-a.x,dz=b.z-a.z;
-    box(blue,(a.x+b.x)/2,.018,(a.z+b.z)/2,.19,.016,Math.hypot(dx,dz)+.035,0,Math.atan2(dx,dz));
-  }
-  round(blue,trail.at(-1).x,.024,trail.at(-1).z,.34,.012,.34);
   // Graphite identity wall uses a real opening, so the camera can pass through it.
   box(graphite,-8.15,3,0,8.1,6,.42);
   box(graphite,1.05,3,0,.9,6,.42);
@@ -127,6 +90,16 @@ export function buildStudyWalkSet(T,scene) {
   box(0xd85737,-5.03,4.96,.26,.14,.57,.06,-.35);
   sign('공부방',-1.75,3.17,.49,2.45,.48,'#1f3343','#e9dec4');
   box(wood,-7.8,.47,.81,4.2,.19,.94);for(const x of[-9.55,-6.05])box(ink,x,.22,.78,.22,.44,.78);
+  // Three freestanding entrances and the existing reading-room door face the same concourse.
+  const portalColors = {office:0x344a4d, live:0x634438, library:0x4c5260};
+  for (const [id,color] of Object.entries(portalColors)) {
+    const {x,z,label}=doors[id];
+    for (const dx of [-1.36,1.36]) box(color,x+dx,1.53,z-.26,.21,3.06,.46);
+    box(color,x,3.04,z-.26,2.94,.56,.46);
+    box(0xd6b98b,x,2.78,z-.02,2.54,.048,.08);
+    sign(label,x,3.05,z+.005,2.42,.38,'#fff6e5');
+    box(0xd0c6b0,x,.017,z,2.56,.024,.82);
+  }
   // Arches frame the moon. An open span between ribs gives the entrance its sight line.
   for(const z of[-10,-3,4,11,17]){
     for(const x of[-13,13])box(steel,x,2.35,z,.16,4.7,.16);

@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
       ],
     }, {
+      source: "/experience/study-walk/scene",
+      headers: [
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+      ],
+    }, {
       // Public course information can be read inside this site’s campus dialog.
       source: "/classes/:slug",
       headers: [
