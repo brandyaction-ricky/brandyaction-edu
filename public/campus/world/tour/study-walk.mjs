@@ -156,14 +156,18 @@ async function start() {
     const studyWing=smooth((6.1-position.z)/3.1)*smooth((2.0-Math.abs(position.x-doors.study.x))/1.1);
     const inside=smooth((3.55-position.z)/4.5)*studyWing;
     const blend=(a,b,t)=>a+(b-a)*t;
-    const cx=blend(position.x*.88+(narrow?.12:1.72),position.x-.16+inside*(narrow?1.34:1.96),studyWing);
-    const cy=blend(narrow?3.35+entryView*.85:2.92,2.14+inside*.65,studyWing);
-    const cz=blend(narrow?8+8.2*entryView:6.35,narrow?5.05-inside*.46:4.85-inside*.18,studyWing);
-    camera.position.set(cx,cy,position.z+cz);
+    const cy=blend(narrow?3.35+entryView*.85:2.92,2.14+inside*.42,studyWing);
+    const cz=blend(narrow?8+8.2*entryView:6.35,narrow?5.05-inside*1.60:4.85-inside*1.73,studyWing);
+    const cameraZ=position.z+cz;
+    // The character crosses the opening several paces before the camera. Keep the lens in
+    // the aisle until it clears the inner red jamb, then reveal the chair from the side.
+    const clearOfArch=smooth((2.70-cameraZ)/1.12);
+    const cx=blend(position.x*.88+(narrow?.12:1.72),position.x-.11+inside*clearOfArch*(narrow?1.48:1.86),studyWing);
+    camera.position.set(cx,cy,cameraZ);
     const targetOffset=destination?(doors[destination].x-position.x)*(narrow?.7:.3):0;
     lookOffset+=(targetOffset-lookOffset)*Math.min(1,dt*8);
     camera.lookAt(blend(position.x*.84+lookOffset+entryView*1.39,studySeat.x-.04-inside*.5,studyWing),
-      blend(narrow?1.25+entryView*.58:1.96,2.05-inside*.50,studyWing),
+      blend(narrow?1.25+entryView*.58:1.96,2.05-inside*.75,studyWing),
       position.z-blend(6.3,2.55-inside*1.80,studyWing));
     renderer.render(scene,camera);
     canvas.dataset.playerX=position.x.toFixed(2);canvas.dataset.playerZ=position.z.toFixed(2);
