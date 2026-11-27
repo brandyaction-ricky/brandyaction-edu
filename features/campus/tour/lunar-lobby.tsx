@@ -1,5 +1,6 @@
 'use client';
-import {useEffect, useRef} from 'react';
+import {useEffect, useRef, useState} from 'react';
+import {readTourAvatar, TOUR_AVATAR_KEY, type TourAvatar} from './appearance';
 import type {TourRoom} from './model';
 import styles from './lunar-lobby.module.css';
 
@@ -8,7 +9,14 @@ export function isLobbyRoom(value: unknown): value is LobbyRoom {
   return value === 'study' || value === 'office' || value === 'live' || value === 'library';
 }
 
-export function LunarLobby({onEnter, onMap}: {onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
+export function LunarLobby({avatar, onEnter, onMap}: {avatar?: TourAvatar | null; onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
+  // Snapshot cosmetic choices on entry; a profile refresh must not reset a walk in progress.
+  const [sceneUrl] = useState(() => {
+    const look = avatar ?? readTourAvatar(TOUR_AVATAR_KEY);
+    const appearance = new URLSearchParams({gender: look.gender, model: String(look.model),
+      coat: look.coat, hairColor: look.hairColor, skinColor: look.skinColor, pantsColor: look.pantsColor});
+    return '/experience/study-walk/scene#' + appearance;
+  });
   const frame = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     function receive(event: MessageEvent) {
@@ -19,7 +27,7 @@ export function LunarLobby({onEnter, onMap}: {onEnter: (id: LobbyRoom) => void; 
     return () => window.removeEventListener('message', receive);
   }, [onEnter]);
   return <main className={styles.lobby} aria-label="문샷 캠퍼스 공용 로비">
-    <iframe ref={frame} src="/experience/study-walk/scene" title="달 풍경 로비" />
+    <iframe ref={frame} src={sceneUrl} title="달 풍경 로비" />
     <button className={styles.mapButton} onClick={onMap}>공간 이동</button>
   </main>;
 }

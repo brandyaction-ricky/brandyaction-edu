@@ -23,6 +23,6 @@ export function LunarCampus(props: CampusTourProps) {
     setEntry(null);
   }
   if (entry === 'loading') return <p role="status">캠퍼스 입구를 열고 있어요.</p>;
-  if (entry === null) return <LunarLobby onEnter={setEntry} onMap={() => setEntry('map')}/>;
+  if (entry === null) return <LunarLobby avatar={props.live?.avatar} onEnter={setEntry} onMap={() => setEntry('map')}/>;
   return <CampusRooms {...props} lobbyEntry={entry} returnToLobby={returnToLobby}/>;
 }

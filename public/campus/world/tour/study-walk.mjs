@@ -1,5 +1,6 @@
 import {buildStudyWalkSet} from './study-walk-set.mjs';
 import {doors, entrance, nearestPoint, pointAt, routeFrom} from './lobby-paths.mjs';
+import {resolveAvatarModel, styleAvatarActor} from '../office/vendor/avatar-appearance.js';
 import {advanceMovement} from './movement-time.mjs';
 import {applyRenderProfile} from './render-profile.mjs';
 
@@ -60,7 +61,11 @@ async function start() {
   const scene=new T.Scene();scene.background=new T.Color(0x050d20);
   scene.add(new T.HemisphereLight(0xfff5df,0x83939e,1.9));
   const sun=new T.DirectionalLight(0xffedcf,2.15);sun.position.set(6,10,4);scene.add(sun);
-  const [avatar]=await Promise.all([createCampusAssetLoader().loadAsync('/campus/world/office/vendor/assets/kenney/characters/character-female-c.glb'), buildStudyWalkSet(T,scene)]);
+  const appearance=Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+  appearance.model=Number(appearance.model);
+  const avatarModel=resolveAvatarModel(appearance);
+  const asset=avatarModel.gender+'-'+'abcdef'[avatarModel.model];
+  const [avatar]=await Promise.all([createCampusAssetLoader().loadAsync('/campus/world/office/vendor/assets/kenney/characters/character-'+asset+'.glb'), buildStudyWalkSet(T,scene)]);
   const actor=avatar.scene,bounds=new T.Box3().setFromObject(actor),scale=1.54/(bounds.max.y-bounds.min.y);
   actor.scale.setScalar(scale); scene.add(actor);
   const mixer=new T.AnimationMixer(actor);
@@ -70,6 +75,7 @@ async function start() {
   shadow.rotation.x=-Math.PI/2; scene.add(shadow);
   const lineMaterial=new T.MeshBasicMaterial({color:0x2852c8});
   const segmentGeometry = new T.BoxGeometry(1,1,1);
+  styleAvatarActor({obj:actor},appearance,(values,size)=>new T.BufferAttribute(values,size));
   const segment = new T.Object3D();
   let stripe;
   showLine = points => {
@@ -145,6 +151,6 @@ async function start() {
   });
   window.addEventListener('resize',resize);
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();cancelAnimationFrame(frame);fallback();});
-  resize();ready=true;guide();document.body.dataset.ready='true';
+  resize();cancelAnimationFrame(frame);previous=0;draw(performance.now());ready=true;guide();document.body.dataset.ready='true';
 }
 start().catch(error=>{console.error('Campus lobby could not start',error);fallback();});
