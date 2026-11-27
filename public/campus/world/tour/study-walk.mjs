@@ -69,12 +69,12 @@ async function start() {
   renderer.shadowMap.enabled=false;
   const scene=new T.Scene();scene.background=new T.Color(0x050d20);
   scene.add(new T.HemisphereLight(0xfff5df,0x83939e,1.9));
-  const sun=new T.DirectionalLight(0xffedcf,2.15);sun.position.set(6,10,4);scene.add(sun);
+  const sun=new T.DirectionalLight(0xffedcf,2.36);sun.position.set(9,8,5);scene.add(sun);
   const appearance=Object.fromEntries(params);
   appearance.model=Number(appearance.model);
   const avatarModel=resolveAvatarModel(appearance);
   const asset=avatarModel.gender+'-'+'abcdef'[avatarModel.model];
-  const [avatar]=await Promise.all([createCampusAssetLoader().loadAsync('/campus/world/office/vendor/assets/kenney/characters/character-'+asset+'.glb'), buildStudyWalkSet(T,scene)]);
+  const [avatar]=await Promise.all([createCampusAssetLoader().loadAsync('/campus/world/office/vendor/assets/kenney/characters/character-'+asset+'.glb'), buildStudyWalkSet(T,scene,()=>wake())]);
   const actor=avatar.scene,bounds=new T.Box3().setFromObject(actor),scale=1.54/(bounds.max.y-bounds.min.y);
   actor.scale.setScalar(scale); scene.add(actor);
   const mixer=new T.AnimationMixer(actor);
@@ -82,7 +82,7 @@ async function start() {
   const idle=action('idle'),walking=action('walk'); let current=idle;idle.play();
   const shadow=new T.Mesh(new T.CircleGeometry(.42,20),new T.MeshBasicMaterial({color:0x413830,transparent:true,opacity:.2,depthWrite:false}));
   shadow.rotation.x=-Math.PI/2; scene.add(shadow);
-  const lineMaterial=new T.MeshBasicMaterial({color:0x2852c8});
+  const lineMaterial=new T.MeshBasicMaterial({color:0x3155e7});
   const segmentGeometry = new T.BoxGeometry(1,1,1);
   styleAvatarActor({obj:actor},appearance,(values,size)=>new T.BufferAttribute(values,size));
   const segment = new T.Object3D();
@@ -127,10 +127,10 @@ async function start() {
     const narrow=camera.aspect<.83;
     // Pull back at entry so the concourse reads as one space; follow the walker at each door.
     const entryView=narrow?Math.max(0,Math.min(1,(position.z-5.8)/5.2)):0;
-    camera.position.set(position.x*.82-entryView*.75,narrow?3.75+entryView*.7:3.15,position.z+(narrow?8.5+7.1*entryView:6.0));
+    camera.position.set(position.x*.88+(narrow?.12:1.72),narrow?3.35+entryView*.85:2.92,position.z+(narrow?8.0+8.2*entryView:6.35));
     const targetOffset=destination?(doors[destination].x-position.x)*(narrow?.7:.3):0;
     lookOffset+=(targetOffset-lookOffset)*Math.min(1,dt*8);
-    camera.lookAt(position.x*.78+lookOffset-entryView*.75,narrow?.95+entryView*.55:1.55,position.z-5.6);
+    camera.lookAt(position.x*.84+lookOffset+entryView*1.39,narrow?1.25+entryView*.58:1.96,position.z-6.3);
     renderer.render(scene,camera);
     canvas.dataset.playerX=position.x.toFixed(2);canvas.dataset.playerZ=position.z.toFixed(2);
     if(destination){document.body.style.setProperty('--progress',String(length?distance/length:1));if(distance>=length-.001){arrive();return;}}

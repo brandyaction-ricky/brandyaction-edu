@@ -15,7 +15,7 @@ const html = `<!doctype html>
 <section class="card" aria-label="캠퍼스 길 안내">
 <div class="panel-head"><h1 id="title">문샷 캠퍼스</h1><button id="watch" type="button"><span aria-hidden="true">▶</span> 라이브 보기</button></div>
 <fieldset id="destinations"><legend>이동할 공간</legend>
-<button type="button" data-room="library">자료실</button><button type="button" data-room="study">공부방</button><button type="button" data-room="office">내 AI 사무실</button></fieldset>
+<button type="button" data-room="study">공부방</button><button type="button" data-room="library">자료실</button><button type="button" data-room="office">내 AI 사무실</button></fieldset>
 <div class="actions"><p id="hint" role="status">갈 곳을 고르면 문 앞까지 파란 길이 이어져요.</p><button id="next" type="button" hidden>따라 걷기</button></div>
 <div class="track" hidden aria-hidden="true"><span></span></div>
 </section></main><script type="module" src="/campus/world/tour/study-walk.mjs"></script></body></html>`;

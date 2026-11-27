@@ -168,3 +168,10 @@ body[data-room=study] #hotspots > .tour-hotspot::after {
   transform: rotate(var(--stem-angle));
   pointer-events: none;
 }
+
+/* An arrival through the lunar concourse keeps the same view through the interior glazing. */
+body[data-lunar-campus=true]:is([data-room=study],[data-room=library],[data-room=office]) .campus-backdrop {
+  background: #101b2b url('../assets/study-lunar-horizon.webp') center 52% / cover no-repeat;
+  opacity:1; filter:none;
+}
+body[data-lunar-campus=true]:is([data-room=study],[data-room=library],[data-room=office]) .campus-backdrop:after { content:none; }

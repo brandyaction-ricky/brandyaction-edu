@@ -277,3 +277,5 @@ p.loading{pointer-events:none}
   .root[data-shared-study] .topButtons .exitButton { min-width: 60px; padding-inline: 6px; }
   .root[data-shared-study] .topButtons .primary { padding-inline: 7px; }
 }
+
+.root[data-lunar-entry=true] .scene { background: #142335 url('/campus/world/assets/study-lunar-horizon.webp') center / cover; }

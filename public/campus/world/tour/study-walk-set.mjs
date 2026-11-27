@@ -1,20 +1,9 @@
 import {doors} from './lobby-paths.mjs';
+import {joinery,finish,roomTrim,interiorView} from './campus-interior-finish.mjs';
 
-export function buildStudyWalkSet(T,scene) {
-  const ink=0x263a48, graphite=0x31404c, ivory=0xe3dac7, stone=0xccbeaa;
-  const wood=0xbe9267, edge=0xe4c49a, navy=0x294359, steel=0x52606a;
-  const cube=new T.BoxGeometry(1,1,1);
-  const batches=new Map(), temp=new T.Object3D();
-  function part(geo,color,x,y,z,w,h,d,rz=0,ry=0) {
-    const key=geo.uuid+color;
-    if(!batches.has(key))batches.set(key,{geo,color,matrices:[]});
-    temp.position.set(x,y,z);temp.rotation.set(0,ry,rz,'YXZ');temp.scale.set(w,h,d);temp.updateMatrix();
-    batches.get(key).matrices.push(temp.matrix.clone());
-  }
-  const box=(...args)=>part(cube,...args);
-  function rib(x1,y1,x2,y2,z,width) {
-    box(steel,(x1+x2)/2,(y1+y2)/2,z,width,Math.hypot(x2-x1,y2-y1),.16,-Math.atan2(x2-x1,y2-y1));
-  }
+export function buildStudyWalkSet(T,scene,redraw) {
+  const {box,round,beam,portal,shelves,desk,plant,build}=joinery(T,scene);
+  const {wall,trim,timber,oak,paper,brass,lamp,shadow}=finish;
   function sign(str,x,y,z,w,h,fg,bg,weight=700){
     const c=document.createElement('canvas');c.width=Math.min(1024,Math.max(256,Math.ceil(w*110)));c.height=Math.round(c.width*h/w);
     const ctx=c.getContext('2d');
@@ -26,42 +15,75 @@ export function buildStudyWalkSet(T,scene) {
     const mesh=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map,transparent:!bg,alphaTest:.15}));
     mesh.position.set(x,y,z);scene.add(mesh);
   }
-  // The audience faces the stage from the entrance. Both side aisles stay clear to the doors.
-  box(stone,0,-.16,14,25,.3,44);
-  box(ivory,0,-.015,14,17,.035,42);
-  // Daylight is painted once. The floor needs no realtime lights or shadow passes.
-  const finish=document.createElement('canvas');finish.width=768;finish.height=640;
-  const brush=finish.getContext('2d');
-  const daylight=brush.createLinearGradient(0,640,768,0);
-  daylight.addColorStop(0,'#b7b1a4');daylight.addColorStop(.54,'#e3daca');daylight.addColorStop(1,'#bab9b1');
-  brush.fillStyle=daylight;brush.fillRect(0,0,768,640);
-  brush.save();brush.transform(1,.15,-.55,1,65,0);
-  for(let i=0;i<6;i++){brush.fillStyle='#fff5de36';brush.fillRect(i*150,-150,139,1050);brush.fillStyle='#34415116';brush.fillRect(i*150+139,-150,4,1050);}
-  brush.restore();
-  brush.strokeStyle='#665c4e2e';brush.lineWidth=1;
-  for(let i=0;i<9;i++){brush.beginPath();brush.moveTo(i*96,0);brush.lineTo(i*96,640);brush.stroke();}
-  for(let i=0;i<8;i++){brush.beginPath();brush.moveTo(0,i*90);brush.lineTo(768,i*90);brush.stroke();}
-  const paving=new T.CanvasTexture(finish);paving.colorSpace=T.SRGBColorSpace;
-  const tile=new T.Mesh(new T.PlaneGeometry(25,44),new T.MeshBasicMaterial({map:paving}));
-  tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,14);scene.add(tile);
-  for(const x of [-8.4,8.4])box(edge,x,.009,4,.055,.012,22);
-  for(const z of [-5,-1,3,7,11,15])box(stone,0,.005,z,16.8,.012,.022);
-  for(const z of [-8,1,12]){
-    for(const x of [-12.2,12.2])box(steel,x,2.35,z,.13,4.7,.13);
-    for(let i=0;i<16;i++){
-      const at=j=>[12.2*Math.cos(j*Math.PI/16),4.7+4.2*Math.sin(j*Math.PI/16)];
-      rib(...at(i),...at(i+1),z,.105);
-    }
+  // Large limestone slabs with baked window shadows and contact shadows. No shadow-map pass.
+  const floor=document.createElement('canvas');floor.width=1024;floor.height=1280;
+  const c=floor.getContext('2d'), palette=['#d5c9b7','#d6cbbd','#dacfbd','#d4c8b8'];
+  for(let r=0;r<12;r++)for(let k=-1;k<8;k++){
+    const x=k*160+(r%2)*80,y=r*110;
+    c.fillStyle=palette[(r*7+k+8)%4];c.fillRect(x,y,160,110);
+    c.strokeStyle='#ad9f8e';c.lineWidth=1;c.strokeRect(x,y,160,110);
   }
-  for(const x of [-12.2,12.2]){
-    box(ivory,x,.32,3,.24,.64,24);
-    box(steel,x,1.1,3,.085,.09,24);
+  for(let i=0;i<4200;i++){
+    const x=(i*727)%1024,y=(i*547+Math.floor(i/1024)*67)%1280;
+    c.fillStyle=i%2?'#f8f4e41c':'#514d4b14';c.fillRect(x,y,1+(i%3),1);
+  }
+  c.save();c.transform(1,.14,-.78,1,350,0);
+  c.strokeStyle='rgba(56,65,82,.23)';c.lineWidth=7;
+  for(let i=-4;i<13;i++){c.beginPath();c.moveTo(i*135,-420);c.lineTo(i*135,1600);c.stroke();}
+  c.lineWidth=4;for(let j=0;j<8;j++){c.beginPath();c.moveTo(-700,j*194);c.lineTo(1900,j*194);c.stroke();}
+  c.restore();
+  // The plane's top edge is the back of the concourse.
+  function pool(x,z,w,d){
+    c.save();c.translate((x+15)/30*1024,(z+12)/47*1280);c.scale(w/30*1024,d/47*1280);
+    const grad=c.createRadialGradient(0,0,0,0,0,1);grad.addColorStop(0,'#25324672');grad.addColorStop(1,'#3d374000');
+    c.fillStyle=grad;c.fillRect(-1,-1,2,2);c.restore();
+  }
+  // Low sun across the open concourse, baked into the floor once.
+  const pavingPoint=(x,z)=>[(x+15)*1024/30,(z+12)*1280/47];
+  function cast(points){
+    c.save();c.fillStyle='#4454693a';c.shadowColor='#4b586a33';c.shadowBlur=5;c.beginPath();
+    points.forEach(([x,z],i)=>{const [u,v]=pavingPoint(x,z);if(i)c.lineTo(u,v);else c.moveTo(u,v);});
+    c.closePath();c.fill();c.restore();
+  }
+  cast([[-11,3.52],[-2.37,3.52],[-.65,6.25],[-9.68,6.25],[-11,4.45]]);
+  cast([[2.49,-2.12],[6.91,-2.12],[8.23,-.05],[3.96,-.05]]);
+  cast([[6.74,3.02],[10.92,3.02],[12.2,5.07],[8.04,5.07]]);
+  pool(-7,1,7,4);pool(6,-3,5,3.5);pool(10,1,4,4);pool(0,-4,4,2.5);
+  const paving=new T.CanvasTexture(floor);paving.colorSpace=T.SRGBColorSpace;
+  const tile=new T.Mesh(new T.PlaneGeometry(30,47),new T.MeshBasicMaterial({map:paving}));
+  tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,11.5);scene.add(tile);
+  box(paper,0,-.17,11.5,30,.31,47);
+
+  // The barrel vault wraps over the wings. A single translucent skin spans its metal lattice.
+  const arch=(i)=>{const a=Math.PI*i/20;return [14.65*Math.cos(a),3.9+5.5*Math.sin(a)];};
+  const panes=[],indices=[];
+  for(let k=0;k<20;k++){
+    const [x,y]=arch(k),[xx,yy]=arch(k+1),n=4*k;
+    panes.push(x,y,-10,xx,yy,-10,xx,yy,22,x,y,22);indices.push(n,n+1,n+2,n,n+2,n+3);
+    if(k%2===0)box(trim,x,y,6,.095,.105,32);
+    for(const z of [-9.5,-3,4.5,13,21.5])beam(x,y,xx,yy,z,.14,.24,trim);
+  }
+  const glass=new T.PlaneGeometry();glass.setAttribute('position',new T.BufferAttribute(new Float32Array(panes),3));glass.setIndex(indices);
+  glass.deleteAttribute('normal');glass.deleteAttribute('uv');glass.computeBoundingSphere();
+  scene.add(new T.Mesh(glass,new T.MeshBasicMaterial({color:0xb2c9dd,transparent:true,opacity:.085,depthWrite:false,side:T.DoubleSide})));
+  for(const side of [-1,1]){
+    box(trim,side*14.65,2,5.5,.13,.10,32);
+    for(const z of [-9.5,-3,4.5,13,21.5])box(trim,side*14.65,1.96,z,.20,3.92,.25);
   }
 
-  box(graphite,0,.14,-2.8,9.15,.28,3.4);
-  box(wood,0,.30,-2.8,9.15,.055,3.4);
-  box(edge,0,.19,-1.084,9.0,.034,.024);
-  box(navy,0,2.1,-3.94,7.7,3.72,.23);
+  // Rear glass is framed in perspective; the galleries sit inside the envelope.
+  for(const x of [-13.1,-9.4,-5.7,-2,1.7,5.4,9.1,12.8]){
+    const h=3.9+5.5*Math.sqrt(1-(x/14.65)**2);
+    box(trim,x,h/2,-9.6,.092,h,.13);
+  }
+  box(trim,0,4.83,-9.6,28.72,.075,.13);
+  box(paper,0,.34,-9.6,29.3,.68,.36);
+  // Wide dark stage, oak steps and an uninterrupted view of the lunar horizon above them.
+  box(wall,.10,.16,-6.05,7.10,.31,3.25);
+  box(oak,.10,.34,-6.05,7.12,.07,3.25);
+  box(timber,.10,.10,-4.22,6.86,.19,.45);
+  box(brass,.10,.19,-4.05,6.87,.042,.07);
+  box(wall,.10,2.16,-7.22,6.9,3.9,.38);
   const art=document.createElement('canvas');art.width=896;art.height=400;
   const g=art.getContext('2d');
   const backdrop=g.createLinearGradient(0,400,880,0);
@@ -79,57 +101,95 @@ export function buildStudyWalkSet(T,scene) {
   g.fillStyle='#ebeff1';g.font='600 23px system-ui';g.fillText('MOONSHOT  /  CAMPUS',130,148);
   g.fillStyle='#fff6e5';g.font='bold 67px system-ui';g.fillText('라이브 무대',125,244);
   const map=new T.CanvasTexture(art);map.colorSpace=T.SRGBColorSpace;
-  const screen=new T.Mesh(new T.PlaneGeometry(7.35,3.30),new T.MeshBasicMaterial({map}));
-  screen.position.set(0,2.1,-3.803);screen.name='live-stage-screen';scene.add(screen);
-  for(const x of [-4.15,4.15]){
-    box(ink,x,.86,-3.3,.42,1.0,.48);
-    box(steel,x,.47,-3.3,.66,.18,.61);
+  const screen=new T.Mesh(new T.PlaneGeometry(6.59,3.53),new T.MeshBasicMaterial({map}));
+  screen.position.set(.10,2.18,-7.0);screen.name='live-stage-screen';scene.add(screen);
+  for(const x of [-3.7,3.90]){
+    box(trim,x,1.05,-6.87,.26,1.75,.30);
+    for(const y of [.63,1.13,1.63])round(shadow,x,y,-6.68,.07,.10,.07);
   }
-  for(const x of [-1.38,1.38]) {
-    box(wood,x,.46,.35,2.05,.12,.6);
-    for(const leg of [-.7,.7])box(ink,x+leg,.22,.35,.12,.44,.46);
+  // The study opens from the navy identity wall; the archive is a separate gallery beyond the stage.
+  const study=doors.study,library=doors.library,office=doors.office;
+  const sf=study.z-.7,lf=library.z-.7,of=office.z-.7;
+  function alcove(x,z,w,d,h) {
+    box(timber,x,h*.50,z-d,w,h,.14);
+    box(oak,x,.055,z-d/2,w,.09,d);
+    box(wall,x,h+.07,z-d/2,w+.30,.23,d+.30);
+    for(const s of [-1,1])box(wall,x+s*w/2,h*.5,z-d/2,.19,h,d);
+    box(lamp,x,h-.045,z-d*.43,w*.76,.045,.07);
   }
-  // The two learning doors share a brass lintel; the office has a darker oak surround.
-  for(const [id,door] of Object.entries(doors)){
-    const {x,z,label}=door, color=id==='office'?navy:graphite;
-    const face=z-.8;
-    const side=id==='office'?1:-1;
-    // A roof, return wall and furnished window make each entry read as a room.
-    box(color,x,1.57,face-1.12,2.76,3.14,1.9);
-    if(id!=='study'){
-      box(steel,x+side*1.72,3.25,face-1.2,6.5,.20,2.9);
-      box(color,x+side*3.1,1.53,face-1.34,3.6,3.08,2.05);
-      box(edge,x+side*3.08,2.68,face-.26,3.40,.07,.09);
-      box(ink,x+side*3.08,1.70,face-.25,3.24,1.8,.13);
-      for(const dx of [-1.05,0,1.05]){
-        const wx=x+side*3.08+dx;
-        box(id==='library'?wood:0x859da2,wx,1.70,face-.168,.94,1.62,.03);
-        if(id==='library')for(const h of [1.3,1.95]){
-          box(edge,wx,h-.22,face-.10,.94,.055,.12);
-          for(let j=0;j<4;j++)box([navy,stone,graphite,ivory][j],wx-.32+j*.18,h,face-.11,.12,.27+j*.05,.09);
-        }
-        if(id==='office')box(navy,wx,1.51,face-.10,.66,.41,.08);
-      }
-      box(stone,x+side*3.08,.54,face-.16,3.4,.12,.38);
-    }else{
-      box(steel,x,3.25,face-.9,3.3,.20,2.3);
-    }
-    box(color,x,1.56,face-.28,2.76,3.12,.20);
-    box(wood,x+.28,1.27,face-.16,1.48,2.51,.13);
-    for(const dx of [-1.34,1.34]) box(color,x+dx,1.56,face,.17,3.12,.50);
-    box(color,x,2.98,face,2.84,.45,.50);
-    box(edge,x,2.73,face+.24,2.69,.05,.08);
-    box(edge,x+.76,1.24,face-.04,.055,.43,.10);
-    sign(label,x,2.98,face+.27,2.46,.37,'#fff2d7');
-    box(steel,x,.017,z-.36,2.58,.024,.68);
+  alcove(study.x,sf,3.45,3.35,3.45);
+  interiorView(T,scene,'study',study.x,1.80,sf-3.23,3.31,3.0,redraw);desk(study.x,sf-1.66,2.21);
+  portal(study.x,sf+.11,3.28,3.30,roomTrim.study,.40);
+  sign('공부방',study.x,3.80,sf+.19,2.18,.37,'#fff0d7');
+  // Gallery and clerestory form one offset mass, shading the seating niche on the left.
+  const wing=-8.24;
+  box(wall,wing,1.90,sf-1.25,5.18,3.80,2.66);
+  box(wall,-6.64,3.94,sf-1.32,8.41,.75,2.79);
+  box(shadow,-6.65,4.34,sf-1.27,8.51,.095,2.80);
+  box(oak,-6.93,4.49,sf-1.57,8.56,.18,3.0);
+  box(timber,-6.93,5.03,sf-2.72,8.54,1.04,.24);
+  for(let k=0;k<7;k++){
+    const x=-10.57+k*1.22;
+    box(k===1||k===4?paper:oak,x,4.98,sf-2.55,1.13,.92,.08);
+    box(trim,x-.61,5.06,sf-.44,.065,1.14,.11);
+    if(k%2===0)box(lamp,x,5.40,sf-1.66,.68,.04,.13);
   }
+  interiorView(T,scene,'study',-6.95,5.035,sf-2.38,8.51,1.04,redraw);
+  box(wall,-6.95,5.72,sf-1.62,8.88,.23,3.18);
+  box(lamp,-6.94,5.57,sf-.13,8.70,.046,.06);
+  sign('MOONSHOT',wing,2.33,sf+.105,4.65,.83,'#fff3da',null,800);
+  box(roomTrim.study,wing-2.38,2.34,sf+.10,.13,.55,.075,-.32);
+  box(oak,wing,.55,sf+.40,3.52,.14,.68);
+  for(const x of [wing-1.43,wing+1.43])box(shadow,x,.27,sf+.39,.14,.52,.48);
+  plant(-10.55,sf+.68,.91);
+  for(let k=0;k<4;k++)box(trim,wing-2.13+k*1.48,1.9,sf+.088,.012,3.75,.009);
+  box(trim,wing,1.27,sf+.088,5.1,.012,.009);
+  // The west stair and glazed landing give the two-storey wing a visible section.
+  for(let k=0;k<17;k++){
+    const h=(k+1)*.26,z=5.40-k*.46;
+    box(trim,-12.19,h/2,z,2.50,h,.47);
+    box(paper,-12.19,h+.012,z,2.52,.047,.47);
+    box(brass,-12.19,h-.035,z+.236,2.50,.034,.026);
+    if(k%4===0)for(const side of [-1,1])box(trim,-12.19+side*1.27,h+.45,z,.065,.90,.065);
+  }
+  for(const side of [-1,1]){
+    const hand=new T.Mesh(new T.BoxGeometry(.076,.075,Math.hypot(7.36,4.16)),new T.MeshStandardMaterial({color:trim}));
+    hand.rotation.x=Math.atan2(4.16,7.36);hand.position.set(-12.19+side*1.27,3.25,1.72);scene.add(hand);
+  }
+  box(oak,-11.44,4.45,-2.67,4.05,.19,1.35);
+
+  // The archive reads as an oak reading gallery with visible books, clear of the study wing.
+  alcove(library.x,lf,4.15,3.05,3.40);
+  interiorView(T,scene,'library',library.x,1.78,lf-2.92,3.99,3.02,redraw);
+  shelves(library.x-1.38,.19,lf-1.73,.80,1.73,1);
+  portal(library.x,lf+.08,3.94,3.25,roomTrim.library,.31);
+  box(wall,library.x,3.75,lf-.95,4.63,.68,2.58);
+  sign('자료실',library.x,3.73,lf+.36,2.28,.44,'#fff1d7');
+  box(lamp,library.x,3.42,lf+.28,4.06,.040,.08);
+  for(const side of [-1,1])for(let k=0;k<4;k++)box(oak,library.x+side*(1.86-k*.105),1.45,lf-.24,.050,2.84,.13);
+
+  // A glazed office wing takes the near right edge. Its long side gives the hall a third axis.
+  alcove(office.x,of,3.72,3.84,3.38);
+  interiorView(T,scene,'office',office.x,1.76,of-3.72,3.57,3.13,redraw);
+  desk(office.x,of-1.9,2.72);
+  box(trim,office.x,1.17,of-1.95,1.27,.65,.12);
+  box(0xacc8c8,office.x,1.18,of-1.875,1.13,.50,.025);
+  portal(office.x,of+.10,3.54,3.23,roomTrim.office,.32);
+  box(wall,office.x,3.76,of-1.42,4.17,.65,3.36);
+  sign('내 AI 사무실',office.x,3.76,of+.29,3.36,.43,'#fff1d7');
+  box(lamp,office.x,3.44,of+.19,3.73,.043,.09);
+  plant(office.x+1.48,of-.64,.76);
+  for(let i=0;i<7;i++)box(timber,office.x+2.17+i*.17,1.55,of-.07,.085,3.12,.23);
+  // Narrow seats and downlights sit outside the travelling line.
+  for(const x of [-1.88,.33]){box(oak,x,.46,-2.90,1.92,.12,.59);for(const dx of [-.7,.7])box(trim,x+dx,.23,-2.90,.09,.43,.40);}
+  build();
   // One matte backdrop is shared by the atrium and the study windows.
   const panorama=new Image();
   panorama.src='/campus/world/assets/study-lunar-horizon.webp';
   const backdropReady=panorama.decode().then(()=>{
     const map=new T.CanvasTexture(panorama);map.colorSpace=T.SRGBColorSpace;
     const view=new T.Mesh(new T.PlaneGeometry(115,38.33),new T.MeshBasicMaterial({map}));
-    view.position.set(2,7,-37);scene.add(view);
+    view.position.set(12,7,-37);scene.add(view);
     // Wrap the ridgelines around the windows while keeping Earth in the front view only.
     function sideWindow(x, rotation, start, width) {
       const geometry = view.geometry.clone();
@@ -143,9 +203,5 @@ export function buildStudyWalkSet(T,scene) {
     sideWindow(24, -Math.PI / 2, .63, .37);
     sideWindow(-27, Math.PI / 2, 0, .45);
   });
-  for(const batch of batches.values()){
-    const mesh=new T.InstancedMesh(batch.geo,new T.MeshStandardMaterial({color:batch.color,roughness:.88}),batch.matrices.length);
-    batch.matrices.forEach((m,i)=>mesh.setMatrixAt(i,m));scene.add(mesh);
-  }
   return backdropReady;
 }
