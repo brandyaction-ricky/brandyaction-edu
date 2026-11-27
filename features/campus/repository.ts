@@ -5,7 +5,7 @@ import type { Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { campusError, campusScopes, campusSnapshot } from './snapshot';
 import { externalPartnerUrl } from '@/lib/external-partner-url';
-import { myExternalPartnerScope, type ExternalPartnerScope } from '@/lib/external-partner-access';
+import { myExternalPartnerScope, myExternalPartnerScopes, type ExternalPartnerScope } from '@/lib/external-partner-access';
 import type { CampusScope } from './contracts';
 import {cohortWeekVisible,cohortLessonVisible} from '@/lib/cohort-curriculum-visibility';
 
@@ -66,7 +66,11 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   const scopes = campusScopes(viewer.id, enrollments, courses, cohorts, now);
   const scope = scopes.find(s => s.enrollmentId === enrollmentId);
   if (enrollmentId && !scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
-  if (!scope) return campusSnapshot({ viewer, scopes, enrollmentId: null, now });
+  if (!scope) {
+    const partners = viewer.role === 'student' ? await myExternalPartnerScopes(db) : [];
+    const accessible = [...scopes, ...partners.map(partnerCampusScope)];
+    return campusSnapshot({ viewer, scopes: accessible, enrollmentId: null, now });
+  }
   // Publication overrides intentionally have no student SELECT grant. Only read
   // this verified owner's cohort with the server client; content stays under RLS.
   const visibilityDb=await getVisibilityDb();

@@ -31,9 +31,9 @@ function fixture() {
     lesson_progress: [{ id: uid(10), enrollment_id: uid(2), lesson_id: uid(6), completed_at: '2026-11-01' }],
   };
 }
-function database(data, { failTable, truncateTable, gates } = {}) {
+function database(data, { failTable, truncateTable, gates, partners = [] } = {}) {
   const calls = [];
-  return { calls, rpc(name, args) { if(name==='edu_my_external_partner_scopes')return Promise.resolve({data:[],error:null}); calls.push({ rpc: name, args }); return Promise.resolve(gates ? { data: gates, error: null } : { data: null, error: { code: '42501' } }); }, from(table) {
+  return { calls, rpc(name, args) { if(name==='edu_my_external_partner_scopes')return Promise.resolve({data:partners.filter(row=>!args.p_access || row.id===args.p_access),error:null}); calls.push({ rpc: name, args }); return Promise.resolve(gates ? { data: gates, error: null } : { data: null, error: { code: '42501' } }); }, from(table) {
     const filters = []; let columns, limit = Infinity;
     calls.push({ table, filters });
     const query = {
@@ -100,6 +100,17 @@ test('context reads only current owner scopes and no lesson bodies', async () =>
   assert.deepEqual(db.calls.map(c => c.table), ['enrollments', 'courses', 'cohorts']);
   assert.equal(result.viewer.email, undefined);
   assert.deepEqual(result.lessons, []);
+});
+
+test('the My Page banner sees the signed-in partner grant without a student enrollment', async () => {
+  const data = fixture();
+  data.enrollments = [];
+  const partner = {id:uid(19), course_id:uid(3), cohort_id:uid(4), course_title:'문샷', cohort_name:'4기'};
+  const viewer = {...user, role:'student', status:'active'};
+  const snapshot = await loadCampusSnapshot(database(data, {partners:[partner]}), viewer, null, now);
+  assert.deepEqual(snapshot.scopes, [{enrollmentId:uid(19), courseId:uid(3), cohortId:uid(4),
+    courseTitle:'문샷', cohortName:'4기', externalPartner:true}]);
+  assert.deepEqual((await loadCampusSnapshot(database(data), viewer, null, now)).scopes, []);
 });
 
 test('selected scope maps published lessons, real completion and latest own submission', async () => {

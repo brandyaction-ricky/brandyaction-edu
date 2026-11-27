@@ -3,7 +3,6 @@ import theme from '@/features/campus/ui/theme.module.css';
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
 import {myExternalPartnerScopes} from '@/lib/external-partner-access';
-import {externalPartnerUrl} from '@/lib/external-partner-url';
 import {getAuthenticatedUser} from '@/lib/server-auth';
 import {createClient} from '@/lib/supabase/server';
 import {campusEntry,campusEntryPath} from '@/features/campus/entry';
@@ -23,16 +22,24 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  const ids=[...new Set(candidates.map(e=>e.course_id))],cohortIds=[...new Set(candidates.map(e=>e.cohort_id))];
  const [courses,cohorts]=ids.length?await Promise.all([db.from('courses').select('id,title').in('id',ids).eq('status','published').is('archived_at',null),db.from('cohorts').select('id,name,course_id').in('id',cohortIds).is('archived_at',null)]):[{data:[],error:null},{data:[],error:null}];
  if(courses.error||cohorts.error)throw Error('클래스를 확인하지 못했습니다. 다시 시도해 주세요.');
- const options=candidates.filter(e=>courses.data?.some(c=>c.id===e.course_id)&&cohorts.data?.some(c=>c.id===e.cohort_id&&c.course_id===e.course_id));
- const chosen=cohort ? options.find(e=>e.ready) || options[0] : options.length===1 ? options[0] : null;
- if (!options.length) {
-  if (canReviewCampus(user)) redirect(campusReviewPath(cohort));
-  const partners = await myExternalPartnerScopes(db);
-  const partner = cohort ? partners.find(access => access.cohort_id === cohort) : partners[0];
-  if (partner) redirect(partners.length > 1 && !cohort ? externalPartnerUrl() : '/campus/workspace?' +
-   new URLSearchParams({ enrollmentId: partner.id, section: 'space' }));
+ const options = candidates.flatMap(candidate => {
+  const course = courses.data?.find(row => row.id === candidate.course_id);
+  const group = cohorts.data?.find(row => row.id === candidate.cohort_id && row.course_id === candidate.course_id);
+  return course && group ? [{id:candidate.id, cohort_id:candidate.cohort_id, ready:candidate.ready, startsAt:candidate.startsAt, courseTitle:course.title, cohortName:group.name}] : [];
+ });
+ if (!options.length && canReviewCampus(user)) redirect(campusReviewPath(cohort));
+ const partners = canReviewCampus(user) ? [] : await myExternalPartnerScopes(db);
+ for (const partner of partners) {
+  if (cohort && partner.cohort_id !== cohort) continue;
+  const existing = options.find(option => option.cohort_id === partner.cohort_id && option.ready);
+  if (existing) continue;
+  const entry = {id:partner.id, cohort_id:partner.cohort_id, courseTitle:partner.course_title,
+   cohortName:partner.cohort_name, ready:true, startsAt:null};
+  const waiting = options.findIndex(option => option.cohort_id === partner.cohort_id);
+  if (waiting >= 0) options[waiting] = entry;
+  else options.push(entry);
  }
+ const chosen = cohort ? options.find(option => option.ready) || options[0] : options.length === 1 ? options[0] : null;
  if(chosen?.ready)redirect('/campus/workspace?enrollmentId='+chosen.id+'&section=space');
- const course=chosen&&courses.data?.find(c=>c.id===chosen.course_id),group=chosen&&cohorts.data?.find(c=>c.id===chosen.cohort_id);
- return <main className={`${theme.surface} ${styles.page}`}><Link href="/my/classes">← 내 클래스</Link><p className={styles.muted}>문샷 캠퍼스</p><h1>{chosen?'문샷에 오신 것을 환영해요':options.length?'입장할 클래스를 선택하세요':'이용 가능한 수강권을 확인해 주세요'}</h1>{chosen?<><p>{course?.title} · {group?.name}</p><p>정규 공부방은 {chosen.startsAt?new Date(chosen.startsAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'수강 시작일'}부터 열려요. 그전에는 내 클래스에서 일정과 공지를 확인해 주세요.</p><div className={styles.cards}><section className={styles.card}><h2>1. 수강 준비 확인</h2><p>내 클래스에서 일정과 공지를 확인해 주세요.</p><Link href="/my/classes">내 클래스 보기 →</Link></section><section className={styles.card}><h2>2. 캠퍼스에서는 이렇게 해요</h2><p>수업과 미션 확인 → 작업 공간에서 집중 → 결과물을 올리고 동료 의견 받기</p><p>내 캐릭터와 작업 기록은 계정에 연결됩니다.</p></section></div></>:options.length?<div className={styles.cards}>{options.map(e=><section key={e.id} className={styles.card}><h2>{courses.data?.find(c=>c.id===e.course_id)?.title}</h2><p>{cohorts.data?.find(c=>c.id===e.cohort_id)?.name}</p><Link href={campusEntryPath(e.cohort_id)}>{e.ready?'캠퍼스 입장':'개강 일정 보기'} →</Link></section>)}</div>:<><p>신청한 계정으로 로그인했는지 확인해 주세요. 만료·환불·회수된 수강권으로는 입장할 수 없습니다.</p><Link href="/classes">클래스 둘러보기 →</Link></>}</main>;
+ return <main className={`${theme.surface} ${styles.page}`}><Link href="/my/classes">← 내 클래스</Link><p className={styles.muted}>문샷 캠퍼스</p><h1>{chosen?'문샷에 오신 것을 환영해요':options.length?'입장할 클래스를 선택하세요':'이용 가능한 수강권을 확인해 주세요'}</h1>{chosen?<><p>{chosen.courseTitle} · {chosen.cohortName}</p><p>정규 공부방은 {chosen.startsAt?new Date(chosen.startsAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'수강 시작일'}부터 열려요. 그전에는 내 클래스에서 일정과 공지를 확인해 주세요.</p><div className={styles.cards}><section className={styles.card}><h2>1. 수강 준비 확인</h2><p>내 클래스에서 일정과 공지를 확인해 주세요.</p><Link href="/my/classes">내 클래스 보기 →</Link></section><section className={styles.card}><h2>2. 캠퍼스에서는 이렇게 해요</h2><p>수업과 미션 확인 → 작업 공간에서 집중 → 결과물을 올리고 동료 의견 받기</p><p>내 캐릭터와 작업 기록은 계정에 연결됩니다.</p></section></div></>:options.length?<div className={styles.cards}>{options.map(e=><section key={e.id} className={styles.card}><h2>{e.courseTitle}</h2><p>{e.cohortName}</p><Link href={campusEntryPath(e.cohort_id)}>{e.ready?'캠퍼스 입장':'개강 일정 보기'} →</Link></section>)}</div>:<><p>신청한 계정으로 로그인했는지 확인해 주세요. 만료·환불·회수된 수강권으로는 입장할 수 없습니다.</p><Link href="/classes">클래스 둘러보기 →</Link></>}</main>;
 }
