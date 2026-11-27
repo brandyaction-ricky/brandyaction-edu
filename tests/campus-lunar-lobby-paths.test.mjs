@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {doors, entrance, nearestPoint, pointAt, routeFrom} from '../public/campus/world/tour/lobby-paths.mjs';
+import {doors, entrance, nearestPoint, pointAt, routeFrom, studySeat, walkRoute} from '../public/campus/world/tour/lobby-paths.mjs';
 
 test('changing the destination mid-walk starts at the current position and reaches the selected door', () => {
   for (const from of Object.keys(doors)) {
@@ -30,5 +30,21 @@ test('each room exit is a walkable point with a route to the other doors', () =>
       assert.deepEqual([path.at(-1).x,path.at(-1).z],[doors[target].x,doors[target].z]);
       assert.equal(path.at(-1).length === 0, source === target);
     }
+  }
+});
+
+
+test('the student path crosses the study threshold and reaches the chair; a visitor stops outside', () => {
+  const path=walkRoute(entrance,'study',true), doorway=doors.study;
+  const crossing=path.find(p=>p.x===doorway.x && p.z===doorway.z);
+  assert.ok(crossing && crossing.length<path.at(-1).length);
+  assert.deepEqual([path.at(-1).x,path.at(-1).z],[studySeat.x,studySeat.z]);
+  assert.deepEqual(walkRoute(entrance,'study',false).at(-1),routeFrom(entrance,'study').at(-1));
+  const inRoom=pointAt(path,path.at(-1).length-.8);
+  for(const room of ['library','office']){
+    const redirected=walkRoute(inRoom,room,true);
+    const exit=redirected.findIndex(p=>p.x===doorway.x && p.z===doorway.z);
+    assert.ok(exit>0);
+    assert.deepEqual([redirected.at(-1).x,redirected.at(-1).z],[doors[room].x,doors[room].z]);
   }
 });

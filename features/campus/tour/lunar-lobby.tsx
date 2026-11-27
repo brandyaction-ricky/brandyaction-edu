@@ -9,12 +9,13 @@ export function isLobbyRoom(value: unknown): value is LobbyRoom {
   return value === 'study' || value === 'office' || value === 'live' || value === 'library';
 }
 
-export function LunarLobby({from, avatar, exit, onEnter, onMap}: {from: Exclude<LobbyRoom, 'live'> | null; exit: {href: string; label: string}; avatar?: TourAvatar | null; onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
+export function LunarLobby({from, studyAccess, avatar, exit, onEnter, onMap}: {from: Exclude<LobbyRoom, 'live'> | null; studyAccess: boolean; exit: {href: string; label: string}; avatar?: TourAvatar | null; onEnter: (id: LobbyRoom, seated?: boolean) => void; onMap: () => void}) {
   // Snapshot cosmetic choices on entry; a profile refresh must not reset a walk in progress.
   const [sceneUrl] = useState(() => {
     const look = avatar ?? readTourAvatar(TOUR_AVATAR_KEY);
     const appearance = new URLSearchParams({gender: look.gender, model: String(look.model),
       coat: look.coat, hairColor: look.hairColor, skinColor: look.skinColor, pantsColor: look.pantsColor});
+    if (studyAccess) appearance.set('study','open');
     if (from) appearance.set('from',from);
     return '/experience/study-walk/scene#' + appearance;
   });
@@ -23,7 +24,7 @@ export function LunarLobby({from, avatar, exit, onEnter, onMap}: {from: Exclude<
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== location.origin) return;
       if (event.data?.type === 'moonshot-watch-stage') onEnter('live');
-      if (event.data?.type === 'moonshot-lobby-arrived' && isLobbyRoom(event.data.room)) onEnter(event.data.room);
+      if (event.data?.type === 'moonshot-lobby-arrived' && isLobbyRoom(event.data.room)) onEnter(event.data.room,event.data.seated===true && event.data.room==='study');
     }
     window.addEventListener('message', receive);
     return () => window.removeEventListener('message', receive);

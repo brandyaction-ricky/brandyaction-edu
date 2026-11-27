@@ -108,7 +108,7 @@ function positionRoomMarkers() {
 }
 let deskProfiles=[],deskJobs=[],deskMarkers=[],deskLive=false;
 const officeSeats=Plan.createCampusPlan().officeSeats;
-let lunarCampus=false,entryFollow=false,directEntry=false, officeFirst=false, pendingOffice=null, initialRoomSync=false;
+let lunarCampus=false,seatedEntry=false,entryFollow=false,directEntry=false, officeFirst=false, pendingOffice=null, initialRoomSync=false;
 let firstDeskFrame=null;
 let finishDeskCheck;
 function checkFirstDeskData(){
@@ -369,7 +369,13 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
  if(officeFirst)applyPersonalOffice(pendingOffice);
  pendingOffice=null;
  // showRoom also configures lighting and camera; paint once after both are set.
- showRoom(room);if(entryFollow||officeIntro&&room==='office')view.set('third');configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
+ showRoom(room);
+ if(seatedEntry&&room==='study'&&allowed('study')){
+   const seats=Plan.getStudySeats();
+   const seat=seats.find(p=>!(office.studyCompanions||[]).some(other=>Math.hypot(p.x-other.x,p.y-other.y)<.55));
+   if(seat){Object.assign(office.campusAvatar,seat,{yaw:Math.PI,studyPose:'sit',moving:false});}
+ }
+ if(entryFollow||officeIntro&&room==='office')view.set('third');configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
   // The renderer paints its own English failure text on the canvas; the host shows the Korean guidance instead.
   if(office?.loadError){office.loadError='';try{office.draw();}catch{}}
   status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
@@ -378,7 +384,7 @@ window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.orig
   if (ready && room === 'study') office.draw();
   return;
  }
- if(m.type==='init'){if(!started){lunarCampus=p.lunarCampus===true;entryFollow=lunarCampus&&p.entryView==='third';document.body.dataset.lunarCampus=String(lunarCampus);document.body.dataset.studyControls=String(p.studyControls===true);guidedPreview=p.guidedPreview===true;document.body.dataset.guidedPreview=String(guidedPreview);if(guidedPreview){setOfficeIntro(p.officeIntro===true);currentRole='student';room=['welcome','office','live'].includes(p.initialRoom)?p.initialRoom:'welcome';guidedDemoPhase=p.demoPhase==='brief'?'brief':'result';if(typeof p.demoTitle==='string'&&p.demoTitle.trim())guidedDemoTitle=p.demoTitle.trim().slice(0,160);}publicVisitor=!guidedPreview&&p.visitor===true;operatorReview=p.operatorReview===true;devPresence=!guidedPreview&&p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=!guidedPreview&&[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=!guidedPreview&&p.studentOffice===true&&!publicVisitor&&!operatorReview;
+ if(m.type==='init'){if(!started){lunarCampus=p.lunarCampus===true;entryFollow=lunarCampus&&p.entryView==='third';seatedEntry=lunarCampus&&p.seatedEntry===true&&p.initialRoom==='study';document.body.dataset.lunarCampus=String(lunarCampus);document.body.dataset.studyControls=String(p.studyControls===true);guidedPreview=p.guidedPreview===true;document.body.dataset.guidedPreview=String(guidedPreview);if(guidedPreview){setOfficeIntro(p.officeIntro===true);currentRole='student';room=['welcome','office','live'].includes(p.initialRoom)?p.initialRoom:'welcome';guidedDemoPhase=p.demoPhase==='brief'?'brief':'result';if(typeof p.demoTitle==='string'&&p.demoTitle.trim())guidedDemoTitle=p.demoTitle.trim().slice(0,160);}publicVisitor=!guidedPreview&&p.visitor===true;operatorReview=p.operatorReview===true;devPresence=!guidedPreview&&p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=!guidedPreview&&[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=!guidedPreview&&p.studentOffice===true&&!publicVisitor&&!operatorReview;
  if(!guidedPreview&&!publicVisitor&&['student','admin','waiting','expired','guest'].includes(p.role)){
   currentRole=p.role;
   if(allowed(p.initialRoom)){room=p.initialRoom;directEntry=true;}

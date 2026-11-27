@@ -54,7 +54,7 @@ type OfficeDeskJob = {id:string; name:string; jobId:string; status:'running'|'re
 export type CampusTourProps = {welcome?:{settings:WelcomeSettings;resources:CampusResource[];content?:CampusContent};review?:{room:TourRoom;role?:'waiting'|'student';cohortId?:string;lessonContent?:ReactNode;returnHref?:string};snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor};
 export type LobbyEntry = LobbyRoom | 'map';
 
-export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,welcome,lobbyEntry,returnToLobby}: CampusTourProps & {lobbyEntry?: LobbyEntry; returnToLobby?: (from?: LobbyRoom, watch?: boolean) => void}) {
+export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,welcome,lobbyEntry,seatedEntry=false,returnToLobby}: CampusTourProps & {lobbyEntry?: LobbyEntry; seatedEntry?: boolean; returnToLobby?: (from?: LobbyRoom, watch?: boolean) => void}) {
  const welcomeSettings=welcome?.settings||live?.welcomeSettings||DEFAULT_WELCOME;
  const assessment=welcomeSettings.assessment||DEFAULT_ASSESSMENT;
  const currentAssessmentKey=welcomeAssessmentKey(assessment);
@@ -328,8 +328,8 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const waitingForOffice=useRef(false);
  const startTourFrame=useCallback(()=>{
   setDeskFrameVisible(false);
-  post('init',{...(lobbyEntry?{initialRoom:state.current.room,role:state.current.role,lunarCampus:true,entryView:state.current.camera}:{}),studentOffice,studyControls:!!live?.studyPresence&&role==='student',personalOffice:studentOffice&&desksVisible&&deskLoaded&&previousDeskView.current?JSON.parse(previousDeskView.current):null,visitor:!!visitor,devPresence:visitor?.devPresence===true||live?.publicPresence===true,qaCrowd:visitor?.qaCrowd===true,ambientCount:visitor?.ambientCount||0,operatorReview:visitor?.operatorReview===true});
- },[lobbyEntry,studentOffice,desksVisible,deskLoaded,visitor,live?.publicPresence,live?.studyPresence,role]);
+  post('init',{...(lobbyEntry?{initialRoom:state.current.room,role:state.current.role,lunarCampus:true,seatedEntry,entryView:state.current.camera}:{}),studentOffice,studyControls:!!live?.studyPresence&&role==='student',personalOffice:studentOffice&&desksVisible&&deskLoaded&&previousDeskView.current?JSON.parse(previousDeskView.current):null,visitor:!!visitor,devPresence:visitor?.devPresence===true||live?.publicPresence===true,qaCrowd:visitor?.qaCrowd===true,ambientCount:visitor?.ambientCount||0,operatorReview:visitor?.operatorReview===true});
+ },[lobbyEntry,seatedEntry,studentOffice,desksVisible,deskLoaded,visitor,live?.publicPresence,live?.studyPresence,role]);
  useEffect(()=>{
   if(sceneStarted&&waitingForOffice.current&&frame.current){
    waitingForOffice.current=false;startTourFrame();

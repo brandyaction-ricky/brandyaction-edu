@@ -71,3 +71,19 @@ export function routeFrom(position,destination) {
   const forward=target.filter(p=>p.length>(turnBack?fork:nearest.length));
   return measure([[position.x,position.z],...[...back,...forward].map(p=>[p.x,p.z])]);
 }
+
+export const studySeat = {x:-4.72, z:-1.68, cushionTop:.385};
+const insideStudy = measure(rounded([[doors.study.x,doors.study.z],[-4.10,2.44],[-4.15,.82],[-4.05,-1.20],[-4.15,-1.68],[studySeat.x,studySeat.z]]));
+
+// Retrace the doorway before switching wings from inside the reading room.
+export function walkRoute(position, destination, studyAccess) {
+  const inside = position.z < doors.study.z && nearestPoint(insideStudy,position.x,position.z).gap < .07;
+  const progress=inside ? nearestPoint(insideStudy,position.x,position.z).length : 0;
+  const pair=p=>[p.x,p.z];
+  if(inside && destination==='study' && studyAccess)
+    return measure([pair(position),...insideStudy.filter(p=>p.length>progress).map(pair)]);
+  const back=inside?insideStudy.filter(p=>p.length<progress).reverse():[];
+  const outside=routeFrom(inside?doors.study:position,destination);
+  const onward=destination==='study' && studyAccess?insideStudy:[];
+  return measure([pair(position),...back.map(pair),...outside.map(pair),...onward.map(pair)]);
+}

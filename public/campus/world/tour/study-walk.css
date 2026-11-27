@@ -35,3 +35,7 @@ p { margin: 0; font-size: 13px; line-height: 1.55; color: #455765; word-break: k
  h1{font-size:20px;}.panel-head{margin-bottom:8px;}
 }
 @media(max-height:480px){.card{left:12px;transform:none;bottom:8px;width:min(390px,95%);padding:8px 12px;}.panel-head{margin-bottom:4px;}}
+
+@media(min-width:850px) and (min-height:481px){
+  body[data-guiding] .card{left:24px;transform:none;width:min(375px,34vw);}
+}

@@ -5,7 +5,7 @@ const finish = {
 };
 export const roomTrim = {study:0xc2482e, library:0xb88c52, office:0x476b7c};
 let sceneryImage;
-function interiorView(T,parent,id,x,y,z,width,height,redraw) {
+function interiorView(T,parent,id,x,y,z,width,height,redraw,crop) {
   if(!sceneryImage){
     const img=new Image();img.src='/campus/world/assets/lunar-interiors.webp';
     sceneryImage=img.decode().then(()=>{const tex=new T.CanvasTexture(img);tex.colorSpace=T.SRGBColorSpace;return tex;});
@@ -15,7 +15,11 @@ function interiorView(T,parent,id,x,y,z,width,height,redraw) {
     const geometry=new T.PlaneGeometry(width,height),uv=geometry.attributes.uv;
     const ratio=(map.image.width/(map.image.height/3))/(width/height);
     const uSpan=Math.min(1,1/ratio),vSpan=Math.min(1,ratio)*(.33333-.006);
-    for(let i=0;i<uv.count;i++)uv.setXY(i,.5+(uv.getX(i)-.5)*uSpan,1-(row+.5)/3+(uv.getY(i)-.5)*vSpan);
+    for(let i=0;i<uv.count;i++){
+      const u=uv.getX(i),v=uv.getY(i);
+      if(crop){const [left,top,right,bottom]=crop;uv.setXY(i,left+u*(right-left),1-(row+bottom-v*(bottom-top))/3);}
+      else uv.setXY(i,.5+(u-.5)*uSpan,1-(row+.5)/3+(v-.5)*vSpan);
+    }
     const image=new T.Mesh(geometry,new T.MeshBasicMaterial({map}));
     image.position.set(x,y,z);parent.add(image);redraw?.();
   }).catch(()=>{}); // The furnished geometry is usable before, or without, its scenic glazing.

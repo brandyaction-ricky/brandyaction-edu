@@ -21,6 +21,7 @@ const CampusWindow=dynamic(()=>import('../ui/campus-window').then(module=>module
 export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sample?:boolean}) {
   const router=useRouter();
   const [entry,setEntry]=useState<Door | 'loading' | null>('loading');
+  const [seatedEntry,setSeatedEntry]=useState(false);
   const [from,setFrom]=useState<Door | null>(null);
   const [gateVisit,setGateVisit]=useState(0);
   const [panel,setPanel]=useState<Panel>(null);
@@ -42,7 +43,7 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
     if(room && room!=='live')setFrom(room);
     setPanel(watch?'stage':null);setEntry(null);
   }
-  function enter(room:LobbyRoom) {
+  function enter(room:LobbyRoom,seated=false) {
     if(room==='live'){setPanel('stage');return;}
     if(!canEnter(role,room)){
       if(props.visitor?.operatorReview && props.visitor.operatorEvent){
@@ -53,7 +54,7 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
     }
     const url=new URL(location.href);url.searchParams.set('room',room);
     history.replaceState(history.state,'',url);
-    setPanel(null);setEntry(room);
+    setSeatedEntry(room==='study'&&seated);setPanel(null);setEntry(room);
   }
   useEffect(()=>{
     if(!entry || entry==='loading')return;
@@ -68,14 +69,14 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
     <link rel="preload" as="image" href="/campus/world/assets/study-lunar-horizon.webp"/>
     <p role="status">문샷 캠퍼스를 열고 있어요.</p>
   </>;
-  if(entry)return <CampusRooms {...props} lobbyEntry={entry} returnToLobby={returnToCampus}/>;
+  if(entry)return <CampusRooms {...props} lobbyEntry={entry} seatedEntry={seatedEntry} returnToLobby={returnToCampus}/>;
   const lesson=props.live?campusSourceLesson(new URLSearchParams(location.search).get('fromLesson'),props.snapshot.selectedEnrollmentId):null;
   const exit=lesson?{href:lesson,label:'수업으로 돌아가기'}:props.live?{href:'/my/classes',label:'내 클래스로'}:{href:'/',label:'에듀 홈으로'};
   const program=props.program||props.live?.stageProgram;
   const close=()=>{setPanel(null);if(requestedRoom(location.search)==='live')returnToCampus();};
   const titles={stage:program?.title||'라이브 무대',map:'공간 이동',offer:'문샷에서 배우는 것',experience:'고객 발견 체험',...labels};
   return <>
-    <LunarLobby key={(from||'entry')+gateVisit} from={from} avatar={props.live?.avatar} exit={exit} onEnter={enter} onMap={()=>setPanel('map')}/>
+    <LunarLobby key={(from||'entry')+gateVisit} from={from} studyAccess={canEnter(role,'study')} avatar={props.live?.avatar} exit={exit} onEnter={enter} onMap={()=>setPanel('map')}/>
     {panel&&<CampusWindow backCloses open title={titles[panel]} context="문샷 캠퍼스" onClose={close}>
       {panel==='map'?<div className={styles.destinations}>{(['study','office','library','live'] as const).map(id=><button key={id} onClick={()=>enter(id)}>{labels[id]}<span aria-hidden="true"> →</span></button>)}</div>:
        panel==='stage'?<>
