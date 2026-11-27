@@ -3,11 +3,11 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import type {CampusScope} from '../contracts';
 import {campusReviewPath} from '../operator-access';
-import {campusReturnPath} from './navigation';
+import {campusReturnPath, campusSourceLesson} from './navigation';
 import styles from './entry.module.css';
 
-type Props = { returnTo?: string; enrollmentId?: string; reviewCohort?: string };
-export function CampusEntryBar({ returnTo, enrollmentId, reviewCohort }: Props = {}) {
+type Props = { returnTo?: string; fromLesson?: string; enrollmentId?: string; reviewCohort?: string };
+export function CampusEntryBar({ returnTo, fromLesson, enrollmentId, reviewCohort }: Props = {}) {
  const previous = campusReturnPath(returnTo || null);
  const previousEnrollment = previous && new URL(previous, 'https://campus.invalid').searchParams.get('enrollmentId');
  const back = previous && (enrollmentId ? previousEnrollment === enrollmentId : !reviewCohort) ? previous : null;
@@ -36,6 +36,9 @@ export function CampusEntryBar({ returnTo, enrollmentId, reviewCohort }: Props =
  const scope = scopes.find(s => s.enrollmentId === enrollmentId && (!reviewCohort || s.cohortId === reviewCohort));
  if (reviewCohort && !scope) return <nav className={styles.bar} aria-label="문샷 캠퍼스 바로가기"><strong>문샷 캠퍼스</strong><span>이 기수에서는 운영자 미리보기를 이용할 수 있어요.</span><Link href={campusReviewPath(reviewCohort)}>캠퍼스 미리보기 →</Link></nav>;
  if (enrollmentId ? !scope : !scopes.length) return null;
- const href = scope ? '/campus/workspace?' + new URLSearchParams({ enrollmentId:scope.enrollmentId,section:'space' }) : '/campus/enter';
+ const query = new URLSearchParams({enrollmentId: scope?.enrollmentId || '', section: 'space'});
+ const lesson = scope && campusSourceLesson(fromLesson || null, scope.enrollmentId);
+ if (lesson) query.set('fromLesson', lesson);
+ const href = scope ? '/campus/workspace?' + query : '/campus/enter';
  return <nav className={styles.bar} aria-label="문샷 캠퍼스 바로가기"><strong>문샷 캠퍼스</strong>{scope && <span>{scope.courseTitle} · {scope.cohortName}</span>}<Link href={href}>작업 공간 입장 →</Link></nav>;
 }

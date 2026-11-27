@@ -110,3 +110,12 @@ test('event removal requires marketing access, origin and the selected revision'
  assert.equal((await access.GET(req(),params)).status,404);
  const writes=state.writes;assert.equal((await admin.POST(req(undefined,{event:config,expectedRevision:null}))).status,409);assert.equal((await remove()).status,200);assert.equal(state.writes,writes);
 });
+
+test('the campus stage selects an active or next published program for the authorized cohort',()=>{
+ const now=Date.parse('2026-12-07T12:05:00Z');
+ const event=(title,start,end,status='published')=>({...config,title,status,startsAt:new Date(now+start).toISOString(),endsAt:new Date(now+end).toISOString()});
+ const ended=event('ended',-200,-100),draft=event('draft',-100,100,'draft'),active=event('on air',-50,50),next=event('up next',51,150);
+ assert.equal(d.campusStageProgram([draft,ended],now),null);
+ assert.deepEqual(d.campusStageProgram([next,draft,active],now),{title:active.title,startsAt:active.startsAt,endsAt:active.endsAt,youtubeId:active.youtubeId});
+ assert.equal(d.campusStageProgram([next,ended],now).title,'up next');
+});

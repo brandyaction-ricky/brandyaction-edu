@@ -47,7 +47,11 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  // The bar itself shows the entry only to someone with a campus-eligible enrollment.
  const CampusEntryBar=campusPage&&root==='my'?(await import('@/features/campus/ui/entry-bar')).CampusEntryBar:null;
  const returnTo=typeof campusBack==='string'?campusBack:undefined;
- const classroomCampus=campusPage&&root==='learn'?{returnTo}:undefined;
+ const lunarEntry = process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV === 'development';
+ const mission = root === 'learn' && lunarEntry ? (await searchParams)?.mission : undefined;
+ const fromLesson = root === 'learn' && lunarEntry ? '/' + path.join('/') +
+  (typeof mission === 'string' ? '?' + new URLSearchParams({mission}) : '') : undefined;
+ const classroomCampus=campusPage&&root==='learn'?{returnTo,fromLesson}:undefined;
  // Crawlers read the server HTML: give public pages their name and summary before the client loads the rest.
  const item=['classes','articles'].includes(root)&&section?await publicItem(root,section):null;
  const ld=path.length===0?jsonLd([{'@context':'https://schema.org','@type':'WebSite',name:EDU_SITE_NAME,alternateName:brand.alternateName,url:SITE_URL+'/'},{'@context':'https://schema.org',...brand}])

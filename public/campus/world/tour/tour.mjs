@@ -54,10 +54,10 @@ function fit(){if(!office?.camera?.isOrthographicCamera)return;const f=info[room
  const studyFit = room === 'study' && document.body.dataset.studyControls === 'true';
  const span = Math.max((maxY-minY) / (studyFit ? 0.85 : 0.8), (maxX-minX) / aspect / ((studyFit ? 1.04 : 0.9) * available));
  const cx=(minX+maxX)/2-span*aspect*(1-available)/2,cy=(minY+maxY)/2;c.left=cx-span*aspect/2;c.right=cx+span*aspect/2;c.top=cy+span/2;c.bottom=cy-span/2;c.zoom=1;c.updateProjectionMatrix();c.updateMatrixWorld();}
-function box(group,x,y,z,w,d,h,color,solid=true,glow=false){const mesh=office.boxMesh(x,y,z,w,d,h,color,{group,rough:.55,metal:.15,...glow?{emissive:color,ei:.5}: {}});if(solid&&room in obstacles)obstacles[room].push({x,y,w,d});return mesh;}
+function box(group,x,y,z,w,d,h,color,solid=true,glow=false){const mesh=office.boxMesh(x,y,z,w,d,h,color,{group,rough:.55,metal:.15,...glow?{emissive:color,ei:.5}: {}});if(solid&&group.userData.tourRoom in obstacles)obstacles[group.userData.tourRoom].push({x,y,w,d});return mesh;}
 function sign(group,text,x,y,z,w,h,design){const previousRoom=office.room;office.room=group;office.buildSign({text:design?'':text,x,y,z,w,h,bg:'#0e2444',fg:'#ddecff',border:design?undefined:'#3f8de9',glow:true,font:'system-ui, sans-serif'});if(design){const mesh=group.children[group.children.length-1],texture=mesh.material.map;texture.image.width=1024;texture.image.height=Math.round(1024*h/w);paintLibrarySign(texture.image,design);texture.needsUpdate=true;}office.room=previousRoom;}
-function createScene(id){room=id;const group=new office.room.constructor();groups.set(id,group);office.scene.add(group);const f=info[id];
- if(id==='library'){buildLibrary(office,group,box,sign);group.visible=false;return;}
+function createScene(id){const group=new office.room.constructor();group.userData.tourRoom=id;groups.set(id,group);office.scene.add(group);const f=info[id];
+ if(id==='library'){buildLibrary(office,group,box,sign,lunarCampus);group.visible=false;return;}
  if(id==='live'){buildOpenCampus(office,group,box,{guidedPreview});group.visible=false;return;}
  box(group,f.cx-f.w/2,f.cy-f.d/2,-.25,f.w,f.d,.25,id==='live'?0x22334e:0x718b9d,false);
  for(let i=0;i<4;i++)box(group,f.cx-f.w/2+.2+i*.09,f.cy-f.d/2,.02,.025,f.d,.025,0x489fff,false,true);
@@ -84,7 +84,7 @@ const walkIds=id=>id.startsWith('destination:')||(room==='live'&&id==='experienc
 function walkZone(a){for(const [id,,,item] of actions()){if(!walkIds(id)||!item?.w)continue;const cx=item.x+item.w/2,cy=item.y+item.d/2;if(Math.hypot(a.x-cx,a.y-cy)<=Math.max(item.w,item.d)/2+.7)return id;}return null;}
 let zoneRoom=null,lastZone=null;
 function checkZone(a){const zone=walkZone(a);if(zoneRoom!==room){zoneRoom=room;lastZone=zone;return;}if(zone===lastZone)return;lastZone=zone;if(!zone)return;keys.clear();target=null;a.moving=false;if(zone.startsWith('destination:'))send('destination',{id:zone.split(':')[1]});else send('action',{id:zone});}
-function actions(){if(guidedPreview)return [];if(room==='library')return [['library:files','무료 자료 받기','눌러서 파일 다운로드',{x:-7,y:8,w:4,d:1,height:.7}],['library:replay','다시보기 선택','눌러서 영상 목록 보기',{x:3,y:6,w:5,d:1,height:.65}],['destination:live','오픈 캠퍼스로','동료들과 다시 만나기',{x:-1,y:20,w:2,d:1,height:1}]];if(room==='live')return publicVisitor?[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',libraryPortal]]:[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',libraryPortal],['live-video','라이브 보기','영상 안내',{x:-4,y:-5,w:4,d:1,height:4}]];const desk=Plan.getStudyDesks()[0],books=Plan.getStudyBookcase();return {
+function actions(){if(guidedPreview)return [];if(room==='library')return [['library:files','무료 자료 받기','눌러서 파일 다운로드',{x:-7,y:8,w:4,d:1,height:.7}],['library:replay','다시보기 선택','눌러서 영상 목록 보기',{x:3,y:6,w:5,d:1,height:.65}],[directEntry?'destination:lobby':'destination:live',directEntry?'수강생 입장':'오픈 캠퍼스로',directEntry?'공용 로비로 나가기':'동료들과 다시 만나기',{x:-1,y:20,w:2,d:1,height:1}]];if(room==='live')return publicVisitor?[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',libraryPortal]]:[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',libraryPortal],['live-video','라이브 보기','영상 안내',{x:-4,y:-5,w:4,d:1,height:4}]];const desk=Plan.getStudyDesks()[0],books=Plan.getStudyBookcase();return {
  live:[['live-video','라이브 보기','무대 스크린',{x:-2,y:2,w:4,d:1,height:3}],['experience','AI 체험하기','작은 요청부터',{x:-5,y:13,w:2,d:1,height:1}],['offer','교육·상담 안내','내 다음 도약',{x:10,y:10,w:1.5,d:3,height:2}],['destination:study','문샷 공부방','어떤 곳일까요?',{x:-10,y:19,w:2,d:2,height:2}],['destination:office','내 AI 사무실','어떤 곳일까요?',{x:5,y:17,w:2,d:2,height:2}]],
  welcome:[['video','라이브 다시보기','놓친 내용 다시 보기',{x:-2,y:3,w:5,d:1,height:3}],['quiz','OX 퀴즈','02 · 안전한 AI 활용',{x:-6,y:11,w:3,d:2,height:2}],['level','AI 수준 확인','03 · 나에게 맞는 시작',{x:4,y:11,w:3,d:2,height:2}],['notices','공지사항','일정 · 수업 준비',{x:-2,y:18,w:6,d:1,height:1}],['basics','AI 기초 지식','쉬운 예시로 시작하기',{x:8,y:16,w:2,d:2,height:2}]],
  study:[['learning','수업','오늘의 실행',{x:books.x,y:books.y,w:books.width,d:.6,height:2}],['destination:office','내 AI 사무실','문으로 나가기',doorSpot('study')],['focus','앉아서 집중','타이머 열기',{...desk,w:2.8,d:1,height:1}],['feedback','동료 피드백','함께 더 나은 결과',furniture('study-low-shelf')]],
@@ -108,7 +108,7 @@ function positionRoomMarkers() {
 }
 let deskProfiles=[],deskJobs=[],deskMarkers=[],deskLive=false;
 const officeSeats=Plan.createCampusPlan().officeSeats;
-let officeFirst=false, pendingOffice=null, initialRoomSync=false;
+let lunarCampus=false,entryFollow=false,directEntry=false, officeFirst=false, pendingOffice=null, initialRoomSync=false;
 let firstDeskFrame=null;
 let finishDeskCheck;
 function checkFirstDeskData(){
@@ -154,16 +154,24 @@ function showFirstDeskFrame(){
  observer.observe(root);
  return {projectJobs,finish(){observer.disconnect();layer.replaceChildren();delete root.dataset.officeStage;}};
 }
-let atriumMeshType;
+let atriumMeshType,finishRoom;
+const finishedRooms=new Set();
+function finishLunarRoom(id){
+ if(!finishRoom||finishedRooms.has(id))return;
+ const group=id==='library'?groups.get(id):office.campusRoomGroups?.get(id);
+ if(!group)return;
+ finishRoom(group,id);
+ finishedRooms.add(id);
+}
 const preparedRooms=new Set(['office']);
 function prepareRoom(id){
- if(preparedRooms.has(id))return;
+ if(preparedRooms.has(id)){finishLunarRoom(id);return;}
  if(id==='study')applyWarmStudy(office,Plan);
  else {
   createScene(id);
   if(id==='live')sceneBatch=batchAtriumBoxes(groups.get(id),atriumMeshType);
  }
- preparedRooms.add(id);
+ preparedRooms.add(id);finishLunarRoom(id);
 }
 
 let lastDocument='';
@@ -293,12 +301,15 @@ function setMarkers() {
   });
   renderDeskMarkers();
 }
-function showRoom(id){if(!names[id]||!allowed(id))return;const previousRoom=room;prepareRoom(id);positions.set(guidedPreview?previousRoom:room,{x:office.campusAvatar?.x,y:office.campusAvatar?.y});room=id;if(guidedPreview&&ready&&previousRoom!==id)transitionGuidedRoom();document.body.dataset.room=id;if(!guidedPreview&&['study','office'].includes(id)){interiors??=attachInteriorInteractions({office,root,getRoom:()=>room,onMessage:text=>{keys.clear();target=null;budget.wake(performance.now()+4000);status.textContent=text;}});}else{interiors?.destroy();interiors=null;}mixer?.setRoom(id);document.getElementById('environment-open').hidden=guidedPreview||!['study','office'].includes(id);office.setEnvironment({lighting:guidedPreview?'bright':['study','office'].includes(id)?document.getElementById('lighting-select').value:'bright'});keys.clear();target=null;const p=positions.get(id);office.campusAvatar={...(Number.isFinite(p?.x)?p:info[id].spawn),roomId:id==='office'?'office':'study',moving:false,yaw:id==='live'?Math.PI+.12:Math.PI,studyPose:null};if(officeIntro&&id==='office')Object.assign(office.campusAvatar,introEntrance(officeSeats[introSeatIndex]));office.campusAvatar.jumpHeight=room==='live'?atriumHeightAt(office.campusAvatar.x,office.campusAvatar.y):0;setMarkers();view?.roomChanged();meetup?.roomChanged();if(ready||!officeFirst)budget.wake(performance.now());office.draw();showStatusHint();status.textContent=guidedPreview?'바닥을 눌러 이동 · 드래그로 둘러보기':matchMedia('(pointer:coarse), (max-width:650px)').matches?'바닥 터치 · 이동\n드래그 · 둘러보기\n두 손가락 · 확대':(publicVisitor&&id==='live'?'문샷 오픈 캠퍼스':names[id])+' · WASD 이동 · 클릭 이동 · 드래그 시점 · 스크롤 확대' ;send('room',{id});}
+function showRoom(id){if(!names[id]||!allowed(id))return;const previousRoom=room;prepareRoom(id);if(ready)positions.set(previousRoom,{x:office.campusAvatar?.x,y:office.campusAvatar?.y});room=id;if(guidedPreview&&ready&&previousRoom!==id)transitionGuidedRoom();document.body.dataset.room=id;if(!guidedPreview&&['study','office'].includes(id)){interiors??=attachInteriorInteractions({office,root,getRoom:()=>room,onMessage:text=>{keys.clear();target=null;budget.wake(performance.now()+4000);status.textContent=text;}});}else{interiors?.destroy();interiors=null;}mixer?.setRoom(id);document.getElementById('environment-open').hidden=guidedPreview||!['study','office'].includes(id);office.setEnvironment({lighting:guidedPreview?'bright':['study','office'].includes(id)?document.getElementById('lighting-select').value:'bright'});keys.clear();target=null;const p=positions.get(id);office.campusAvatar={...(Number.isFinite(p?.x)?p:info[id].spawn),roomId:id==='office'?'office':'study',moving:false,yaw:id==='live'?Math.PI+.12:Math.PI,studyPose:null};if(officeIntro&&id==='office')Object.assign(office.campusAvatar,introEntrance(officeSeats[introSeatIndex]));office.campusAvatar.jumpHeight=room==='live'?atriumHeightAt(office.campusAvatar.x,office.campusAvatar.y):0;setMarkers();view?.roomChanged();meetup?.roomChanged();if(ready||!officeFirst)budget.wake(performance.now());office.draw();showStatusHint();status.textContent=guidedPreview?'바닥을 눌러 이동 · 드래그로 둘러보기':matchMedia('(pointer:coarse), (max-width:650px)').matches?'바닥 터치 · 이동\n드래그 · 둘러보기\n두 손가락 · 확대':(publicVisitor&&id==='live'?'문샷 오픈 캠퍼스':names[id])+' · WASD 이동 · 클릭 이동 · 드래그 시점 · 스크롤 확대' ;send('room',{id});}
 // The control hint shows when a room opens, then fades so it never covers the room's bottom buttons (staff QA 11-17).
 let hintTimer=0;function showStatusHint(){status.classList.remove('faded');clearTimeout(hintTimer);hintTimer=setTimeout(()=>status.classList.add('faded'),6000);}
 function free(p){if(room==='study'||room==='office'){const a=office.campusAvatar;return Plan.resolveCampusMovement(a,{x:p.x-a.x,y:p.y-a.y},room).position;}if(room==='live'&&!canWalkAtrium(office.campusAvatar,p))return null;const f=info[room],r=.25;return p.x>f.cx-f.w/2+r&&p.x<f.cx+f.w/2-r&&p.y>f.cy-f.d/2+r&&p.y<f.cy+f.d/2-r&&!obstacles[room].some(o=>p.x>o.x-r&&p.x<o.x+o.w+r&&p.y>o.y-r&&p.y<o.y+o.d+r)?p:null;}
 function move(dt){if(blocked||editing||document.hidden)return;const a=office.campusAvatar;let x=Number(keys.has('right'))-Number(keys.has('left')),y=Number(keys.has('down'))-Number(keys.has('up'));if(x||y){target=null;const length=Math.hypot(x,y);x/=length;y/=length;const v=view.moveVector(x,y);x=v.x;y=v.y;}else if(target){const dx=target.x-a.x,dy=target.y-a.y,d=Math.hypot(dx,dy);if(d<.15)target=null;else{x=dx/d;y=dy/d;}}a.moving=!!(x||y);if(!a.moving)return;a.studyPose=null;const before={x:a.x,y:a.y},step=dt*4;const px=free({x:a.x+x*step,y:a.y});if(px)Object.assign(a,px);const py=free({x:a.x,y:a.y+y*step});if(py)Object.assign(a,py);if(Math.hypot(a.x-before.x,a.y-before.y)<.001)target=null;a.jumpHeight=room==='live'?atriumHeightAt(a.x,a.y):0;a.yaw=Math.atan2(x,y);checkZone(a);}
-async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry,CampusBasicMaterial}=await import('../office/vendor/office3d.js');office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst,...guidedPreview?{compact:true}:{}});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
+async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry,CampusBasicMaterial,CampusWalkThree}=await import('../office/vendor/office3d.js');if(lunarCampus){
+   const {finishCampusRoom}=await import('./campus-interior-finish.mjs');
+   finishRoom=(group,id)=>finishCampusRoom(CampusWalkThree,group,id,()=>office.draw());
+ }office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst,...guidedPreview?{compact:true}:{}});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
  let configuringOffice=officeFirst;
  if(officeFirst){
   if(!office.gl)throw Error('renderer');
@@ -340,7 +351,7 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
   if (room === 'study' && options.self) studyNameplate = bounds;
   return bounds;
  };attachOfficeEnvironment(office,root);attachAvatarAppearance(office);office.campusIdentity={displayId:'나 · 미리보기',gender:'male',coat:'#386eb4',hairColor:'#302825',skinColor:'#e8b68b',pantsColor:'#36485d',model:0};
- configureGuidedLabels();office.campusHeightAt=(x,y)=>room==='live'?atriumHeightAt(x,y):0;atriumMeshType=CampusInstancedMesh;const arrivalRoom=room;if(!officeFirst)for(const id of (guidedPreview?['welcome','live']:['study','library','live']))prepareRoom(id);if(guidedPreview){room=arrivalRoom;deskProfiles=[{employeeId:'demo-writer',seatIndex:introSeatIndex,name:'체험용 AI 직원'}];setGuidedDemoPhase(guidedDemoPhase);office.update([{key:'guided-demo-writer',employeeId:'demo-writer',name:'체험용 AI 직원',fullName:'체험용 AI 직원',project:'미리 준비한 예시',role:'체험 직원',agent:'present',status:'present',activity:null,title:guidedDemoTitle,appearanceSeed:210,seatIndex:introSeatIndex,startedAt:0,lastEventAt:0,subagent:false}]);}office.getCampusVisibleRoom=()=>room==='office'?'office':'study';office.drawCampusRoomLabels=()=>{};office.updateCampusVisibility=()=>{for(const [id,g]of office.campusRoomGroups)g.visible=id===room;for(const [id,g]of groups)g.visible=id===room;office.plan.observationWindows=[];};office.fitCamera3D=fit;office.pauseCampusInput=()=>{editing=true;keys.clear();target=null;view?.refresh();};office.resumeCampusInput=()=>{editing=false;view?.refresh();budget.wake(performance.now());};
+ configureGuidedLabels();office.campusHeightAt=(x,y)=>room==='live'?atriumHeightAt(x,y):0;atriumMeshType=CampusInstancedMesh;const arrivalRoom=room;if(directEntry&&!officeFirst)prepareRoom(arrivalRoom);else if(!officeFirst)for(const id of (guidedPreview?['welcome','live']:['study','library','live']))prepareRoom(id);if(guidedPreview){room=arrivalRoom;deskProfiles=[{employeeId:'demo-writer',seatIndex:introSeatIndex,name:'체험용 AI 직원'}];setGuidedDemoPhase(guidedDemoPhase);office.update([{key:'guided-demo-writer',employeeId:'demo-writer',name:'체험용 AI 직원',fullName:'체험용 AI 직원',project:'미리 준비한 예시',role:'체험 직원',agent:'present',status:'present',activity:null,title:guidedDemoTitle,appearanceSeed:210,seatIndex:introSeatIndex,startedAt:0,lastEventAt:0,subagent:false}]);}office.getCampusVisibleRoom=()=>room==='office'?'office':'study';office.drawCampusRoomLabels=()=>{};office.updateCampusVisibility=()=>{for(const [id,g]of office.campusRoomGroups)g.visible=id===room;for(const [id,g]of groups)g.visible=id===room;office.plan.observationWindows=[];};office.fitCamera3D=fit;office.pauseCampusInput=()=>{editing=true;keys.clear();target=null;view?.refresh();};office.resumeCampusInput=()=>{editing=false;view?.refresh();budget.wake(performance.now());};
  mixer=attachAmbientMixer(document.getElementById('ambient-host'));mixer.setRoom(room);environment=attachEnvironmentControls({office,root,isBlocked:()=>blocked,wake:()=>budget.wake(performance.now()),onOpenChange:open=>send('editor',{open})});
  view=attachTourView({office,root,fitMap:fit,wake:()=>budget.wake(performance.now()),onChange:mode=>send('camera',{mode}),isBlocked:()=>blocked||editing||document.hidden});
  editor=attachAppearanceEditor(office,(type,payload)=>{if(type==='appearance-cancel'){send('editor',{open:false});view.refresh();}if(type==='appearance-save')send(type,payload);});
@@ -358,7 +369,7 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
  if(officeFirst)applyPersonalOffice(pendingOffice);
  pendingOffice=null;
  // showRoom also configures lighting and camera; paint once after both are set.
- showRoom(room);if(officeIntro&&room==='office')view.set('third');configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
+ showRoom(room);if(entryFollow||officeIntro&&room==='office')view.set('third');configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
   // The renderer paints its own English failure text on the canvas; the host shows the Korean guidance instead.
   if(office?.loadError){office.loadError='';try{office.draw();}catch{}}
   status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
@@ -367,7 +378,11 @@ window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.orig
   if (ready && room === 'study') office.draw();
   return;
  }
- if(m.type==='init'){if(!started){document.body.dataset.studyControls=String(p.studyControls===true);guidedPreview=p.guidedPreview===true;document.body.dataset.guidedPreview=String(guidedPreview);if(guidedPreview){setOfficeIntro(p.officeIntro===true);currentRole='student';room=['welcome','office','live'].includes(p.initialRoom)?p.initialRoom:'welcome';guidedDemoPhase=p.demoPhase==='brief'?'brief':'result';if(typeof p.demoTitle==='string'&&p.demoTitle.trim())guidedDemoTitle=p.demoTitle.trim().slice(0,160);}publicVisitor=!guidedPreview&&p.visitor===true;operatorReview=p.operatorReview===true;devPresence=!guidedPreview&&p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=!guidedPreview&&[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=!guidedPreview&&p.studentOffice===true&&!publicVisitor&&!operatorReview;
+ if(m.type==='init'){if(!started){lunarCampus=p.lunarCampus===true;entryFollow=lunarCampus&&p.entryView==='third';document.body.dataset.lunarCampus=String(lunarCampus);document.body.dataset.studyControls=String(p.studyControls===true);guidedPreview=p.guidedPreview===true;document.body.dataset.guidedPreview=String(guidedPreview);if(guidedPreview){setOfficeIntro(p.officeIntro===true);currentRole='student';room=['welcome','office','live'].includes(p.initialRoom)?p.initialRoom:'welcome';guidedDemoPhase=p.demoPhase==='brief'?'brief':'result';if(typeof p.demoTitle==='string'&&p.demoTitle.trim())guidedDemoTitle=p.demoTitle.trim().slice(0,160);}publicVisitor=!guidedPreview&&p.visitor===true;operatorReview=p.operatorReview===true;devPresence=!guidedPreview&&p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=!guidedPreview&&[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=!guidedPreview&&p.studentOffice===true&&!publicVisitor&&!operatorReview;
+ if(!guidedPreview&&!publicVisitor&&['student','admin','waiting','expired','guest'].includes(p.role)){
+  currentRole=p.role;
+  if(allowed(p.initialRoom)){room=p.initialRoom;directEntry=true;}
+ }
  if(officeFirst){room='office';currentRole='student';pendingOffice=p.personalOffice;}
  void start();}else if(ready)send('ready');return;}if(m.type==='guided-office-intro'){setOfficeIntro(p.enabled===true);return;}if(m.type==='guided-demo'){setGuidedDemoPhase(p.phase,p.title);return;}if(m.type==='meetup-start'){meetupWanted=true;void meetup?.join();return;}if(!ready){
  if(m.type==='office-desk-check-done')finishDeskCheck?.();

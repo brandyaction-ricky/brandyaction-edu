@@ -15,5 +15,5 @@ export async function GET(request:Request){try{
  const cohort = result.data ? (hasLearningAccess(result.data) ? result.data.cohort_id : null) : (await externalPartnerScope(user.id, id, db))?.cohort_id;
  if (!cohort) return privateReply({error:'현재 이용 가능한 캠퍼스 권한이 없습니다.'},403);
  const welcome=await readWelcome(cohort);
- return privateReply({resources:welcome.resources,welcome:welcome.settings,content:welcome.content});
+ return privateReply({resources:welcome.resources,welcome:welcome.settings,content:welcome.content,stageProgram:welcome.stageProgram});
 }catch(e){return problem(e);}}

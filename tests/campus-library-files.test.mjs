@@ -21,7 +21,7 @@ test('member library rejects foreign or revoked enrollment before querying publi
 
 test('course information embeds only on the same origin; account and payment routes remain unframeable',async()=>{
  const config=(await load('next.config.ts')).default,headers=await config.headers();const general=headers.find(h=>h.source==='/:path*'),exceptions=headers.filter(h=>h.headers.some(x=>x.key==='X-Frame-Options'&&x.value==='SAMEORIGIN'));
- assert.equal(general.headers.find(h=>h.key==='X-Frame-Options').value,'DENY');assert.deepEqual(exceptions.map(h=>h.source).sort(),['/campus/world/:path*','/classes/:slug']);for(const h of exceptions)assert.equal(h.headers.find(x=>x.key==='Content-Security-Policy').value,"frame-ancestors 'self'");
+ assert.equal(general.headers.find(h=>h.key==='X-Frame-Options').value,'DENY');assert.deepEqual(exceptions.map(h=>h.source).sort(),['/campus/world/:path*','/classes/:slug','/experience/study-walk/scene']);for(const h of exceptions)assert.equal(h.headers.find(x=>x.key==='Content-Security-Policy').value,"frame-ancestors 'self'");
 });
 
 const adminDownload=await load('app/api/admin/campus/webinars/[slug]/resources/[resource]/route.ts');

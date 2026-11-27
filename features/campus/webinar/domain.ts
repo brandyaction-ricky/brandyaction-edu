@@ -11,6 +11,14 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 export const uuid = (v: unknown): v is string => typeof v === 'string' && uuidPattern.test(v);
 export type Webinar = { slug: string; title: string; description: string; status: 'draft'|'published'|'paused'; startsAt: string; endsAt: string; cohortId: string; detailPath: string; kakaoUrl: string; youtubeId: string; revision: string; resources?:CampusResource[]; welcome?:WelcomeSettings; arrival?:ArrivalConfig; content?:CampusContent; ambientCount?:number };
 export type PublicWebinar = Pick<Webinar, 'slug'|'title'|'description'|'startsAt'|'endsAt'|'detailPath'|'kakaoUrl'|'youtubeId'> & { checkoutPath: string; content?:CampusContent; resources?:CampusResource[]; ambientCount?:number };
+export type StageProgram = Pick<PublicWebinar,'title'|'startsAt'|'endsAt'|'youtubeId'>;
+export function campusStageProgram(events:Webinar[],now=Date.now()):StageProgram|null {
+ const scheduled=events.filter(e=>e.status==='published'&&Date.parse(e.endsAt)>now)
+  .sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt));
+ if(!scheduled.length)return null;
+ const {title,startsAt,endsAt,youtubeId}=scheduled[0];
+ return {title,startsAt,endsAt,youtubeId};
+}
 export type AccessResult = { kind: 'login'|'offer'|'welcome'|'member'; href?: string };
 export function fail(message: string, status = 400): never { throw Object.assign(Error(message), {status}); }
 function text(v: unknown, max: number, label: string) { if(typeof v !== 'string' || v.trim().length > max) fail(`${label}을 확인해 주세요.`); return v.trim(); }
