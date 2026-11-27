@@ -219,7 +219,7 @@ export function Platform({
   path: string[];
   user: User | null;
   adminContent?: ReactNode;
-  classroomCampus?: { returnTo?: string };
+  classroomCampus?: { returnTo?: string; fromLesson?: string };
   // Server-read name and summary of a public class/article, shown (and crawled) while the page loads.
   preview?: { title: string; summary: string };
 }) {
@@ -915,7 +915,7 @@ export function Platform({
     body = <StaffCurriculumReview key={user!.id + ':' + path.join('/')} enrollmentId={path[1]} initialLesson={path[2] || ''} classroomCampus={classroomCampus}/>;
   else if (learning)
     body = (
-      <>{classroomCampus && <CampusEntryBar enrollmentId={path[1]} returnTo={classroomCampus.returnTo}/>}
+      <>{classroomCampus && <CampusEntryBar enrollmentId={path[1]} returnTo={classroomCampus.returnTo} fromLesson={classroomCampus.fromLesson}/>}
       <Classroom
         progression={questionProgression}
         key={user?.id}

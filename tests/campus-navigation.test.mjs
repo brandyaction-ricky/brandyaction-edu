@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {build} from 'esbuild';
 const out=await build({entryPoints:['features/campus/ui/navigation.ts'],bundle:true,write:false,format:'esm',platform:'node'});
-const {campusReturnPath,withCampusReturn,validSection,requestedEnrollment,requestedRoom}=await import('data:text/javascript;base64,'+Buffer.from(out.outputFiles[0].text).toString('base64'));
+const {campusSourceLesson,campusReturnPath,withCampusReturn,validSection,requestedEnrollment,requestedRoom}=await import('data:text/javascript;base64,'+Buffer.from(out.outputFiles[0].text).toString('base64'));
 const source='/campus/workspace?enrollmentId=00000000-0000-4000-8000-000000000001&section=space&view=immersive';
 test('return hints keep only known campus routes and parameters',()=>{
  assert.equal(campusReturnPath(source+'&admin=true'),source);
@@ -21,4 +21,16 @@ test('the way back keeps the room the learner was in, and only a known room',()=
  const base='/campus/workspace?enrollmentId=00000000-0000-4000-8000-000000000001&section=learning';
  assert.equal(campusReturnPath(base+'&room=study'),base+'&room=study');assert.equal(campusReturnPath(base+'&room=admin'),base);
  assert.equal(requestedRoom('?enrollmentId=x&room=office'),'office');assert.equal(requestedRoom('?room=../admin'),null);assert.equal(requestedRoom('?section=learning'),null);
+});
+
+test('a campus exit returns to the originating lesson in the same enrollment',()=>{
+ const enrollment='00000000-0000-4000-8000-000000000001', id='00000000-0000-4000-8000-000000000003';
+ const path='/learn/'+enrollment+'/'+id+'/mission';
+ const lesson=path+'?mission='+id;
+ assert.equal(campusSourceLesson(lesson+'&campusReturn=stale',enrollment),lesson);
+ assert.equal(campusSourceLesson(path, id),null);
+ for(const value of ['/admin','//other.example'+path,path+'/extra',path+'/../admin','https://other.example'+path])
+  assert.equal(campusSourceLesson(value,enrollment),null);
+ const back=campusReturnPath(source+'&fromLesson='+encodeURIComponent(lesson));
+ assert.equal(new URL(back,'https://edu.example').searchParams.get('fromLesson'),lesson);
 });

@@ -10,8 +10,8 @@
     {
       "path": "office3d.js",
       "sourceSha256": "b45dd4c5cba821669a53bdb666b0ea6b21ca8b16a163a7a1c5c6e6bb9b7ab748",
-      "importSha256": "caaca46b0f0c97c68acfb5e458169a7eb0d3212f4f0eebde3d300db65a215336",
-      "localPatch": "Export existing bundled geometry, rendering and asset-loading classes for the campus adapter and welcome corridor. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
+      "importSha256": "9f8a487cc7b807c3415ead43b4bdf44dc26b068a18f51fb77022d993601158d2",
+      "localPatch": "Export the bundled BufferAttribute for lobby avatar colors and existing geometry, rendering and asset-loading classes for the campus adapter and welcome corridor. Expose geometry and asset readiness separately for first-frame office entry, defer model-backed furnishings until loaded, and draw identical floor tiles with one instanced mesh."
     },
     {
       "path": "campus-plan.js",

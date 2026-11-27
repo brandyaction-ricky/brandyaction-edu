@@ -9,7 +9,7 @@ export function isLobbyRoom(value: unknown): value is LobbyRoom {
   return value === 'study' || value === 'office' || value === 'live' || value === 'library';
 }
 
-export function LunarLobby({avatar, onEnter, onMap}: {avatar?: TourAvatar | null; onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
+export function LunarLobby({avatar, exit, onEnter, onMap}: {exit: {href: string; label: string}; avatar?: TourAvatar | null; onEnter: (id: LobbyRoom) => void; onMap: () => void}) {
   // Snapshot cosmetic choices on entry; a profile refresh must not reset a walk in progress.
   const [sceneUrl] = useState(() => {
     const look = avatar ?? readTourAvatar(TOUR_AVATAR_KEY);
@@ -28,6 +28,9 @@ export function LunarLobby({avatar, onEnter, onMap}: {avatar?: TourAvatar | null
   }, [onEnter]);
   return <main className={styles.lobby} aria-label="문샷 캠퍼스 공용 로비">
     <iframe ref={frame} src={sceneUrl} title="달 풍경 로비" />
-    <button className={styles.mapButton} onClick={onMap}>공간 이동</button>
+    <nav className={styles.actions} aria-label="캠퍼스 이동">
+      <button onClick={onMap}>공간 이동</button>
+      <a href={exit.href}>{exit.label} <span aria-hidden="true">→</span></a>
+    </nav>
   </main>;
 }
