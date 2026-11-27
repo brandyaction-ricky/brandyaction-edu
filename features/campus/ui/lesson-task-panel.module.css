@@ -8,7 +8,7 @@
 .reader :global(.lb-page-position){margin:0 0 .3rem;padding-top:.6rem;font-size:.9rem;color:#3e5574}
 
 .readerTools{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
-.readerTools :global(.floating-learning-question):not(:has([role="dialog"]:not([hidden]))){position:static}
+.readerTools :global(.floating-learning-question):not(:has([role="dialog"]:not([hidden]))){position:static;padding:0;background:transparent;border:0}
 .readerTools :global(.floating-learning-question-panel){max-width:calc(100vw - 32px)}
 .reader>details{margin-block:1.5rem}.reader>details>summary{cursor:pointer;padding-block:.6rem;font-weight:600}
 
@@ -48,4 +48,15 @@
 }
 .regularClassroom :global(.reading p) {
   color: #25374a;
+}
+
+.reader > .top { align-items: end; flex-wrap: wrap; gap: .75rem; }
+.reader > .top label { flex: 1 1 16rem; max-width: none; }
+.reader > .readerTools { margin-block: .75rem 1rem; }
+.reader .regularClassroom { min-height: 0; }
+.reader .regularClassroom + * { margin-block-start: 1.25rem; }
+@media (max-width: 560px) {
+  .reader > .top { align-items: stretch; }
+  .reader > .top label { flex: none; }
+  .reader > .top > button { align-self: flex-start; }
 }

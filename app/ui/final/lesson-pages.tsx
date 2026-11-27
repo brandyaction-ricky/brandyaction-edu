@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicBlockDocument, PublicLessonBlock } from '@/lib/lesson-blocks';
 import { practiceSteps } from '@/lib/lesson-practice-steps';
 import { lessonSections, withoutBlankPages } from '@/lib/lesson-reading-pages';
@@ -66,7 +66,15 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
     }
   }, [index]);
   // Keep the current task visible inside the short, scrollable task list.
-  useEffect(() => { const list = toc.current, item = list?.querySelector<HTMLElement>('[aria-current=step]'); if (list && item) list.scrollTop = item.offsetTop - list.offsetTop - 8; }, [index, pages.length]);
+  useLayoutEffect(() => {
+    const list = toc.current;
+    const item = list?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!list || !item) return;
+    const frame = list.getBoundingClientRect();
+    const active = item.getBoundingClientRect();
+    if (active.top < frame.top + 4) list.scrollTop += active.top - frame.top - 4;
+    else if (active.bottom > frame.bottom - 4) list.scrollTop += active.bottom - frame.bottom + 4;
+  }, [index, pages.length]);
   if (!pages.length) return <>{children(undefined, true)}{enabled && continuation}</>;
   const page = Math.min(index, pages.length - 1);
   const last = page === pages.length - 1;
@@ -81,7 +89,7 @@ export function LessonPages({ document, lessonId, enabled, busy, positionKey, co
     try { if (positionKey) localStorage.setItem(positionKey, String(next)); } catch { /* Storage is optional. */ }
   }
   return <div className="lb-pages">
-    <p aria-live="polite" className="lb-page-position">오늘의 작업 {page + 1} / {pages.length} · {labels[page]}</p>
+    <p aria-live="polite" className="lb-page-position">오늘의 작업 {page + 1} / {pages.length}</p>
     {pages.length > 1 && <nav ref={toc} aria-label="오늘의 작업 목차" className="lb-page-toc"><ol>
       {pages.map((_, n) => <li key={n}><button type="button" aria-current={n === page ? 'step' : undefined} disabled={busy} onClick={() => move(n)}><span>{n + 1}</span>{labels[n]}</button></li>)}
     </ol></nav>}

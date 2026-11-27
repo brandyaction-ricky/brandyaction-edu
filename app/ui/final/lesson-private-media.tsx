@@ -3,12 +3,12 @@ import { LessonAudio } from './lesson-audio';
 import { LessonImage } from './lesson-image';
 import { useRef, useState } from 'react';
 import { lessonMediaUrl, type LessonMediaContext, type LessonMediaKind } from '@/lib/lesson-media';
-export function LessonPrivateMedia({ assetId, kind, alt, caption, context, submissionId, floatingAudio = false }: { floatingAudio?: boolean; assetId: string; kind: LessonMediaKind; alt?: string; caption?: string; context?: LessonMediaContext; submissionId?: string }) {
+export function LessonPrivateMedia({ assetId, kind, alt, caption, context, submissionId, floatingAudio = false, priority = false }: { priority?: boolean; floatingAudio?: boolean; assetId: string; kind: LessonMediaKind; alt?: string; caption?: string; context?: LessonMediaContext; submissionId?: string }) {
   const [attempt, setAttempt] = useState(0), [failed, setFailed] = useState(false);
   const position = useRef(0);
   const url = lessonMediaUrl(assetId, context, submissionId) + '&attempt=' + attempt;
   return <figure>
-    {kind === 'image' ? <LessonImage key={url} src={url} alt={alt} onError={() => setFailed(true)} />
+    {kind === 'image' ? <LessonImage priority={priority} key={url} src={url} alt={alt} onError={() => setFailed(true)} />
       : kind === 'audio' ? <LessonAudio key={url} floating={floatingAudio} refreshOnError src={url} aria-label={alt || '학습 음성'} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => { event.currentTarget.currentTime = position.current; }} onError={() => setFailed(true)} />
         : <video key={url} controls playsInline preload="metadata" src={url} aria-label={alt || '학습 영상'} style={{ aspectRatio: 'auto 16 / 9', objectFit: 'contain' }} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => {
           const video = event.currentTarget;
