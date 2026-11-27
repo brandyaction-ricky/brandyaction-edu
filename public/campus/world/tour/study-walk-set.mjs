@@ -158,8 +158,18 @@ export function buildStudyWalkSet(T,scene) {
     const map=new T.CanvasTexture(panorama);map.colorSpace=T.SRGBColorSpace;
     const view=new T.Mesh(new T.PlaneGeometry(115,38.33),new T.MeshBasicMaterial({map}));
     view.position.set(2,7,-37);scene.add(view);
-    const side=view.clone();side.rotation.y=-Math.PI/2;side.position.set(24,7,-30);scene.add(side);
-    const west=view.clone();west.rotation.y=Math.PI/2;west.position.set(-27,7,-30);scene.add(west);
+    // Wrap the ridgelines around the windows while keeping Earth in the front view only.
+    function sideWindow(x, rotation, start, width) {
+      const geometry = view.geometry.clone();
+      const uv = geometry.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setX(i, start + uv.getX(i) * width);
+      const window = new T.Mesh(geometry, view.material);
+      window.rotation.y = rotation;
+      window.position.set(x, 7, -30);
+      scene.add(window);
+    }
+    sideWindow(24, -Math.PI / 2, .63, .37);
+    sideWindow(-27, Math.PI / 2, 0, .45);
   });
   // A clerestory, a pale soffit and warm pinboard complete the reading room.
   box(edge,-3,4.12,-6,15,.19,12.65);
