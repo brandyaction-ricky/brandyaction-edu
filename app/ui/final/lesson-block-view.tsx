@@ -122,6 +122,15 @@ function lessonOutline(blocks: PublicLessonBlock[]): OutlineItem[] {
   return result;
 }
 
+function firstInlineImage(node?: LessonNode | null): string | undefined {
+  if (!node || node.type === 'detailsContent') return;
+  if (node.type === 'lessonImage') return String(node.attrs?.blockId || '') || undefined;
+  for (const child of node.content || []) {
+    const id = firstInlineImage(child);
+    if (id) return id;
+  }
+}
+
 export function LessonBlockView({ document, values, onChange, readOnly = false, filesReadOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false, reviewPrompts = false, floatingAudio = false, showOutline = false, pageBlocks, showChecklist = true }: { pageBlocks?: PublicLessonBlock[]; showChecklist?: boolean; showOutline?: boolean; floatingAudio?: boolean; livePrompts?: boolean; reviewPrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; filesReadOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
   const blocksRef = useRef<HTMLDivElement>(null);
   const outlineToggle = useRef<HTMLElement>(null);
@@ -131,18 +140,30 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
   // Quiz questions are numbered across the whole lesson, the same numbers the completion check reports.
   const quizStart = useMemo(() => { const starts = new Map<string, number>(); let n = 0; for (const b of document.blocks) if (b.quiz) { starts.set(b.id, n); n += b.quiz.questions.length; } return starts; }, [document.blocks]);
   const imageColumns = lessonImageColumns(visibleBlocks);
+  const displayed = pageBlocks ?? visibleBlocks;
+  // Start the first illustration near the beginning of this task immediately.
+  // Leave later illustrations and images inside closed disclosures browser-lazy.
+  const leadingImageId = useMemo(() => {
+    for (const block of displayed.slice(0, 3)) {
+      if (block.type === 'image') return block.id;
+      if (block.type === 'text' && block.content?.includes('lessonImage')) {
+        const id = firstInlineImage(parseLessonDocument(block.content));
+        if (id) return id;
+      }
+    }
+  }, [displayed]);
   const embedded = new Map<string, ReactNode>();
   function renderBlock(block: PublicLessonBlock) {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;
       if (block.type === 'file') content = block.assetId ? <LessonDownload key={block.assetId} assetId={block.assetId} caption={block.content} context={fileContext} submissionId={submissionId} /> : <p>다운로드할 파일을 첨부해 주세요.</p>;
-      else if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
+      else if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia priority={block.id === leadingImageId} key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
       else switch (block.type) {
         case 'heading': content = <h2 tabIndex={showOutline ? -1 : undefined}>{block.content}</h2>; break;
         case 'subheading': content = <h3>{block.content}</h3>; break;
         case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} images={embedded} /></div>; break;
         case 'divider': content = <hr />; break;
-        case 'image': content = url && <figure><LessonImage src={url} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
+        case 'image': content = url && <figure><LessonImage priority={block.id === leadingImageId} src={url} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
         case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><LessonAudio key={url} floating={floatingAudio} src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></LessonAudio></figure>; break;
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
         case 'link': content = url && <LessonLinkCard url={url} title={block.content}/>; break;
@@ -184,7 +205,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
   return <div ref={blocksRef} className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
     {outline.length > 1 && <details className="lesson-outline"><summary ref={outlineToggle}>이 수업 목차 <span>{outline.length}개 항목</span></summary><nav aria-label="이 수업 목차"><ol>{outline.map(item => <li key={`${item.blockId}:${item.index}`}><button type="button" onClick={() => goToBlock(item)}>{item.label}</button></li>)}</ol></nav></details>}
     <LessonTag label={document.presentation?.tagLabel} />
-    {(pageBlocks ?? visibleBlocks).map(renderBlock)}
+    {displayed.map(renderBlock)}
     {showOutline && outline.length > 1 && <div className="lesson-back-to-top"><button type="button" className="btn small" onClick={() => {
       outlineToggle.current?.focus({ preventScroll: true });
       (blocksRef.current?.closest('.learning-content') || blocksRef.current)?.scrollIntoView({ block: 'start', behavior: 'auto' });

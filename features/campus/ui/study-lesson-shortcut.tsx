@@ -1,6 +1,6 @@
 'use client';
 
-import {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
+import type {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
 import type {CampusSnapshot} from '../contracts';
 import styles from './study-lesson-shortcut.module.css';
 
@@ -11,14 +11,14 @@ function pendingPractice(lesson: Lesson) {
     ?? lesson.missions.find(m => m.required && m.status === 'not_started');
 }
 
-export function StudyLessonShortcut({snapshot,onOpen}: {
+export function StudyLessonShortcut({snapshot,onOpen,gates}: {
+  gates: ReturnType<typeof useLessonProgression>;
   snapshot: CampusSnapshot;
   onOpen: (lesson: string, mission?: string) => void;
 }) {
   const enrollment = snapshot.selectedEnrollmentId || '';
   const scope = snapshot.scopes.find(s => s.enrollmentId === enrollment);
   const blocks = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
-  const gates = useLessonProgression(enrollment, blocks && !scope?.externalPartner && snapshot.lessons.length > 0, snapshot.fetchedAt);
   const lessons = snapshot.lessons;
   const firstUnfinished = lessons.findIndex(l => !l.completed);
   const unlocked = lessons.filter((lesson, index) => scope?.graduate || scope?.externalPartner || lesson.staffPreview || (blocks

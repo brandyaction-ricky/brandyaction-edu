@@ -3,6 +3,7 @@ import {EmployeeCard} from '../office/employee-card';
 import {invalidateOfficeView} from '../office/shared-inbox';
 import {useOfficeLive} from '../office/use-office-live';
 import type {BotDocument} from '@/public/campus/world/office/bot-profile.mjs';
+import {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
 import {StudyLessonShortcut} from '../ui/study-lesson-shortcut';
 import {LessonText} from '@/app/ui/final/lesson-text';
 import {contentTasks,type CampusContent} from '../content/model';
@@ -79,8 +80,23 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const liveRef=useRef(live);useEffect(()=>{liveRef.current=live;},[live]);
  const requestedStart = review?.room || live?.initialRoom;
  const defaultRoom = visitor || (review?.role || live?.role) === 'waiting' ? 'live' : 'study';
- const initialRoom = !visitor && requestedStart && requestedStart !== 'welcome' ? requestedStart : defaultRoom;
+ const initialRoom = !visitor && requestedStart && (!live || canEnter(live.role, requestedStart)) && requestedStart !== 'welcome' ? requestedStart : defaultRoom;
  const [role,setRole]=useState<TourRole>(visitor?'guest':review?(review.role||'admin'):live?.role||'student'),[room,setRoom]=useState<TourRoom>(initialRoom),[mapOpen,setMapOpen]=useState(!visitor&&!review&&!live),[tool,setTool]=useState(review?.lessonContent ? 'learning' : ''),[gate,setGate]=useState<TourRoom|null>(null),[ready,setReady]=useState(false),[failed,setFailed]=useState(false),[notice,setNotice]=useState(''),[progress,setProgress]=useState<Progress>(emptyProgress),[storageReady,setStorageReady]=useState(false),[editing,setEditing]=useState(false),[camera,setCamera]=useState(visitor?'third':'overall'),[activityMenu,setActivityMenu]=useState(false);
+ const enrollment = snapshot.selectedEnrollmentId || '';
+ const studyScope = snapshot.scopes.find(scope => scope.enrollmentId === enrollment);
+ const needsLessonGates = !!live && room === 'study' && !studyScope?.externalPartner && snapshot.lessons.length > 0
+   && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
+ const lessonGates = useLessonProgression(enrollment, needsLessonGates, snapshot.fetchedAt);
+ const isLive = !!live;
+ useEffect(() => {
+   if (activityMenu) void import('./feature-panels').catch(() => {});
+ }, [activityMenu]);
+ useEffect(() => {
+   if (!isLive || room !== 'study' || !enrollment) return;
+   const load = snapshot.guidedLessons && !studyScope?.externalPartner
+     ? import('@/app/ui/final/lesson-block-session') : import('../ui/room-classroom');
+   void load.catch(() => {}); // Opening the lesson retries through the normal loader.
+ }, [isLive, room, enrollment, snapshot.guidedLessons, studyScope?.externalPartner]);
  const [studyCardHost,setStudyCardHost]=useState<HTMLDivElement|null>(null);
  const environmentTrigger = useRef<HTMLButtonElement|null>(null);
  useEffect(() => {
@@ -369,7 +385,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  {visitor&&arrival&&!editing&&<section className={styles.arrival} aria-label="방문자 입장"><small>MOONSHOT OPEN CAMPUS</small><h1>{visitor.title}</h1><p>10% 더 나아지는 것을 넘어,<br/>내 일을 10배 다르게 바꿔볼 가능성.<br/>AI 마케팅 기지를 직접 둘러보세요.</p><p className={styles.arrivalGuide}>바닥의 파란 화살표를 따라 문샷 자료실로 가면<br/>무료 자료와 라이브 다시보기를 만날 수 있어요.</p><button className={styles.primary} disabled={!ready} onClick={()=>{post('blocked',{value:false});post('appearance-open');}}>캐릭터 꾸미고 입장</button><button disabled={!ready&&!failed} onClick={visitorEntered}>{failed?'공간 안내로 입장':'이 캐릭터로 바로 입장'}</button><small>가입 없이 체험 · 캐릭터는 이 브라우저에만 저장돼요.<br/>닉네임에 개인정보를 넣지 마세요.</small></section>}
  <div className={styles.miniFocus} data-study-map-control>
   {sharedStudy&&<div className={styles.studyShelf} hidden={mapOpen||!!tool||!!gate||editing||activityMenu}>
-   {!mapOpen&&!tool&&!gate&&!editing&&!activityMenu&&managedTask('learning')&&<StudyLessonShortcut snapshot={snapshot} onOpen={openLesson}/>}
+   {!mapOpen&&!tool&&!gate&&!editing&&!activityMenu&&managedTask('learning')&&<StudyLessonShortcut gates={lessonGates} snapshot={snapshot} onOpen={openLesson}/>}
    <div ref={setStudyCardHost}/>
    {sceneLoading}
   </div>}
@@ -400,7 +416,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
 
  {tool==='office-guide'&&<OfficeFirstVisit onEmployees={()=>selectTask('bots')} onInbox={()=>{setOfficeFilter(null);selectTask('office');}}/>}
  {tool==='bots'&&<>{review&&<p>운영자 연습 공간이에요. 여기서 배치한 직원은 이 브라우저에만 저장됩니다.</p>}<PersonalOffice onJobs={employee=>{setOfficeFilter({...employee});selectTask('office');}} enrollmentId={snapshot.selectedEnrollmentId||''} demo={demo} onChange={document=>post('personal-office',{document})}/><button className={styles.toolLink} onClick={()=>{setOfficeFilter(null);selectTask('office');}}>이 사무실의 업무 관리 열기 →</button></>}
- {!review&&tool==='learning'&&<LessonTaskPanel key={[snapshot.selectedEnrollmentId,requestedLesson,requestedMission].join(':')} initialLesson={requestedLesson} initialMission={requestedMission} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
+ {!review&&tool==='learning'&&<LessonTaskPanel sharedProgression={lessonGates} key={[snapshot.selectedEnrollmentId,requestedLesson,requestedMission].join(':')} initialLesson={requestedLesson} initialMission={requestedMission} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
  {tool==='lesson'&&<div className={styles.lesson}><small>미리보기용 수업 안내</small><h2>{selectedLesson}</h2><p>실제 서비스에서는 해당 수강권으로 공개된 수업과 과제를 연결합니다. 이 화면은 동선 확인용 예시입니다.</p><button onClick={()=>{setTool(previous||'learning');setPrevious('');}}>수업 목록으로</button></div>}
  {tool==='intro:'+room&&canEnter(role,room)&&<article className={styles.managedArticle}><h2>{managed[room]?.title}</h2><LessonText text={managed[room]?.body||''}/></article>}
  {tool.startsWith('content:')&&canEnter(role,room)&&(()=>{const a=managed[room]?.articles.find(a=>'content:'+room+':'+a.id===tool&&a.published);return a?<article className={styles.managedArticle}><h2>{a.title}</h2>{a.image&&<img src={a.image} alt={a.imageAlt||a.title}/>}<LessonText text={a.body}/>{a.url&&<a href={a.url} target="_blank" rel="noopener noreferrer">{a.linkLabel} ↗</a>}</article>:null;})()}

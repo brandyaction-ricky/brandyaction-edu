@@ -12,11 +12,12 @@ import {reviewUrl, type CurriculumReview, type ReviewContent} from '@/lib/staff-
 import type {CampusScope} from '../contracts';
 import {useCampusDraftGuard} from './draft-guard';
 import styles from './lesson-task-panel.module.css';
+import {RoomLessonLoading} from './room-lesson-loading';
 
 export function RoomPublishedLesson({access, lesson, partner = false}: {access: string; lesson: string; partner?: boolean}) {
   const result = useReviewRead<ReviewContent>(reviewUrl(access, lesson, false, partner));
   if (result.error) return <p role="alert">{result.error} <button className="btn" onClick={result.retry}>수업 다시 확인</button></p>;
-  if (!result.data) return <p role="status">공개 수업을 불러오고 있어요.</p>;
+  if (!result.data) return <RoomLessonLoading/>;
   return <div className={`edu-front ${styles.regularClassroom}`}>
     <p className="meta">읽기 전용 · 학습 기록은 저장되지 않습니다.</p>
     <ReviewBody key={lesson + ':' + result.data.revision} content={result.data} cohort={access} lesson={lesson} student={false} partner={partner}/>
@@ -43,8 +44,8 @@ export function OperatorRoomCurriculum({initialCohort}: {initialCohort?: string}
     </select></label>}</div>
     {lesson ? <><h2>{lesson.title}</h2><RoomPublishedLesson access={data.cohortId} lesson={lesson.id}/>
       <nav className={styles.readerTools} aria-label="수업 이동">
-        {previous && <button type="button" className="btn" onClick={() => setSelected(previous.id)}>이전 학습</button>}
-        {next && <button type="button" className="btn" onClick={() => setSelected(next.id)}>다음 학습 · {next.day}일차</button>}
+        {previous && <button type="button" className="btn" onClick={() => setSelected(previous.id)}>이전 일차 · {previous.day}일차</button>}
+        {next && <button type="button" className="btn" onClick={() => setSelected(next.id)}>다음 일차 · {next.day}일차</button>}
       </nav></> : <p>이 기수에 공개된 수업이 없어요.</p>}
   </section>;
 }
@@ -86,7 +87,7 @@ export function RoomClassroom({scope, lesson, day, title, reviewNavigation, prog
     } finally {setPending(false);}
   });
   if (result.error) return <p role="alert">{result.error} <button className="btn" onClick={result.retry}>수업 다시 확인</button></p>;
-  if (!result.data) return <p role="status">수업 본문을 불러오고 있어요.</p>;
+  if (!result.data) return <RoomLessonLoading/>;
   if (!result.data.user || !result.data.data) return <p role="alert">수강 정보를 확인할 수 없습니다. <button className="btn" onClick={result.retry}>다시 확인</button></p>;
   const data = result.data.data;
   if (!data.enrollments?.some(row => row.id === scope.enrollmentId && hasLearningAccess(row))) {

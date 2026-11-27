@@ -354,3 +354,33 @@ test('opening a lesson from 수업 자료 찾기 starts on the task with the sea
   await expect(toc.getByRole('button', { name: /도구 설치/ })).toHaveAttribute('aria-current', 'step');
   expect(await page.evaluate(() => sessionStorage.getItem('campus:find:11111111-1111-4111-8111-111111111111'))).toBeNull();
 });
+
+test('guided lessons keep the selected step in the outline and load the leading image first', async ({page}) => {
+  const images = ['first', 'later'].map(label => ({id: label, type: 'image', url: 'https://example.test/' + label + '.png', alt: label}));
+  const blocks = Array.from({length: 12}, (_, n) => [
+    {id: 'heading-' + n, type: 'heading', content: '실습 ' + (n + 1)},
+    ...(n === 7 ? images : [{id: 'body-' + n, type: 'text', content: '수업 본문'}]),
+  ]).flat();
+  await page.route('https://example.test/*.png', route => route.fulfill({
+    contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXioAAAAASUVORK5CYII=', 'base64'),
+  }));
+  await page.route('**/api/platform/lesson-blocks**', route => route.fulfill({json: {
+    revision, currentRevision: revision, editable: true, draft: null, previousDrafts: [],
+    document: {schemaVersion: 1, checklist: [], blocks},
+  }}));
+  await page.goto('/lesson-blocks-test?guided');
+  const toc = page.getByRole('navigation', {name: '오늘의 작업 목차'});
+  await toc.getByRole('button').nth(6).click();
+  await page.getByRole('button', {name: /^다음 작업/}).press('Enter');
+  const active = toc.locator('[aria-current=step]');
+  await expect(active).toContainText('실습 8');
+  await expect.poll(() => active.evaluate(e => {
+    const frame = e.closest('nav')!.getBoundingClientRect(), rect = e.getBoundingClientRect();
+    return rect.top >= frame.top && rect.bottom <= frame.bottom;
+  })).toBe(true);
+  const first = page.getByRole('img', {name: 'first', exact: true});
+  await expect(first).toHaveAttribute('loading', 'eager');
+  await expect(first).toHaveAttribute('fetchpriority', 'high');
+  await expect.poll(() => first.evaluate(e => (e as HTMLImageElement).naturalWidth)).toBe(1);
+  await expect(page.getByRole('img', {name: 'later', exact: true})).toHaveAttribute('loading', 'lazy');
+});

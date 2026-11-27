@@ -278,6 +278,38 @@ test('study shortcut and 3D lesson hotspot open published content in the same st
   expect(api.reads).not.toContain(locked.id);
 });
 
+test('opening a staff lesson reuses the room permission check and reads the selected publication directly', async ({page}) => {
+  const api = await connect(page);
+  await page.route('**/api/campus?**', route => route.fulfill({json: {
+    ...student, lessons, guidedLessons: false, staffPublicationReader: true,
+  }}));
+  let gateReads = 0;
+  await page.route('**/api/platform/lesson-blocks?**', route => {
+    expect(new URL(route.request().url()).searchParams.get('action')).toBe('progression');
+    gateReads++;
+    return route.fulfill({json: {lessons: lessons.map(row => ({lessonId: row.id, isUnlocked: !row.locked}))}});
+  });
+  const reads: string[] = [];
+  await page.route('**/api/platform/curriculum-review?**', route => {
+    const lesson = new URL(route.request().url()).searchParams.get('lesson')!;
+    reads.push(lesson);
+    return lesson === second.id
+      ? route.fulfill({json: {revision: 'published-1', body: body(2), document: null}})
+      : route.fulfill({status: 403, json: {error: '수업 권한을 다시 확인해 주세요.'}});
+  });
+  await page.goto(roomUrl + '&lessonBlocks=1');
+  await page.getByRole('button', {name: '수업 열기', exact: true}).click();
+  const dialog = page.getByRole('dialog', {name: '수업', exact: true});
+  await expect(dialog.getByText(body(2), {exact: true})).toBeVisible();
+  await dialog.getByRole('button', {name: /이전 일차/}).click();
+  await expect(dialog.getByRole('heading', {name: first.title})).toBeVisible();
+  await expect(dialog.getByRole('alert')).toContainText('권한');
+  await expect(dialog.getByText(body(2), {exact: true})).toHaveCount(0);
+  expect(gateReads).toBe(1);
+  expect(api.reads).toEqual([]);
+  expect(reads).toEqual([second.id, first.id]);
+});
+
 test('the room discards previously read content when the next member read is denied', async ({page}) => {
   const api = await connect(page);
   await page.goto(roomUrl);

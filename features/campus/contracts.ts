@@ -17,6 +17,7 @@ export type CampusScope = {
 };
 export type CampusSnapshot = {
   guidedLessons?: boolean;
+  staffPublicationReader?: boolean;
   schemaVersion: 1;
   fetchedAt: string;
   viewer: { id: string; displayName: string };
