@@ -38,15 +38,25 @@ jobs:
         run: |
           head_ref="$HEAD_REF"
           if [ "$head_ref" = "codex/partner-campus-entry-1127" ]; then
-            expected_main=3eee26df66b3a3e8c1bd6b467013adcafcabc8c1
-            release_payload=ac37546b4f41b4e10841ecceac478356e7d854f0
+            expected_main=7a7b0426e7b0979edaf4b6fbd0f39e42f892d6cd
+            reviewed_payload=ac37546b4f41b4e10841ecceac478356e7d854f0
             test "$(git rev-parse HEAD^1)" = "$expected_main"
-            test "$(git rev-parse "$release_payload^")" = "$expected_main"
-            git merge-base --is-ancestor "$release_payload" HEAD
-            expected_files=$(printf '%s\n' app/campus/enter/page.tsx features/campus/repository.ts tests/campus-browser/navigation.spec.ts tests/campus-connection.test.mjs tests/campus-operator-access.test.mjs)
-            test "$(git diff --name-only "$expected_main" "$release_payload")" = "$expected_files"
-            git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
-            echo 'Verified the scoped partner campus entry release.'
+            git merge-base --is-ancestor "$reviewed_payload" HEAD
+            reviewed_files=(app/campus/enter/page.tsx features/campus/repository.ts tests/campus-browser/navigation.spec.ts tests/campus-connection.test.mjs tests/campus-operator-access.test.mjs)
+            test "$(git diff --name-only "$expected_main" HEAD -- . ':(exclude).github/workflows/ci.yml')" = "$(printf '%s\n' "${reviewed_files[@]}")"
+            git diff --exit-code "$reviewed_payload" HEAD -- "${reviewed_files[@]}"
+            echo 'Verified reviewed partner campus entry on the current production base.'
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/curriculum-reading-1127" ]; then
+            expected_main=3eee26df66b3a3e8c1bd6b467013adcafcabc8c1
+            reviewed_payload=556bb83c4ccde4c65866f07495e35e4913af1c6f
+            test "$(git rev-parse HEAD^1)" = "$expected_main"
+            git merge-base --is-ancestor "$expected_main" "$reviewed_payload"
+            git merge-base --is-ancestor "$reviewed_payload" HEAD
+            git diff --exit-code "$reviewed_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'
+            echo 'Verified the reviewed curriculum typography and attachment caption changes.'
             exit 0
           fi
 
