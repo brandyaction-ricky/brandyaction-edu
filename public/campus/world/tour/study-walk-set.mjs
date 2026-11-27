@@ -15,43 +15,13 @@ export function buildStudyWalkSet(T,scene,redraw) {
     const mesh=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map,transparent:!bg,alphaTest:.15}));
     mesh.position.set(x,y,z);scene.add(mesh);
   }
-  // Large limestone slabs with baked window shadows and contact shadows. No shadow-map pass.
-  const floor=document.createElement('canvas');floor.width=1024;floor.height=1280;
-  const c=floor.getContext('2d'), palette=['#d5c9b7','#d6cbbd','#dacfbd','#d4c8b8'];
-  for(let r=0;r<12;r++)for(let k=-1;k<8;k++){
-    const x=k*160+(r%2)*80,y=r*110;
-    c.fillStyle=palette[(r*7+k+8)%4];c.fillRect(x,y,160,110);
-    c.strokeStyle='#ad9f8e';c.lineWidth=1;c.strokeRect(x,y,160,110);
-  }
-  for(let i=0;i<4200;i++){
-    const x=(i*727)%1024,y=(i*547+Math.floor(i/1024)*67)%1280;
-    c.fillStyle=i%2?'#f8f4e41c':'#514d4b14';c.fillRect(x,y,1+(i%3),1);
-  }
-  c.save();c.transform(1,.14,-.78,1,350,0);
-  c.strokeStyle='rgba(56,65,82,.23)';c.lineWidth=7;
-  for(let i=-4;i<13;i++){c.beginPath();c.moveTo(i*135,-420);c.lineTo(i*135,1600);c.stroke();}
-  c.lineWidth=4;for(let j=0;j<8;j++){c.beginPath();c.moveTo(-700,j*194);c.lineTo(1900,j*194);c.stroke();}
-  c.restore();
-  // The plane's top edge is the back of the concourse.
-  function pool(x,z,w,d){
-    c.save();c.translate((x+15)/30*1024,(z+12)/47*1280);c.scale(w/30*1024,d/47*1280);
-    const grad=c.createRadialGradient(0,0,0,0,0,1);grad.addColorStop(0,'#25324672');grad.addColorStop(1,'#3d374000');
-    c.fillStyle=grad;c.fillRect(-1,-1,2,2);c.restore();
-  }
-  // Low sun across the open concourse, baked into the floor once.
-  const pavingPoint=(x,z)=>[(x+15)*1024/30,(z+12)*1280/47];
-  function cast(points){
-    c.save();c.fillStyle='#4454693a';c.shadowColor='#4b586a33';c.shadowBlur=5;c.beginPath();
-    points.forEach(([x,z],i)=>{const [u,v]=pavingPoint(x,z);if(i)c.lineTo(u,v);else c.moveTo(u,v);});
-    c.closePath();c.fill();c.restore();
-  }
-  cast([[-11,3.52],[-2.37,3.52],[-.65,6.25],[-9.68,6.25],[-11,4.45]]);
-  cast([[2.49,-2.12],[6.91,-2.12],[8.23,-.05],[3.96,-.05]]);
-  cast([[6.74,3.02],[10.92,3.02],[12.2,5.07],[8.04,5.07]]);
-  pool(-7,1,7,4);pool(6,-3,5,3.5);pool(10,1,4,4);pool(0,-4,4,2.5);
-  const paving=new T.CanvasTexture(floor);paving.colorSpace=T.SRGBColorSpace;
-  const tile=new T.Mesh(new T.PlaneGeometry(30,47),new T.MeshBasicMaterial({map:paving}));
-  tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,11.5);scene.add(tile);
+  // Static stone veining and shadows are baked once, outside of the visitor's render loop.
+  const floorImage=new Image();floorImage.src='/campus/world/assets/lunar-concourse-floor.webp';
+  const floorReady=floorImage.decode().then(()=>{
+    const paving=new T.CanvasTexture(floorImage);paving.colorSpace=T.SRGBColorSpace;
+    const tile=new T.Mesh(new T.PlaneGeometry(30,47),new T.MeshBasicMaterial({map:paving}));
+    tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,11.5);scene.add(tile);
+  }).catch(()=>{}); // The solid base remains usable if the decorative texture is unavailable.
   box(paper,0,-.17,11.5,30,.31,47);
 
   // The barrel vault wraps over the wings. A single translucent skin spans its metal lattice.
@@ -203,5 +173,5 @@ export function buildStudyWalkSet(T,scene,redraw) {
     sideWindow(24, -Math.PI / 2, .63, .37);
     sideWindow(-27, Math.PI / 2, 0, .45);
   });
-  return backdropReady;
+  return Promise.all([floorReady,backdropReady]);
 }

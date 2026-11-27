@@ -5,7 +5,12 @@ const html = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#17252e">
 <link rel="icon" href="data:,"><title>문샷 캠퍼스</title>
-<link rel="stylesheet" href="/campus/world/tour/study-walk.css">
+<link rel="modulepreload" href="/campus/world/tour/study-walk-set.mjs">
+<link rel="modulepreload" href="/campus/world/tour/campus-interior-finish.mjs">
+<link rel="modulepreload" href="/campus/world/tour/lobby-paths.mjs">
+<link rel="preload" as="image" href="/campus/world/assets/lunar-concourse-floor.webp">
+<link rel="preload" as="image" href="/campus/world/assets/study-lunar-horizon.webp">
+<link rel="stylesheet"  href="/campus/world/tour/study-walk.css">
 <link rel="modulepreload" href="/campus/world/office/vendor/office.js">
 <link rel="modulepreload" href="/campus/world/office/vendor/office3d.js">
 </head><body>

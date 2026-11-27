@@ -62,7 +62,12 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
       returnToCampus(isLobbyRoom(current)?current:entry);
     });
   },[entry]);
-  if(entry==='loading')return <p role="status">문샷 캠퍼스를 열고 있어요.</p>;
+  if(entry==='loading')return <>
+    <link rel="preload" as="script" crossOrigin="anonymous" href="/campus/world/office/vendor/office.js"/>
+    <link rel="preload" as="script" crossOrigin="anonymous" href="/campus/world/office/vendor/office3d.js"/>
+    <link rel="preload" as="image" href="/campus/world/assets/study-lunar-horizon.webp"/>
+    <p role="status">문샷 캠퍼스를 열고 있어요.</p>
+  </>;
   if(entry)return <CampusRooms {...props} lobbyEntry={entry} returnToLobby={returnToCampus}/>;
   const lesson=props.live?campusSourceLesson(new URLSearchParams(location.search).get('fromLesson'),props.snapshot.selectedEnrollmentId):null;
   const exit=lesson?{href:lesson,label:'수업으로 돌아가기'}:props.live?{href:'/my/classes',label:'내 클래스로'}:{href:'/',label:'에듀 홈으로'};
