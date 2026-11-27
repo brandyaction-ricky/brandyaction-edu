@@ -80,12 +80,6 @@
 .edu-front .reading-copy .lesson-rich-body.lesson-rich-body p {
   min-height: 1lh;
 }
-.edu-front .reading-copy .lesson-rich-body.lesson-rich-body p + p:not(:has(> br:only-child)) {
-  margin-block-start: .75rem;
-}
-.edu-front .reading-copy .lesson-rich-body.lesson-rich-body p:has(> br:only-child) + p {
-  margin-block-start: 0;
-}
 .edu-front .reading-copy .lesson-rich-body.lesson-rich-body li + li {
   margin-block-start: .5rem;
 }
