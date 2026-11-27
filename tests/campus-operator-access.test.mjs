@@ -93,6 +93,12 @@ test('campus entry resolves the verified enrollment before staff review or exter
   user={id:id(20),role:'member',status:'active'};grants=[first];partners=[{id:id(8),cohort_id:id(4)}];
   await goes({cohort:id(4)},'/campus/workspace?enrollmentId='+id(8)+'&section=space');
   await goes({cohort:id(3)},'/campus/workspace?enrollmentId='+id(1)+'&section=space');
+  assert.equal((await open()).type, 'main');
+  user = {...user,role:'student'}; grants = [];
+  await goes({}, '/campus/workspace?enrollmentId='+id(8)+'&section=space');
+  partners.push({id:id(7),cohort_id:id(3),course_title:'문샷',cohort_name:'4기'});
+  assert.match(JSON.stringify(await open()), /4기/);
+  await goes({cohort:id(3)}, '/campus/workspace?enrollmentId='+id(7)+'&section=space');
   assert.equal((await open({cohort:id(9)})).type,'main');
  } finally {if(before===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=before;}
 });

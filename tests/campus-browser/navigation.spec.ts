@@ -89,3 +89,18 @@ test('eligible learners have one workspace entry on the unscoped My Classes page
  await expect(banner.getByRole('link', {name:'작업 공간 입장 →'})).toHaveAttribute('href','/campus/enter');
  await expect(banner.getByText('처음이라면 웰컴 안내')).toHaveCount(0);
 });
+
+test('partner-only members see the same workspace button while expired access hides it', async ({page}) => {
+ const nav = page.getByRole('navigation', {name:'문샷 캠퍼스 바로가기'});
+ const access = {enrollmentId:'00000000-0000-4000-8000-000000000111', courseId:'course', cohortId:'cohort',
+  courseTitle:'문샷', cohortName:'4기', externalPartner:true};
+ let active = true;
+ await page.route('**/api/campus', route => route.fulfill({json:{scopes:active ? [access] : []}}));
+ await page.goto('/my/classes');
+ await expect(nav.getByRole('link', {name:'작업 공간 입장 →'})).toHaveAttribute('href','/campus/enter');
+ active = false;
+ const response = page.waitForResponse(r => r.url().endsWith('/api/campus'));
+ await page.reload();
+ await response;
+ await expect(nav).toHaveCount(0);
+});
