@@ -125,3 +125,21 @@
 .lb-carry-audio{position:sticky;top:0;z-index:5;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.5rem .75rem;margin:.5rem 0;border:1px solid #d7e1ec;border-radius:12px;background:#f5f8fc}
 .lb-carry-audio small{flex-basis:100%;color:#4e5968}
 .lb-carry-audio audio{flex:1;min-width:200px;height:36px}
+
+.edu-front .lesson-blocks {
+  row-gap: .75rem;
+}
+.edu-front .lesson-blocks > [data-lesson-block] > :is(h2, h3) {
+  margin-block: 0;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+.edu-front .lesson-blocks > [data-lesson-block] + [data-lesson-block]:has(> :is(h2, h3)) {
+  margin-block-start: 1.25rem;
+}
+.edu-front .lesson-blocks > [data-lesson-block]:has(> :is(h2, h3)) + [data-lesson-block] {
+  margin-block-start: -.25rem;
+}
+.edu-front .lesson-blocks .lb-prompt pre {
+  max-inline-size: 40em;
+}

@@ -41,3 +41,59 @@
 @media(max-width:540px) { :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-toggle-content { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body summary, :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body summary::before { transition:none; } }
 .lesson-rich-body:not(.ldc-document) .lesson-toggle-drag { display:none; }
+
+/* The study-room reader can be narrow even on a desktop display. */
+.edu-front :is(.lesson-blocks, .reading:has(> .reading-copy)) {
+  container: lesson-reader / inline-size;
+}
+.edu-front :is(.lesson-blocks, .reading) .reading-copy,
+.edu-front .lesson-blocks :is(.lb-prompt pre, .lb-field, .lb-download-info) {
+  --lesson-body-size: 1.0625rem;
+  font-size: var(--lesson-body-size);
+  line-height: 1.7;
+  letter-spacing: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+@container lesson-reader (min-width: 38rem) {
+  .edu-front :is(.lesson-blocks, .reading) .reading-copy,
+  .edu-front .lesson-blocks :is(.lb-prompt pre, .lb-field, .lb-download-info) {
+    --lesson-body-size: 1.125rem;
+  }
+}
+.edu-front :is(.lesson-blocks, .reading) .reading-copy .lesson-rich-body {
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
+.edu-front :is(.lesson-blocks, .reading) .reading-copy .lesson-text-links {
+  display: block;
+  white-space: pre-wrap;
+}
+.edu-front :is(.lesson-blocks, .reading) .reading-copy :is(.lesson-text-links, p, ul, ol, blockquote) {
+  max-inline-size: 40em;
+}
+.edu-front :is(.lesson-blocks, .reading) .reading-copy .lesson-rich-body :is(p, ul, ol) {
+  font-size: inherit;
+  line-height: inherit;
+}
+.edu-front .reading-copy .lesson-rich-body.lesson-rich-body p {
+  min-height: 1lh;
+}
+.edu-front .reading-copy .lesson-rich-body.lesson-rich-body p + p:not(:has(> br:only-child)) {
+  margin-block-start: .75rem;
+}
+.edu-front .reading-copy .lesson-rich-body.lesson-rich-body p:has(> br:only-child) + p {
+  margin-block-start: 0;
+}
+.edu-front .reading-copy .lesson-rich-body.lesson-rich-body li + li {
+  margin-block-start: .5rem;
+}
+.edu-front .reading-copy .lesson-rich-body.lesson-rich-body :is(h1, h2, h3) {
+  margin-block: 1.75rem .5rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+.edu-front .reading-copy .lesson-rich-body.lesson-rich-body > :first-child {
+  margin-block-start: 0;
+}

@@ -21,11 +21,13 @@ export function LessonDownload({ assetId, caption, context, submissionId }: { as
   }, [url, attempt]);
   const current = state?.url === url ? state : null;
   const file = current?.data;
+  const description = caption?.trim();
+  const repeatedName = file && (description === file.name || description === file.name + ' 다운로드');
   return <div className="lb-download" aria-label="학습 첨부 파일">
     <FileText size={24} aria-hidden="true" />
     <div className="lb-download-info"><strong>{file?.name || '첨부 파일'}</strong>
       {file && <small>{file.size < 1024 * 1024 ? `${Math.max(1, Math.ceil(file.size / 1024))}KB` : `${(file.size / (1024 * 1024)).toFixed(1)}MB`}</small>}
-      {caption && <p>{caption}</p>}
+      {description && !repeatedName && <p>{description}</p>}
       {current?.error ? <><p role="alert">{current.error}</p><button type="button" className="btn small" onClick={() => { setState(null); setAttempt(value => value + 1); }}>첨부 파일 다시 확인</button></> : !file && <span role="status">파일을 확인하고 있습니다…</span>}
     </div>
     {file && <a className="btn small" href={url + '&download=1'} target="_blank" rel="noopener noreferrer" aria-label={`${file.name} 다운로드`}><Download size={16} aria-hidden="true" />다운로드</a>}
