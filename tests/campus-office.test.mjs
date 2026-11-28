@@ -169,3 +169,18 @@ test('registration is opt-in, single-owner, signed and cannot submit owner or re
  assert.equal(seen.event.ownerId,undefined);assert.equal(seen.event.status,undefined);
  assert.equal((await handleOfficeWebhook(req(),{...deps,registrationEnabled:true,connectors:[{...connector,ownerIds:[uid(1),uid(2)]}]})).status,403);
 });
+
+test('preview inbox restores the approved draft and its review note after hiding a job',async()=>{
+ const {mutateOfficeDemo,receiveOfficeDemo,emptyOfficeDemo}=await load('../features/campus/office/demo.ts');
+ const enrollmentId=uid(2),jobId=uid(101),snapshot={viewer:{id:uid(1)},scopes:[{enrollmentId}]},receipts=new Map();
+ let state=mutateOfficeDemo(emptyOfficeDemo(),{action:'create',requestId:jobId,enrollmentId,objective:'Write a sample reply for a customer',materialUrls:[],outputType:'copy'},snapshot,receipts);
+ for(const event of ['accepted','started','draft']){
+  state=receiveOfficeDemo(state,{jobId,expectedRevision:state.jobs[0].revision,event,draftText:'The sample order is ready for pickup.'});
+ }
+ for(const action of ['approve','archive','restore']){
+  const rev=state.jobs[0].revision;
+  state=mutateOfficeDemo(state,{action,requestId:uid(200+rev),jobId,enrollmentId,expectedRevision:rev,note:action==='approve'?'Pickup time confirmed.':''},snapshot,receipts);
+ }
+ assert.equal(state.jobs[0].status,'approved');
+ assert.equal(state.jobs[0].review_note,'Pickup time confirmed.');
+});

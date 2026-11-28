@@ -19,11 +19,12 @@ import Link from 'next/link';
 import {LibraryScreen} from '../webinar/library-screen';
 import type {CampusResource} from '../webinar/resources';
 import {ResourceLibrary} from '../webinar/resource-library';
-import {lazy,Suspense,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
+import {lazy,Suspense,useCallback,useEffect,useEffectEvent,useRef,useState,type ReactNode} from 'react';
 import {SlidersHorizontal,Scan,Eye,List,Map,LockKeyhole,ArrowUpRight,Maximize,Minimize,Orbit,DoorOpen,Users} from 'lucide-react';
 import type {TourLiveConnection} from './live-contract';
 import type {CampusSnapshot} from '../contracts';
 import type {CampusAdminSnapshot} from '../admin-metrics';
+import {holdBack} from '../ui/back-close';
 import {campusDraftState} from '../ui/draft-guard';
 import {MiniFocus} from '../space/mini-focus';
 import {menuHidden,taskById,taskMatches,taskOpen,tourTasks} from './tasks';
@@ -51,10 +52,10 @@ const STORAGE='moonshot-four-spaces-preview-v1';
 function readProgress(key=STORAGE):Progress{try{const p=JSON.parse(localStorage.getItem(key)||'null');if(p&&typeof p.video==='boolean'&&Array.isArray(p.quiz)&&p.quiz.length<=20&&p.quiz.every((v:unknown)=>v===null||typeof v==='boolean')&&Array.isArray(p.level)&&p.level.length<=12&&p.level.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=-1&&Number(v)<3))return p;}catch{}return emptyProgress();}
 export type TourVisitor={content?:CampusContent;analyticsScope?:string;presenceId?:string;devPresence?:boolean;qaCrowd?:boolean;ambientCount?:number;operatorReview?:boolean;operatorEvent?:string;title:string;renderGate:(room:TourRoom)=>ReactNode;renderTool:(tool:string,onPlay?:(item:CampusResource)=>void)=>ReactNode;onEnter:()=>void;onActivity:(tool:string)=>void};
 type OfficeDeskJob = {id:string; name:string; jobId:string; status:'running'|'review'};
-export type CampusTourProps = {welcome?:{settings:WelcomeSettings;resources:CampusResource[];content?:CampusContent};review?:{room:TourRoom;role?:'waiting'|'student';cohortId?:string;lessonContent?:ReactNode;returnHref?:string};snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor};
+export type CampusTourProps = {officeExample?:import('../office/domain').OfficeState;welcome?:{settings:WelcomeSettings;resources:CampusResource[];content?:CampusContent};review?:{room:TourRoom;role?:'waiting'|'student';cohortId?:string;lessonContent?:ReactNode;returnHref?:string};snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor};
 export type LobbyEntry = LobbyRoom | 'map';
 
-export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,welcome,lobbyEntry,seatedEntry=false,returnToLobby}: CampusTourProps & {lobbyEntry?: LobbyEntry; seatedEntry?: boolean; returnToLobby?: (from?: LobbyRoom, watch?: boolean) => void}) {
+export function FourSpacesPreview({snapshot,adminSnapshot,officeExample,live,visitor,review,welcome,lobbyEntry,seatedEntry=false,returnToLobby}: CampusTourProps & {lobbyEntry?: LobbyEntry; seatedEntry?: boolean; returnToLobby?: (from?: LobbyRoom, watch?: boolean) => void}) {
  const welcomeSettings=welcome?.settings||live?.welcomeSettings||DEFAULT_WELCOME;
  const assessment=welcomeSettings.assessment||DEFAULT_ASSESSMENT;
  const currentAssessmentKey=welcomeAssessmentKey(assessment);
@@ -200,13 +201,18 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  }
  function canVisit(id:TourRoom){return canEnter(role,id)||visitor?.operatorReview===true;}
  async function exitCampus(){if(!mayLeave(true))return;if(document.fullscreenElement)try{await document.exitFullscreen();}catch{}if(returnToLobby){returnToLobby(isLobbyRoom(room)?room:undefined);return;}window.location.assign(review?.returnHref || (visitor?'/':review&&review.role!=='waiting'?'/admin':'/my/classes'));}
+ const inLobbyRoom=!!lobbyEntry&&!!returnToLobby;
+ const backFromRoom=useEffectEvent(()=>{void exitCampus();});
+ useEffect(()=>{
+  if(inLobbyRoom)return holdBack(()=>backFromRoom(),'room');
+ },[inLobbyRoom]);
  // A document navigation releases the WebGL scene/presence and rechecks operator auth.
  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
- function enter(id:TourRoom){if(id==='welcome')return;if(id==='library'&&returnToLobby){selectTask('library:all');return;}post('meetup-start');if(!mayLeave())return;if(id==='live'&&returnToLobby){returnToLobby(isLobbyRoom(state.current.room)?state.current.room:undefined,true);return;}if(visitorRef.current?.operatorReview&&!['live','library'].includes(id)){const q=new URLSearchParams({room:id});if(visitorRef.current.operatorEvent)q.set('event',visitorRef.current.operatorEvent);window.location.assign('/campus/operator?'+q);return;}if(!canEnter(role,id)){setMapOpen(false);setActivityMenu(false);setGate(id);return;}let first=false;if(id==='office'&&live&&role==='student'){try{const key='campus:office-guide:v1:'+snapshot.viewer.id;first=!localStorage.getItem(key);if(first)localStorage.setItem(key,'seen');}catch{}}
+ function enter(id:TourRoom){if(id==='welcome')return;if(id==='library'&&returnToLobby){selectTask('library:all');return;}post('meetup-start');if(!mayLeave(id==='live'&&!!returnToLobby))return;if(id==='live'&&returnToLobby){returnToLobby(isLobbyRoom(state.current.room)?state.current.room:undefined,true);return;}if(visitorRef.current?.operatorReview&&!['live','library'].includes(id)){const q=new URLSearchParams({room:id});if(visitorRef.current.operatorEvent)q.set('event',visitorRef.current.operatorEvent);window.location.assign('/campus/operator?'+q);return;}if(!canEnter(role,id)){setMapOpen(false);setActivityMenu(false);setGate(id);return;}let first=false;if(id==='office'&&live&&role==='student'){try{const key='campus:office-guide:v1:'+snapshot.viewer.id;first=!localStorage.getItem(key);if(first)localStorage.setItem(key,'seen');}catch{}}
  entryMap.current=false;setRoom(id);setMapOpen(false);setGate(null);setTool(first?'office-guide':'');setPrevious('');setActivityMenu(false);setNotice('');post('room',{id});
  // 들어온 공간을 주소에 적어 둔다. 새로고침하거나 수업에서 돌아올 때 지도 대신 이 공간이 열린다.
  rememberStudentRoom(id);}
- function selectTask(id:string){const t=managedTask(id);if(!t||!taskOpen(id,live?.modules)||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;
+ function selectTask(id:string){const t=managedTask(id);if(!t||!taskOpen(id,live?.modules)||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave(id==='live-video'&&!!returnToLobby))return;
   if(returnToLobby&&t.room==='live'&&id==='live-video'){returnToLobby(isLobbyRoom(room)?room:undefined,true);return;}
   // 조명·배경음은 버튼 하나뿐인 중간 화면을 거치지 않고 3D 화면의 설정 창을 바로 연다.
   if(id==='sound'&&ready&&!failed&&room===t.room){setTool('');setPrevious('');setMapOpen(false);setActivityMenu(false);setNotice('');post('environment-open');return;}
@@ -226,8 +232,15 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
   if(restoredRoom.current || (!lobbyEntry && (!live || role!=='student')))return;
   restoredRoom.current=true;
   const want=lobbyEntry || requestedRoom(location.search);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- run first-visit and access checks on the incoming room
-  if(isLobbyRoom(want))enter(want);
+  if(isLobbyRoom(want)) {
+   // eslint-disable-next-line react-hooks/set-state-in-effect -- apply first-visit and access checks for the incoming URL
+   enter(want);
+   if(want==='study'&&seatedEntry&&canEnter(role,'study')&&managedTask('learning')) {
+    const sampleLesson=!live && snapshot.lessons.find(row=>!row.completed&&!row.locked);
+    if(sampleLesson)openLesson(sampleLesson.id);
+    else setTool('learning');
+   }
+  }
  },[live,lobbyEntry]); // eslint-disable-line react-hooks/exhaustive-deps
  function navigate(id:string){selectTask(({community:'feedback',business:'business:brief',support:'support:request',learning:'learning'} as Record<string,string>)[id]||id);}
  useEffect(()=>{state.current={role,room,tool,mapOpen,gate,camera};},[role,room,tool,mapOpen,gate,camera]);
@@ -415,7 +428,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  </section>}
  {!review&&isFeature(tool)&&!['ai','office'].includes(tool)&&<FeaturePanel key={role+tool} id={tool} archive={!live||!!live.modules?.business} snapshot={snapshot} demo={demo} onRefresh={live?.onRefresh} onSelect={live?.onSelect} adminSnapshot={adminSnapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}
  <div hidden={tool!=='ai'}>{!review&&aiVisited&&canEnter(role,'study')&&<FeaturePanel key={role+JSON.stringify(handoff)} id="ai" demo={demo} active={tool==='ai'} snapshot={snapshot} handoff={handoff} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
- <div hidden={tool!=='office'}>{!review&&officeVisited&&(!officeFilter?.jobId||tool==='office')&&canEnter(role,'office')&&<FeaturePanel key={role} officeFilter={officeFilter} id="office" demo={demo} active={tool==='office'} snapshot={snapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
+ <div hidden={tool!=='office'}>{!review&&officeVisited&&(!officeFilter?.jobId||tool==='office')&&canEnter(role,'office')&&<FeaturePanel key={role} officeFilter={officeFilter} officeExample={officeExample} id="office" demo={demo} active={tool==='office'} snapshot={snapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
  <div hidden={!spacePane(tool)}>{((sharedStudy&&enteredStudy)||(toolsVisited&&!sharedStudy&&(demo||room==='study')))&&canEnter(role,'study')&&<SpaceTools journal={live?!!live.modules?.focus:true} support={live?!!live.modules?.support:true} studyEntry={sharedStudy?{host:studyCardHost,onJoined:()=>setSceneStarted(true),openLounge:()=>selectTask('lounge')}:undefined} snapshot={snapshot} demo={demo} toolsVisible={!!spacePane(tool)} toolsPane={toolsPane} onOpenEnvironment={()=>{setTool('');post('environment-open');}} onOpenLesson={openLesson} onNavigate={navigate}/>}</div>
  </Suspense>
  </div>

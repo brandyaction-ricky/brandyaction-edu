@@ -32,15 +32,16 @@ function arrive() {
 }
 function guide() {
   const moving = goal !== null || keys.size > 0;
-  walk.textContent = failed ? '공간 열기' : moving ? '멈추기' : '따라 걷기';
-  if(seated)walk.textContent='공부 시작하기';
-  walk.disabled = (!ready && !failed) || seating;
+  walk.textContent = failed ? '공간 열기' : !ready ? '바로 입장' : moving ? '멈추기' : '따라 걷기';
+  if(seated)walk.textContent='수업을 열고 있어요…';
+  walk.disabled = seating || seated;
   document.querySelector('#destinations').hidden=seated||seating;
   watch.hidden=seated||seating;
   walk.hidden = !destination;
   track.hidden = !destination || seated || seating;
   hint.textContent = failed ? '3D 대신 선택한 공간으로 바로 들어갈 수 있어요.' :
     !destination ? (returnDoor ? returnDoor.label+' 문 앞이에요. 다음 공간을 골라주세요.' : '갈 곳을 누르면 파란 길을 따라 걸어요.') :
+    !ready ? doors[destination].label+' 입장을 준비하고 있어요.' :
     seated ? '내 자리에 앉았어요.' : seating ? '자리에 앉고 있어요.' :
     destination==='study' && studyAccess ? (moving?'붉은 아치를 지나 내 자리로 가고 있어요.':'파란 길이 공부방 안 내 자리까지 이어져요.') :
     moving ? '문에 도착하면 공간이 열려요.' : '파란 선을 누르거나 따라 걷기를 선택하세요.';
@@ -61,12 +62,15 @@ for (const button of picks) {
 }
 walk.onclick=()=>{
   if (!destination || sent) return;
-  if (seated || failed) {arrive();return;}
+  if (failed || !ready) {arrive();return;}
   if(seating)return;
   if (goal !== null || keys.size) {goal=null;keys.clear();}
   else goal=length;
   guide();wake();
 };
+const earlyRoom = document.body.dataset.pendingRoom;
+if (earlyRoom) choose(earlyRoom);
+delete document.body.dataset.pendingRoom;
 function fallback() { failed=true; guide(); }
 
 async function start() {
@@ -172,6 +176,7 @@ async function start() {
     renderer.render(scene,camera);
     canvas.dataset.playerX=position.x.toFixed(2);canvas.dataset.playerZ=position.z.toFixed(2);
     if(destination){document.body.style.setProperty('--progress',String(length?distance/length:1));if(distance>=length-.001 && !seating && !seated){arrive();return;}}
+    if(seated && settle<=0){arrive();return;}
     if(seating||moving||keys.size||goal!==null||settle>0||Math.abs(targetOffset-lookOffset)>.015)frame=requestAnimationFrame(draw);else previous=0;
   }
   wake=()=>{if(!frame&&!sent&&!failed&&!document.hidden){if(!previous)previous=performance.now();frame=requestAnimationFrame(draw);}};

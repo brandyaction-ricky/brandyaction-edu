@@ -2,11 +2,10 @@
 import dynamic from 'next/dynamic';
 import {useEffect, useRef, useState} from 'react';
 import type {CampusTourProps} from './preview';
-import {LunarLobby, isLobbyRoom, type LobbyRoom} from './lunar-lobby';
+import {LunarLobby, type LobbyRoom} from './lunar-lobby';
 import {campusSourceLesson, requestedRoom} from '../ui/navigation';
 import type {StageProgram} from '../webinar/domain';
 import {canEnter} from './model';
-import {holdBack} from '../ui/back-close';
 import {useRouter} from 'next/navigation';
 import styles from './lunar-lobby.module.css';
 
@@ -60,13 +59,6 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
     history.replaceState(history.state,'',url);
     setSeatedEntry(room==='study'&&seated);setPanel(null);setEntry(room);
   }
-  useEffect(()=>{
-    if(!entry || entry==='loading')return;
-    return holdBack(()=>{
-      const current=requestedRoom(location.search);
-      returnToCampus(isLobbyRoom(current)?current:entry);
-    });
-  },[entry]);
   if(entry==='loading')return <>
     <link rel="preload" as="script" crossOrigin="anonymous" href="/campus/world/office/vendor/office.js"/>
     <link rel="preload" as="script" crossOrigin="anonymous" href="/campus/world/office/vendor/office3d.js"/>

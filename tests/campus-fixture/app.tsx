@@ -38,6 +38,11 @@ if(location.pathname==='/campus-tour-live'||location.pathname==='/campus/workspa
   ? { community: false, focus: true, support: true, business: true } : undefined;
  return <FourSpacesLive operator={query.get('operator')==='1'} studyPresence={query.get('studyPresence')==='1'} modules={modules}/>;
 }
+if(location.pathname==='/lunar-room-fixture') {
+ const seated=new URLSearchParams(location.search).has('seated');
+ if(mode==='lobby')return <h1>캠퍼스 문 앞</h1>;
+ return <FourSpacesPreview snapshot={student} lobbyEntry="study" seatedEntry={seated} returnToLobby={()=>setMode('lobby')}/>;
+}
 if(location.pathname==='/campus-analytics')return <CampusAnalyticsPanel/>;
 if(location.pathname==='/office'&&new URLSearchParams(location.search).has('api'))return <OfficePanel snapshot={student} demo={false}/>;
 if(location.pathname==='/personal-office')return <div style={{padding:24,maxWidth:900,margin:'auto'}}><PersonalOffice enrollmentId={student.selectedEnrollmentId!} demo/></div>;

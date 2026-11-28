@@ -10,7 +10,11 @@ export function mutateOfficeDemo(state: OfficeState, input: OfficeCommand, snaps
   if (c.action === 'create') job = { id: c.requestId, owner_id: snapshot.viewer.id, enrollment_id: c.enrollmentId, objective: c.objective!, material_urls: c.materialUrls!, output_type: c.outputType!, status: 'awaiting_connection', revision: 1, draft_text: '', draft_url: '', review_note: '', error_note: '', created_at: now, updated_at: now };
   else {
     const original = next.jobs.find(j => j.id === c.jobId && j.owner_id === snapshot.viewer.id && j.enrollment_id === c.enrollmentId); if (!original) campusError(403, '내 작업만 확인할 수 있어요.');
-    job = { ...original, status: learnerOfficeTransition(original, c), revision: original.revision + 1, review_note: c.note ?? '', updated_at: now };
+    const beforeArchive = c.action === 'restore'
+      ? state.history.find(h => h.job_id === original.id && h.revision === original.revision - 1)?.status
+      : undefined;
+    const reviewNote = c.action === 'approve' || c.action === 'request_revision' ? c.note ?? '' : original.review_note;
+    job = { ...original, status: learnerOfficeTransition(original, c, beforeArchive), revision: original.revision + 1, review_note: reviewNote, updated_at: now };
   }
   next.jobs = [job, ...next.jobs.filter(j => j.id !== job.id)];
   next.history.unshift({ id: c.requestId, job_id: job.id, revision: job.revision, actor_type: 'learner', action: c.action, status: job.status, note: c.note ?? '', draft_text: '', created_at: now });

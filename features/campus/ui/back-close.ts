@@ -12,10 +12,11 @@ function pop() {
   setTimeout(() => { if (stack.length && !entry) push(); }, 0);
 }
 function push() { history.pushState(history.state, ''); entry = true; pushedLength = history.length; }
-export function holdBack(close: () => void) {
+export function holdBack(close: () => void, layer: 'window' | 'room' = 'window') {
   const item = { close };
   if (!listening) { window.addEventListener('popstate', pop); listening = true; }
-  stack.push(item);
+  if (layer === 'room') stack.unshift(item);
+  else stack.push(item);
   if (pending) { clearTimeout(pending); pending = null; }
   if (!entry) push();
   return () => {

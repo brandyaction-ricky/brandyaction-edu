@@ -24,7 +24,28 @@ const html = `<!doctype html>
 <button type="button" data-room="office"><strong>내 AI 사무실</strong><small>AI 직원과 업무 관리</small></button></fieldset>
 <div class="actions"><p id="hint" role="status">갈 곳을 누르면 파란 길을 따라 걸어요.</p><button id="next" type="button" hidden>따라 걷기</button></div>
 <div class="track" hidden aria-hidden="true"><span></span></div>
-</section></main><script type="module" src="/campus/world/tour/study-walk.mjs"></script></body></html>`;
+</section></main><script>
+{
+  const picks = document.querySelectorAll('[data-room]');
+  const hint = document.querySelector('#hint');
+  const next = document.querySelector('#next');
+  let failed = false;
+  function select(button) {
+    document.body.dataset.pendingRoom = button.dataset.room;
+    for (const pick of picks) pick.setAttribute('aria-pressed', String(pick === button));
+    hint.textContent = failed ? '공간으로 바로 들어갈 수 있어요.' : button.querySelector('strong').textContent + ' 입장을 준비하고 있어요.';
+    next.hidden = false;
+    next.textContent = '바로 입장';
+  }
+  for (const pick of picks) pick.onclick = () => select(pick);
+  next.onclick = () => parent.postMessage({type:'moonshot-lobby-arrived', room:document.body.dataset.pendingRoom}, location.origin);
+  document.querySelector('#watch').onclick = () => parent.postMessage({type:'moonshot-watch-stage'}, location.origin);
+  import('/campus/world/tour/study-walk.mjs').catch(() => {
+    failed = true;
+    hint.textContent = '공간을 골라 바로 들어가세요.';
+  });
+}
+</script></body></html>`;
 
 export function GET() {
   if (process.env.VERCEL_ENV === 'production' || (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production')) {

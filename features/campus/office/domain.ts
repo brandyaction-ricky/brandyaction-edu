@@ -43,15 +43,15 @@ export function validateOfficeEvent(input: unknown): OfficeEvent {
   out.note = text(e.note ?? '', e.event === 'failed' ? 5 : 0, 1000);
   return out;
 }
-export function learnerOfficeTransition(job: OfficeJob, command: OfficeCommand): OfficeStatus {
+export function learnerOfficeTransition(job: OfficeJob, command: OfficeCommand, beforeArchive?: OfficeStatus): OfficeStatus {
   if (job.revision !== command.expectedRevision) campusError(409, '작업 상태가 바뀌었습니다.');
   if (command.action === 'approve' && job.status === 'review' && job.draft_text.length >= 10) return 'approved';
   if (command.action === 'request_revision' && job.status === 'review') return 'revision_requested';
   if (command.action === 'retry' && job.status === 'failed') return 'awaiting_connection';
   if (command.action === 'archive' && ['awaiting_connection', 'review', 'approved', 'revision_requested', 'failed'].includes(job.status)) return 'archived';
-  // The database returns a hidden job to the state it had before it was hidden. This practice copy keeps no
-  // history of its own, so it returns to the nearest state it can tell from the job itself.
-  if (command.action === 'restore' && job.status === 'archived') return job.draft_text.length >= 10 ? 'review' : 'awaiting_connection';
+  if (command.action === 'restore' && job.status === 'archived') {
+    return beforeArchive ?? (job.draft_text.length >= 10 ? 'review' : 'awaiting_connection');
+  }
   return campusError(409, '현재 상태에서 할 수 없는 요청입니다.');
 }
 export function connectorOfficeTransition(job: OfficeJob, event: OfficeEvent): OfficeStatus {
