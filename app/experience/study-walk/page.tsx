@@ -33,8 +33,10 @@ export default async function StudyWalkPreview() {
   officeExample = receiveOfficeDemo(officeExample, {jobId,expectedRevision:3,event:'draft',
     draftText:'안녕하세요! 예약하신 빵은 오늘 오후 3시부터 6시까지 매장에서 찾으실 수 있어요. 예약자 성함을 말씀해 주시면 바로 챙겨드릴게요. 다른 시간에 오실 예정이라면 편한 시간을 알려주세요.',
   });
-  return <LunarCampus sample snapshot={snapshot} officeExample={officeExample} welcome={{settings:DEFAULT_WELCOME,resources:[{
-    id:'ai-request-example',kind:'file',title:'AI 업무 요청 템플릿',description:'맡길 일과 결과를 확인할 기준을 한 장에 정리해 보세요.',
-    url:'/uiux/assets/brandy-ai-request-sample.html',published:true,
-  }]}}/>;
+  const settings = {...DEFAULT_WELCOME, lessons: DEFAULT_WELCOME.lessons.map(item =>
+    item.id === sampleLesson?.id
+      ? {...item, url: '/uiux/assets/brandy-ai-request-sample.html', linkLabel: 'AI 업무 요청 템플릿 열기'}
+      : item
+  )};
+  return <LunarCampus sample snapshot={snapshot} officeExample={officeExample} welcome={{settings,resources:[]}}/>;
 }

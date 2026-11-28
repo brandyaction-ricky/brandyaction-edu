@@ -16,7 +16,6 @@ const labels = {study:'공부방', office:'내 AI 사무실', resources:'자료�
 const CampusRooms=dynamic(()=>import('./preview').then(module=>module.FourSpacesPreview), {
   loading: () => <p role="status">공간을 열고 있어요.</p>,
 });
-const ResourceLibrary=dynamic(()=>import('../webinar/resource-library').then(module=>module.ResourceLibrary));
 const CampusWindow=dynamic(()=>import('../ui/campus-window').then(module=>module.CampusWindow));
 
 export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sample?:boolean}) {
@@ -29,9 +28,14 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
   const initialVisitor=useRef(props.visitor);
   const role=props.visitor?'guest':props.live?.role||'student';
   useEffect(()=>{
-    const dest=requestedRoom(location.search);
     const visitor=initialVisitor.current;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the incoming room after hydration
+    const url=new URL(location.href);
+    let dest=requestedRoom(url.search);
+    if(dest==='library'&&!visitor){
+      dest='study';
+      url.searchParams.set('room',dest);
+      history.replaceState(history.state,'',url);
+    }
     setEntry(isDoor(dest)&&canEnter(role,dest)?dest:null);
     if(dest==='live'||(visitor&&!dest))setPanel('stage');
     else if(dest==='library')setPanel('resources');
@@ -47,7 +51,10 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
   }
   function enter(room:LobbyRoom,seated=false) {
     if(room==='live'){setPanel('stage');return;}
-    if(room==='library'){setPanel('resources');return;}
+    if(room==='library'){
+      if(props.visitor){setPanel('resources');return;}
+      room='study';
+    }
     if(!canEnter(role,room)){
       if(props.visitor?.operatorReview && props.visitor.operatorEvent){
         router.push('/campus/operator?'+new URLSearchParams({room,event:props.visitor.operatorEvent}));
@@ -76,8 +83,8 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
     {panel&&<CampusWindow backCloses open title={titles[panel]} context="문샷 캠퍼스" onClose={close}>
       {panel==='map'?<>
         <div className={styles.destinations}>{(['study','office'] as const).map(id=><button key={id} onClick={()=>enter(id)}>{labels[id]} <span aria-hidden="true">→</span></button>)}</div>
-        <div className={styles.utilities}><button onClick={()=>setPanel('stage')}>라이브 보기</button><button onClick={()=>enter('library')}>자료·다시보기</button></div>
-       </>:panel==='resources'?(props.visitor?props.visitor.renderTool('library:all'):<ResourceLibrary heading="자료·다시보기" items={props.welcome?.resources||props.live?.libraryResources}/>):
+        <div className={styles.utilities}><button onClick={()=>setPanel('stage')}>라이브 보기</button>{props.visitor&&<button onClick={()=>enter('library')}>자료·다시보기</button>}</div>
+       </>:panel==='resources'?props.visitor?.renderTool('library:all'):
        panel==='stage'?<>
         {program?.youtubeId?<iframe className={styles.player} src={'https://www.youtube-nocookie.com/embed/'+program.youtubeId+'?playsinline=1'} title={program.title} allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen/>:
          props.sample?<><video className={styles.player} controls playsInline preload="metadata" src="/campus/showcase/learning-knowledge-full-v2.mp4" aria-label="무대 시청 예시 영상"/><p className={styles.caption}>시청 예시 · 대화에서 배운 내용을 연결하는 AI 직원</p></>:

@@ -295,3 +295,5 @@ p.loading{pointer-events:none}
 @media(max-width:650px){.roomDock{margin-inline:auto;}.roomDock>button,.roomMore summary{padding-inline:11px;font-size:13px;}}
 
 .sampleReading { margin-block: 12px 20px; white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
+
+.lessonAttachment {display:inline-flex;align-items:center;gap:6px;min-height:44px;margin-top:8px;color:inherit;text-decoration:underline;text-underline-offset:3px;font-weight:650;}

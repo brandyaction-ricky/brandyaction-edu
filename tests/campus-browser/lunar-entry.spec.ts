@@ -9,7 +9,9 @@ test('seating opens the first unfinished lesson and Back protects a hidden quest
  await dialog.getByRole('button',{name:/닫기/}).first().click();
  const dock=page.getByLabel('공간 바로가기');
  async function openQuestions(){
-  await dock.locator('summary').click();
+  await expect(dock.getByRole('button',{name:'수업 열기',exact:true})).toBeVisible();
+  await expect(dock.getByRole('button',{name:'자료·다시보기'})).toHaveCount(0);
+  await expect(dock.locator('details')).toHaveJSProperty('open',false);
   await dock.getByRole('button',{name:'이 공간에서 할 일'}).click();
   await page.getByRole('region',{name:'이 공간에서 할 일'}).getByRole('button',{name:/AI 조교·멘토/}).click();
  }
