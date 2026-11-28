@@ -293,3 +293,5 @@ p.loading{pointer-events:none}
 .roomMapLinks {display:flex;gap:14px;margin-top:8px;}
 .roomMapLinks button {min-height:44px;color:#204861;background:transparent;border:0;text-decoration:underline;text-underline-offset:3px;}
 @media(max-width:650px){.roomDock{margin-inline:auto;}.roomDock>button,.roomMore summary{padding-inline:11px;font-size:13px;}}
+
+.sampleReading { margin-block: 12px 20px; white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
