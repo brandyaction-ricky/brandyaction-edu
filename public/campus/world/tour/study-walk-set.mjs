@@ -17,10 +17,10 @@ export function buildStudyWalkSet(T,scene,redraw) {
   }
   // Static stone veining and shadows are baked once, outside of the visitor's render loop.
   const floorImage=new Image();floorImage.src='/campus/world/assets/lunar-concourse-floor.webp';
-  const floorReady=floorImage.decode().then(()=>{
+  void floorImage.decode().then(()=>{
     const paving=new T.CanvasTexture(floorImage);paving.colorSpace=T.SRGBColorSpace;
     const tile=new T.Mesh(new T.PlaneGeometry(30,47),new T.MeshBasicMaterial({map:paving}));
-    tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,11.5);scene.add(tile);
+    tile.rotation.x=-Math.PI/2;tile.position.set(0,.008,11.5);scene.add(tile);redraw();
   }).catch(()=>{}); // The solid base remains usable if the decorative texture is unavailable.
   box(paper,0,-.17,11.5,30,.31,47);
 
@@ -278,7 +278,7 @@ export function buildStudyWalkSet(T,scene,redraw) {
   // One matte backdrop is shared by the atrium and the study windows.
   const panorama=new Image();
   panorama.src='/campus/world/assets/study-lunar-horizon.webp';
-  const backdropReady=panorama.decode().then(()=>{
+  void panorama.decode().then(()=>{
     const map=new T.CanvasTexture(panorama);map.colorSpace=T.SRGBColorSpace;
     const view=new T.Mesh(new T.PlaneGeometry(115,38.33),new T.MeshBasicMaterial({map}));
     view.position.set(12,7,-37);scene.add(view);
@@ -294,6 +294,6 @@ export function buildStudyWalkSet(T,scene,redraw) {
     }
     sideWindow(24, -Math.PI / 2, .63, .37);
     sideWindow(-27, Math.PI / 2, 0, .45);
-  });
-  return Promise.all([floorReady,backdropReady]);
+    redraw();
+  }).catch(()=>{}); // The horizon can arrive after the first walkable frame.
 }

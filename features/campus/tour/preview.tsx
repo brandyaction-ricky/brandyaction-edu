@@ -102,9 +102,19 @@ export function FourSpacesPreview({snapshot,adminSnapshot,officeExample,live,vis
  const [deskFrameVisible,setDeskFrameVisible]=useState(false);
  const [deskList,setDeskList]=useState<{enrollment:typeof snapshot.selectedEnrollmentId;jobs:OfficeDeskJob[];profiles:BotDocument['profiles']}|null>(null);
  const studentOffice=!!live&&role==='student'&&room==='office';
- // 3D를 쓸 수 없는 브라우저는 3D 로딩을 기다리지 않고 바로 평면 화면으로 간다.
- // eslint-disable-next-line react-hooks/set-state-in-effect -- Browser capability is only known after mount.
- useEffect(()=>{try{const canvas=document.createElement('canvas'),gl=canvas.getContext('webgl2')||canvas.getContext('webgl');if(!gl)setFailed(true);else gl.getExtension('WEBGL_lose_context')?.loseContext();}catch{setFailed(true);}},[]);
+ const probeRenderer=!lobbyEntry||!!live;
+ // A preview mounts its renderer immediately and reports failure through the frame.
+ // Live rooms may defer the frame, so keep their early 2D fallback.
+ useEffect(()=>{
+  if(!probeRenderer)return;
+  try{
+   const canvas=document.createElement('canvas');
+   const gl=canvas.getContext('webgl2')||canvas.getContext('webgl');
+   // eslint-disable-next-line react-hooks/set-state-in-effect -- Browser capability is only known after mount.
+   if(!gl)setFailed(true);
+   else gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }catch{setFailed(true);}
+ },[probeRenderer]);
  const deskLoaded=!!deskList&&deskList.enrollment===snapshot.selectedEnrollmentId;
  const studentMap=!!live&&role==='student'&&mapOpen;
  const sharedStudy=!!live?.studyPresence&&role==='student'&&room==='study';

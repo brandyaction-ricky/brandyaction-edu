@@ -1,3 +1,4 @@
+import {createSceneGesture} from './scene-gesture.mjs';
 import {buildStudyWalkSet} from './study-walk-set.mjs';
 import {doors, entrance, nearestPoint, pointAt, walkRoute, studySeat} from './lobby-paths.mjs';
 import {resolveAvatarModel, styleAvatarActor} from '../office/vendor/avatar-appearance.js';
@@ -49,6 +50,7 @@ function guide() {
 function choose(id) {
   if (sent || seated || seating || !doors[id]) return;
   if (id !== destination) {
+    window.parent.postMessage({type:'moonshot-room-approach'},location.origin);
     destination=id; path=walkRoute(position,id,studyAccess); length=path.at(-1).length; distance=0;
     goal=length; keys.clear(); showLine(path); canvas.dataset.route=id;document.body.dataset.guiding='true';
     document.body.style.setProperty('--progress','0');
@@ -86,7 +88,9 @@ async function start() {
   appearance.model=Number(appearance.model);
   const avatarModel=resolveAvatarModel(appearance);
   const asset=avatarModel.gender+'-'+'abcdef'[avatarModel.model];
-  const [avatar]=await Promise.all([createCampusAssetLoader().loadAsync('/campus/world/office/vendor/assets/kenney/characters/character-'+asset+'.glb'), buildStudyWalkSet(T,scene,()=>wake())]);
+  const avatarReady=createCampusAssetLoader().loadAsync('/campus/world/office/vendor/assets/kenney/characters/character-'+asset+'.glb');
+  buildStudyWalkSet(T,scene,()=>wake());
+  const avatar=await avatarReady;
   const actor=avatar.scene,bounds=new T.Box3().setFromObject(actor),scale=1.54/(bounds.max.y-bounds.min.y);
   actor.scale.setScalar(scale); scene.add(actor);
   const mixer=new T.AnimationMixer(actor);
@@ -190,12 +194,18 @@ async function start() {
   document.addEventListener('keyup',e=>{if(keys.delete(e.code)){guide();wake();}});
   window.addEventListener('blur',stop);
   document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;stop();}else wake();});
-  let down=null;
-  canvas.addEventListener('pointerdown',e=>{down={id:e.pointerId,x:e.clientX,y:e.clientY};});
-  canvas.addEventListener('pointercancel',()=>{down=null;});
+  const gesture=createSceneGesture();
+  window.addEventListener('blur',()=>gesture.reset());
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;
+    canvas.setPointerCapture(e.pointerId);gesture.begin(e);
+  });
+  canvas.addEventListener('pointermove',e=>gesture.move(e));
+  canvas.addEventListener('pointercancel',e=>gesture.cancel(e));
+  canvas.addEventListener('lostpointercapture',e=>gesture.cancel(e));
   canvas.addEventListener('pointerup',e=>{
-    if(seated||seating||sent||!down||e.pointerId!==down.id||Math.hypot(e.clientX-down.x,e.clientY-down.y)>10)return;
-    down=null;const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);
+    if(!gesture.end(e)||seated||seating||sent)return;
+    const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);
     ray.setFromCamera(ndc,camera);
     for(const [id,door] of Object.entries(doors)){
       if(ray.ray.distanceToPoint(new T.Vector3(door.x,2.15,door.z-.6))<1.42){choose(id);goal=length;guide();wake();return;}

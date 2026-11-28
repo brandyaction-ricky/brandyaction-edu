@@ -16,6 +16,11 @@ const labels = {study:'공부방', office:'내 AI 사무실', resources:'자료�
 const CampusRooms=dynamic(()=>import('./preview').then(module=>module.FourSpacesPreview), {
   loading: () => <p role="status">공간을 열고 있어요.</p>,
 });
+// Start the room UI while the participant walks. This imports code only, without mounting a second world.
+function warmRoomTools() {
+  const network=(navigator as Navigator & {connection?: {saveData?: boolean}}).connection;
+  if(!network?.saveData)void import('./preview').catch(()=>{});
+}
 const CampusWindow=dynamic(()=>import('../ui/campus-window').then(module=>module.CampusWindow));
 
 export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sample?:boolean}) {
@@ -27,6 +32,7 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
   const [panel,setPanel]=useState<Panel>(null);
   const initialVisitor=useRef(props.visitor);
   const role=props.visitor?'guest':props.live?.role||'student';
+  const onApproach=canEnter(role,'study')||canEnter(role,'office')?warmRoomTools:undefined;
   useEffect(()=>{
     const visitor=initialVisitor.current;
     const url=new URL(location.href);
@@ -79,7 +85,7 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
   const close=()=>{setPanel(null);if(['live','library'].includes(requestedRoom(location.search)||''))returnToCampus();};
   const titles={stage:program?.title||'라이브 무대',map:'공간 이동',offer:'문샷에서 배우는 것',experience:'고객 발견 체험',...labels};
   return <>
-    <LunarLobby key={(from||'entry')+gateVisit} from={from} studyAccess={canEnter(role,'study')} avatar={props.live?.avatar} exit={exit} onEnter={enter} onMap={()=>setPanel('map')}/>
+    <LunarLobby key={(from||'entry')+gateVisit} from={from} studyAccess={canEnter(role,'study')} avatar={props.live?.avatar} exit={exit} onEnter={enter} onApproach={onApproach} onMap={()=>{setPanel('map');onApproach?.();}}/>
     {panel&&<CampusWindow backCloses open title={titles[panel]} context="문샷 캠퍼스" onClose={close}>
       {panel==='map'?<>
         <div className={styles.destinations}>{(['study','office'] as const).map(id=><button key={id} onClick={()=>enter(id)}>{labels[id]} <span aria-hidden="true">→</span></button>)}</div>

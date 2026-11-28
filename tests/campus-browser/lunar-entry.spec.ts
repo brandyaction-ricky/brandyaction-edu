@@ -53,3 +53,23 @@ test('a choice made before the walking code loads still works when the module fa
  await page.getByRole('button',{name:'바로 입장'}).click();
  expect(await arrival).toMatchObject({type:'moonshot-lobby-arrived',room:'office'});
 });
+
+
+test('the lobby is walkable while its decorative textures are unavailable', async ({page})=>{
+ let release!:()=>void;
+ const hold=new Promise<void>(resolve=>{release=resolve;});
+ await page.route('**/lunar-scene-fixture',async route=>{
+  await route.fulfill({contentType:'text/html',body:await getScene().text()});
+ });
+ await page.route(/(?:lunar-concourse-floor|study-lunar-horizon)\.webp$/,async route=>{
+  await hold;
+  await route.abort();
+ });
+ try {
+  await page.goto('/lunar-scene-fixture',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('body')).toHaveAttribute('data-ready','true');
+  await page.getByRole('button',{name:/공부방/}).click();
+  await expect(page.locator('#walk-scene')).toHaveAttribute('data-route','study');
+  await expect(page.getByRole('button',{name:'멈추기'})).toBeVisible();
+ } finally {release();}
+});

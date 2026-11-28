@@ -309,13 +309,14 @@ function move(dt){if(blocked||editing||document.hidden)return;const a=office.cam
 async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry,CampusBasicMaterial,CampusWalkThree}=await import('../office/vendor/office3d.js');if(lunarCampus){
    const {finishCampusRoom}=await import('./campus-interior-finish.mjs');
    finishRoom=(group,id)=>finishCampusRoom(CampusWalkThree,group,id,()=>office.draw());
- }office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst,...guidedPreview?{compact:true}:{}});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
- let configuringOffice=officeFirst;
- if(officeFirst){
+ }office=new Office3D(root,{showAgent:false,deskCapacity:8,deferModels:officeFirst||lunarCampus,...guidedPreview?{compact:true}:{}});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
+ let configuringRoom=officeFirst||lunarCampus;
+ if(configuringRoom){
   if(!office.gl)throw Error('renderer');
-  // Configure the destination, camera and roster before paying for the first draw.
   const draw=office.draw.bind(office);
-  office.draw=(...args)=>configuringOffice?false:draw(...args);
+  office.draw=(...args)=>configuringRoom?false:draw(...args);
+ }
+ if(officeFirst){
   office.getCampusVisibleRoom=()=>room==='office'?'office':'study';
   office.prepareRoomGeometry();
   // Only the stationary lab architecture is present here. Furnishings, lights and
@@ -345,6 +346,11 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
   }
   firstDeskFrame.finish();firstDeskFrame=null;
   office.installCampusInterior();
+ }else if(lunarCampus){
+  // The legacy ready promise waits for three rendered frames. Build once, then
+  // paint the destination with its own lighting, avatar and camera on frame one.
+  if(!await office.loadModels())throw Error('renderer');
+  office.prepareRoomGeometry();
  }else if(!await office.ready)throw Error('renderer');
  office.avatarNameplate = (ctx, options) => {
   const bounds = room === 'study' ? drawStudyNameplate(ctx, options) : drawAvatarNameplate(ctx, options);
@@ -353,7 +359,7 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
  };attachOfficeEnvironment(office,root);attachAvatarAppearance(office);office.campusIdentity={displayId:'나 · 미리보기',gender:'male',coat:'#386eb4',hairColor:'#302825',skinColor:'#e8b68b',pantsColor:'#36485d',model:0};
  configureGuidedLabels();office.campusHeightAt=(x,y)=>room==='live'?atriumHeightAt(x,y):0;atriumMeshType=CampusInstancedMesh;const arrivalRoom=room;if(directEntry&&!officeFirst)prepareRoom(arrivalRoom);else if(!officeFirst)for(const id of (guidedPreview?['welcome','live']:['study','library','live']))prepareRoom(id);if(guidedPreview){room=arrivalRoom;deskProfiles=[{employeeId:'demo-writer',seatIndex:introSeatIndex,name:'체험용 AI 직원'}];setGuidedDemoPhase(guidedDemoPhase);office.update([{key:'guided-demo-writer',employeeId:'demo-writer',name:'체험용 AI 직원',fullName:'체험용 AI 직원',project:'미리 준비한 예시',role:'체험 직원',agent:'present',status:'present',activity:null,title:guidedDemoTitle,appearanceSeed:210,seatIndex:introSeatIndex,startedAt:0,lastEventAt:0,subagent:false}]);}office.getCampusVisibleRoom=()=>room==='office'?'office':'study';office.drawCampusRoomLabels=()=>{};office.updateCampusVisibility=()=>{for(const [id,g]of office.campusRoomGroups)g.visible=id===room;for(const [id,g]of groups)g.visible=id===room;office.plan.observationWindows=[];};office.fitCamera3D=fit;office.pauseCampusInput=()=>{editing=true;keys.clear();target=null;view?.refresh();};office.resumeCampusInput=()=>{editing=false;view?.refresh();budget.wake(performance.now());};
  mixer=attachAmbientMixer(document.getElementById('ambient-host'));mixer.setRoom(room);environment=attachEnvironmentControls({office,root,isBlocked:()=>blocked,wake:()=>budget.wake(performance.now()),onOpenChange:open=>send('editor',{open})});
- view=attachTourView({office,root,fitMap:fit,wake:()=>budget.wake(performance.now()),onChange:mode=>send('camera',{mode}),isBlocked:()=>blocked||editing||document.hidden});
+ view=attachTourView({office,root,lunarCampus,fitMap:fit,wake:()=>budget.wake(performance.now()),onChange:mode=>send('camera',{mode}),isBlocked:()=>blocked||editing||document.hidden});
  editor=attachAppearanceEditor(office,(type,payload)=>{if(type==='appearance-cancel'){send('editor',{open:false});view.refresh();}if(type==='appearance-save')send(type,payload);});
  meetup=guidedPreview?null:((publicVisitor||devPresence)&&!new URLSearchParams(location.search).has('qaChat')?attachVisitorExperience:attachPreviewMeetup)({send,devPresence,qaCrowd,ambientCount,operatorReview,showStories:publicVisitor,office,root,CampusInstancedMesh,CampusSphereGeometry,getRoom:()=>room,getRole:()=>currentRole,wake:()=>budget.wake(performance.now())});
  const recordFrame=previewFrameMetrics(root,office.gl,new URLSearchParams(location.search).has('previewMeetup'));const drawScene=office.draw.bind(office);const paintScene=()=>{if(!ready||blocked||(editing&&!environment?.isOpen())||document.hidden)return;const frameStart=performance.now();studyNameplate=null;drawScene();meetup?.labels?.();root.dataset.playerX=office.campusAvatar?.x?.toFixed(2);recordFrame(frameStart,performance.now(),office.campusAvatar?.moving);root.dataset.playerY=office.campusAvatar?.y?.toFixed(2);root.dataset.playerHeight=String(office.campusAvatar?.jumpHeight||0);root.dataset.room=room;if(deskMarkers.length)positionCurrentDeskMarkers();positionRoomMarkers();};
@@ -375,7 +381,7 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
    const seat=seats.find(p=>!(office.studyCompanions||[]).some(other=>Math.hypot(p.x-other.x,p.y-other.y)<.55));
    if(seat){Object.assign(office.campusAvatar,seat,{yaw:Math.PI,studyPose:'sit',moving:false});}
  }
- if(entryFollow||officeIntro&&room==='office')view.set('third');configuringOffice=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
+ if(entryFollow||officeIntro&&room==='office')view.set('third');configuringRoom=false;ready=true;paintScene();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;
   // The renderer paints its own English failure text on the canvas; the host shows the Korean guidance instead.
   if(office?.loadError){office.loadError='';try{office.draw();}catch{}}
   status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
