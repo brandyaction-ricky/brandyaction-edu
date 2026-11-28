@@ -15,13 +15,14 @@ const html = `<!doctype html>
 <link rel="modulepreload" href="/campus/world/office/vendor/office3d.js">
 </head><body>
 <main aria-label="달 풍경 캠퍼스">
-<canvas id="walk-scene" tabindex="0" aria-label="목적지를 선택한 뒤 파란 선을 누르거나 위쪽 방향키로 걸어가세요."></canvas>
+<canvas id="walk-scene" tabindex="0" aria-label="이동할 공간을 고르세요. 걷는 동안 방향키로도 움직일 수 있어요."></canvas>
 <header><span class="wordmark">MOONSHOT</span><span class="divider"></span><span>캠퍼스</span></header>
 <section class="card" aria-label="캠퍼스 길 안내">
 <div class="panel-head"><h1 id="title">문샷 캠퍼스</h1><button id="watch" type="button"><span aria-hidden="true">▶</span> 라이브 보기</button></div>
 <fieldset id="destinations"><legend>이동할 공간</legend>
-<button type="button" data-room="study">공부방</button><button type="button" data-room="library">자료실</button><button type="button" data-room="office">내 AI 사무실</button></fieldset>
-<div class="actions"><p id="hint" role="status">갈 곳을 고르면 문 앞까지 파란 길이 이어져요.</p><button id="next" type="button" hidden>따라 걷기</button></div>
+<button type="button" data-room="study"><strong>공부방</strong><small>수업과 복습</small></button>
+<button type="button" data-room="office"><strong>내 AI 사무실</strong><small>AI 직원과 업무 관리</small></button></fieldset>
+<div class="actions"><p id="hint" role="status">갈 곳을 누르면 파란 길을 따라 걸어요.</p><button id="next" type="button" hidden>따라 걷기</button></div>
 <div class="track" hidden aria-hidden="true"><span></span></div>
 </section></main><script type="module" src="/campus/world/tour/study-walk.mjs"></script></body></html>`;
 

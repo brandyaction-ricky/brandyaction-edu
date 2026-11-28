@@ -279,3 +279,17 @@ p.loading{pointer-events:none}
 }
 
 .root[data-lunar-entry=true] .scene { background: #142335 url('/campus/world/assets/study-lunar-horizon.webp') center / cover; }
+
+.roomDock {pointer-events:auto;position:relative;display:flex;align-items:center;gap:4px;margin-left:auto;width:max-content;max-width:100%;padding:4px;border:1px solid #557079;border-radius:13px;background:#142a35f5;box-shadow:0 3px 14px #16253630;}
+.roomDock>button,.roomMore summary {display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 15px;border:0;border-radius:8px;background:transparent;color:#f7f4eb;font-size:14px;font-weight:650;white-space:nowrap;}
+.roomDock>button:first-child {background:#f8eedc;color:#293e42;}
+.roomDock>button:hover,.roomMore summary:hover {box-shadow:inset 0 0 0 1px #91a5ac;}
+.roomMore summary {cursor:pointer;list-style:none;color:#cbdadf;}
+.roomMore summary::-webkit-details-marker {display:none;}
+.roomMore summary:focus-visible {outline:3px solid #77b9ff;}
+.roomMore[open]>div {position:absolute;bottom:calc(100% + 6px);right:0;width:min(320px,calc(100vw - 28px));}
+.root .roomMore .bottomActions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:6px;background:#152935;border:1px solid #4f646e;border-radius:12px;}
+.root .roomMore .bottomActions button {min-height:44px;justify-content:center;white-space:normal;}
+.roomMapLinks {display:flex;gap:14px;margin-top:8px;}
+.roomMapLinks button {min-height:44px;color:#204861;background:transparent;border:0;text-decoration:underline;text-underline-offset:3px;}
+@media(max-width:650px){.roomDock{margin-inline:auto;}.roomDock>button,.roomMore summary{padding-inline:11px;font-size:13px;}}

@@ -118,6 +118,7 @@ export function finishCampusRoom(T,group,id,redraw) {
     a.box(f.oak,4.1,.33,.67,10.9,.60,.10);
     interiorView(T,group,'study',5.75,2.50,.68,5.9,2.72,redraw);
     a.box(f.oak,5.75,1.11,.77,6.04,.095,.28);
+    a.shelves(-.96,.16,.91,2.05,1.74,3);
     a.portal(1.45,.94,2.75,3.39,roomTrim.study,.25);
     for(const x of [-.80,9.05])a.box(f.lamp,x,2.8,.72,.065,2.25,.085);
   }else if(id==='library'){
@@ -138,6 +139,10 @@ export function finishCampusRoom(T,group,id,redraw) {
       a.box(roomTrim.office,x,2.02,9.74,.10,2.12,.15);
       a.box(f.lamp,x,3.11,9.76,.13,.055,.19);
     }
+    // Pin-up ledge and acoustic timber ribs continue the finish from the entrance.
+    for(let i=0;i<10;i++)a.box(f.timber,19.77+i*.22,1.72,9.66,.10,3.33,.16);
+    a.box(f.trim,22.36,3.33,9.72,5.30,.16,.30);
+    a.box(f.lamp,22.36,3.23,9.81,5.12,.032,.09);
     a.box(f.oak,23.82,1.02,9.79,2.14,.095,.24);
   }
   a.build();

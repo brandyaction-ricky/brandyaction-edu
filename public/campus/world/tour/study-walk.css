@@ -24,9 +24,13 @@ p { margin: 0; font-size: 13px; line-height: 1.55; color: #455765; word-break: k
 #next:disabled { background: #556773; cursor: wait; }
 [hidden] { display: none !important; }
 
-#destinations {display:grid;grid-template-columns:repeat(3,1fr);gap:6px;border:0;padding:0;margin:0 0 9px;}
+#destinations {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:0;padding:0;margin:0 0 9px;}
 #destinations legend {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
-#destinations button {min-height:44px;text-align:center;font-size:14px;font-weight:650;border:1px solid #c9cfcc;border-radius:7px;background:#fff;color:#243846;padding:5px;}
+#destinations button {position:relative;min-height:52px;text-align:left;border:1px solid #c9cfcc;border-radius:8px;background:#fff;color:#243846;padding:6px 18px 6px 12px;}
+#destinations strong,#destinations small {display:block;}
+#destinations strong {font-size:15px;line-height:1.4;}
+#destinations small {font-size:12px;line-height:1.5;color:#52616b;}
+#destinations button::after {content:'›';position:absolute;right:9px;top:50%;transform:translateY(-52%);font-size:21px;color:#52616b;}
 #destinations button[aria-pressed="true"] {color:#1d4396;background:#e9effd;border-color:#4162a8;}
 @media(max-width:600px) {
  header .divider, header .divider+span {display:none;}

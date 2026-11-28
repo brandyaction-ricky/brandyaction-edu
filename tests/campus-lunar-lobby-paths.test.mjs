@@ -22,7 +22,7 @@ test('changing the destination mid-walk starts at the current position and reach
 });
 
 test('each room exit is a walkable point with a route to the other doors', () => {
-  assert.deepEqual(Object.keys(doors).sort(), ['library','office','study']);
+  assert.deepEqual(Object.keys(doors).sort(), ['office','study']);
   for (const [source, door] of Object.entries(doors)) {
     for (const target of Object.keys(doors)) {
       const path = routeFrom(door, target);
@@ -41,10 +41,8 @@ test('the student path crosses the study threshold and reaches the chair; a visi
   assert.deepEqual([path.at(-1).x,path.at(-1).z],[studySeat.x,studySeat.z]);
   assert.deepEqual(walkRoute(entrance,'study',false).at(-1),routeFrom(entrance,'study').at(-1));
   const inRoom=pointAt(path,path.at(-1).length-.8);
-  for(const room of ['library','office']){
-    const redirected=walkRoute(inRoom,room,true);
-    const exit=redirected.findIndex(p=>p.x===doorway.x && p.z===doorway.z);
-    assert.ok(exit>0);
-    assert.deepEqual([redirected.at(-1).x,redirected.at(-1).z],[doors[room].x,doors[room].z]);
-  }
+  const redirected=walkRoute(inRoom,'office',true);
+  const exit=redirected.findIndex(p=>p.x===doorway.x && p.z===doorway.z);
+  assert.ok(exit>0);
+  assert.deepEqual([redirected.at(-1).x,redirected.at(-1).z],[doors.office.x,doors.office.z]);
 });

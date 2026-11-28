@@ -77,9 +77,9 @@ export function buildStudyWalkSet(T,scene,redraw) {
     box(trim,x,1.05,-6.87,.26,1.75,.30);
     for(const y of [.63,1.13,1.63])round(shadow,x,y,-6.68,.07,.10,.07);
   }
-  // The study opens from the navy identity wall; the archive is a separate gallery beyond the stage.
-  const study=doors.study,library=doors.library,office=doors.office;
-  const sf=study.z-.7,lf=library.z-.7,of=office.z-.7;
+  // The study opens from the navy identity wall; the office faces it across the concourse.
+  const study=doors.study,office=doors.office;
+  const sf=study.z-.7,of=office.z-.7;
   function alcove(x,z,w,d,h) {
     box(timber,x,h*.50,z-d,w,h,.14);
     box(oak,x,.055,z-d/2,w,.09,d);
@@ -243,28 +243,35 @@ export function buildStudyWalkSet(T,scene,redraw) {
   }
   box(oak,-11.44,4.45,-2.67,4.05,.19,1.35);
 
-  // The archive reads as an oak reading gallery with visible books, clear of the study wing.
-  alcove(library.x,lf,4.15,3.05,3.40);
-  interiorView(T,scene,'library',library.x,1.78,lf-2.92,3.99,3.02,redraw);
-  shelves(library.x-1.38,.19,lf-1.73,.80,1.73,1);
-  portal(library.x,lf+.08,3.94,3.25,roomTrim.library,.31);
-  box(wall,library.x,3.75,lf-.95,4.63,.68,2.58);
-  sign('자료실',library.x,3.73,lf+.36,2.28,.44,'#fff1d7');
-  box(lamp,library.x,3.42,lf+.28,4.06,.040,.08);
-  for(const side of [-1,1])for(let k=0;k<4;k++)box(oak,library.x+side*(1.86-k*.105),1.45,lf-.24,.050,2.84,.13);
-
-  // A glazed office wing takes the near right edge. Its long side gives the hall a third axis.
-  alcove(office.x,of,3.72,3.84,3.38);
-  interiorView(T,scene,'office',office.x,1.76,of-3.72,3.57,3.13,redraw);
-  desk(office.x,of-1.9,2.72);
-  box(trim,office.x,1.17,of-1.95,1.27,.65,.12);
-  box(0xacc8c8,office.x,1.18,of-1.875,1.13,.50,.025);
-  portal(office.x,of+.10,3.54,3.23,roomTrim.office,.32);
-  box(wall,office.x,3.76,of-1.42,4.17,.65,3.36);
-  sign('내 AI 사무실',office.x,3.76,of+.29,3.36,.43,'#fff1d7');
-  box(lamp,office.x,3.44,of+.19,3.73,.043,.09);
-  plant(office.x+1.48,of-.64,.76);
-  for(let i=0;i<7;i++)box(timber,office.x+2.17+i*.17,1.55,of-.07,.085,3.12,.23);
+  // A deep work bay faces the reading pavilion across the open sightline to the stage.
+  const ox=office.x, officeWidth=6.4, back=of-4.68;
+  alcove(ox,of,officeWidth,4.83,3.82);
+  interiorView(T,scene,'office',ox,2.08,back,officeWidth-.24,3.18,redraw);
+  box(wall,ox,4.02,of-2.12,officeWidth+.46,.52,5.06);
+  box(oak,ox,3.77,of-.10,officeWidth+.40,.08,1.10);
+  box(lamp,ox,3.71,of+.31,officeWidth-.18,.035,.06);
+  portal(ox,of-.38,3.54,3.38,0x30484e,.57);
+  portal(ox,of+.12,3.68,3.48,0x51746f,.27);
+  sign('내 AI 사무실',ox,4.02,of+.42,3.12,.40,'#fff1d7');
+  // Sidelights share one material, with a clear opening through the middle.
+  const glazing=new T.MeshBasicMaterial({color:0xaacbcc,transparent:true,opacity:.19,side:T.DoubleSide,depthWrite:false});
+  const paneGeometry=new T.PlaneGeometry(1.14,3.03);
+  for(const side of [-1,1]){
+    const x=ox+side*2.55;
+    const pane=new T.Mesh(paneGeometry,glazing);pane.position.set(x,1.88,of+.02);scene.add(pane);
+    box(trim,x,.34,of,1.21,.58,.16);
+    box(trim,x,1.47,of,1.21,.046,.08);
+    box(trim,x+side*.57,1.86,of,.065,3.2,.12);
+  }
+  desk(ox+.11,of-2.38,3.18);
+  for(const dx of [-.65,.69]){
+    box(trim,ox+dx,1.03,of-2.37,.065,.35,.08);
+    box(wall,ox+dx,1.39,of-2.40,1.27,.72,.096);
+    box(0xa2c7c0,ox+dx,1.39,of-2.341,1.15,.59,.025);
+    for(let row=0;row<3;row++)box(row===0?0x385763:0x6c9396,ox+dx-.17,1.54-row*.12,of-2.322,.62-row*.11,.029,.012);
+  }
+  for(let i=0;i<9;i++)box(timber,ox+2.88,1.96,back+.24+i*.35,.17,3.56,.085);
+  plant(ox-2.35,of-1.15,.93);
   // Narrow seats and downlights sit outside the travelling line.
   for(const x of [-.90,1.31]){box(oak,x,.46,-2.90,1.92,.12,.59);for(const dx of [-.7,.7])box(trim,x+dx,.23,-2.90,.09,.43,.40);}
   build();

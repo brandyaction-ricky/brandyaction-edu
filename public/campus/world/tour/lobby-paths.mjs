@@ -2,8 +2,7 @@
 const trunk = [[0,11], [0,9.4], [0,8.3]];
 export const doors = {
   study: {label:'공부방', x:-4.10, z:4.26, points:[[-1.80,7.55],[-4.10,5.54],[-4.10,4.26]]},
-  library: {label:'자료실', x:4.78, z:-1.46, points:[[2.66,6.92],[4.78,4.97],[4.78,-1.46]]},
-  office: {label:'내 AI 사무실', x:8.78, z:3.68, points:[[3.50,7.33],[8.78,5.8],[8.78,3.68]]},
+  office: {label:'내 AI 사무실', x:5.45, z:4.12, points:[[2.45,7.57],[5.45,5.62],[5.45,4.12]]},
 };
 function measure(pairs) {
   const path = [];

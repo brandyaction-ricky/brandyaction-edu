@@ -8,3 +8,6 @@
 .caption { font-size:14px; color:#455665; }
 .destinations { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0; }
 .destinations button { min-height:46px; padding:10px; font:inherit; font-weight:650; border:1px solid #cbd4d9; border-radius:8px; color:#223d51; background:white; cursor:pointer; }
+
+.utilities {display:flex;gap:16px;align-items:center;border-top:1px solid #d8dfdf;padding-top:4px;}
+.utilities button {min-height:44px;padding:0 4px;border:0;background:transparent;color:#294a5c;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}

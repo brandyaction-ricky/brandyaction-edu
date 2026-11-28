@@ -10,12 +10,14 @@ import {holdBack} from '../ui/back-close';
 import {useRouter} from 'next/navigation';
 import styles from './lunar-lobby.module.css';
 
-type Door = Exclude<LobbyRoom,'live'>;
-type Panel = 'stage' | 'map' | 'offer' | 'experience' | Door | null;
-const labels = {study:'공부방', office:'내 AI 사무실', library:'자료실',live:'라이브 무대'};
+type Door = 'study' | 'office';
+function isDoor(value: unknown): value is Door {return value==='study' || value==='office';}
+type Panel = 'stage' | 'map' | 'offer' | 'experience' | 'resources' | Door | null;
+const labels = {study:'공부방', office:'내 AI 사무실', resources:'자료·다시보기'};
 const CampusRooms=dynamic(()=>import('./preview').then(module=>module.FourSpacesPreview), {
   loading: () => <p role="status">공간을 열고 있어요.</p>,
 });
+const ResourceLibrary=dynamic(()=>import('../webinar/resource-library').then(module=>module.ResourceLibrary));
 const CampusWindow=dynamic(()=>import('../ui/campus-window').then(module=>module.CampusWindow));
 
 export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sample?:boolean}) {
@@ -31,20 +33,22 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
     const dest=requestedRoom(location.search);
     const visitor=initialVisitor.current;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read the incoming room after hydration
-    setEntry(isLobbyRoom(dest)&&dest!=='live'&&canEnter(role,dest)?dest:null);
+    setEntry(isDoor(dest)&&canEnter(role,dest)?dest:null);
     if(dest==='live'||(visitor&&!dest))setPanel('stage');
-    else if(isLobbyRoom(dest)&&dest!=='live'&&!canEnter(role,dest))setPanel(dest);
+    else if(dest==='library')setPanel('resources');
+    else if(isDoor(dest)&&!canEnter(role,dest))setPanel(dest);
     visitor?.onEnter();
   },[role]);
   function returnToCampus(room?:LobbyRoom, watch=false) {
     const url=new URL(location.href);
     if(watch)url.searchParams.set('room','live');else url.searchParams.delete('room');
     history.replaceState(history.state,'',url);
-    if(room && room!=='live')setFrom(room);
+    if(isDoor(room))setFrom(room);
     setPanel(watch?'stage':null);setEntry(null);
   }
   function enter(room:LobbyRoom,seated=false) {
     if(room==='live'){setPanel('stage');return;}
+    if(room==='library'){setPanel('resources');return;}
     if(!canEnter(role,room)){
       if(props.visitor?.operatorReview && props.visitor.operatorEvent){
         router.push('/campus/operator?'+new URLSearchParams({room,event:props.visitor.operatorEvent}));
@@ -73,12 +77,15 @@ export function LunarCampus(props: CampusTourProps & {program?:StageProgram; sam
   const lesson=props.live?campusSourceLesson(new URLSearchParams(location.search).get('fromLesson'),props.snapshot.selectedEnrollmentId):null;
   const exit=lesson?{href:lesson,label:'수업으로 돌아가기'}:props.live?{href:'/my/classes',label:'내 클래스로'}:{href:'/',label:'에듀 홈으로'};
   const program=props.program||props.live?.stageProgram;
-  const close=()=>{setPanel(null);if(requestedRoom(location.search)==='live')returnToCampus();};
+  const close=()=>{setPanel(null);if(['live','library'].includes(requestedRoom(location.search)||''))returnToCampus();};
   const titles={stage:program?.title||'라이브 무대',map:'공간 이동',offer:'문샷에서 배우는 것',experience:'고객 발견 체험',...labels};
   return <>
     <LunarLobby key={(from||'entry')+gateVisit} from={from} studyAccess={canEnter(role,'study')} avatar={props.live?.avatar} exit={exit} onEnter={enter} onMap={()=>setPanel('map')}/>
     {panel&&<CampusWindow backCloses open title={titles[panel]} context="문샷 캠퍼스" onClose={close}>
-      {panel==='map'?<div className={styles.destinations}>{(['study','office','library','live'] as const).map(id=><button key={id} onClick={()=>enter(id)}>{labels[id]}<span aria-hidden="true"> →</span></button>)}</div>:
+      {panel==='map'?<>
+        <div className={styles.destinations}>{(['study','office'] as const).map(id=><button key={id} onClick={()=>enter(id)}>{labels[id]} <span aria-hidden="true">→</span></button>)}</div>
+        <div className={styles.utilities}><button onClick={()=>setPanel('stage')}>라이브 보기</button><button onClick={()=>enter('library')}>자료·다시보기</button></div>
+       </>:panel==='resources'?(props.visitor?props.visitor.renderTool('library:all'):<ResourceLibrary heading="자료·다시보기" items={props.welcome?.resources||props.live?.libraryResources}/>):
        panel==='stage'?<>
         {program?.youtubeId?<iframe className={styles.player} src={'https://www.youtube-nocookie.com/embed/'+program.youtubeId+'?playsinline=1'} title={program.title} allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen/>:
          props.sample?<><video className={styles.player} controls playsInline preload="metadata" src="/campus/showcase/learning-knowledge-full-v2.mp4" aria-label="무대 시청 예시 영상"/><p className={styles.caption}>시청 예시 · 대화에서 배운 내용을 연결하는 AI 직원</p></>:

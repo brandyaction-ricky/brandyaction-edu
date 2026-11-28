@@ -40,7 +40,7 @@ function guide() {
   walk.hidden = !destination;
   track.hidden = !destination || seated || seating;
   hint.textContent = failed ? '3D 대신 선택한 공간으로 바로 들어갈 수 있어요.' :
-    !destination ? (returnDoor ? returnDoor.label+' 문 앞이에요. 다음 공간을 골라주세요.' : '갈 곳을 고르면 문 앞까지 파란 길이 이어져요.') :
+    !destination ? (returnDoor ? returnDoor.label+' 문 앞이에요. 다음 공간을 골라주세요.' : '갈 곳을 누르면 파란 길을 따라 걸어요.') :
     seated ? '내 자리에 앉았어요.' : seating ? '자리에 앉고 있어요.' :
     destination==='study' && studyAccess ? (moving?'붉은 아치를 지나 내 자리로 가고 있어요.':'파란 길이 공부방 안 내 자리까지 이어져요.') :
     moving ? '문에 도착하면 공간이 열려요.' : '파란 선을 누르거나 따라 걷기를 선택하세요.';
@@ -49,7 +49,7 @@ function choose(id) {
   if (sent || seated || seating || !doors[id]) return;
   if (id !== destination) {
     destination=id; path=walkRoute(position,id,studyAccess); length=path.at(-1).length; distance=0;
-    goal=null; keys.clear(); showLine(path); canvas.dataset.route=id;document.body.dataset.guiding='true';
+    goal=length; keys.clear(); showLine(path); canvas.dataset.route=id;document.body.dataset.guiding='true';
     document.body.style.setProperty('--progress','0');
     for (const button of picks) button.setAttribute('aria-pressed',String(button.dataset.room===id));
     title.textContent=doors[id].label+' 가는 길'; guide(); wake();
